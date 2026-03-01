@@ -85,6 +85,23 @@
       margin-bottom: 6px;
     }
 
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
     input[type="text"],
     input[type="password"],
     input[type="email"],
@@ -418,6 +435,21 @@
       color: var(--success);
     }
 
+    .view-toggle { display: flex; gap: 4px; }
+    .tasks-view-table { overflow-x: auto; }
+    .tasks-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .tasks-table th, .tasks-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; }
+    .tasks-table th { font-weight: 600; font-size: 13px; color: var(--text-muted); background: var(--bg-secondary); position: relative; }
+    .tasks-table th.no-resize .col-resize { display: none; }
+    .tasks-table .col-resize { position: absolute; top: 0; right: 0; width: 6px; height: 100%; cursor: col-resize; }
+    .tasks-table .col-resize:hover { background: var(--accent-light); }
+    .tasks-table td .btn { margin-right: 4px; }
+
+    .report-table th { position: relative; }
+    .report-table th .col-resize { position: absolute; top: 0; right: 0; width: 6px; height: 100%; cursor: col-resize; }
+    .report-table th .col-resize:hover { background: var(--accent-light); }
+    .report-table.resizable-table { table-layout: fixed; }
+
     /* Modal */
     .modal-overlay {
       position: fixed;
@@ -595,6 +627,32 @@
       background: var(--bg-secondary);
       color: var(--danger);
     }
+
+    /* Мобильный интерфейс — постановка задач с телефона */
+    @media (max-width: 640px) {
+      .header { padding: 0 12px; flex-wrap: wrap; height: auto; min-height: 56px; gap: 8px; }
+      .header-left { flex-wrap: wrap; }
+      .nav { order: 3; width: 100%; }
+      .nav a { padding: 10px 14px; font-size: 15px; }
+      .main { padding: 16px; }
+      .page-title { font-size: 20px; margin-bottom: 16px; }
+      .toolbar { flex-direction: column; align-items: stretch; gap: 12px; }
+      .filters { justify-content: center; }
+      .filter-btn { padding: 10px 14px; min-height: 44px; }
+      #newTaskBtn { min-height: 48px; font-size: 16px; }
+      .task-item { flex-wrap: wrap; gap: 8px; padding: 12px; }
+      .task-actions { width: 100%; justify-content: flex-end; }
+      .task-actions .btn { min-height: 44px; padding: 10px 16px; }
+      .modal { max-height: 85vh; margin: 16px; }
+      .modal-body { padding: 16px; }
+      .modal-footer .btn { min-height: 44px; flex: 1; }
+      .btn { min-height: 44px; }
+      .user-bar .name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+    }
+
+    @media (max-width: 380px) {
+      .login-card { padding: 24px; }
+    }
   </style>
 </head>
 <body>
@@ -602,13 +660,18 @@
   <div class="login-screen" id="loginScreen">
     <div class="login-card">
       <h1>TaskTime</h1>
-      <p>Логин = пароль. Допустимые: user1 … user10</p>
+      <p>Войдите по email и паролю. Можно ставить задачи с телефона.</p>
       <form id="loginForm">
         <div class="form-group">
-          <label for="loginInput">Логин</label>
-          <input type="text" id="loginInput" placeholder="user1" required autocomplete="username">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="alice@demo.com" required autocomplete="username">
         </div>
-        <button type="submit" class="btn btn-primary">Войти</button>
+        <div class="form-group">
+          <label for="loginPassword">Пароль</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <p id="loginError" class="login-error" style="display:none; color: var(--danger); font-size: 13px; margin-bottom: 12px;"></p>
+        <button type="submit" class="btn btn-primary" id="loginSubmit">Войти</button>
       </form>
     </div>
   </div>
@@ -629,7 +692,7 @@
       </div>
       <div class="user-bar">
         <span class="name" id="userName">—</span>
-        <button type="button" class="logout-btn" id="logoutBtn">Выйти</button>
+        <button type="button" class="logout-btn" id="logoutBtn" title="Выход и смена учётной записи">Выйти</button>
       </div>
     </header>
 
@@ -644,9 +707,29 @@
             <button type="button" class="filter-btn" data-filter="done">Готово</button>
             <button type="button" class="filter-btn" data-filter="mine">Мои</button>
           </div>
+          <div class="view-toggle">
+            <button type="button" class="filter-btn" data-view="list" id="viewListBtn">Список</button>
+            <button type="button" class="filter-btn" data-view="table" id="viewTableBtn">Таблица</button>
+          </div>
           <button type="button" class="btn btn-primary" id="newTaskBtn">Новая задача</button>
         </div>
-        <ul class="task-list" id="taskList"></ul>
+        <div id="tasksListWrap" class="tasks-view-list">
+          <ul class="task-list" id="taskList"></ul>
+        </div>
+        <div id="tasksTableWrap" class="tasks-view-table" style="display:none">
+          <table class="tasks-table resizable-table" id="tasksTable" data-storage-key="tasktime_table_tasks">
+            <thead>
+              <tr>
+                <th data-col="0"><span>Название</span><div class="col-resize" aria-hidden="true"></div></th>
+                <th data-col="1"><span>Статус</span><div class="col-resize" aria-hidden="true"></div></th>
+                <th data-col="2"><span>Исполнитель</span><div class="col-resize" aria-hidden="true"></div></th>
+                <th data-col="3"><span>Приоритет</span><div class="col-resize" aria-hidden="true"></div></th>
+                <th data-col="4" class="no-resize"><span>Действия</span></th>
+              </tr>
+            </thead>
+            <tbody id="tasksTableBody"></tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Report page -->
@@ -657,11 +740,11 @@
           <button type="button" class="report-tab" data-report="tasks">По задачам</button>
         </div>
         <div class="report-section active" id="reportByDays">
-          <table class="report-table">
+          <table class="report-table resizable-table" id="reportDaysTable" data-storage-key="tasktime_table_report_days">
             <thead>
               <tr>
-                <th>День</th>
-                <th style="text-align:right">Время</th>
+                <th data-col="0"><span>День</span><div class="col-resize" aria-hidden="true"></div></th>
+                <th data-col="1" style="text-align:right"><span>Время</span><div class="col-resize" aria-hidden="true"></div></th>
               </tr>
             </thead>
             <tbody id="reportDaysBody"></tbody>
@@ -669,11 +752,11 @@
           <div class="report-empty" id="reportDaysEmpty" style="display:none">Нет данных за выбранный период</div>
         </div>
         <div class="report-section" id="reportByTasks">
-          <table class="report-table">
+          <table class="report-table resizable-table" id="reportTasksTable" data-storage-key="tasktime_table_report_tasks">
             <thead>
               <tr>
-                <th>Задача</th>
-                <th style="text-align:right">Время</th>
+                <th data-col="0"><span>Задача</span><div class="col-resize" aria-hidden="true"></div></th>
+                <th data-col="1" style="text-align:right"><span>Время</span><div class="col-resize" aria-hidden="true"></div></th>
               </tr>
             </thead>
             <tbody id="reportTasksBody"></tbody>
@@ -701,10 +784,24 @@
             <label for="taskDesc">Описание (необязательно)</label>
             <textarea id="taskDesc" placeholder="Подробности..."></textarea>
           </div>
+          <div class="form-group">
+            <label for="taskAssignee">Исполнитель (необязательно)</label>
+            <select id="taskAssignee">
+              <option value="">— Не назначен —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="taskPriority">Приоритет</label>
+            <select id="taskPriority">
+              <option value="low">Низкий</option>
+              <option value="medium" selected>Средний</option>
+              <option value="high">Высокий</option>
+            </select>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="taskModalCancel">Отмена</button>
-          <button type="submit" class="btn btn-primary">Создать</button>
+          <button type="submit" class="btn btn-primary" id="taskSubmit">Создать</button>
         </div>
       </form>
     </div>
@@ -712,14 +809,16 @@
 
   <script>
     (function() {
-      const STORAGE_TASKS = 'tasktime_tasks';
-      const STORAGE_TIME_ENTRIES = 'tasktime_time_entries';
+      const API_BASE = '';
+      const STORAGE_TOKEN = 'tasktime_token';
       const STORAGE_USER = 'tasktime_user';
       const STORAGE_TIMER = 'tasktime_timer';
 
-      let tasks = JSON.parse(localStorage.getItem(STORAGE_TASKS) || '[]');
-      let timeEntries = JSON.parse(localStorage.getItem(STORAGE_TIME_ENTRIES) || '[]');
+      let token = localStorage.getItem(STORAGE_TOKEN);
       let currentUser = JSON.parse(localStorage.getItem(STORAGE_USER) || 'null');
+      let tasks = [];
+      let users = [];
+      let timeLogs = [];
       let currentFilter = 'all';
       let timerInterval = null;
       let timerStartedAt = null;
@@ -728,34 +827,27 @@
       const $ = (sel, el = document) => el.querySelector(sel);
       const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 
-      function saveTasks() {
-        localStorage.setItem(STORAGE_TASKS, JSON.stringify(tasks));
-      }
-
-      function saveTimeEntries() {
-        localStorage.setItem(STORAGE_TIME_ENTRIES, JSON.stringify(timeEntries));
-      }
-
-      function saveTimer() {
-        if (runningTaskId && timerStartedAt) {
-          localStorage.setItem(STORAGE_TIMER, JSON.stringify({ taskId: runningTaskId, startedAt: timerStartedAt }));
-        } else {
-          localStorage.removeItem(STORAGE_TIMER);
+      async function apiFetch(path, options = {}) {
+        const url = (API_BASE + path).replace(/\/\/+/g, '/');
+        const headers = { 'Content-Type': 'application/json', ...options.headers };
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        const res = await fetch(url, { ...options, headers });
+        if (res.status === 401) {
+          token = null;
+          currentUser = null;
+          localStorage.removeItem(STORAGE_TOKEN);
+          localStorage.removeItem(STORAGE_USER);
+          document.getElementById('loginScreen').classList.remove('hidden');
+          document.getElementById('app').classList.remove('visible');
+          return null;
         }
-      }
-
-      function loadTimer() {
-        const raw = localStorage.getItem(STORAGE_TIMER);
-        if (!raw) return;
+        const text = await res.text();
+        if (!text) return null;
         try {
-          const { taskId, startedAt } = JSON.parse(raw);
-          runningTaskId = taskId;
-          timerStartedAt = new Date(startedAt);
-          startTimerTicker();
-          updateHeaderTimer();
-          $('#headerTimer').classList.remove('hidden');
-          renderTasks();
-        } catch (_) {}
+          return JSON.parse(text);
+        } catch (_) {
+          return text;
+        }
       }
 
       function formatTime(ms) {
@@ -779,99 +871,203 @@
 
       function startTimerTicker() {
         if (timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-          updateHeaderTimer();
-        }, 1000);
+        timerInterval = setInterval(() => { updateHeaderTimer(); }, 1000);
       }
 
       function updateHeaderTimer() {
         const el = $('#headerTimerLabel');
-        if (!el) return;
-        el.textContent = formatTime(getTimerElapsed());
+        if (el) el.textContent = formatTime(getTimerElapsed());
       }
 
-      function stopTimer() {
-        if (!runningTaskId || !timerStartedAt) return;
-        const startedAt = new Date(timerStartedAt);
-        timeEntries.push({
-          taskId: runningTaskId,
-          userId: currentUser?.id,
-          startedAt: startedAt.toISOString(),
-          endedAt: new Date().toISOString(),
-          durationMs: Date.now() - startedAt.getTime()
-        });
-        saveTimeEntries();
+      function saveTimer() {
+        if (runningTaskId && timerStartedAt) {
+          localStorage.setItem(STORAGE_TIMER, JSON.stringify({ taskId: runningTaskId, startedAt: timerStartedAt }));
+        } else {
+          localStorage.removeItem(STORAGE_TIMER);
+        }
+      }
+
+      async function stopTimer() {
+        if (!runningTaskId) return;
+        await apiFetch('/api/tasks/' + runningTaskId + '/time/stop', { method: 'POST' });
         clearInterval(timerInterval);
         timerInterval = null;
         runningTaskId = null;
         timerStartedAt = null;
         saveTimer();
         $('#headerTimer').classList.add('hidden');
-        renderTasks();
+        await loadTasks();
+        await loadTimeLogs();
         if ($('#pageReport').classList.contains('active')) renderReport();
       }
 
-      const VALID_LOGINS = ['user1','user2','user3','user4','user5','user6','user7','user8','user9','user10'];
-
-      function login(loginName) {
-        const name = (loginName || '').trim().toLowerCase();
-        if (!VALID_LOGINS.includes(name)) {
-          alert('Допустимые логины: user1 … user10. Логин = пароль.');
-          return;
-        }
-        currentUser = { id: name, name };
-        localStorage.setItem(STORAGE_USER, JSON.stringify(currentUser));
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('app').classList.add('visible');
-        $('#userName').textContent = currentUser.name;
-        loadTimer();
+      async function loadTasks() {
+        const list = await apiFetch('/api/tasks');
+        if (Array.isArray(list)) tasks = list;
         renderTasks();
-        renderReport();
       }
 
-      function logout() {
-        if (timerInterval) {
-          stopTimer();
-        }
-        currentUser = null;
-        localStorage.removeItem(STORAGE_USER);
-        document.getElementById('loginScreen').classList.remove('hidden');
-        document.getElementById('app').classList.remove('visible');
+      async function loadUsers() {
+        const list = await apiFetch('/api/users');
+        if (Array.isArray(list)) users = list;
+        const sel = $('#taskAssignee');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">— Не назначен —</option>' +
+          users.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join('');
       }
 
-      document.getElementById('loginForm').addEventListener('submit', function(e) {
+      async function loadTimeLogs() {
+        const list = await apiFetch('/api/time-logs');
+        if (Array.isArray(list)) timeLogs = list;
+      }
+
+      document.getElementById('loginForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        const value = $('#loginInput').value.trim().toLowerCase();
-        login(value);
+        const email = $('#loginEmail').value.trim();
+        const password = $('#loginPassword').value;
+        const errEl = $('#loginError');
+        const btn = $('#loginSubmit');
+        errEl.style.display = 'none';
+        btn.disabled = true;
+        const data = await fetch(API_BASE + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        }).then(r => r.json()).catch(() => ({}));
+        if (data.token && data.user) {
+          token = data.token;
+          currentUser = data.user;
+          localStorage.setItem(STORAGE_TOKEN, token);
+          localStorage.setItem(STORAGE_USER, JSON.stringify(currentUser));
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('app').classList.add('visible');
+          $('#userName').textContent = currentUser.name || currentUser.email;
+          await loadUsers();
+          await loadTasks();
+          await loadTimeLogs();
+          renderReport();
+          const raw = localStorage.getItem(STORAGE_TIMER);
+          if (raw) try {
+            const { taskId, startedAt } = JSON.parse(raw);
+            runningTaskId = String(taskId);
+            timerStartedAt = new Date(startedAt);
+            startTimerTicker();
+            updateHeaderTimer();
+            $('#headerTimer').classList.remove('hidden');
+            renderTasks();
+          } catch (_) {}
+        } else {
+          errEl.textContent = data.error || 'Ошибка входа';
+          errEl.style.display = 'block';
+        }
+        btn.disabled = false;
       });
 
-      document.getElementById('logoutBtn').addEventListener('click', logout);
+      document.getElementById('logoutBtn').addEventListener('click', function() {
+        if (timerInterval) clearInterval(timerInterval);
+        token = null;
+        currentUser = null;
+        localStorage.removeItem(STORAGE_TOKEN);
+        localStorage.removeItem(STORAGE_USER);
+        localStorage.removeItem(STORAGE_TIMER);
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('app').classList.remove('visible');
+      });
 
       function getFilteredTasks() {
         let list = tasks;
         if (currentFilter === 'in_progress') list = list.filter(t => t.status === 'in_progress');
         else if (currentFilter === 'done') list = list.filter(t => t.status === 'done');
-        else if (currentFilter === 'mine') list = list.filter(t => t.assigneeId === currentUser?.id);
+        else if (currentFilter === 'mine') list = list.filter(t => t.assignee_id === currentUser?.id);
         return list;
       }
 
       function statusLabel(s) {
-        return { todo: 'К выполнению', in_progress: 'В работе', done: 'Готово' }[s] || s;
+        return { open: 'К выполнению', in_progress: 'В работе', done: 'Готово' }[s] || s || 'К выполнению';
       }
 
+      function escapeHtml(s) {
+        if (s == null) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+
+      let taskViewMode = localStorage.getItem('tasktime_view_mode') || 'list';
+
       function renderTasks() {
-        const list = $('#taskList');
         const filtered = getFilteredTasks();
+        if (taskViewMode === 'table') {
+          $('#tasksListWrap').style.display = 'none';
+          $('#tasksTableWrap').style.display = 'block';
+          const tbody = $('#tasksTableBody');
+          tbody.innerHTML = filtered.map(task => {
+            const id = task.id;
+            const isRunning = String(id) === String(runningTaskId);
+            const isDone = task.status === 'done';
+            const statusCls = task.status === 'in_progress' ? 'in_progress' : task.status === 'done' ? 'done' : 'todo';
+            const assigneeText = task.assignee_name ? escapeHtml(task.assignee_name) : '—';
+            const priorityLabel = { low: 'Низкий', medium: 'Средний', high: 'Высокий' }[task.priority] || task.priority;
+            return `
+              <tr class="task-row ${isDone ? 'done' : ''} ${isRunning ? 'running' : ''}" data-id="${id}">
+                <td><span class="task-title">${escapeHtml(task.title)}</span></td>
+                <td><span class="task-status ${statusCls}">${statusLabel(task.status)}</span></td>
+                <td>${assigneeText}</td>
+                <td>${priorityLabel}</td>
+                <td class="task-actions-cell">
+                  ${!isDone && !isRunning ? `<button type="button" class="btn btn-primary btn-sm" data-action="start">Старт</button>` : ''}
+                  ${isRunning ? `<button type="button" class="btn btn-danger btn-sm" data-action="stop">Стоп</button>` : ''}
+                  <button type="button" class="btn btn-ghost btn-sm" data-action="toggle">${isDone ? 'Открыть' : 'Готово'}</button>
+                </td>
+              </tr>`;
+          }).join('') || '<tr><td colspan="5" class="report-empty">Нет задач</td></tr>';
+          tbody.querySelectorAll('[data-action]').forEach(el => {
+            el.addEventListener('click', async function() {
+              const row = this.closest('.task-row');
+              if (!row || !row.dataset.id) return;
+              const id = row.dataset.id;
+              const action = this.dataset.action;
+              const t = tasks.find(x => String(x.id) === id);
+              if (!t) return;
+              if (action === 'toggle') {
+                const newStatus = t.status === 'done' ? 'open' : 'done';
+                await apiFetch('/api/tasks/' + id, { method: 'PUT', body: JSON.stringify({ status: newStatus, assignee_id: t.assignee_id ?? null }) });
+                if (newStatus === 'done' && runningTaskId === id) await stopTimer();
+                await loadTasks();
+              } else if (action === 'start') {
+                if (runningTaskId) await stopTimer();
+                const res = await apiFetch('/api/tasks/' + id + '/time/start', { method: 'POST' });
+                if (res && res.id) {
+                  runningTaskId = id;
+                  timerStartedAt = new Date(res.started_at || Date.now());
+                  saveTimer();
+                  startTimerTicker();
+                  $('#headerTimer').classList.remove('hidden');
+                  await apiFetch('/api/tasks/' + id, { method: 'PUT', body: JSON.stringify({ status: 'in_progress' }) });
+                  await loadTasks();
+                }
+              } else if (action === 'stop') {
+                await stopTimer();
+              }
+            });
+          });
+          return;
+        }
+        $('#tasksTableWrap').style.display = 'none';
+        $('#tasksListWrap').style.display = 'block';
+        const list = $('#taskList');
         list.innerHTML = filtered.map(task => {
-          const isRunning = task.id === runningTaskId;
+          const id = task.id;
+          const isRunning = String(id) === String(runningTaskId);
           const isDone = task.status === 'done';
           const statusCls = task.status === 'in_progress' ? 'in_progress' : task.status === 'done' ? 'done' : 'todo';
+          const assigneeText = task.assignee_name ? ' · ' + escapeHtml(task.assignee_name) : '';
           return `
-            <li class="task-item ${isDone ? 'done' : ''} ${isRunning ? 'running' : ''}" data-id="${task.id}">
+            <li class="task-item ${isDone ? 'done' : ''} ${isRunning ? 'running' : ''}" data-id="${id}">
               <div class="task-checkbox" data-action="toggle" aria-label="Отметить выполненной"></div>
               <div class="task-body">
                 <div class="task-title">${escapeHtml(task.title)}</div>
-                <div class="task-meta">${statusLabel(task.status)}${task.assigneeId ? ' · Назначено вам' : ''}</div>
+                <div class="task-meta">${statusLabel(task.status)}${assigneeText}</div>
               </div>
               <div class="task-actions">
                 <span class="task-status ${statusCls}">${statusLabel(task.status)}</span>
@@ -883,51 +1079,93 @@
         }).join('') || '<li class="report-empty">Нет задач</li>';
 
         list.querySelectorAll('[data-action]').forEach(el => {
-          el.addEventListener('click', function() {
+          el.addEventListener('click', async function() {
             const item = this.closest('.task-item');
             if (!item || !item.dataset.id) return;
             const id = item.dataset.id;
             const action = this.dataset.action;
             if (action === 'toggle') {
-              const t = tasks.find(x => x.id === id);
-              if (t) {
-                t.status = t.status === 'done' ? 'todo' : 'done';
-                if (t.status === 'done' && runningTaskId === id) stopTimer();
-                saveTasks();
-                renderTasks();
-              }
+              const t = tasks.find(x => String(x.id) === id);
+              if (!t) return;
+              const newStatus = t.status === 'done' ? 'open' : 'done';
+              await apiFetch('/api/tasks/' + id, { method: 'PUT', body: JSON.stringify({ status: newStatus, assignee_id: t.assignee_id ?? null }) });
+              if (newStatus === 'done' && runningTaskId === id) await stopTimer();
+              await loadTasks();
             } else if (action === 'start') {
-              if (runningTaskId) stopTimer();
-              runningTaskId = id;
-              const t = tasks.find(x => x.id === id);
-              if (t) t.status = 'in_progress';
-              timerStartedAt = new Date();
-              saveTasks();
-              saveTimer();
-              startTimerTicker();
-              $('#headerTimer').classList.remove('hidden');
-              renderTasks();
+              if (runningTaskId) await stopTimer();
+              const res = await apiFetch('/api/tasks/' + id + '/time/start', { method: 'POST' });
+              if (res && res.id) {
+                runningTaskId = id;
+                timerStartedAt = new Date(res.started_at || Date.now());
+                saveTimer();
+                startTimerTicker();
+                $('#headerTimer').classList.remove('hidden');
+                await apiFetch('/api/tasks/' + id, { method: 'PUT', body: JSON.stringify({ status: 'in_progress' }) });
+                await loadTasks();
+              }
             } else if (action === 'stop') {
-              stopTimer();
+              await stopTimer();
             }
           });
         });
       }
 
-      function escapeHtml(s) {
-        const div = document.createElement('div');
-        div.textContent = s;
-        return div.innerHTML;
-      }
-
       $$('.filter-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-          $$('.filter-btn').forEach(b => b.classList.remove('active'));
+          if (this.dataset.view) {
+            taskViewMode = this.dataset.view;
+            localStorage.setItem('tasktime_view_mode', taskViewMode);
+            $$('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === taskViewMode));
+            renderTasks();
+            return;
+          }
+          $$('.filter-btn').forEach(b => { if (!b.dataset.view) b.classList.remove('active'); });
           this.classList.add('active');
           currentFilter = this.dataset.filter;
           renderTasks();
         });
       });
+
+      function initResizableTables() {
+        document.querySelectorAll('.resizable-table').forEach(table => {
+          const key = table.dataset.storageKey;
+          if (!key) return;
+          const saved = (function() { try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) { return {}; } })();
+          const ths = table.querySelectorAll('thead th[data-col]');
+          ths.forEach(th => {
+            const col = th.dataset.col;
+            if (saved[col] != null) th.style.width = saved[col] + 'px';
+          });
+          table.querySelectorAll('thead th .col-resize').forEach(resizer => {
+            const th = resizer.closest('th');
+            if (!th || th.classList.contains('no-resize')) return;
+            const tableEl = th.closest('table');
+            const key = tableEl.dataset.storageKey;
+            let startX = 0, startW = 0;
+            resizer.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              startX = e.pageX;
+              startW = th.offsetWidth;
+              const onMove = function(e2) {
+                const dw = e2.pageX - startX;
+                const newW = Math.max(40, startW + dw);
+                th.style.width = newW + 'px';
+              };
+              const onUp = function() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                const widths = {};
+                tableEl.querySelectorAll('thead th[data-col]').forEach(c => { widths[c.dataset.col] = c.offsetWidth; });
+                try { localStorage.setItem(key, JSON.stringify(widths)); } catch (_) {}
+              };
+              document.addEventListener('mousemove', onMove);
+              document.addEventListener('mouseup', onUp);
+            });
+          });
+        });
+      }
+      initResizableTables();
+      document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === taskViewMode));
 
       const taskModal = $('#taskModal');
       const taskForm = document.getElementById('taskForm');
@@ -936,6 +1174,8 @@
         taskModal.classList.add('visible');
         $('#taskTitle').value = '';
         $('#taskDesc').value = '';
+        $('#taskAssignee').value = '';
+        $('#taskPriority').value = 'medium';
         $('#taskTitle').focus();
       }
 
@@ -946,26 +1186,33 @@
       document.getElementById('newTaskBtn').addEventListener('click', openTaskModal);
       document.getElementById('taskModalClose').addEventListener('click', closeTaskModal);
       document.getElementById('taskModalCancel').addEventListener('click', closeTaskModal);
-      taskModal.addEventListener('click', function(e) {
-        if (e.target === taskModal) closeTaskModal();
-      });
+      taskModal.addEventListener('click', function(e) { if (e.target === taskModal) closeTaskModal(); });
 
-      taskForm.addEventListener('submit', function(e) {
+      taskForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         const title = $('#taskTitle').value.trim();
         if (!title) return;
-        const task = {
-          id: 't' + Date.now(),
-          title,
-          description: $('#taskDesc').value.trim(),
-          status: 'todo',
-          assigneeId: currentUser?.id || null,
-          createdAt: new Date().toISOString()
-        };
-        tasks.push(task);
-        saveTasks();
-        closeTaskModal();
-        renderTasks();
+        const assigneeVal = $('#taskAssignee').value;
+        const assignee_id = assigneeVal ? parseInt(assigneeVal, 10) : null;
+        const btn = $('#taskSubmit');
+        btn.disabled = true;
+        const created = await apiFetch('/api/tasks', {
+          method: 'POST',
+          body: JSON.stringify({
+            title,
+            description: $('#taskDesc').value.trim() || undefined,
+            assignee_id: assignee_id || undefined,
+            priority: $('#taskPriority').value || 'medium',
+            status: 'open'
+          })
+        });
+        btn.disabled = false;
+        if (created && created.id) {
+          closeTaskModal();
+          await loadTasks();
+        } else {
+          alert(created && created.error ? created.error : 'Не удалось создать задачу');
+        }
       });
 
       $$('.nav-link').forEach(link => {
@@ -985,10 +1232,14 @@
       function renderReport() {
         const byDay = {};
         const byTask = {};
-        timeEntries.forEach(entry => {
-          const day = entry.startedAt.slice(0, 10);
-          byDay[day] = (byDay[day] || 0) + entry.durationMs;
-          byTask[entry.taskId] = (byTask[entry.taskId] || 0) + entry.durationMs;
+        timeLogs.forEach(entry => {
+          const started = entry.started_at || entry.startedAt;
+          const day = (started || '').slice(0, 10);
+          const dur = (entry.duration_minutes != null ? entry.duration_minutes * 60000 : 0) ||
+            (entry.ended_at && started ? new Date(entry.ended_at) - new Date(started) : 0);
+          if (day) byDay[day] = (byDay[day] || 0) + dur;
+          const tid = entry.task_id || entry.taskId;
+          if (tid) byTask[tid] = (byTask[tid] || 0) + dur;
         });
 
         const daysBody = $('#reportDaysBody');
@@ -1016,15 +1267,29 @@
         } else {
           tasksEmpty.style.display = 'none';
           tasksBody.innerHTML = taskIds.map(taskId => {
-            const task = tasks.find(t => t.id === taskId);
-            const title = task ? task.title : 'Удалённая задача';
+            const task = tasks.find(t => String(t.id) === String(taskId));
+            const title = task ? task.title : (timeLogs.find(l => String(l.task_id || l.taskId) === String(taskId))?.task_title) || 'Задача';
             return `<tr><td>${escapeHtml(title)}</td><td class="time-cell" style="text-align:right">${formatDuration(byTask[taskId])}</td></tr>`;
           }).join('');
         }
       }
 
-      if (currentUser && VALID_LOGINS.includes((currentUser.name || '').toLowerCase())) {
-        login(currentUser.name);
+      if (token && currentUser) {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('app').classList.add('visible');
+        $('#userName').textContent = currentUser.name || currentUser.email;
+        loadUsers().then(() => {}).catch(() => {});
+        loadTasks().then(() => {}).catch(() => {});
+        loadTimeLogs().then(() => { renderReport(); }).catch(() => {});
+        const raw = localStorage.getItem(STORAGE_TIMER);
+        if (raw) try {
+          const { taskId, startedAt } = JSON.parse(raw);
+          runningTaskId = String(taskId);
+          timerStartedAt = new Date(startedAt);
+          startTimerTicker();
+          updateHeaderTimer();
+          $('#headerTimer').classList.remove('hidden');
+        } catch (_) {}
       }
     })();
   </script>

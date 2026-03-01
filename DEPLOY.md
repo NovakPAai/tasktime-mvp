@@ -68,6 +68,7 @@ sudo systemctl daemon-reload
 
 ```bash
 sudo -u tasktime bash -c 'cd /home/tasktime/app/backend && npm install'
+# При обновлении: применять schema.sql для новых таблиц (например audit_log). Миграции: см. docs/ADMIN_GUIDE.md.
 sudo cat /home/tasktime/app/backend/schema.sql | sudo -u postgres psql -d tasktime
 sudo -u tasktime /home/tasktime/init-db.sh
 sudo systemctl start tasktime
@@ -75,6 +76,8 @@ sudo systemctl status tasktime
 ```
 
 Проверка в браузере: `http://IP_СЕРВЕРА`
+
+**Рекомендация:** в проде отдавайте приложение только через HTTPS (обратный прокси с TLS). См. раздел «HTTPS и безопасность» ниже.
 
 ---
 
@@ -105,3 +108,31 @@ sudo systemctl restart tasktime
 | Лог приложения        | `sudo journalctl -u tasktime -f` |
 | Статус сервиса        | `sudo systemctl status tasktime` |
 | Перезапуск приложения | `sudo systemctl restart tasktime` |
+
+---
+
+## Резервное копирование (ТЗ п. 9.7)
+
+Регулярно создавайте резервные копии БД и при необходимости восстанавливайте из них:
+
+```bash
+# Создание дампа (пример: в /backup)
+sudo -u postgres pg_dump -Fc tasktime > /backup/tasktime_$(date +%Y%m%d).dump
+
+# Восстановление (осторожно: перезаписывает БД)
+sudo -u postgres pg_restore -d tasktime --clean --if-exists /backup/tasktime_YYYYMMDD.dump
+```
+
+Рекомендуется автоматизировать резервное копирование (cron) и хранить копии в безопасном месте. Подробнее: [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md).
+
+---
+
+## HTTPS и безопасность (ТЗ п. 9.4, TLS)
+
+Доступ к системе из внешней и внутренней сети должен осуществляться по **HTTPS** (целостность и безопасность данных при передаче). Рекомендуется:
+
+1. Установить перед приложением обратный прокси (nginx, Caddy и т.п.) с TLS 1.2 и выше.
+2. Настроить сертификат (например Let's Encrypt) и перенаправление HTTP → HTTPS.
+3. Не передавать секреты (JWT_SECRET, пароли БД) по незашифрованным каналам.
+
+Детали настройки прокси и сертификатов зависят от вашей инфраструктуры. См. также [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md).
