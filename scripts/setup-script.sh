@@ -129,13 +129,66 @@ ufw --force enable
 # 12. Установка Certbot для SSL (опционально)
 apt-get install -y certbot python3-certbot-nginx
 
-# 13. Создание скрипта для первого деплоя
+# 13. Sudoers: деплой без пароля для systemctl restart/status
+cat > /etc/sudoers.d/tasktime-deploy << 'EOF'
+tasktime ALL=(ALL) NOPASSWD: /bin/systemctl restart tasktime, /bin/systemctl status tasktime
+EOF
+chmod 440 /etc/sudoers.d/tasktime-deploy
+
+# 13b. Скрипт деплоя (с логами и rollback; также используется GitHub Actions)
 cat > /home/tasktime/deploy.sh << 'EOF'
 #!/bin/bash
-cd /home/tasktime/app
-git pull origin main 2>/dev/null || echo "Repository not cloned yet"
-npm install
-systemctl restart tasktime
+set -e
+
+APP_DIR="/home/tasktime/app"
+LOG_FILE="/var/log/tasktime-deploy.log"
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+
+log() {
+  echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE"
+}
+
+log "=== Deploy started ==="
+
+cd "$APP_DIR"
+
+OLD_COMMIT=$(git rev-parse HEAD)
+
+git fetch origin main
+NEW_COMMIT=$(git rev-parse origin/main)
+
+if [ "$OLD_COMMIT" = "$NEW_COMMIT" ]; then
+  log "No new commits. Deploy skipped."
+  exit 0
+fi
+
+log "Updating: $OLD_COMMIT -> $NEW_COMMIT"
+git pull origin main
+
+log "Running npm install..."
+cd "$APP_DIR/backend"
+npm install --omit=dev --no-audit --prefer-offline 2>&1 | tee -a "$LOG_FILE"
+
+log "Restarting tasktime service..."
+sudo systemctl restart tasktime
+
+sleep 3
+if systemctl is-active --quiet tasktime; then
+  log "Service is running. Deploy completed successfully."
+else
+  log "ERROR: Service failed. Rolling back to $OLD_COMMIT..."
+  git -C "$APP_DIR" reset --hard "$OLD_COMMIT"
+  cd "$APP_DIR/backend"
+  npm install --omit=dev --no-audit --prefer-offline 2>&1 | tee -a "$LOG_FILE"
+  sudo systemctl restart tasktime
+  sleep 3
+  if systemctl is-active --quiet tasktime; then
+    log "Rollback successful."
+  else
+    log "CRITICAL: Rollback also failed. Manual intervention required."
+  fi
+  exit 1
+fi
 EOF
 
 chmod +x /home/tasktime/deploy.sh

@@ -83,18 +83,63 @@ sudo systemctl status tasktime
 
 ## 3. Деплой обновлений
 
-На сервере (под пользователем `tasktime` или через root):
+### Автоматически (GitHub Actions — рекомендуется)
+
+Push в ветку `main` → GitHub Actions автоматически подключается к серверу по SSH и запускает деплой. Ручного вмешательства не требуется.
+
+**Настройка (один раз):**
+
+**Шаг 1.** Сгенерируйте SSH-ключ для деплоя (на своём Mac):
 
 ```bash
-sudo -u tasktime /home/tasktime/deploy.sh
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/tasktime_deploy -N ""
+cat ~/.ssh/tasktime_deploy.pub   # публичный ключ — добавить на сервер
+cat ~/.ssh/tasktime_deploy       # приватный ключ — добавить в GitHub Secrets
 ```
 
-Либо вручную:
+**Шаг 2.** Добавьте публичный ключ на сервер:
+
+```bash
+ssh root@IP_СЕРВЕРА
+sudo -u tasktime bash -c 'mkdir -p ~/.ssh && chmod 700 ~/.ssh'
+# вставьте содержимое tasktime_deploy.pub:
+sudo -u tasktime bash -c 'echo "ПУБЛИЧНЫЙ_КЛЮЧ" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+```
+
+**Шаг 3.** Добавьте sudoers-правило (если сервер поднят старым `setup-script.sh` без этого правила):
+
+```bash
+echo "tasktime ALL=(ALL) NOPASSWD: /bin/systemctl restart tasktime, /bin/systemctl status tasktime" \
+  | sudo tee /etc/sudoers.d/tasktime-deploy
+sudo chmod 440 /etc/sudoers.d/tasktime-deploy
+```
+
+**Шаг 4.** Добавьте секреты в GitHub репозиторий (`Settings → Secrets and variables → Actions`):
+
+| Secret name | Значение |
+|---|---|
+| `DEPLOY_HOST` | IP-адрес сервера |
+| `DEPLOY_SSH_KEY` | содержимое `~/.ssh/tasktime_deploy` (приватный ключ) |
+
+Всё. Теперь каждый `git push origin main` автоматически деплоит приложение.  
+Логи деплоя: в GitHub Actions (вкладка `Actions` в репозитории) и на сервере в `/var/log/tasktime-deploy.log`.
+
+---
+
+### Вручную
+
+На сервере:
+
+```bash
+sudo -u tasktime bash /home/tasktime/deploy.sh
+```
+
+Либо пошагово:
 
 ```bash
 cd /home/tasktime/app
 sudo -u tasktime git pull origin main
-sudo -u tasktime bash -c 'cd /home/tasktime/app/backend && npm install'
+sudo -u tasktime bash -c 'cd /home/tasktime/app/backend && npm install --omit=dev'
 sudo systemctl restart tasktime
 ```
 
