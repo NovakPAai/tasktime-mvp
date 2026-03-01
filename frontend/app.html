@@ -1526,8 +1526,9 @@
       document.getElementById('cioLogoutBtn').addEventListener('click', handleLogout);
 
       // ——— Init on load ———
-      // Сервер уже проверил JWT-куку перед отдачей этой страницы.
-      // Если localStorage пуст (куки ещё валидны), запрашиваем /api/auth/me.
+      // Проверяем авторизацию на клиенте: localStorage → /api/auth/me → редирект.
+      // Если ни токена, ни валидной куки нет — редиректим на /?blocked=1 (пасхалка),
+      // чтобы показать: прямой заход на /app без авторизации запрещён.
       (async function initApp() {
         if (currentUser) {
           showApp();
@@ -1538,10 +1539,10 @@
               currentUser = await r.json();
               showApp();
             } else {
-              window.location.href = '/';
+              window.location.href = '/?blocked=1';
             }
           } catch (_) {
-            window.location.href = '/';
+            window.location.href = '/?blocked=1';
           }
         }
       })();

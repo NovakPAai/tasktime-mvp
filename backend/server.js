@@ -941,17 +941,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 
-// ——— Защищённое приложение — только с валидным JWT в куке ———
+// ——— Защищённое приложение ———
+// Отдаём HTML без server-side cookie-gate: браузеры (особенно Safari/ITP)
+// не всегда включают куку, установленную через fetch(), в навигационный запрос.
+// Реальная защита — client-side: app.html проверяет localStorage → /api/auth/me → redirect /.
+// Пасхалка на /index.html (?blocked=1) остаётся — она срабатывает только при прямом
+// переходе на / с параметром blocked=1, который выставляется самим клиентом при 401.
 app.get('/app', (req, res) => {
-  const token = req.cookies && req.cookies[COOKIE_NAME];
-  if (!token) return res.redirect('/?blocked=1');
-  try {
-    jwt.verify(token, JWT_SECRET);
-    res.sendFile(path.join(__dirname, '..', 'frontend', 'app.html'));
-  } catch (_) {
-    res.clearCookie(COOKIE_NAME, { path: '/' });
-    res.redirect('/?blocked=1');
-  }
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'app.html'));
 });
 
 // ——— Статика frontend (только разрешённые файлы) ———
