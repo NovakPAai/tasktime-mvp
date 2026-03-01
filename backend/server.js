@@ -3,6 +3,7 @@ const path = require('path');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const { query, getClient } = require('./db');
 const { audit } = require('./audit');
 
@@ -11,8 +12,17 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const PIXEL_OFFICE_WEBHOOK_URL = process.env.PIXEL_OFFICE_WEBHOOK_URL || '';
+const COOKIE_NAME = 'tasktime_token';
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: 'Strict',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: '/',
+};
 
 app.use(express.json());
+app.use(cookieParser());
 
 // ——— Task permission (ТЗ п. 9.4, ТР.1: CRUD по объекту) ———
 // admin: full; manager: full; user: only if creator or assignee
@@ -29,10 +39,13 @@ function canDeleteTask(task, user) {
   return task.creator_id === user.id || task.assignee_id === user.id;
 }
 
-// ——— JWT middleware ———
+// ——— JWT middleware — принимает Bearer-заголовок ИЛИ HttpOnly-куку ———
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const token =
+    (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null) ||
+    (req.cookies && req.cookies[COOKIE_NAME]) ||
+    null;
   if (!token) {
     return res.status(401).json({ error: 'Token required' });
   }
@@ -94,6 +107,7 @@ app.post('/api/auth/login', async (req, res) => {
       { expiresIn: JWT_EXPIRES_IN }
     );
     await audit({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id, req: req });
+    res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
     res.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
       token,
@@ -101,6 +115,26 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ——— Auth: me (current user) ———
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT id, email, name, role FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ——— Auth: logout ———
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie(COOKIE_NAME, { path: '/' });
+  res.json({ ok: true });
 });
 
 // ——— Impersonation (admin only) ———
@@ -896,8 +930,34 @@ app.get('/api/dashboard/main', authMiddleware, async (req, res) => {
   }
 });
 
-// Static frontend (постановка задач, мобильный интерфейс)
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
+// ——— Публичная страница входа ———
+app.get('/', (req, res) => {
+  const token = req.cookies && req.cookies[COOKIE_NAME];
+  if (token) {
+    try { jwt.verify(token, JWT_SECRET); return res.redirect('/app'); } catch (_) {
+      res.clearCookie(COOKIE_NAME, { path: '/' });
+    }
+  }
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+});
+
+// ——— Защищённое приложение — только с валидным JWT в куке ———
+app.get('/app', (req, res) => {
+  const token = req.cookies && req.cookies[COOKIE_NAME];
+  if (!token) return res.redirect('/?blocked=1');
+  try {
+    jwt.verify(token, JWT_SECRET);
+    res.sendFile(path.join(__dirname, '..', 'frontend', 'app.html'));
+  } catch (_) {
+    res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.redirect('/?blocked=1');
+  }
+});
+
+// ——— Статика frontend (только разрешённые файлы) ———
+app.get('/okak.png', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'okak.png'));
+});
 
 app.listen(PORT, () => {
   console.log(`TaskTime API listening on http://localhost:${PORT}`);
