@@ -1,6 +1,6 @@
 ---
 name: tasktime-workflow
-description: TaskTime full development pipeline: gatekeeper architecture review → system analysis → infosec sign-off → test design → implementation → testing → user review → deploy. Use for ANY task that involves code changes, new features, fixes, or infrastructure work.
+description: TaskTime full development pipeline: gatekeeper architecture review → system analysis → infosec sign-off → test design → implementation → testing → user review → deploy → skills update. Use for ANY task that involves code changes, new features, fixes, or infrastructure work.
 ---
 
 # Workflow TaskTime: полный пайплайн разработки
@@ -25,6 +25,8 @@ description: TaskTime full development pipeline: gatekeeper architecture review 
 [7] ПРОВЕРКА С ПАВЛОМ  → показать результат, получить явное «ок»
        ↓
 [8] ДЕПЛОЙ             → push в main → GitHub Actions (deploy-tasktime)
+       ↓
+[9] РАЗБОР НА ЗНАНИЯ   → git diff → извлечь паттерны/грабли → обновить скиллы агентов
 ```
 
 ---
@@ -151,6 +153,61 @@ Gatekeeper:
 
 **Документация** — обновить до коммита (правило `docs-after-every-task`):  
 DEPLOYMENT_STEPS.md + при необходимости DEPLOY.md, ACCOUNTS.md, docs/API.md.
+
+---
+
+## Этап 9 — Разбор изменений на знания: наполнение скиллов агентов
+
+**Кто:** любой агент, завершивший задачу  
+**Когда:** после деплоя (или после проверки с Павлом, если деплой ещё не был)  
+**Обязательно:** да — знания, полученные в задаче, должны остаться в команде
+
+### Алгоритм
+
+1. **Собрать изменения задачи:**
+   ```
+   git log --oneline -10          # что сделано в последних коммитах
+   git diff HEAD~N HEAD --stat    # какие файлы затронуты
+   ```
+
+2. **Для каждого изменения задать вопросы:**
+   - Что нового узнали? (паттерн, антипаттерн, грабли, команда, конфиг)
+   - Какой роли это полезно? (developer / infosec / tester / deploy-tasktime / …)
+   - Это уже есть в соответствующем скилле?
+
+3. **Обновить скиллы** — добавить только то, чего там ещё нет:
+   - Новый паттерн или антипаттерн → в скилл роли
+   - Новая команда / конфиг / путь на сервере → в `deploy-tasktime`
+   - Новая ИБ-ловушка → в `infosec`
+   - Новый сценарий тестирования → в `tester`
+   - Изменение процесса документирования → в `docs-tasktime`
+
+4. **Обновить `DEPLOYMENT_STEPS.md`** (правило `docs-after-every-task`): что сделано, зачем, результат.
+
+5. **Залить скиллы и доки одним коммитом** вместе с кодом (или отдельным `docs(skills): ...`).
+
+### Что попадает в скиллы
+
+| Тип знания | Куда |
+|---|---|
+| Паттерн / антипаттерн кода | `developer` |
+| Грабли с auth, куками, RBAC | `infosec` + `developer` |
+| Кросс-браузерные/регрессионные сценарии | `tester` |
+| Команды деплоя, пути, конфиги, sudoers | `deploy-tasktime` |
+| CI/CD, GitHub Actions, SSH | `network-infrastructure` |
+| Новые API-эндпоинты или изменения схемы | `docs-tasktime` + `system-analyst` |
+| Новые роли или учётки | `docs-tasktime` (ACCOUNTS.md синхронизация) |
+| Новый архитектурный паттерн | `corporate-architect` |
+
+### Что НЕ попадает в скиллы
+
+- Одноразовые хотфиксы без переиспользуемой ценности
+- Детали конкретных данных (ID, пароли, токены)
+- Описание того, что и так очевидно из кода
+
+### Критерий готовности этапа
+
+Скиллы обновлены так, что **другой агент**, прочитав их, не наступит на те же грабли и сможет выполнить аналогичную задачу без дополнительных разъяснений.
 
 ---
 
