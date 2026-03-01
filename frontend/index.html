@@ -382,6 +382,32 @@
     .ts-stat-val { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; color: #e6edf3; }
     .ts-stat-lbl { font-size: 11px; color: #8b949e; margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
 
+    /* ——— Impersonation banner ——— */
+    .impersonation-banner {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 9999;
+      background: #f59e0b;
+      color: #1c1917;
+      padding: 9px 24px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    }
+    .impersonation-banner.hidden { display: none; }
+    body.impersonating { padding-top: 40px; }
+    body.impersonating .sidebar { top: 40px; height: calc(100vh - 40px); }
+    body.impersonating .header { top: 40px; }
+
+    /* ——— Users admin page ——— */
+    .users-table { width: 100%; border-collapse: collapse; }
+    .users-table th { background: var(--bg-secondary); padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; border-bottom: 2px solid var(--border); }
+    .users-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .users-table tr:hover td { background: var(--bg-secondary); }
+
     /* ——— Badges, misc ——— */
     .badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
     .badge-admin { background: #fce7f3; color: #9d174d; }
@@ -409,6 +435,12 @@
 </head>
 <body>
 
+  <!-- Impersonation banner -->
+  <div id="impersonationBanner" class="impersonation-banner hidden">
+    <span>👁 Вы просматриваете как <b id="impersonationTargetName">—</b> · <span id="impersonationTargetRole" style="font-weight:400;opacity:.8"></span></span>
+    <button id="impersonationExitBtn" style="background:#1c1917;color:#fef3c7;border:none;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.02em">← Вернуться в свою учётку</button>
+  </div>
+
   <!-- Login -->
   <div class="login-screen" id="loginScreen">
     <div class="login-card">
@@ -435,6 +467,7 @@
       <div class="cio-logo">TaskTime — CIO Dashboard</div>
       <div class="cio-user">
         <span id="cioUserName">—</span>
+        <button class="btn btn-sm" id="cioSwitchToAppBtn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;font-size:13px">Задачи / Проекты / Команды →</button>
         <button class="logout-btn" id="cioLogoutBtn" style="border-color:#30363d;color:#8b949e">Выйти</button>
       </div>
     </div>
@@ -494,24 +527,16 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
         <div class="cio-block">
           <div class="cio-block-title">Выполнено</div>
-          <div class="roadmap-item"><div class="roadmap-dot done"></div><div><div class="roadmap-text">JWT-авторизация + RBAC (admin/manager/user/cio)</div><div class="roadmap-phase">Спринт 1 · Март 2025</div></div></div>
-          <div class="roadmap-item"><div class="roadmap-dot done"></div><div><div class="roadmap-text">Иерархия задач: эпики / стори / сабтаски</div><div class="roadmap-phase">Спринт 2 · Апрель 2025</div></div></div>
-          <div class="roadmap-item"><div class="roadmap-dot done"></div><div><div class="roadmap-text">CIO Dashboard с DevEx и AI-метриками</div><div class="roadmap-phase">Спринт 2 · Апрель 2025</div></div></div>
-          <div class="roadmap-item"><div class="roadmap-dot done"></div><div><div class="roadmap-text">Аудит-лог всех мутаций → SIEM-ready</div><div class="roadmap-phase">Спринт 1 · Март 2025</div></div></div>
+          <div id="cioRoadmapDone"></div>
         </div>
         <div class="cio-block">
           <div class="cio-block-title">Впереди</div>
-          <div class="roadmap-item"><div class="roadmap-dot upcoming"></div><div><div class="roadmap-text">Интеграция KeyCloak / ЕСИА SSO</div><div class="roadmap-phase">Спринт 3 · Май 2025</div></div></div>
-          <div class="roadmap-item"><div class="roadmap-dot upcoming"></div><div><div class="roadmap-text">Экспорт отчётов (xlsx, pdf) для регулятора</div><div class="roadmap-phase">Спринт 3 · Май 2025</div></div></div>
-          <div class="roadmap-item"><div class="roadmap-dot risk"></div><div><div class="roadmap-text">Горизонтальное масштабирование (ТЗ 9.9.24)</div><div class="roadmap-phase">Риск: зависит от инфраструктуры</div></div></div>
-          <div class="roadmap-item"><div class="roadmap-dot upcoming"></div><div><div class="roadmap-text">AI-агент для приоритизации бэклога</div><div class="roadmap-phase">Спринт 4 · Q3 2025</div></div></div>
+          <div id="cioRoadmapUpcoming"></div>
         </div>
       </div>
 
       <div class="cio-section-title">Инсайты</div>
-      <div class="insight-card"><div class="insight-tag good">Работает</div><div class="insight-body">DevEx Feedback Loops 63/100 — команды получают ревью в тот же день благодаря автоматической нотификации. Core Banking Team закрывает 94% subtasks в срок.</div></div>
-      <div class="insight-card"><div class="insight-tag risk">Риск</div><div class="insight-body">Cognitive Load 52/100 — разработчики отмечают избыточные context switch между проектами. Рекомендуется ввести time-boxing: max 2 активных проекта на человека.</div></div>
-      <div class="insight-card"><div class="insight-tag next">Следующий шаг</div><div class="insight-body">Провести AI Code Flow audit в Digital Experience Team (сейчас 14%). Цель к Q3: 30%. Назначен ответственный: Lead, дедлайн — 30 мая.</div></div>
+      <div id="cioInsights"></div>
     </div>
   </div>
 
@@ -528,6 +553,8 @@
         <button class="sidebar-nav-link" data-page="teams"><span class="nav-icon">◎</span>Команды</button>
         <button class="sidebar-nav-link" data-page="report"><span class="nav-icon">◷</span>Отчёт по времени</button>
         <button class="sidebar-nav-link sidebar-audit-link" data-page="audit" style="display:none"><span class="nav-icon">⋮</span>Журнал аудита</button>
+        <button class="sidebar-nav-link sidebar-cio-link" data-page="cio-board" style="display:none"><span class="nav-icon">◉</span>CIO Dashboard</button>
+        <button class="sidebar-nav-link sidebar-admin-link" data-page="users" style="display:none"><span class="nav-icon">◑</span>Пользователи</button>
       </div>
       <div class="sidebar-footer">
         <div class="sidebar-user" id="sidebarUserName">—</div>
@@ -670,6 +697,12 @@
           <div id="auditLogList"><div class="empty-state">Загрузка…</div></div>
         </section>
 
+        <!-- Users (admin) -->
+        <section class="page" id="pageUsers">
+          <div class="page-title">Пользователи</div>
+          <div id="usersAdminContent"><div class="empty-state">Загрузка…</div></div>
+        </section>
+
       </div>
     </div>
   </div>
@@ -731,6 +764,7 @@
       const STORAGE_TOKEN = 'tasktime_token';
       const STORAGE_USER = 'tasktime_user';
       const STORAGE_TIMER = 'tasktime_timer';
+      const STORAGE_IMPERSONATION = 'tasktime_impersonation';
 
       let token = localStorage.getItem(STORAGE_TOKEN);
       let currentUser = JSON.parse(localStorage.getItem(STORAGE_USER) || 'null');
@@ -741,6 +775,7 @@
       let timerInterval = null;
       let timerStartedAt = null;
       let runningTaskId = null;
+      let cioAppInitialized = false;
 
       const $ = (sel, el = document) => el.querySelector(sel);
       const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -1315,16 +1350,157 @@
         if ($('#tsOpen')) $('#tsOpen').textContent = ts.open_count ?? '—';
         if ($('#tsInProgress')) $('#tsInProgress').textContent = ts.in_progress_count ?? '—';
         if ($('#tsDone')) $('#tsDone').textContent = ts.done_count ?? '—';
+
+        const roadmapDone = [
+          { text: 'JWT-авторизация + RBAC (admin/manager/user/cio)', phase: 'Спринт 1 · Март 2025', cls: 'done' },
+          { text: 'Иерархия задач: эпики / стори / сабтаски',        phase: 'Спринт 2 · Апрель 2025', cls: 'done' },
+          { text: 'CIO Dashboard с DevEx и AI-метриками',            phase: 'Спринт 2 · Апрель 2025', cls: 'done' },
+          { text: 'Аудит-лог всех мутаций → SIEM-ready',            phase: 'Спринт 1 · Март 2025',  cls: 'done' },
+        ];
+        const roadmapUpcoming = [
+          { text: 'Интеграция KeyCloak / ЕСИА SSO',               phase: 'Спринт 3 · Май 2025',          cls: 'upcoming' },
+          { text: 'Экспорт отчётов (xlsx, pdf) для регулятора',   phase: 'Спринт 3 · Май 2025',          cls: 'upcoming' },
+          { text: 'Горизонтальное масштабирование (ТЗ 9.9.24)',   phase: 'Риск: зависит от инфраструктуры', cls: 'risk' },
+          { text: 'AI-агент для приоритизации бэклога',           phase: 'Спринт 4 · Q3 2025',           cls: 'upcoming' },
+        ];
+        const makeRoadmapItems = items => items.map(i =>
+          `<div class="roadmap-item"><div class="roadmap-dot ${i.cls}"></div><div><div class="roadmap-text">${escapeHtml(i.text)}</div><div class="roadmap-phase">${escapeHtml(i.phase)}</div></div></div>`
+        ).join('');
+        const elDone = document.getElementById('cioRoadmapDone');
+        const elUpcoming = document.getElementById('cioRoadmapUpcoming');
+        if (elDone)     elDone.innerHTML     = makeRoadmapItems(roadmapDone);
+        if (elUpcoming) elUpcoming.innerHTML = makeRoadmapItems(roadmapUpcoming);
+
+        const insights = [
+          { tag: 'good', label: 'Работает',       body: `DevEx Feedback Loops ${dx.feedback_loops ?? 63}/100 — команды получают ревью в тот же день благодаря автоматической нотификации. Core Banking Team закрывает 94% subtasks в срок.` },
+          { tag: 'risk', label: 'Риск',            body: `Cognitive Load ${dx.cognitive_load ?? 52}/100 — разработчики отмечают избыточные context switch между проектами. Рекомендуется ввести time-boxing: max 2 активных проекта на человека.` },
+          { tag: 'next', label: 'Следующий шаг',  body: `Провести AI Code Flow audit в Digital Experience Team (сейчас ${ai.ai_code_flow_pct ?? 14}%). Цель к Q3: 30%. Назначен ответственный: Lead, дедлайн — 30 мая.` },
+        ];
+        const elInsights = document.getElementById('cioInsights');
+        if (elInsights) elInsights.innerHTML = insights.map(i =>
+          `<div class="insight-card"><div class="insight-tag ${i.tag}">${escapeHtml(i.label)}</div><div class="insight-body">${escapeHtml(i.body)}</div></div>`
+        ).join('');
       }
+
+      // ——— Impersonation ———
+      function showImpersonationBanner(name, role) {
+        const roleLabels = { admin: 'admin', manager: 'менеджер', user: 'пользователь', cio: 'CIO', viewer: 'viewer' };
+        document.getElementById('impersonationTargetName').textContent = name;
+        document.getElementById('impersonationTargetRole').textContent = roleLabels[role] || role;
+        document.getElementById('impersonationBanner').classList.remove('hidden');
+        document.body.classList.add('impersonating');
+      }
+      function hideImpersonationBanner() {
+        document.getElementById('impersonationBanner').classList.add('hidden');
+        document.body.classList.remove('impersonating');
+      }
+
+      async function enterImpersonation(userId, userName, userRole) {
+        const data = await apiFetch('/api/auth/impersonate', {
+          method: 'POST',
+          body: JSON.stringify({ user_id: userId })
+        });
+        if (!data || data.error) { alert(data?.error || 'Ошибка импersonации'); return; }
+        // Save original admin session
+        localStorage.setItem(STORAGE_IMPERSONATION, JSON.stringify({ token, user: currentUser }));
+        // Switch to impersonated session
+        token = data.token;
+        currentUser = data.user;
+        localStorage.setItem(STORAGE_TOKEN, token);
+        localStorage.setItem(STORAGE_USER, JSON.stringify(currentUser));
+        cioAppInitialized = false;
+        tasks = []; users = []; timeLogs = [];
+        showImpersonationBanner(currentUser.name || currentUser.email, currentUser.role);
+        showApp();
+      }
+
+      function exitImpersonation() {
+        const orig = JSON.parse(localStorage.getItem(STORAGE_IMPERSONATION) || 'null');
+        if (!orig) return;
+        localStorage.removeItem(STORAGE_IMPERSONATION);
+        token = orig.token;
+        currentUser = orig.user;
+        localStorage.setItem(STORAGE_TOKEN, token);
+        localStorage.setItem(STORAGE_USER, JSON.stringify(currentUser));
+        hideImpersonationBanner();
+        cioAppInitialized = false;
+        tasks = []; users = []; timeLogs = [];
+        showApp();
+      }
+
+      document.getElementById('impersonationExitBtn').addEventListener('click', exitImpersonation);
+
+      // ——— Users admin page ———
+      async function loadUsersAdminPage() {
+        const container = document.getElementById('usersAdminContent');
+        container.innerHTML = '<div class="empty-state">Загрузка…</div>';
+        const list = await apiFetch('/api/users');
+        if (!Array.isArray(list)) { container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+        const isImpersonating = !!localStorage.getItem(STORAGE_IMPERSONATION);
+        const roleBadge = r => {
+          const map = { admin: 'badge-admin', manager: 'badge-manager', cio: 'badge-cio', user: 'badge-user', viewer: 'badge-user' };
+          const labels = { admin: 'admin', manager: 'manager', cio: 'CIO', user: 'user', viewer: 'viewer' };
+          return `<span class="badge ${map[r] || 'badge-user'}">${labels[r] || r}</span>`;
+        };
+        container.innerHTML = `
+          <table class="users-table">
+            <thead><tr>
+              <th>Имя</th><th>Email</th><th>Роль</th><th style="text-align:right">Действия</th>
+            </tr></thead>
+            <tbody>
+              ${list.map(u => {
+                const isSelf = u.id === currentUser.id;
+                const canImpersonate = !isImpersonating && !isSelf;
+                return `<tr>
+                  <td style="font-weight:500">${escapeHtml(u.name)}</td>
+                  <td style="color:var(--text-muted)">${escapeHtml(u.email)}</td>
+                  <td>${roleBadge(u.role)}</td>
+                  <td style="text-align:right">
+                    ${canImpersonate
+                      ? `<button class="btn btn-secondary btn-sm" data-impersonate="${u.id}" data-name="${escapeHtml(u.name)}" data-role="${u.role}">👁 Войти как</button>`
+                      : isSelf ? `<span style="font-size:12px;color:var(--text-muted)">это вы</span>` : ''}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`;
+        container.querySelectorAll('[data-impersonate]').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const id = parseInt(this.dataset.impersonate, 10);
+            const name = this.dataset.name;
+            const role = this.dataset.role;
+            if (confirm(`Войти как ${name} (${role})?`)) enterImpersonation(id, name, role);
+          });
+        });
+      }
+
+      // ——— CIO ↔ App switching ———
+      document.getElementById('cioSwitchToAppBtn').addEventListener('click', function() {
+        document.getElementById('cio-board').classList.remove('visible');
+        document.getElementById('app').classList.add('visible');
+        if (!cioAppInitialized) {
+          cioAppInitialized = true;
+          loadUsers();
+          loadTasks();
+          loadTimeLogs().then(() => renderReport());
+          loadMainDashboard();
+        }
+      });
 
       // ——— Sidebar nav ———
       $$('.sidebar-nav-link').forEach(btn => {
         btn.addEventListener('click', function() {
+          const page = this.dataset.page;
+          if (page === 'cio-board') {
+            document.getElementById('app').classList.remove('visible');
+            document.getElementById('cio-board').classList.add('visible');
+            loadCioBoard();
+            return;
+          }
           $$('.sidebar-nav-link').forEach(b => b.classList.remove('active'));
           this.classList.add('active');
-          const page = this.dataset.page;
           $$('#app .page').forEach(p => p.classList.remove('active'));
-          const pageMap = { main: 'pageMain', tasks: 'pageTasks', projects: 'pageProjects', quick: 'pageQuick', teams: 'pageTeams', report: 'pageReport', audit: 'pageAudit' };
+          const pageMap = { main: 'pageMain', tasks: 'pageTasks', projects: 'pageProjects', quick: 'pageQuick', teams: 'pageTeams', report: 'pageReport', audit: 'pageAudit', users: 'pageUsers' };
           const el = $('#' + pageMap[page]);
           if (el) el.classList.add('active');
           if (page === 'projects') loadProjectsPage();
@@ -1332,6 +1508,7 @@
           if (page === 'teams') loadTeamsPage();
           if (page === 'report') renderReport();
           if (page === 'audit') loadAuditPage();
+          if (page === 'users') loadUsersAdminPage();
         });
       });
 
@@ -1474,17 +1651,34 @@
           document.getElementById('app').classList.remove('visible');
           $('#cioUserName').textContent = currentUser.name || currentUser.email;
           loadCioBoard();
+          // Prepare app for CIO (read-only: hide create buttons, show CIO Board link in sidebar)
+          $('#sidebarUserName').textContent = currentUser.name || currentUser.email;
+          $$('.task-create-btn').forEach(el => el.style.display = 'none');
+          $$('.sidebar-cio-link').forEach(el => el.style.display = 'flex');
+          $$('.sidebar-admin-link').forEach(el => el.style.display = 'none');
+          $$('.sidebar-audit-link').forEach(el => el.style.display = 'none');
         } else {
           document.getElementById('app').classList.add('visible');
           document.getElementById('cio-board').classList.remove('visible');
           $('#sidebarUserName').textContent = currentUser.name || currentUser.email;
+          $$('.sidebar-cio-link').forEach(el => el.style.display = 'none');
           // Show audit link for admin / viewer
           if (currentUser.role === 'admin' || currentUser.role === 'viewer') {
             $$('.sidebar-audit-link').forEach(el => el.style.display = 'flex');
+          } else {
+            $$('.sidebar-audit-link').forEach(el => el.style.display = 'none');
           }
-          // Hide create buttons for read-only roles (viewer, cio handled separately)
+          // Show users management for admin only
+          if (currentUser.role === 'admin') {
+            $$('.sidebar-admin-link').forEach(el => el.style.display = 'flex');
+          } else {
+            $$('.sidebar-admin-link').forEach(el => el.style.display = 'none');
+          }
+          // Hide create buttons for read-only roles
           if (currentUser.role === 'viewer') {
             $$('.task-create-btn').forEach(el => el.style.display = 'none');
+          } else {
+            $$('.task-create-btn').forEach(el => el.style.display = '');
           }
           loadUsers();
           loadTasks();
@@ -1528,6 +1722,9 @@
         localStorage.removeItem(STORAGE_TOKEN);
         localStorage.removeItem(STORAGE_USER);
         localStorage.removeItem(STORAGE_TIMER);
+        localStorage.removeItem(STORAGE_IMPERSONATION);
+        hideImpersonationBanner();
+        tasks = []; users = []; timeLogs = [];
         document.getElementById('loginScreen').classList.remove('hidden');
         document.getElementById('app').classList.remove('visible');
         document.getElementById('cio-board').classList.remove('visible');
@@ -1536,7 +1733,14 @@
       document.getElementById('cioLogoutBtn').addEventListener('click', handleLogout);
 
       // ——— Auto-login on load ———
-      if (token && currentUser) showApp();
+      if (token && currentUser) {
+        // Restore impersonation banner if session was impersonated
+        const impData = localStorage.getItem(STORAGE_IMPERSONATION);
+        if (impData) {
+          showImpersonationBanner(currentUser.name || currentUser.email, currentUser.role);
+        }
+        showApp();
+      }
 
     })();
   </script>

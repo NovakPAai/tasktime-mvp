@@ -103,6 +103,29 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// ——— Impersonation (admin only) ———
+app.post('/api/auth/impersonate', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { user_id } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'user_id required' });
+    if (parseInt(user_id, 10) === req.user.id) return res.status(400).json({ error: 'Cannot impersonate yourself' });
+    const result = await query('SELECT id, email, name, role FROM users WHERE id = $1', [user_id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+    const target = result.rows[0];
+    const token = jwt.sign(
+      { id: target.id, email: target.email, role: target.role },
+      JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+    await audit({ userId: req.user.id, action: 'auth.impersonate', entityType: 'user', entityId: target.id,
+      details: { target_email: target.email, target_role: target.role }, req });
+    res.json({ user: { id: target.id, email: target.email, name: target.name, role: target.role }, token });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ——— Users list (for assignee picker) ———
 app.get('/api/users', authMiddleware, async (req, res) => {
   try {
