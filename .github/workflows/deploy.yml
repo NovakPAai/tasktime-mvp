@@ -22,4 +22,4 @@ jobs:
 
       - name: Notify on failure
         if: failure()
-        run: echo "Deploy failed! Check logs on server: sudo journalctl -u tasktime -n 50"
+        run: 'echo "Deploy failed! Check logs on server: sudo journalctl -u tasktime -n 50"'
