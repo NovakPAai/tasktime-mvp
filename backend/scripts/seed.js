@@ -22,7 +22,7 @@ const USERS = [
   { email: 'pavel@tasktime.demo',  name: 'Pavel',            role: 'admin',   password: 'tasktime24' },
   { email: 'georgiy@tasktime.demo',name: 'Georgiy',          role: 'viewer',  password: 'tasktime24' },
   { email: 'olesya@tasktime.demo', name: 'Olesya',           role: 'user',    password: 'tasktime24' },
-  { email: 'andrey@tasktime.demo', name: 'Andrey',           role: 'user',    password: 'tasktime24' },
+  { email: 'andrey@tasktime.demo', name: 'Andrey',           role: 'cio',     password: 'tasktime24' },
   { email: 'anton@tasktime.demo',  name: 'Anton',            role: 'user',    password: 'tasktime24' },
 ];
 

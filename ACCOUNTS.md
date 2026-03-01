@@ -33,7 +33,7 @@
 | Павел          | Pavel                    | pavel@tasktime.demo      | tasktime24 | admin |
 | Георгий        | Georgiy                  | georgiy@tasktime.demo    | tasktime24 | user  |
 | Олеся          | Olesya                   | olesya@tasktime.demo     | tasktime24 | user  |
-| Андрей         | Andrey                   | andrey@tasktime.demo     | tasktime24 | user  |
+| Андрей         | Andrey                   | andrey@tasktime.demo     | tasktime24 | cio   |
 | Антон          | Anton                    | anton@tasktime.demo      | tasktime24 | user  |
 
 **Пароль у всех учёток команды:** `tasktime24`  
