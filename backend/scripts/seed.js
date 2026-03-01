@@ -20,18 +20,37 @@ const DEMO_USERS = [
   { email: 'jack@demo.com', name: 'Jack Anderson', role: 'user' },
 ];
 
+const TEAM_PASSWORD = 'tasktime24';
+const TEAM_USERS = [
+  { email: 'pavel@tasktime.demo', name: 'Pavel', role: 'admin' },
+  { email: 'georgiy@tasktime.demo', name: 'Georgiy', role: 'user' },
+  { email: 'olesya@tasktime.demo', name: 'Olesya', role: 'user' },
+  { email: 'andrey@tasktime.demo', name: 'Andrey', role: 'user' },
+  { email: 'anton@tasktime.demo', name: 'Anton', role: 'user' },
+];
+
 async function seed() {
-  const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const demoHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   for (const u of DEMO_USERS) {
     await query(
       `INSERT INTO users (email, password_hash, name, role)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO UPDATE SET password_hash = $2, name = $3, role = $4`,
-      [u.email, hash, u.name, u.role]
+      [u.email, demoHash, u.name, u.role]
     );
     console.log('Seeded user:', u.email);
   }
-  console.log('Done. All demo users have password: ' + DEMO_PASSWORD);
+  const teamHash = await bcrypt.hash(TEAM_PASSWORD, 10);
+  for (const u of TEAM_USERS) {
+    await query(
+      `INSERT INTO users (email, password_hash, name, role)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email) DO UPDATE SET password_hash = $2, name = $3, role = $4`,
+      [u.email, teamHash, u.name, u.role]
+    );
+    console.log('Seeded user:', u.email);
+  }
+  console.log('Done. Demo users password: ' + DEMO_PASSWORD + '; team users password: ' + TEAM_PASSWORD);
   process.exit(0);
 }
 

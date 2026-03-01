@@ -2,6 +2,9 @@
 
 Репозиторий: **https://github.com/jackrescuer-gif/tasktime-mvp**
 
+- **Что сделано (простыми словами):** [DEPLOYMENT_STEPS.md](DEPLOYMENT_STEPS.md) — для отчёта и объяснения неподготовленной аудитории.
+- **Учётные записи (формат, логины, пароли):** [ACCOUNTS.md](ACCOUNTS.md).
+
 ---
 
 ## 1. Подготовка сервера (один раз)
