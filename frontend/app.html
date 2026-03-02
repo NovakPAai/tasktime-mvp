@@ -394,9 +394,46 @@
 
     .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 14px; }
 
+    /* ——— Mobile header & overlay ——— */
+    .mobile-header {
+      display: none;
+      height: 52px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .hamburger-btn {
+      width: 36px; height: 36px;
+      background: none; border: none; font-size: 22px;
+      cursor: pointer; color: var(--text); border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hamburger-btn:hover { background: var(--bg-secondary); }
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 49;
+    }
+    .sidebar-overlay.visible { display: block; }
+
     /* ——— Responsive ——— */
     @media (max-width: 900px) {
-      .sidebar { display: none; }
+      .mobile-header { display: flex; }
+      .sidebar {
+        display: flex !important;
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 50; height: 100vh;
+        transform: translateX(-100%);
+        transition: transform .22s ease;
+        box-shadow: 2px 0 16px rgba(0,0,0,.15);
+      }
+      .sidebar.open { transform: translateX(0); }
       .cio-kpi-grid { grid-template-columns: 1fr 1fr; }
       .cio-row { grid-template-columns: 1fr; }
       .dashboard-grid { grid-template-columns: 1fr; }
@@ -493,6 +530,9 @@
     </div>
   </div>
 
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
   <!-- App (admin / manager / user) -->
   <div class="app" id="app">
     <nav class="sidebar" id="sidebar">
@@ -520,6 +560,13 @@
     </nav>
 
     <div class="app-content">
+      <!-- Mobile top bar -->
+      <div class="mobile-header" id="mobileHeader">
+        <button type="button" class="hamburger-btn" id="hamburgerBtn" aria-label="Открыть меню">☰</button>
+        <span style="font-weight:700;font-size:16px">TaskTime</span>
+        <button type="button" class="logout-btn" id="mobileLogoutBtn">Выйти</button>
+      </div>
+
       <div class="main">
 
         <section class="page active" id="pageMain">
@@ -684,6 +731,32 @@
     </div>
   </div>
 
+  <!-- New project modal -->
+  <div class="modal-overlay" id="projectModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Новый проект</h2>
+        <button type="button" class="modal-close" id="projectModalClose" aria-label="Закрыть">×</button>
+      </div>
+      <form id="projectForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="projectName">Название</label>
+            <input type="text" id="projectName" placeholder="Название проекта" required>
+          </div>
+          <div class="form-group">
+            <label for="projectGoal">Бизнес-цель (необязательно)</label>
+            <textarea id="projectGoal" placeholder="Какую проблему решает проект?"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="projectModalCancel">Отмена</button>
+          <button type="submit" class="btn btn-primary" id="projectSubmit">Создать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Task Item detail modal -->
   <div class="modal-overlay" id="taskItemModal">
     <div class="modal modal-lg">
@@ -700,9 +773,11 @@
   <script>
     (function() {
       const API_BASE = '';
-      const STORAGE_TOKEN = 'tasktime_token';
-      const STORAGE_USER  = 'tasktime_user';
-      const STORAGE_TIMER = 'tasktime_timer';
+      const STORAGE_TOKEN     = 'tasktime_token';
+      const STORAGE_USER      = 'tasktime_user';
+      const STORAGE_TIMER     = 'tasktime_timer';
+      const STORAGE_ORIG_TOKEN = 'tasktime_orig_token';
+      const STORAGE_ORIG_USER  = 'tasktime_orig_user';
 
       let token       = localStorage.getItem(STORAGE_TOKEN);
       let currentUser = JSON.parse(localStorage.getItem(STORAGE_USER) || 'null');
@@ -990,9 +1065,11 @@
         const modal = $('#taskItemModal');
         const body  = $('#tiModalBody');
         modal.classList.add('visible');
+        $('#tiModalTitle').textContent = '…';
         body.innerHTML = '<div class="empty-state">Загрузка…</div>';
         const item = await apiFetch('/api/task-items/' + id);
         if (!item || item.error) { body.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+        $('#tiModalTitle').textContent = item.title || 'Задача';
 
         const breadcrumb = (item.breadcrumb || []).map(b =>
           `<span>${escapeHtml(b.title)}</span><span class="ti-breadcrumb-sep">›</span>`
@@ -1196,6 +1273,7 @@
             <div class="proj-card-goal">${escapeHtml(t.description || '')}</div>
             <div class="proj-card-stats">
               <span>${t.members_count || 0} участников</span>
+              ${t.active_tasks > 0 ? `<span><b>${t.active_tasks}</b> в работе</span>` : ''}
               ${t.lead_name ? `<span>Лид: <b>${escapeHtml(t.lead_name)}</b></span>` : ''}
             </div>
           </div>`
@@ -1247,6 +1325,57 @@
             </div>
           </div>`
         ).join('');
+      }
+
+      // ——— Users admin page ———
+      async function loadUsersPage() {
+        const el = $('#usersAdminContent');
+        el.innerHTML = '<div class="empty-state">Загрузка…</div>';
+        const list = await apiFetch('/api/users');
+        if (!Array.isArray(list)) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        const roleLabel = r => ({ admin: 'Администратор', manager: 'Менеджер', cio: 'CIO', user: 'Пользователь' }[r] || r);
+        const badgeCls  = r => ({ admin: 'badge-admin', manager: 'badge-manager', cio: 'badge-cio', user: 'badge-user' }[r] || 'badge-user');
+        el.innerHTML = `
+          <table class="users-table">
+            <thead><tr>
+              <th>Имя</th>
+              <th>Email</th>
+              <th>Роль</th>
+              ${isAdmin ? '<th>Действия</th>' : ''}
+            </tr></thead>
+            <tbody>
+              ${list.map(u => {
+                const isSelf = u.id === currentUser?.id;
+                return `<tr>
+                  <td style="font-weight:500">${escapeHtml(u.name)}</td>
+                  <td style="color:var(--text-muted)">${escapeHtml(u.email)}</td>
+                  <td><span class="badge ${badgeCls(u.role)}">${roleLabel(u.role)}</span></td>
+                  ${isAdmin ? `<td>${isSelf
+                    ? '<span style="color:var(--text-muted);font-size:12px">— это вы</span>'
+                    : `<button type="button" class="btn btn-ghost btn-sm" data-impersonate="${u.id}" data-uname="${escapeHtml(u.name)}" data-urole="${escapeHtml(roleLabel(u.role))}">Посмотреть как →</button>`
+                  }</td>` : ''}
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`;
+        if (isAdmin) {
+          el.querySelectorAll('[data-impersonate]').forEach(btn => {
+            btn.addEventListener('click', async function() {
+              const userId = parseInt(this.dataset.impersonate, 10);
+              const uname  = this.dataset.uname;
+              const urole  = this.dataset.urole;
+              if (!confirm(`Переключиться в режим просмотра как «${uname}» (${urole})?`)) return;
+              const res = await apiFetch('/api/auth/impersonate', { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+              if (!res || !res.token) { alert('Ошибка переключения'); return; }
+              localStorage.setItem(STORAGE_ORIG_TOKEN, token);
+              localStorage.setItem(STORAGE_ORIG_USER, localStorage.getItem(STORAGE_USER));
+              localStorage.setItem(STORAGE_TOKEN, res.token);
+              localStorage.setItem(STORAGE_USER, JSON.stringify(res.user));
+              window.location.reload();
+            });
+          });
+        }
       }
 
       // ——— CIO board ———
@@ -1337,7 +1466,7 @@
           $$('.sidebar-nav-link').forEach(b => b.classList.remove('active'));
           this.classList.add('active');
           $$('#app .page').forEach(p => p.classList.remove('active'));
-          const pageMap = { main: 'pageMain', tasks: 'pageTasks', projects: 'pageProjects', quick: 'pageQuick', teams: 'pageTeams', report: 'pageReport', audit: 'pageAudit' };
+          const pageMap = { main: 'pageMain', tasks: 'pageTasks', projects: 'pageProjects', quick: 'pageQuick', teams: 'pageTeams', report: 'pageReport', audit: 'pageAudit', users: 'pageUsers' };
           const el = $('#' + pageMap[page]);
           if (el) el.classList.add('active');
           if (page === 'projects') loadProjectsPage();
@@ -1345,6 +1474,7 @@
           if (page === 'teams')    loadTeamsPage();
           if (page === 'report')   renderReport();
           if (page === 'audit')    loadAuditPage();
+          if (page === 'users')    loadUsersPage();
         });
       });
 
@@ -1399,6 +1529,22 @@
       initResizableTables();
       document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === taskViewMode));
 
+      // ——— Mobile sidebar toggle ———
+      function closeMobileSidebar() {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('visible');
+      }
+      document.getElementById('hamburgerBtn').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.add('open');
+        document.getElementById('sidebarOverlay').classList.add('visible');
+      });
+      document.getElementById('sidebarOverlay').addEventListener('click', closeMobileSidebar);
+      $$('.sidebar-nav-link').forEach(btn => {
+        btn.addEventListener('click', function() {
+          if (window.innerWidth <= 900) closeMobileSidebar();
+        });
+      });
+
       // ——— Task modal ———
       function openTaskModal() {
         $('#taskModal').classList.add('visible');
@@ -1410,6 +1556,32 @@
 
       const newTaskBtn = document.getElementById('newTaskBtn');
       if (newTaskBtn) newTaskBtn.addEventListener('click', openTaskModal);
+
+      // ——— Project modal ———
+      function openProjectModal() {
+        $('#projectModal').classList.add('visible');
+        $('#projectName').value = ''; $('#projectGoal').value = '';
+        $('#projectName').focus();
+      }
+      function closeProjectModal() { $('#projectModal').classList.remove('visible'); }
+      const newProjectBtn = document.getElementById('newProjectBtn');
+      if (newProjectBtn) newProjectBtn.addEventListener('click', openProjectModal);
+      document.getElementById('projectModalClose').addEventListener('click', closeProjectModal);
+      document.getElementById('projectModalCancel').addEventListener('click', closeProjectModal);
+      document.getElementById('projectModal').addEventListener('click', function(e) { if (e.target === this) closeProjectModal(); });
+      document.getElementById('projectForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const name = $('#projectName').value.trim();
+        if (!name) return;
+        const btn = $('#projectSubmit'); btn.disabled = true;
+        const created = await apiFetch('/api/projects', {
+          method: 'POST',
+          body: JSON.stringify({ name, business_goal: $('#projectGoal').value.trim() || undefined }),
+        });
+        btn.disabled = false;
+        if (created && created.id) { closeProjectModal(); loadProjectsPage(); }
+        else alert(created && created.error ? created.error : 'Не удалось создать проект');
+      });
       document.getElementById('taskModalClose').addEventListener('click', closeTaskModal);
       document.getElementById('taskModalCancel').addEventListener('click', closeTaskModal);
       document.getElementById('taskModal').addEventListener('click', function(e) { if (e.target === this) closeTaskModal(); });
@@ -1496,6 +1668,10 @@
           if (currentUser.role === 'admin' || currentUser.role === 'viewer') {
             $$('.sidebar-audit-link').forEach(el => el.style.display = 'flex');
           }
+          if (currentUser.role === 'admin') {
+            $$('.sidebar-admin-link').forEach(el => el.style.display = 'flex');
+            $$('.sidebar-cio-link').forEach(el => el.style.display = 'flex');
+          }
           if (currentUser.role === 'viewer') {
             $$('.task-create-btn').forEach(el => el.style.display = 'none');
           }
@@ -1511,6 +1687,17 @@
             $('#sidebarTimer').classList.remove('hidden');
           } catch (_) {}
         }
+
+        // Show impersonation banner if active
+        const origToken = localStorage.getItem(STORAGE_ORIG_TOKEN);
+        if (origToken) {
+          const roleMap = { admin: 'Администратор', manager: 'Менеджер', cio: 'CIO', user: 'Пользователь' };
+          const banner = document.getElementById('impersonationBanner');
+          banner.classList.remove('hidden');
+          document.body.classList.add('impersonating');
+          document.getElementById('impersonationTargetName').textContent = currentUser.name || currentUser.email;
+          document.getElementById('impersonationTargetRole').textContent = roleMap[currentUser.role] || currentUser.role;
+        }
       }
 
       // ——— Logout ———
@@ -1525,6 +1712,19 @@
       }
       document.getElementById('logoutBtn').addEventListener('click', handleLogout);
       document.getElementById('cioLogoutBtn').addEventListener('click', handleLogout);
+      document.getElementById('mobileLogoutBtn').addEventListener('click', handleLogout);
+
+      // ——— Impersonation exit ———
+      document.getElementById('impersonationExitBtn').addEventListener('click', function() {
+        const orig = localStorage.getItem(STORAGE_ORIG_TOKEN);
+        if (!orig) return;
+        localStorage.setItem(STORAGE_TOKEN, orig);
+        const origUser = localStorage.getItem(STORAGE_ORIG_USER);
+        if (origUser) localStorage.setItem(STORAGE_USER, origUser);
+        localStorage.removeItem(STORAGE_ORIG_TOKEN);
+        localStorage.removeItem(STORAGE_ORIG_USER);
+        window.location.reload();
+      });
 
       // ——— Init on load ———
       // Проверяем авторизацию на клиенте: localStorage → /api/auth/me → редирект.
