@@ -565,13 +565,42 @@
     let editingUserId = null;
     let currentSection = 'stats';
 
+    function getToken() {
+      return localStorage.getItem(STORAGE_TOKEN) || null;
+    }
+
     async function apiFetch(url, opts = {}) {
-      // Аутентификация только через HttpOnly-куку (credentials: 'include').
-      // Bearer-токен из localStorage намеренно не используется:
-      // кука надёжнее, не протухает раньше и не зависит от состояния localStorage.
+      const token = getToken();
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       try {
         const r = await fetch(url, { ...opts, headers, credentials: 'include' });
+
+        // Если Bearer-токен устарел — пробуем ещё раз только с кукой.
+        // Это happens когда localStorage содержит старый токен, но кука ещё валидна.
+        if (r.status === 401 && token) {
+          const h2 = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+          const r2 = await fetch(url, { ...opts, headers: h2, credentials: 'include' });
+          if (r2.status === 401) {
+            localStorage.removeItem(STORAGE_TOKEN);
+            localStorage.removeItem(STORAGE_USER);
+            window.location.href = '/';
+            return null;
+          }
+          if (r2.status === 403) {
+            const b = await r2.json().catch(() => ({}));
+            showToast(b.error || 'Доступ запрещён', 'error');
+            return null;
+          }
+          if (!r2.ok) {
+            const b = await r2.json().catch(() => ({}));
+            showToast(b.error || `HTTP ${r2.status}`, 'error');
+            return null;
+          }
+          return r2.status === 204 ? true : await r2.json();
+        }
+
         if (r.status === 401) {
           localStorage.removeItem(STORAGE_TOKEN);
           localStorage.removeItem(STORAGE_USER);
@@ -1127,7 +1156,9 @@
       document.getElementById('sidebarUserRole').textContent = roleLabels[me.role] || me.role;
       document.getElementById('sidebarAvatar').textContent = (me.name || me.email).slice(0, 2).toUpperCase();
 
-      await loadStats();
+      // Панель показана — теперь грузим данные асинхронно.
+      // Не await: ошибка загрузки данных не должна убивать всю сессию.
+      loadStats();
     })();
   </script>
 </body>
