@@ -565,20 +565,14 @@
     let editingUserId = null;
     let currentSection = 'stats';
 
-    // ——— Auth utils ———
-    function getToken() {
-      return localStorage.getItem(STORAGE_TOKEN) || null;
-    }
-
     async function apiFetch(url, opts = {}) {
-      const token = getToken();
+      // Аутентификация только через HttpOnly-куку (credentials: 'include').
+      // Bearer-токен из localStorage намеренно не используется:
+      // кука надёжнее, не протухает раньше и не зависит от состояния localStorage.
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
       try {
         const r = await fetch(url, { ...opts, headers, credentials: 'include' });
         if (r.status === 401) {
-          // Старый Bearer-токен в localStorage мог протухнуть.
-          // Удаляем его и перенаправляем на логин (не на пасхалку).
           localStorage.removeItem(STORAGE_TOKEN);
           localStorage.removeItem(STORAGE_USER);
           window.location.href = '/';

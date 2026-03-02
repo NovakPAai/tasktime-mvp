@@ -976,11 +976,15 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) =>
       dbStatus = 'error';
     }
 
-    const [userCount, taskCount, auditCount, recentErrors] = await Promise.all([
-      query('SELECT COUNT(*) AS cnt FROM users'),
-      query('SELECT COUNT(*) AS cnt FROM tasks'),
-      query('SELECT COUNT(*) AS cnt FROM audit_log'),
-      query(`SELECT COUNT(*) AS cnt FROM audit_log WHERE level = 'error' AND created_at >= NOW() - INTERVAL '24 hours'`),
+    const safeCount = async (sql) => {
+      try { return parseInt((await query(sql)).rows[0].cnt, 10); } catch (_) { return null; }
+    };
+
+    const [usersN, tasksN, auditN, errorsN] = await Promise.all([
+      safeCount('SELECT COUNT(*) AS cnt FROM users'),
+      safeCount('SELECT COUNT(*) AS cnt FROM tasks'),
+      safeCount('SELECT COUNT(*) AS cnt FROM audit_log'),
+      safeCount(`SELECT COUNT(*) AS cnt FROM audit_log WHERE level = 'error' AND created_at >= NOW() - INTERVAL '24 hours'`),
     ]);
 
     res.json({
@@ -1005,14 +1009,15 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) =>
       database: {
         status: dbStatus,
         latency_ms: dbLatencyMs,
-        users: parseInt(userCount.rows[0].cnt, 10),
-        tasks: parseInt(taskCount.rows[0].cnt, 10),
-        audit_entries: parseInt(auditCount.rows[0].cnt, 10),
-        errors_24h: parseInt(recentErrors.rows[0].cnt, 10),
+        users: usersN,
+        tasks: tasksN,
+        audit_entries: auditN,
+        errors_24h: errorsN,
       },
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[admin/stats] error:', e.stack || e.message);
+    res.status(500).json({ error: e.message, stack: process.env.NODE_ENV !== 'production' ? e.stack : undefined });
   }
 });
 
