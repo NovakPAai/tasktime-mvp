@@ -74,3 +74,127 @@ localStorage.getItem(token)
 - `SameSite=Strict` кука **должна** прийти при same-site навигации — но не всегда приходит в реальных браузерах
 - Безопаснее полагаться на `localStorage` токен + `/api/auth/me` как fallback, а не на куку при навигации
 - Никогда не делать логику «если кука есть — значит авторизован» на уровне раздачи статики
+
+---
+
+## Паттерны: vanilla JS SPA без фреймворка
+
+### Навигация: pageMap + явный вызов загрузчика
+
+Типичная грабля — добавить nav-ссылку в HTML, но забыть прописать страницу в `pageMap` и/или не добавить вызов загрузчика данных.
+
+**Правильная схема:**
+```javascript
+// 1. Все страницы в одном месте
+const pageMap = {
+  main: 'pageMain', tasks: 'pageTasks', users: 'pageUsers', /* ... */
+};
+
+// 2. Единый обработчик навигации
+btn.addEventListener('click', function() {
+  const page = this.dataset.page;
+  // активировать страницу
+  const el = document.getElementById(pageMap[page]);
+  if (el) el.classList.add('active');
+  // загрузить данные для страницы
+  if (page === 'users')    loadUsersPage();
+  if (page === 'projects') loadProjectsPage();
+  // ...
+});
+```
+
+**Чеклист при добавлении новой страницы:**
+- [ ] `data-page="..."` на nav-кнопке
+- [ ] `id="page..."` на секции
+- [ ] запись в `pageMap`
+- [ ] вызов `load...Page()` в nav-обработчике
+- [ ] показ/скрытие nav-кнопки по роли в `showApp()`
+
+### Видимость элементов по роли
+
+Элементы скрытые по умолчанию (`display:none`) нужно **явно показывать** в `showApp()` по роли:
+
+```javascript
+function showApp() {
+  if (currentUser.role === 'admin') {
+    document.querySelectorAll('.sidebar-admin-link').forEach(el => el.style.display = 'flex');
+    document.querySelectorAll('.sidebar-audit-link').forEach(el => el.style.display = 'flex');
+  }
+  if (currentUser.role === 'viewer') {
+    document.querySelectorAll('.task-create-btn').forEach(el => el.style.display = 'none');
+  }
+}
+```
+
+Если забыть — ссылка в HTML есть, но пользователь её не видит, и кажется что функция «сломана».
+
+### Мобильная навигация: slide-in sidebar + overlay
+
+```css
+@media (max-width: 900px) {
+  .sidebar {
+    display: flex !important;  /* не скрывать, а прятать за экран */
+    position: fixed;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    z-index: 50;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.visible { display: block; }
+}
+```
+
+```javascript
+// Hamburger открывает
+document.getElementById('hamburgerBtn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('visible');
+});
+// Overlay закрывает
+document.getElementById('sidebarOverlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('visible');
+});
+// Закрывать при выборе пункта меню
+document.querySelectorAll('.sidebar-nav-link').forEach(btn =>
+  btn.addEventListener('click', () => {
+    if (window.innerWidth <= 900) {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebarOverlay').classList.remove('visible');
+    }
+  })
+);
+```
+
+### Impersonation через localStorage
+
+Паттерн «посмотреть как другой пользователь» без серверного session store:
+
+```javascript
+// Сохранить оригинальный токен и переключиться
+async function impersonate(userId) {
+  const res = await apiFetch('/api/auth/impersonate', {
+    method: 'POST', body: JSON.stringify({ user_id: userId })
+  });
+  localStorage.setItem('orig_token', localStorage.getItem('token'));
+  localStorage.setItem('orig_user',  localStorage.getItem('user'));
+  localStorage.setItem('token', res.token);
+  localStorage.setItem('user',  JSON.stringify(res.user));
+  window.location.reload();
+}
+
+// Восстановить
+function exitImpersonation() {
+  localStorage.setItem('token', localStorage.getItem('orig_token'));
+  localStorage.setItem('user',  localStorage.getItem('orig_user'));
+  localStorage.removeItem('orig_token');
+  localStorage.removeItem('orig_user');
+  window.location.reload();
+}
+
+// При загрузке: проверить флаг и показать баннер
+const isImpersonating = !!localStorage.getItem('orig_token');
+if (isImpersonating) showImpersonationBanner(currentUser);
+```
+
+Требования к backend: отдельный endpoint `POST /api/auth/impersonate` (только для `admin`), возвращает JWT с ролью целевого пользователя. Токен с укороченным TTL (например 2h).
