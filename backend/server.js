@@ -1,5 +1,7 @@
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -58,6 +60,15 @@ function authMiddleware(req, res, next) {
   }
 }
 
+// ——— Admin middleware — только admin и super-admin ———
+function adminMiddleware(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+  if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+    return res.status(403).json({ error: 'Forbidden: admin role required' });
+  }
+  next();
+}
+
 // ——— Auth: register ———
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -101,6 +112,16 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
+    // Check is_blocked if column exists (migration may not have run yet)
+    try {
+      const blockedCheck = await query('SELECT is_blocked FROM users WHERE id = $1', [user.id]);
+      if (blockedCheck.rows[0]?.is_blocked) {
+        await audit({ userId: user.id, action: 'auth.blocked_login_attempt', entityType: 'user', entityId: user.id, level: 'warning', req });
+        return res.status(403).json({ error: 'Account is blocked. Contact your administrator.' });
+      }
+    } catch (_) {
+      // is_blocked column not yet migrated — proceed
+    }
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
@@ -139,7 +160,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 // ——— Impersonation (admin only) ———
 app.post('/api/auth/impersonate', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  if (req.user.role !== 'admin' && req.user.role !== 'super-admin') return res.status(403).json({ error: 'Forbidden' });
   try {
     const { user_id } = req.body;
     if (!user_id) return res.status(400).json({ error: 'user_id required' });
@@ -928,6 +949,239 @@ app.get('/api/dashboard/main', authMiddleware, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ——— Admin: system stats ———
+app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const appUptimeSec = Math.floor(process.uptime());
+    const sysUptimeSec = Math.floor(os.uptime());
+    const memUsage = process.memoryUsage();
+
+    let dbStatus = 'ok';
+    let dbLatencyMs = null;
+    try {
+      const t0 = Date.now();
+      await query('SELECT 1');
+      dbLatencyMs = Date.now() - t0;
+    } catch (_) {
+      dbStatus = 'error';
+    }
+
+    const [userCount, taskCount, auditCount, recentErrors] = await Promise.all([
+      query('SELECT COUNT(*) AS cnt FROM users'),
+      query('SELECT COUNT(*) AS cnt FROM tasks'),
+      query('SELECT COUNT(*) AS cnt FROM audit_log'),
+      query(`SELECT COUNT(*) AS cnt FROM audit_log WHERE level = 'error' AND created_at >= NOW() - INTERVAL '24 hours'`),
+    ]);
+
+    res.json({
+      app: {
+        uptime_sec: appUptimeSec,
+        uptime_human: formatUptimeHuman(appUptimeSec),
+        node_version: process.version,
+        env: process.env.NODE_ENV || 'development',
+        memory_mb: Math.round(memUsage.rss / 1024 / 1024),
+        heap_used_mb: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heap_total_mb: Math.round(memUsage.heapTotal / 1024 / 1024),
+      },
+      system: {
+        uptime_sec: sysUptimeSec,
+        uptime_human: formatUptimeHuman(sysUptimeSec),
+        platform: process.platform,
+        cpu_count: os.cpus().length,
+        load_avg: os.loadavg().map(n => +n.toFixed(2)),
+        total_mem_mb: Math.round(os.totalmem() / 1024 / 1024),
+        free_mem_mb: Math.round(os.freemem() / 1024 / 1024),
+      },
+      database: {
+        status: dbStatus,
+        latency_ms: dbLatencyMs,
+        users: parseInt(userCount.rows[0].cnt, 10),
+        tasks: parseInt(taskCount.rows[0].cnt, 10),
+        audit_entries: parseInt(auditCount.rows[0].cnt, 10),
+        errors_24h: parseInt(recentErrors.rows[0].cnt, 10),
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+function formatUptimeHuman(sec) {
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const parts = [];
+  if (d > 0) parts.push(`${d}д`);
+  if (h > 0) parts.push(`${h}ч`);
+  parts.push(`${m}м`);
+  return parts.join(' ');
+}
+
+// ——— Admin: users list ———
+app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    // Try with is_blocked first; fall back if column not yet migrated
+    let result;
+    try {
+      result = await query(
+        `SELECT u.id, u.email, u.name, u.role, u.is_blocked, u.created_at,
+           COUNT(DISTINCT al.id) AS audit_actions,
+           MAX(al.created_at) AS last_activity
+         FROM users u
+         LEFT JOIN audit_log al ON al.user_id = u.id
+         GROUP BY u.id
+         ORDER BY u.created_at DESC`
+      );
+    } catch (_) {
+      result = await query(
+        `SELECT u.id, u.email, u.name, u.role, FALSE AS is_blocked, u.created_at,
+           COUNT(DISTINCT al.id) AS audit_actions,
+           MAX(al.created_at) AS last_activity
+         FROM users u
+         LEFT JOIN audit_log al ON al.user_id = u.id
+         GROUP BY u.id
+         ORDER BY u.created_at DESC`
+      );
+    }
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ——— Admin: update user (role / block) ———
+app.patch('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (isNaN(targetId)) return res.status(400).json({ error: 'Invalid user id' });
+
+    let targetRes;
+    try {
+      targetRes = await query('SELECT id, role, is_blocked FROM users WHERE id = $1', [targetId]);
+    } catch (_) {
+      targetRes = await query('SELECT id, role, FALSE AS is_blocked FROM users WHERE id = $1', [targetId]);
+    }
+    if (!targetRes.rows.length) return res.status(404).json({ error: 'User not found' });
+    const target = targetRes.rows[0];
+
+    if (targetId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot modify your own account from admin panel' });
+    }
+
+    // Only super-admin can manage admin/super-admin users
+    if ((target.role === 'admin' || target.role === 'super-admin') && req.user.role !== 'super-admin') {
+      return res.status(403).json({ error: 'Only super-admin can manage admin accounts' });
+    }
+
+    // Admin cannot assign super-admin role
+    const { role, is_blocked } = req.body;
+    if (role === 'super-admin' && req.user.role !== 'super-admin') {
+      return res.status(403).json({ error: 'Only super-admin can assign super-admin role' });
+    }
+
+    const fields = [];
+    const params = [];
+    let n = 1;
+    if (role !== undefined) { fields.push(`role = $${n}`); params.push(role); n++; }
+    if (is_blocked !== undefined) { fields.push(`is_blocked = $${n}`); params.push(is_blocked); n++; }
+    if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
+    fields.push(`updated_at = NOW()`);
+    params.push(targetId);
+
+    const updated = await query(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${n} RETURNING id, email, name, role, is_blocked`,
+      params
+    );
+    await audit({
+      userId: req.user.id, action: 'admin.user_updated', entityType: 'user', entityId: targetId,
+      details: { role, is_blocked }, req,
+    });
+    res.json(updated.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ——— Admin: activity log ———
+app.get('/api/admin/activity', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const result = await query(
+      `SELECT al.id, al.created_at, al.action, al.entity_type, al.entity_id,
+              al.level, al.ip, al.details,
+              u.name AS user_name, u.email AS user_email, u.role AS user_role
+       FROM audit_log al
+       LEFT JOIN users u ON al.user_id = u.id
+       ORDER BY al.created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    const total = await query('SELECT COUNT(*) AS cnt FROM audit_log');
+    res.json({ items: result.rows, total: parseInt(total.rows[0].cnt, 10) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ——— Admin: deploy history ———
+const DEPLOY_LOG_PATH = process.env.DEPLOY_LOG_PATH || '/var/log/tasktime-deploy.log';
+
+app.get('/api/admin/deploys', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    let deploys = [];
+    if (fs.existsSync(DEPLOY_LOG_PATH)) {
+      const raw = fs.readFileSync(DEPLOY_LOG_PATH, 'utf8');
+      const lines = raw.split('\n').filter(l => l.trim());
+      deploys = parseDeployLog(lines);
+    }
+    res.json(deploys);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
+function parseDeployLog(lines) {
+  const deployBlocks = [];
+  let current = null;
+  const startRe = /^\[(.+?)\]\s+={3,}/;
+  const deployStartRe = /^\[(.+?)\]\s+.*(?:Deploy|START|deploy start)/i;
+  const doneRe = /(?:DONE|SUCCESS|OK|done|success)/i;
+  const errorRe = /(?:ERROR|FAIL|failed)/i;
+
+  for (const line of lines) {
+    const ts = extractTimestamp(line);
+    if (line.match(/={10,}/) && ts) {
+      if (current) deployBlocks.push(current);
+      current = { started_at: ts, lines: [line], status: 'success' };
+    } else if (current) {
+      current.lines.push(line);
+      if (doneRe.test(line)) current.status = 'success';
+      if (errorRe.test(line)) current.status = 'error';
+    } else if (ts) {
+      if (!current) current = { started_at: ts, lines: [line], status: 'success' };
+    }
+  }
+  if (current) deployBlocks.push(current);
+
+  return deployBlocks.slice(-20).reverse().map((b, i) => ({
+    id: i + 1,
+    started_at: b.started_at,
+    status: b.status,
+    summary: b.lines.slice(0, 3).join(' | ').replace(/\s+/g, ' ').slice(0, 200),
+  }));
+}
+
+function extractTimestamp(line) {
+  const m = line.match(/\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?)/);
+  return m ? m[1] : null;
+}
+
+// ——— Admin panel page ———
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'admin.html'));
 });
 
 // ——— Публичная страница входа ———

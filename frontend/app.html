@@ -547,6 +547,7 @@
         <button class="sidebar-nav-link sidebar-audit-link" data-page="audit" style="display:none"><span class="nav-icon">⋮</span>Журнал аудита</button>
         <button class="sidebar-nav-link sidebar-cio-link" data-page="cio-board" style="display:none"><span class="nav-icon">◉</span>CIO Dashboard</button>
         <button class="sidebar-nav-link sidebar-admin-link" data-page="users" style="display:none"><span class="nav-icon">◑</span>Пользователи</button>
+        <a class="sidebar-nav-link sidebar-adminpanel-link" href="/admin" style="display:none"><span class="nav-icon">⛨</span>Админ-панель</a>
       </div>
       <div class="sidebar-footer">
         <div class="sidebar-user" id="sidebarUserName">—</div>
@@ -1665,11 +1666,12 @@
           document.getElementById('app').classList.add('visible');
           document.getElementById('cio-board').classList.remove('visible');
           $('#sidebarUserName').textContent = currentUser.name || currentUser.email;
-          if (currentUser.role === 'admin' || currentUser.role === 'viewer') {
+          if (currentUser.role === 'admin' || currentUser.role === 'super-admin' || currentUser.role === 'viewer') {
             $$('.sidebar-audit-link').forEach(el => el.style.display = 'flex');
           }
-          if (currentUser.role === 'admin') {
+          if (currentUser.role === 'admin' || currentUser.role === 'super-admin') {
             $$('.sidebar-admin-link').forEach(el => el.style.display = 'flex');
+            $$('.sidebar-adminpanel-link').forEach(el => el.style.display = 'flex');
             $$('.sidebar-cio-link').forEach(el => el.style.display = 'flex');
           }
           if (currentUser.role === 'viewer') {
@@ -1691,7 +1693,7 @@
         // Show impersonation banner if active
         const origToken = localStorage.getItem(STORAGE_ORIG_TOKEN);
         if (origToken) {
-          const roleMap = { admin: 'Администратор', manager: 'Менеджер', cio: 'CIO', user: 'Пользователь' };
+          const roleMap = { admin: 'Администратор', 'super-admin': 'Супер-администратор', manager: 'Менеджер', cio: 'CIO', user: 'Пользователь' };
           const banner = document.getElementById('impersonationBanner');
           banner.classList.remove('hidden');
           document.body.classList.add('impersonating');
