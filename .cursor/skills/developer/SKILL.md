@@ -198,3 +198,105 @@ if (isImpersonating) showImpersonationBanner(currentUser);
 ```
 
 Требования к backend: отдельный endpoint `POST /api/auth/impersonate` (только для `admin`), возвращает JWT с ролью целевого пользователя. Токен с укороченным TTL (например 2h).
+
+---
+
+## Паттерны: Admin Panel (отдельная SPA-страница)
+
+### Отдельный HTML для adminpanel — правильнее, чем секция в app.html
+
+Когда приложение уже большое (>1500 строк), добавление новой функциональности в тот же файл ухудшает поддержку. Для инструментов с другой аудиторией (администраторы vs пользователи) — делать отдельную страницу:
+
+```
+/app    → frontend/app.html  (пользователи)
+/admin  → frontend/admin.html (только admin/super-admin)
+```
+
+Защита строго на двух уровнях:
+1. **Сервер**: `adminMiddleware` на каждом `/api/admin/*` — 403 для не-admin
+2. **Клиент**: `init()` в admin.html — `/api/auth/me` → проверка роли → если не admin → показать заглушку или редирект
+
+**Никогда не делать cookie-gate на раздаче admin.html!** — та же грабля что с `/app`.
+
+### adminMiddleware — паттерн для RBAC-группы ролей
+
+```javascript
+function adminMiddleware(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+  if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+    return res.status(403).json({ error: 'Forbidden: admin role required' });
+  }
+  next();
+}
+
+// Использование: два middleware подряд
+app.get('/api/admin/stats', authMiddleware, adminMiddleware, handler);
+```
+
+### super-admin vs admin: паттерн иерархии ролей
+
+| Может | admin | super-admin |
+|---|---|---|
+| Доступ к /admin | ✓ | ✓ |
+| Управлять user/manager/cio/viewer | ✓ | ✓ |
+| Управлять другими admin | ✗ | ✓ |
+| Назначать super-admin | ✗ | ✓ |
+
+```javascript
+// Проверка в PATCH /api/admin/users/:id
+if ((target.role === 'admin' || target.role === 'super-admin') && req.user.role !== 'super-admin') {
+  return res.status(403).json({ error: 'Only super-admin can manage admin accounts' });
+}
+if (role === 'super-admin' && req.user.role !== 'super-admin') {
+  return res.status(403).json({ error: 'Only super-admin can assign super-admin role' });
+}
+// Нельзя менять самого себя
+if (targetId === req.user.id) return res.status(400).json({ error: 'Cannot modify your own account' });
+```
+
+### Graceful DB migration: ADD COLUMN IF NOT EXISTS
+
+Паттерн для добавления колонки без даунтайма — колонка добавляется и в schema.sql, и сразу применяется через `ALTER TABLE IF NOT EXISTS`:
+
+```sql
+-- В schema.sql: сначала основная таблица, потом migration-строка
+CREATE TABLE IF NOT EXISTS users ( id SERIAL ... );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT FALSE;
+```
+
+Запрос в коде делать graceful-fallback, если колонка ещё не создана:
+
+```javascript
+try {
+  result = await query('SELECT id, is_blocked FROM users WHERE id = $1', [id]);
+} catch (_) {
+  result = await query('SELECT id, FALSE AS is_blocked FROM users WHERE id = $1', [id]);
+}
+```
+
+### Системные метрики через Node.js built-ins (без внешних зависимостей)
+
+```javascript
+const os = require('os');
+// process.uptime() — аптайм Node-процесса в секундах
+// os.uptime()      — аптайм ОС в секундах
+// process.memoryUsage() — { rss, heapUsed, heapTotal, external }
+// os.cpus().length — число ядер
+// os.loadavg()     — [1min, 5min, 15min] load average
+// os.totalmem() / os.freemem() — память в байтах
+```
+
+### Чтение deploy-лога: graceful если файл отсутствует
+
+```javascript
+const DEPLOY_LOG = process.env.DEPLOY_LOG_PATH || '/var/log/tasktime-deploy.log';
+app.get('/api/admin/deploys', adminMiddleware, async (req, res) => {
+  try {
+    if (!fs.existsSync(DEPLOY_LOG)) return res.json([]);
+    const raw = fs.readFileSync(DEPLOY_LOG, 'utf8');
+    res.json(parseDeployLog(raw.split('\n').filter(Boolean)));
+  } catch (_) {
+    res.json([]);  // никогда не падаем с 500 из-за лога
+  }
+});
+```
