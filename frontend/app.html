@@ -204,6 +204,79 @@
     .col-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; }
     .resizable-table th { user-select: none; }
 
+    /* ——— New Task block (registration area) ——— */
+    .new-task-block {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      margin-bottom: 18px;
+      background: var(--bg-secondary);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .ntb-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .ntb-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .ntb-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .ntb-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ntb-row {
+      display: grid;
+      grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr) auto;
+      gap: 8px;
+    }
+    .ntb-row-secondary {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    }
+    .ntb-field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .ntb-field input,
+    .ntb-field select {
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+    .ntb-field-title input {
+      font-weight: 500;
+    }
+    .ntb-field-submit {
+      align-self: end;
+    }
+    .ntb-field-submit .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    @media (max-width: 900px) {
+      .new-task-block {
+        padding: 12px 12px 14px;
+      }
+      .ntb-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .ntb-row-secondary {
+        grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+      }
+    }
+
     /* ——— Report ——— */
     .report-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
     .report-tab { padding: 7px 14px; font-size: 13px; font-weight: 500; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
@@ -594,6 +667,64 @@
 
         <section class="page" id="pageTasks">
           <div class="page-title">Задачи</div>
+
+          <div class="new-task-block" id="newTaskBlock">
+            <div class="ntb-header">
+              <div>
+                <div class="ntb-title">Регистрация задачи</div>
+                <div class="ntb-subtitle">Куда складываем новые задачи вместо Jira</div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm task-create-btn" id="openAdvancedTaskModalBtn">
+                Расширенная форма
+              </button>
+            </div>
+            <form id="taskInlineForm" class="ntb-form">
+              <div class="ntb-row">
+                <div class="ntb-field ntb-field-title">
+                  <label for="taskInlineTitle">Краткое название</label>
+                  <input type="text" id="taskInlineTitle" placeholder="Что нужно сделать?" autocomplete="off">
+                </div>
+                <div class="ntb-field ntb-field-type">
+                  <label for="taskInlineType">Тип</label>
+                  <select id="taskInlineType">
+                    <option value="task" selected>Задача</option>
+                    <option value="bug">Баг</option>
+                    <option value="feature">Фича</option>
+                    <option value="support">Запрос</option>
+                  </select>
+                </div>
+                <div class="ntb-field ntb-field-priority">
+                  <label for="taskInlinePriority">Приоритет</label>
+                  <select id="taskInlinePriority">
+                    <option value="low">Низкий</option>
+                    <option value="medium" selected>Средний</option>
+                    <option value="high">Высокий</option>
+                  </select>
+                </div>
+                <div class="ntb-field ntb-field-assignee">
+                  <label for="taskInlineAssignee">Исполнитель</label>
+                  <select id="taskInlineAssignee">
+                    <option value="">— Не назначен —</option>
+                  </select>
+                </div>
+                <div class="ntb-field ntb-field-submit">
+                  <label>&nbsp;</label>
+                  <button type="submit" class="btn btn-primary task-create-btn" id="taskInlineSubmit">Создать</button>
+                </div>
+              </div>
+              <div class="ntb-row ntb-row-secondary">
+                <div class="ntb-field ntb-field-desc">
+                  <label for="taskInlineDesc">Краткое описание (опционально)</label>
+                  <input type="text" id="taskInlineDesc" placeholder="Контекст, ожидаемый результат или ссылка на переписку">
+                </div>
+                <div class="ntb-field ntb-field-estimate">
+                  <label for="taskInlineEstimate">Оценка, ч (опционально)</label>
+                  <input type="number" id="taskInlineEstimate" min="0" step="0.5" inputmode="decimal">
+                </div>
+              </div>
+            </form>
+          </div>
+
           <div class="toolbar">
             <div class="filters">
               <button type="button" class="filter-btn active" data-filter="all">Все</button>
@@ -887,9 +1018,15 @@
         const list = await apiFetch('/api/users');
         if (Array.isArray(list)) users = list;
         const sel = $('#taskAssignee');
-        if (!sel) return;
-        sel.innerHTML = '<option value="">— Не назначен —</option>' +
-          users.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join('');
+        if (sel) {
+          sel.innerHTML = '<option value="">— Не назначен —</option>' +
+            users.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join('');
+        }
+        const selInline = $('#taskInlineAssignee');
+        if (selInline) {
+          selInline.innerHTML = '<option value="">— Не назначен —</option>' +
+            users.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join('');
+        }
       }
       async function loadTimeLogs() {
         const list = await apiFetch('/api/time-logs');
@@ -1664,6 +1801,62 @@
         });
       });
 
+      // ——— New Task registration block (inline) ———
+      let inlineTaskInited = false;
+      function setupInlineTaskBlock() {
+        if (inlineTaskInited) return;
+        const form = $('#taskInlineForm');
+        if (!form) return;
+        inlineTaskInited = true;
+
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const title = $('#taskInlineTitle').value.trim();
+          if (!title) return;
+          const btn = $('#taskInlineSubmit');
+          if (btn) btn.disabled = true;
+          try {
+            const estimateRaw = $('#taskInlineEstimate').value.trim();
+            const estimate = estimateRaw ? Number(estimateRaw.replace(',', '.')) : null;
+            const created = await apiFetch('/api/tasks', {
+              method: 'POST',
+              body: JSON.stringify({
+                title,
+                description: $('#taskInlineDesc').value.trim() || undefined,
+                type: $('#taskInlineType').value || 'task',
+                priority: $('#taskInlinePriority').value || 'medium',
+                assignee_id: $('#taskInlineAssignee').value ? parseInt($('#taskInlineAssignee').value, 10) : undefined,
+                estimated_hours: Number.isFinite(estimate) && estimate > 0 ? estimate : undefined,
+                status: 'open',
+              }),
+            });
+            if (created && created.id) {
+              $('#taskInlineTitle').value = '';
+              $('#taskInlineDesc').value = '';
+              $('#taskInlineEstimate').value = '';
+              $('#taskInlineType').value = 'task';
+              $('#taskInlinePriority').value = 'medium';
+              await loadTasks();
+            } else {
+              alert(created && created.error ? created.error : 'Не удалось создать задачу');
+            }
+          } finally {
+            if (btn) btn.disabled = false;
+          }
+        });
+
+        const advancedBtn = $('#openAdvancedTaskModalBtn');
+        if (advancedBtn) {
+          advancedBtn.addEventListener('click', function() {
+            openTaskModal();
+            const title = $('#taskInlineTitle').value.trim();
+            const desc  = $('#taskInlineDesc').value.trim();
+            if (title) $('#taskTitle').value = title;
+            if (desc)  $('#taskDesc').value = desc;
+          });
+        }
+      }
+
       // ——— Task modal ———
       function openTaskModal() {
         $('#taskModal').classList.add('visible');
@@ -1795,6 +1988,7 @@
           if (currentUser.role === 'viewer') {
             $$('.task-create-btn').forEach(el => el.style.display = 'none');
           }
+          setupInlineTaskBlock();
           loadUsers();
           loadTasks();
           loadTimeLogs().then(() => { renderReport(); });
