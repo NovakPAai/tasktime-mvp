@@ -207,31 +207,60 @@ app.get('/api/users', authMiddleware, async (req, res) => {
 app.get('/api/tasks', authMiddleware, async (req, res) => {
   try {
     const { assignee_id, status, creator_id, project_id } = req.query;
-    let sql = `
-      SELECT t.id, t.title, t.description, t.type, t.priority, t.status,
-             t.assignee_id, t.creator_id, t.estimated_hours, t.project_id,
-             t.created_at, t.updated_at,
-             ua.name AS assignee_name, uc.name AS creator_name,
-             p.name AS project_name
-      FROM tasks t
-      LEFT JOIN users ua ON t.assignee_id = ua.id
-      LEFT JOIN users uc ON t.creator_id = uc.id
-      LEFT JOIN projects p ON t.project_id = p.id
-      WHERE 1=1`;
-    const params = [];
-    let n = 1;
-    if (req.user.role === 'user') {
-      sql += ` AND (t.creator_id = $${n} OR t.assignee_id = $${n})`;
-      params.push(req.user.id);
-      n++;
+    try {
+      // New query with optional project binding
+      let sql = `
+        SELECT t.id, t.title, t.description, t.type, t.priority, t.status,
+               t.assignee_id, t.creator_id, t.estimated_hours, t.project_id,
+               t.created_at, t.updated_at,
+               ua.name AS assignee_name, uc.name AS creator_name,
+               p.name AS project_name
+        FROM tasks t
+        LEFT JOIN users ua ON t.assignee_id = ua.id
+        LEFT JOIN users uc ON t.creator_id = uc.id
+        LEFT JOIN projects p ON t.project_id = p.id
+        WHERE 1=1`;
+      const params = [];
+      let n = 1;
+      if (req.user.role === 'user') {
+        sql += ` AND (t.creator_id = $${n} OR t.assignee_id = $${n})`;
+        params.push(req.user.id);
+        n++;
+      }
+      if (assignee_id) { sql += ` AND t.assignee_id = $${n}`; params.push(assignee_id); n++; }
+      if (status) { sql += ` AND t.status = $${n}`; params.push(status); n++; }
+      if (creator_id) { sql += ` AND t.creator_id = $${n}`; params.push(creator_id); n++; }
+      if (project_id) { sql += ` AND t.project_id = $${n}`; params.push(project_id); n++; }
+      sql += ' ORDER BY t.updated_at DESC';
+      const result = await query(sql, params);
+      res.json(result.rows);
+    } catch (e) {
+      // Graceful fallback if project_id column not yet migrated in DB
+      if (e.code !== '42703') throw e;
+      let sql = `
+        SELECT t.id, t.title, t.description, t.type, t.priority, t.status,
+               t.assignee_id, t.creator_id, t.estimated_hours,
+               t.created_at, t.updated_at,
+               ua.name AS assignee_name, uc.name AS creator_name
+        FROM tasks t
+        LEFT JOIN users ua ON t.assignee_id = ua.id
+        LEFT JOIN users uc ON t.creator_id = uc.id
+        WHERE 1=1`;
+      const params = [];
+      let n = 1;
+      if (req.user.role === 'user') {
+        sql += ` AND (t.creator_id = $${n} OR t.assignee_id = $${n})`;
+        params.push(req.user.id);
+        n++;
+      }
+      if (assignee_id) { sql += ` AND t.assignee_id = $${n}`; params.push(assignee_id); n++; }
+      if (status) { sql += ` AND t.status = $${n}`; params.push(status); n++; }
+      if (creator_id) { sql += ` AND t.creator_id = $${n}`; params.push(creator_id); n++; }
+      // project_id filter игнорируется, если колонки нет
+      sql += ' ORDER BY t.updated_at DESC';
+      const fallback = await query(sql, params);
+      res.json(fallback.rows);
     }
-    if (assignee_id) { sql += ` AND t.assignee_id = $${n}`; params.push(assignee_id); n++; }
-    if (status) { sql += ` AND t.status = $${n}`; params.push(status); n++; }
-    if (creator_id) { sql += ` AND t.creator_id = $${n}`; params.push(creator_id); n++; }
-    if (project_id) { sql += ` AND t.project_id = $${n}`; params.push(project_id); n++; }
-    sql += ' ORDER BY t.updated_at DESC';
-    const result = await query(sql, params);
-    res.json(result.rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -252,16 +281,31 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
       project_id,
     } = req.body;
     if (!title) return res.status(400).json({ error: 'title required' });
-    const result = await query(
-      `INSERT INTO tasks (title, description, type, priority, status, assignee_id, creator_id, estimated_hours, project_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, title, description, type, priority, status,
-                 assignee_id, creator_id, estimated_hours, project_id,
-                 created_at, updated_at`,
-      [title, description || null, type, priority, status,
-       assignee_id || null, req.user.id, estimated_hours || null,
-       project_id || null]
-    );
+    let result;
+    try {
+      result = await query(
+        `INSERT INTO tasks (title, description, type, priority, status, assignee_id, creator_id, estimated_hours, project_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, title, description, type, priority, status,
+                   assignee_id, creator_id, estimated_hours, project_id,
+                   created_at, updated_at`,
+        [title, description || null, type, priority, status,
+         assignee_id || null, req.user.id, estimated_hours || null,
+         project_id || null]
+      );
+    } catch (e) {
+      // Graceful fallback if project_id column not yet migrated
+      if (e.code !== '42703') throw e;
+      result = await query(
+        `INSERT INTO tasks (title, description, type, priority, status, assignee_id, creator_id, estimated_hours)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id, title, description, type, priority, status,
+                   assignee_id, creator_id, estimated_hours,
+                   created_at, updated_at`,
+        [title, description || null, type, priority, status,
+         assignee_id || null, req.user.id, estimated_hours || null]
+      );
+    }
     const task = result.rows[0];
     await audit({ userId: req.user.id, action: 'task.create', entityType: 'task', entityId: task.id, req: req });
     if (PIXEL_OFFICE_WEBHOOK_URL && task) {
@@ -293,19 +337,35 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
 // Get one task (RBAC: user can read only if creator or assignee)
 app.get('/api/tasks/:id', authMiddleware, async (req, res) => {
   try {
-    const result = await query(
-      `SELECT t.id, t.title, t.description, t.type, t.priority, t.status,
-              t.assignee_id, t.creator_id, t.estimated_hours, t.project_id,
-              t.created_at, t.updated_at,
-              ua.name AS assignee_name, uc.name AS creator_name,
-              p.name AS project_name
-       FROM tasks t
-       LEFT JOIN users ua ON t.assignee_id = ua.id
-       LEFT JOIN users uc ON t.creator_id = uc.id
-       LEFT JOIN projects p ON t.project_id = p.id
-       WHERE t.id = $1`,
-      [req.params.id]
-    );
+    let result;
+    try {
+      result = await query(
+        `SELECT t.id, t.title, t.description, t.type, t.priority, t.status,
+                t.assignee_id, t.creator_id, t.estimated_hours, t.project_id,
+                t.created_at, t.updated_at,
+                ua.name AS assignee_name, uc.name AS creator_name,
+                p.name AS project_name
+         FROM tasks t
+         LEFT JOIN users ua ON t.assignee_id = ua.id
+         LEFT JOIN users uc ON t.creator_id = uc.id
+         LEFT JOIN projects p ON t.project_id = p.id
+         WHERE t.id = $1`,
+        [req.params.id]
+      );
+    } catch (e) {
+      if (e.code !== '42703') throw e;
+      result = await query(
+        `SELECT t.id, t.title, t.description, t.type, t.priority, t.status,
+                t.assignee_id, t.creator_id, t.estimated_hours,
+                t.created_at, t.updated_at,
+                ua.name AS assignee_name, uc.name AS creator_name
+         FROM tasks t
+         LEFT JOIN users ua ON t.assignee_id = ua.id
+         LEFT JOIN users uc ON t.creator_id = uc.id
+         WHERE t.id = $1`,
+        [req.params.id]
+      );
+    }
     if (result.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
     const task = result.rows[0];
     if (!canReadTask(task, req.user)) return res.status(403).json({ error: 'Forbidden' });
@@ -332,26 +392,49 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
       estimated_hours,
       project_id,
     } = req.body;
-    const result = await query(
-      `UPDATE tasks SET
-         title = COALESCE($2, title),
-         description = COALESCE($3, description),
-         type = COALESCE($4, type),
-         priority = COALESCE($5, priority),
-         status = COALESCE($6, status),
-         assignee_id = $7,
-         estimated_hours = COALESCE($8, estimated_hours),
-         project_id = COALESCE($9, project_id),
-         updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, title, description, type, priority, status,
-                 assignee_id, creator_id, estimated_hours, project_id,
-                 created_at, updated_at`,
-      [req.params.id, title, description, type, priority, status,
-       assignee_id !== undefined ? assignee_id : null,
-       estimated_hours,
-       project_id]
-    );
+    let result;
+    try {
+      result = await query(
+        `UPDATE tasks SET
+           title = COALESCE($2, title),
+           description = COALESCE($3, description),
+           type = COALESCE($4, type),
+           priority = COALESCE($5, priority),
+           status = COALESCE($6, status),
+           assignee_id = $7,
+           estimated_hours = COALESCE($8, estimated_hours),
+           project_id = COALESCE($9, project_id),
+           updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, title, description, type, priority, status,
+                   assignee_id, creator_id, estimated_hours, project_id,
+                   created_at, updated_at`,
+        [req.params.id, title, description, type, priority, status,
+         assignee_id !== undefined ? assignee_id : null,
+         estimated_hours,
+         project_id]
+      );
+    } catch (e) {
+      if (e.code !== '42703') throw e;
+      result = await query(
+        `UPDATE tasks SET
+           title = COALESCE($2, title),
+           description = COALESCE($3, description),
+           type = COALESCE($4, type),
+           priority = COALESCE($5, priority),
+           status = COALESCE($6, status),
+           assignee_id = $7,
+           estimated_hours = COALESCE($8, estimated_hours),
+           updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, title, description, type, priority, status,
+                   assignee_id, creator_id, estimated_hours,
+                   created_at, updated_at`,
+        [req.params.id, title, description, type, priority, status,
+         assignee_id !== undefined ? assignee_id : null,
+         estimated_hours]
+      );
+    }
     const task = result.rows[0];
     await audit({ userId: req.user.id, action: 'task.update', entityType: 'task', entityId: task.id, req: req });
     res.json(task);
