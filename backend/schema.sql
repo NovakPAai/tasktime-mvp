@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS time_logs (
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_creator ON tasks(creator_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_time_logs_task ON time_logs(task_id);
 CREATE INDEX IF NOT EXISTS idx_time_logs_user ON time_logs(user_id);
 

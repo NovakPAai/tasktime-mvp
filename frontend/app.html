@@ -235,7 +235,7 @@
     }
     .ntb-row {
       display: grid;
-      grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr) auto;
+      grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto;
       gap: 8px;
     }
     .ntb-row-secondary {
@@ -693,6 +693,12 @@
                     <option value="support">Запрос</option>
                   </select>
                 </div>
+                <div class="ntb-field ntb-field-project">
+                  <label for="taskInlineProject">Проект</label>
+                  <select id="taskInlineProject">
+                    <option value="">— Без проекта —</option>
+                  </select>
+                </div>
                 <div class="ntb-field ntb-field-priority">
                   <label for="taskInlinePriority">Приоритет</label>
                   <select id="taskInlinePriority">
@@ -1027,6 +1033,29 @@
           selInline.innerHTML = '<option value="">— Не назначен —</option>' +
             users.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join('');
         }
+      }
+
+      async function loadInlineTaskProjects() {
+        const projectSelect = $('#taskInlineProject');
+        if (!projectSelect) return;
+        projectSelect.innerHTML = '<option value="">Загрузка…</option>';
+        const projects = await apiFetch('/api/projects');
+        if (!Array.isArray(projects) || !projects.length) {
+          projectSelect.innerHTML = '<option value="">— Без проекта —</option>';
+          return;
+        }
+        const realProjects = projects.filter(p => p.project_type === 'real');
+        const items = (realProjects.length ? realProjects : projects);
+        const options = ['<option value="">— Без проекта —</option>'].concat(
+          items.map(p => {
+            const isMvp = p.name === 'MVP замены Jira на вайб-коде';
+            const label = isMvp ? `${p.name} · MVP Jira` : p.name;
+            return `<option value="${p.id}">${escapeHtml(label)}</option>`;
+          })
+        );
+        projectSelect.innerHTML = options.join('');
+        const mvp = items.find(p => p.name === 'MVP замены Jira на вайб-коде');
+        if (mvp) projectSelect.value = String(mvp.id);
       }
       async function loadTimeLogs() {
         const list = await apiFetch('/api/time-logs');
@@ -1809,6 +1838,8 @@
         if (!form) return;
         inlineTaskInited = true;
 
+        loadInlineTaskProjects().catch(() => {});
+
         form.addEventListener('submit', async function(e) {
           e.preventDefault();
           const title = $('#taskInlineTitle').value.trim();
@@ -1826,6 +1857,7 @@
                 type: $('#taskInlineType').value || 'task',
                 priority: $('#taskInlinePriority').value || 'medium',
                 assignee_id: $('#taskInlineAssignee').value ? parseInt($('#taskInlineAssignee').value, 10) : undefined,
+                project_id: $('#taskInlineProject').value ? parseInt($('#taskInlineProject').value, 10) : undefined,
                 estimated_hours: Number.isFinite(estimate) && estimate > 0 ? estimate : undefined,
                 status: 'open',
               }),

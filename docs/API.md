@@ -55,19 +55,19 @@
 ### Задачи
 
 - **GET /api/tasks**  
-  Список задач. Права: для роли `user` возвращаются только задачи, где пользователь — автор или исполнитель; для `admin` и `manager` — все.  
-  Query: `assignee_id`, `status`, `creator_id` (опционально).  
-  Ответ: массив объектов с полями id, title, description, type, priority, status, assignee_id, creator_id, estimated_hours, created_at, updated_at, assignee_name, creator_name.
+Список задач. Права: для роли `user` возвращаются только задачи, где пользователь — автор или исполнитель; для `admin` и `manager` — все.  
+Query: `assignee_id`, `status`, `creator_id`, `project_id` (опционально).  
+Ответ: массив объектов с полями `id`, `title`, `description`, `type`, `priority`, `status`, `assignee_id`, `creator_id`, `estimated_hours`, `project_id`, `created_at`, `updated_at`, `assignee_name`, `creator_name`, `project_name`.
 
 - **POST /api/tasks**  
-  Создание задачи. Тело: `title` (обязательно), `description`, `type`, `priority`, `status`, `assignee_id`, `estimated_hours` (опционально).  
-  Ответ 201: созданная задача.
+Создание задачи. Тело: `title` (обязательно), `description`, `type`, `priority`, `status`, `assignee_id`, `estimated_hours`, `project_id` (опционально).  
+Ответ 201: созданная задача.
 
 - **GET /api/tasks/:id**  
   Одна задача. 403, если у текущего пользователя нет права на просмотр (не автор и не исполнитель и не admin/manager).
 
 - **PUT /api/tasks/:id**  
-  Обновление задачи. Тело: те же поля, что при создании (частичное обновление). 403 при отсутствии права на изменение.
+Обновление задачи. Тело: те же поля, что при создании (частичное обновление, включая `project_id`). 403 при отсутствии права на изменение.
 
 - **DELETE /api/tasks/:id**  
   Удаление задачи. 403 при отсутствии права на удаление.
