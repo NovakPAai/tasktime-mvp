@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="styles/tokens.css">
   <style>
     :root {
       --bg: #ffffff;
@@ -121,7 +122,71 @@
     /* ——— App content ——— */
     .app-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
-    /* ——— Header ——— */
+    /* ——— Topbar (desktop) ——— */
+    .topbar {
+      height: 48px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .topbar-search-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      min-width: 220px;
+      transition: border-color .15s, color .15s;
+    }
+    .topbar-search-btn:hover { border-color: var(--accent); color: var(--text); }
+    .topbar-search-btn kbd { font-size: 11px; padding: 2px 6px; background: var(--border); border-radius: 4px; font-family: inherit; }
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
+    @media (min-width: 901px) {
+      .topbar { display: flex; }
+    }
+    @media (max-width: 900px) {
+      .topbar { display: none; }
+    }
+    /* ——— Command palette ——— */
+    .command-palette-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 200; align-items: flex-start; justify-content: center; padding: 12vh 20px 20px; }
+    .command-palette-overlay.visible { display: flex; }
+    .command-palette {
+      width: 100%; max-width: 560px;
+      background: var(--bg);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .command-palette input {
+      width: 100%; padding: 14px 18px;
+      font-size: 15px;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+    }
+    .command-palette input:focus { box-shadow: none; outline: none; }
+    .command-palette-list { max-height: 320px; overflow-y: auto; padding: 8px 0; }
+    .command-palette-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .command-palette-item:hover, .command-palette-item.selected { background: var(--accent-light); color: var(--accent); }
+    .command-palette-item .cmd-icon { width: 20px; text-align: center; color: var(--text-muted); }
+    .command-palette-item .cmd-shortcut { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+    /* ——— Header (legacy) ——— */
     .header {
       height: 52px;
       display: flex;
@@ -620,12 +685,12 @@
     <nav class="sidebar" id="sidebar">
       <a class="sidebar-logo">TaskTime</a>
       <div class="sidebar-nav">
-        <button class="sidebar-nav-link active" data-page="main"><span class="nav-icon">⊞</span>Дашборд</button>
-        <button class="sidebar-nav-link" data-page="tasks"><span class="nav-icon">✓</span>Задачи</button>
+        <button class="sidebar-nav-link active" data-page="main"><span class="nav-icon">⊞</span>Домой</button>
         <button class="sidebar-nav-link" data-page="projects"><span class="nav-icon">◈</span>Проекты</button>
+        <button class="sidebar-nav-link" data-page="tasks"><span class="nav-icon">✓</span>Задачи</button>
         <button class="sidebar-nav-link" data-page="quick"><span class="nav-icon">⚡</span>Быстрые задачи</button>
+        <button class="sidebar-nav-link" data-page="report"><span class="nav-icon">◷</span>Время</button>
         <button class="sidebar-nav-link" data-page="teams"><span class="nav-icon">◎</span>Команды</button>
-        <button class="sidebar-nav-link" data-page="report"><span class="nav-icon">◷</span>Отчёт по времени</button>
         <button class="sidebar-nav-link sidebar-audit-link" data-page="audit" style="display:none"><span class="nav-icon">⋮</span>Журнал аудита</button>
         <button class="sidebar-nav-link sidebar-cio-link" data-page="cio-board" style="display:none"><span class="nav-icon">◉</span>CIO Dashboard</button>
         <button class="sidebar-nav-link sidebar-admin-link" data-page="users" style="display:none"><span class="nav-icon">◑</span>Пользователи</button>
@@ -643,6 +708,16 @@
     </nav>
 
     <div class="app-content">
+      <!-- Desktop topbar: search + quick actions -->
+      <div class="topbar" id="topbar">
+        <button type="button" class="topbar-search-btn" id="topbarSearchBtn" aria-label="Поиск">
+          <span>Поиск или перейти…</span>
+          <kbd>⌘K</kbd>
+        </button>
+        <div class="topbar-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="topbarNewIssueBtn">Новая задача</button>
+        </div>
+      </div>
       <!-- Mobile top bar -->
       <div class="mobile-header" id="mobileHeader">
         <button type="button" class="hamburger-btn" id="hamburgerBtn" aria-label="Открыть меню">☰</button>
@@ -653,14 +728,21 @@
       <div class="main">
 
         <section class="page active" id="pageMain">
-          <div class="page-title">Дашборд</div>
+          <div class="page-title">Домой</div>
           <div class="dashboard-grid">
             <div class="dashboard-card" style="grid-column: 1 / -1">
-              <div class="dashboard-card-title">Мои задачи</div>
+              <div class="dashboard-card-title">Активная работа</div>
               <div id="myTasksList"><div class="empty-state">Загрузка…</div></div>
             </div>
+            <div class="dashboard-card quick-actions-card">
+              <div class="dashboard-card-title">Быстрые действия</div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px">
+                <button type="button" class="btn btn-primary" id="dashboardNewIssueBtn">Создать задачу</button>
+                <button type="button" class="btn btn-secondary" id="dashboardSearchBtn">Поиск <kbd style="margin-left:4px;font-size:11px;padding:2px 5px;background:var(--border);border-radius:4px">⌘K</kbd></button>
+              </div>
+            </div>
             <div class="dashboard-card">
-              <div class="dashboard-card-title">Проекты</div>
+              <div class="dashboard-card-title">Недавние проекты</div>
               <div id="dashProjectsList"><div class="empty-state">Загрузка…</div></div>
             </div>
             <div class="dashboard-card">
@@ -927,6 +1009,14 @@
       <div class="modal-body" id="tiModalBody">
         <div class="empty-state">Загрузка…</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Command palette (⌘K) -->
+  <div class="command-palette-overlay" id="commandPaletteOverlay">
+    <div class="command-palette">
+      <input type="text" id="commandPaletteInput" placeholder="Поиск или действие…" autocomplete="off" aria-label="Поиск">
+      <div class="command-palette-list" id="commandPaletteList"></div>
     </div>
   </div>
 
@@ -1999,6 +2089,93 @@
 
       const newTaskBtn = document.getElementById('newTaskBtn');
       if (newTaskBtn) newTaskBtn.addEventListener('click', openTaskModal);
+
+      // ——— Topbar & Dashboard: New issue → tasks page + task modal ———
+      function goToTasksAndNewIssue() {
+        const tasksNav = document.querySelector('.sidebar-nav-link[data-page="tasks"]');
+        if (tasksNav) tasksNav.click();
+        setTimeout(openTaskModal, 80);
+      }
+      const topbarNewIssueBtn = document.getElementById('topbarNewIssueBtn');
+      if (topbarNewIssueBtn) topbarNewIssueBtn.addEventListener('click', goToTasksAndNewIssue);
+      const dashboardNewIssueBtn = document.getElementById('dashboardNewIssueBtn');
+      if (dashboardNewIssueBtn) dashboardNewIssueBtn.addEventListener('click', goToTasksAndNewIssue);
+
+      // ——— Command palette (⌘K) ———
+      const commandPaletteOverlay = document.getElementById('commandPaletteOverlay');
+      const commandPaletteInput = document.getElementById('commandPaletteInput');
+      const commandPaletteList = document.getElementById('commandPaletteList');
+      const commandPaletteActions = [
+        { id: 'main', label: 'Домой', icon: '⊞', shortcut: '', page: 'main' },
+        { id: 'projects', label: 'Проекты', icon: '◈', shortcut: '', page: 'projects' },
+        { id: 'tasks', label: 'Задачи', icon: '✓', shortcut: '', page: 'tasks' },
+        { id: 'new-issue', label: 'Создать задачу', icon: '+', shortcut: 'C', page: null, action: 'newIssue' },
+        { id: 'report', label: 'Время', icon: '◷', shortcut: '', page: 'report' },
+        { id: 'teams', label: 'Команды', icon: '◎', shortcut: '', page: 'teams' },
+      ];
+      function openCommandPalette() {
+        if (!commandPaletteOverlay) return;
+        commandPaletteOverlay.classList.add('visible');
+        commandPaletteInput.value = '';
+        commandPaletteInput.focus();
+        renderCommandPaletteItems(commandPaletteActions);
+      }
+      function closeCommandPalette() {
+        if (commandPaletteOverlay) commandPaletteOverlay.classList.remove('visible');
+      }
+      function renderCommandPaletteItems(items) {
+        if (!commandPaletteList) return;
+        const q = (commandPaletteInput && commandPaletteInput.value.trim()) ? commandPaletteInput.value.trim().toLowerCase() : '';
+        const filtered = q ? items.filter(i => i.label.toLowerCase().includes(q)) : items;
+        commandPaletteList.innerHTML = filtered.map((item, idx) =>
+          '<div class="command-palette-item" data-id="' + item.id + '" data-action="' + (item.action || '') + '" data-page="' + (item.page || '') + '" tabindex="0">' +
+            '<span class="cmd-icon">' + (item.icon || '') + '</span>' +
+            '<span>' + escapeHtml(item.label) + '</span>' +
+            (item.shortcut ? '<span class="cmd-shortcut">' + item.shortcut + '</span>' : '') +
+          '</div>'
+        ).join('');
+        commandPaletteList.querySelectorAll('.command-palette-item').forEach((el, i) => {
+          el.addEventListener('click', () => runCommandPaletteAction(el));
+          el.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); runCommandPaletteAction(el); }
+            if (e.key === 'ArrowDown' && i < filtered.length - 1) { e.preventDefault(); filtered[i + 1] && commandPaletteList.querySelectorAll('.command-palette-item')[i + 1].focus(); }
+            if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); commandPaletteList.querySelectorAll('.command-palette-item')[i - 1].focus(); }
+          });
+        });
+        if (filtered.length && commandPaletteList.querySelector('.command-palette-item')) commandPaletteList.querySelector('.command-palette-item').focus();
+      }
+      function runCommandPaletteAction(el) {
+        const action = el.dataset.action;
+        const page = el.dataset.page;
+        closeCommandPalette();
+        var cioBoard = document.getElementById('cio-board');
+        if (cioBoard && cioBoard.classList.contains('visible')) {
+          cioBoard.classList.remove('visible');
+          document.getElementById('app').classList.add('visible');
+        }
+        if (action === 'newIssue') { goToTasksAndNewIssue(); return; }
+        if (page) {
+          const nav = document.querySelector('.sidebar-nav-link[data-page="' + page + '"]');
+          if (nav) nav.click();
+        }
+      }
+      if (commandPaletteInput) {
+        commandPaletteInput.addEventListener('input', () => renderCommandPaletteItems(commandPaletteActions));
+        commandPaletteInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') { e.preventDefault(); closeCommandPalette(); }
+          if (e.key === 'ArrowDown') { e.preventDefault(); const first = commandPaletteList.querySelector('.command-palette-item'); if (first) first.focus(); }
+        });
+      }
+      if (commandPaletteOverlay) {
+        commandPaletteOverlay.addEventListener('click', function(e) { if (e.target === this) closeCommandPalette(); });
+      }
+      document.addEventListener('keydown', function(e) {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCommandPalette(); }
+        if (e.key === 'Escape' && commandPaletteOverlay && commandPaletteOverlay.classList.contains('visible')) { e.preventDefault(); closeCommandPalette(); }
+      });
+      document.getElementById('topbarSearchBtn').addEventListener('click', openCommandPalette);
+      const dashboardSearchBtn = document.getElementById('dashboardSearchBtn');
+      if (dashboardSearchBtn) dashboardSearchBtn.addEventListener('click', openCommandPalette);
 
       // ——— Project modal ———
       function openProjectModal() {

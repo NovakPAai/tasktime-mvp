@@ -118,22 +118,34 @@
         errEl.style.display = 'none';
         btn.disabled = true;
         try {
-          const res  = await fetch('/api/auth/login', {
+          const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ email, password }),
           });
-          const data = await res.json();
-          if (data.token && data.user) {
+          let data;
+          try {
+            data = await res.json();
+          } catch (_) {
+            errEl.textContent   = res.ok ? 'Неверный ответ сервера' : 'Ошибка сервера';
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            return;
+          }
+          if (res.ok && data.token && data.user) {
             localStorage.setItem(STORAGE_TOKEN, data.token);
             localStorage.setItem(STORAGE_USER,  JSON.stringify(data.user));
             window.location.href = '/app';
-          } else {
-            errEl.textContent    = data.error || 'Ошибка входа';
-            errEl.style.display  = 'block';
-            btn.disabled = false;
+            return;
           }
+          var msg = data.error || '';
+          if (!msg && res.status === 401) msg = 'Неверный email или пароль';
+          if (!msg && res.status === 403) msg = 'Учётная запись заблокирована';
+          if (!msg) msg = 'Ошибка входа';
+          errEl.textContent   = msg;
+          errEl.style.display = 'block';
+          btn.disabled = false;
         } catch (_) {
           errEl.textContent   = 'Ошибка соединения с сервером';
           errEl.style.display = 'block';
