@@ -166,6 +166,18 @@ export async function deleteIssue(id: string) {
   await prisma.issue.delete({ where: { id } });
 }
 
+export async function getHistory(id: string) {
+  const issue = await prisma.issue.findUnique({ where: { id } });
+  if (!issue) throw new AppError(404, 'Issue not found');
+
+  return prisma.auditLog.findMany({
+    where: { entityType: 'issue', entityId: id },
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
+}
+
 export async function getChildren(id: string) {
   const issue = await prisma.issue.findUnique({ where: { id } });
   if (!issue) throw new AppError(404, 'Issue not found');

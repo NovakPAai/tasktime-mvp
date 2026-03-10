@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Table, Button, Tag, Space, Modal, Form, Input, Select, message } from 'antd';
-import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useIssuesStore } from '../store/issues.store';
 import { useAuthStore } from '../store/auth.store';
 import * as projectsApi from '../api/projects';
@@ -80,7 +80,9 @@ export default function ProjectDetailPage() {
       </Space>
       {project.description && <Typography.Paragraph type="secondary">{project.description}</Typography.Paragraph>}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+        <Button icon={<AppstoreOutlined />} onClick={() => navigate(`/projects/${id}/board`)}>Board</Button>
+        <Button icon={<ThunderboltOutlined />} onClick={() => navigate(`/projects/${id}/sprints`)}>Sprints</Button>
         {canCreate && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
             New Issue
@@ -88,7 +90,8 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      <Table dataSource={issues} columns={columns} rowKey="id" loading={issuesLoading} pagination={false} size="middle" />
+      <Table dataSource={issues} columns={columns} rowKey="id" loading={issuesLoading} pagination={false} size="middle"
+        onRow={(record) => ({ onClick: () => navigate(`/issues/${record.id}`), style: { cursor: 'pointer' } })} />
 
       <Modal title="New Issue" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} okText="Create" width={600}>
         <Form form={form} layout="vertical" onFinish={handleCreate} initialValues={{ type: 'TASK', priority: 'MEDIUM' }}>

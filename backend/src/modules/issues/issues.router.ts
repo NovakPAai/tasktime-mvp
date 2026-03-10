@@ -99,4 +99,14 @@ router.get('/issues/:id/children', async (req, res, next) => {
   }
 });
 
+// Issue history from audit_log (2.10)
+router.get('/issues/:id/history', async (req, res, next) => {
+  try {
+    const history = await issuesService.getHistory(req.params.id as string);
+    res.json(history);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

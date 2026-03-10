@@ -1,5 +1,5 @@
 import { Layout, Menu, Button, Typography } from 'antd';
-import { ProjectOutlined, LogoutOutlined, DashboardOutlined } from '@ant-design/icons';
+import { ProjectOutlined, LogoutOutlined, DashboardOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -18,6 +18,7 @@ export default function AppLayout() {
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/projects', icon: <ProjectOutlined />, label: 'Projects' },
+    { key: '/time', icon: <ClockCircleOutlined />, label: 'My Time' },
   ];
 
   return (

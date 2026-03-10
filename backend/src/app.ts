@@ -8,6 +8,10 @@ import authRouter from './modules/auth/auth.router.js';
 import usersRouter from './modules/users/users.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
 import issuesRouter from './modules/issues/issues.router.js';
+import boardsRouter from './modules/boards/boards.router.js';
+import sprintsRouter from './modules/sprints/sprints.router.js';
+import commentsRouter from './modules/comments/comments.router.js';
+import timeRouter from './modules/time/time.router.js';
 
 export function createApp() {
   const app = express();
@@ -29,6 +33,10 @@ export function createApp() {
   app.use('/api/projects', projectsRouter);
   // Issues router has mixed paths: /api/projects/:projectId/issues and /api/issues/:id
   app.use('/api', issuesRouter);
+  app.use('/api', boardsRouter);
+  app.use('/api', sprintsRouter);
+  app.use('/api', commentsRouter);
+  app.use('/api', timeRouter);
 
   // Error handler (must be last)
   app.use(errorHandler);

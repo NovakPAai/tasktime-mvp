@@ -7,6 +7,10 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import IssueDetailPage from './pages/IssueDetailPage';
+import BoardPage from './pages/BoardPage';
+import SprintsPage from './pages/SprintsPage';
+import TimePage from './pages/TimePage';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +35,10 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="projects/:id" element={<ProjectDetailPage />} />
+            <Route path="projects/:id/board" element={<BoardPage />} />
+            <Route path="projects/:id/sprints" element={<SprintsPage />} />
+            <Route path="issues/:id" element={<IssueDetailPage />} />
+            <Route path="time" element={<TimePage />} />
           </Route>
         </Routes>
       </BrowserRouter>
