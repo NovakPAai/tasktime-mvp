@@ -1,0 +1,73 @@
+import { useEffect, useState } from 'react';
+import { Typography, Table, Button, Modal, Form, Input, message } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useProjectsStore } from '../store/projects.store';
+import { useAuthStore } from '../store/auth.store';
+import * as projectsApi from '../api/projects';
+import type { Project } from '../types';
+
+export default function ProjectsPage() {
+  const { projects, loading, fetchProjects } = useProjectsStore();
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  const canCreate = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+
+  const handleCreate = async (values: { name: string; key: string; description?: string }) => {
+    try {
+      await projectsApi.createProject(values);
+      message.success('Project created');
+      setModalOpen(false);
+      form.resetFields();
+      fetchProjects();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      message.error(error.response?.data?.error || 'Failed to create project');
+    }
+  };
+
+  const columns = [
+    { title: 'Key', dataIndex: 'key', width: 100 },
+    { title: 'Name', dataIndex: 'name', render: (name: string, record: Project) => (
+      <a onClick={() => navigate(`/projects/${record.id}`)}>{name}</a>
+    )},
+    { title: 'Issues', dataIndex: ['_count', 'issues'], width: 80 },
+    { title: 'Created', dataIndex: 'createdAt', width: 120, render: (v: string) => new Date(v).toLocaleDateString() },
+  ];
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Typography.Title level={3} style={{ margin: 0 }}>Projects</Typography.Title>
+        {canCreate && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+            New Project
+          </Button>
+        )}
+      </div>
+
+      <Table dataSource={projects} columns={columns} rowKey="id" loading={loading} pagination={false} />
+
+      <Modal title="New Project" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} okText="Create">
+        <Form form={form} layout="vertical" onFinish={handleCreate}>
+          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="key" label="Key" rules={[{ required: true, pattern: /^[A-Z][A-Z0-9]*$/, message: 'Uppercase letters/digits, starting with letter' }]} extra="e.g. PROJ, BACK, FRONT">
+            <Input style={{ textTransform: 'uppercase' }} />
+          </Form.Item>
+          <Form.Item name="description" label="Description">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
+}

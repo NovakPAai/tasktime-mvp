@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, claude/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tasktime
+          POSTGRES_PASSWORD: tasktime
+          POSTGRES_DB: tasktime_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://tasktime:tasktime@localhost:5432/tasktime_test
+      JWT_SECRET: test-secret-key-minimum-length
+      JWT_REFRESH_SECRET: test-refresh-secret-key-minimum
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd backend && npm ci
+      - run: cd backend && npx prisma generate
+      - run: cd backend && npx prisma db push
+      - run: cd backend && npx tsc --noEmit
+      - run: cd backend && npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd frontend && npm ci
+      - run: cd frontend && npx tsc --noEmit
+      - run: cd frontend && npm run build
