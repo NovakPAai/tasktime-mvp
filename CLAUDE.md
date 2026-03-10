@@ -9,7 +9,7 @@ TaskTime — импортозамещение Jira для российского
 
 **Фаза:** Пересборка с нуля (v2). Старый прототип удалён.
 **План:** утверждён в `docs/RU/REBUILD_PLAN_V2.md`
-**Статус:** Sprint 1 ЗАВЕРШЁН. Готов к Sprint 2.
+**Статус:** Sprint 2 ЗАВЕРШЁН. Готов к Sprint 3.
 
 ### Sprint 1 — DONE (2026-03-10)
 
@@ -34,27 +34,15 @@ TaskTime — импортозамещение Jira для российского
 **Запуск:** `make setup && make dev` → http://localhost:5173
 **Аккаунты:** admin/manager/dev/viewer @tasktime.ru, пароль: password123
 
-### Sprint 2 — СЛЕДУЮЩИЙ
+### Sprint 2 — DONE (2026-03-10)
 
-Scope (из docs/RU/REBUILD_PLAN_V2.md, задачи 2.1–2.10):
-- 2.1 Kanban Board API (задачи по статусам)
-- 2.2 Kanban Board UI (drag-n-drop между колонками)
-- 2.3 Sprints module API: CRUD + start/close
-- 2.4 Sprints UI: backlog ↔ sprint перемещение
-- 2.5 Time tracking module API: start/stop/manual
-- 2.6 Time tracking UI: таймер + ручной ввод
-- 2.7 Comments module API
-- 2.8 Comments UI на странице задачи
-- 2.9 Issue detail page (полная информация)
-- 2.10 Issue history (из audit_log)
-
-**Definition of Done Sprint 2:**
-- Kanban-доска с drag-n-drop
-- Спринты: создание, старт, закрытие
-- Перемещение задач между спринтом и бэклогом
-- Таймер работает
-- Комментарии к задачам
-- История изменений задачи
+Реализовано всё из плана Sprint 2 (2.1–2.10):
+- Kanban Board API/UI: колонки по статусам, drag-n-drop, сохранение порядка и статуса задач.
+- Sprints module API + UI: создание спринтов, старт/закрытие, перенос задач между бэклогом и спринтом, один ACTIVE спринт на проект.
+- Time tracking API + UI: старт/стоп таймера, ручной ввод времени, страница `My Time`, логирование по задачам и пользователю.
+- Comments API + UI: CRUD комментариев к задаче с проверкой прав, блок комментариев на странице задачи.
+- Issue detail page: полная карточка задачи (поля, иерархия, связи, время, комментарии).
+- Issue history: история изменений задачи из `audit_log` с привязкой к пользователю и действию.
 
 ## Решения из интервью (8 блоков)
 

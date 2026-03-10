@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
+import { validate } from '../../shared/middleware/validate.js';
 import * as boardsService from './boards.service.js';
+import { reorderBoardDto } from './boards.dto.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 
 const router = Router();
@@ -20,7 +22,7 @@ router.get('/projects/:projectId/board', async (req, res, next) => {
 });
 
 // PATCH /api/projects/:projectId/board/reorder
-router.patch('/projects/:projectId/board/reorder', async (req: AuthRequest, res, next) => {
+router.patch('/projects/:projectId/board/reorder', validate(reorderBoardDto), async (req: AuthRequest, res, next) => {
   try {
     await boardsService.reorderIssues(req.body.updates);
     res.json({ ok: true });
