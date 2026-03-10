@@ -240,3 +240,40 @@ PO выбрал:
 - Ветка: `claude/mvp-project-management-hdAvd`
 - Старый прототип полностью удалён
 - **Следующий шаг:** Sprint 2 (Kanban Board + Sprints + Time tracking + Comments)
+
+## Экономия токенов (Token Economy)
+
+### Модели
+
+| Уровень | Модель | Когда |
+|---------|--------|-------|
+| Lite | **Haiku 4.5** | Документация, поиск, коммиты, простые правки |
+| Standard | **Sonnet 4.6** | Основная разработка, тесты, рефакторинг, code review |
+| Heavy | **Opus 4.6** | Архитектура, ИБ-ревью, сложный дебаг, многомодульный рефакторинг |
+
+**Целевое соотношение:** 70% Sonnet, 20% Haiku, 10% Opus.
+
+### Правила для Claude Code CLI
+
+- Точечные инструменты (Glob, Grep, Read, Edit) вместо Agent для простых задач
+- Agent (Explore) — для исследования кодовой базы
+- Plan mode — для задач Opus-уровня (экономит переделки)
+- Параллельные tool calls — объединять независимые вызовы
+- Не читать файлы повторно — запоминать ключевую информацию
+- `/fast` — для итеративной работы (тот же Opus, быстрее)
+
+### Правила для Cursor
+
+- Tab/Inline Edit → Chat → Composer → Agent (от дешёвого к дорогому)
+- `@file`/`@symbol` вместо копирования кода
+- `@codebase` — только для архитектурных задач
+- Максимум 5 файлов в контексте (Sonnet), 10 файлов (Opus)
+- Закрывать ненужные вкладки
+
+### Маршрутизация скиллов по моделям
+
+Полные правила: `.cursor/rules/token-economy.mdc` и `.cursor/AGENTS.md`.
+
+- `developer`, `tester`, `system-analyst` → **Sonnet** (default)
+- `corporate-architect`, `infosec` → **Opus**
+- `deploy-tasktime`, `docs-tasktime`, `tasktime-inbox` → **Haiku**
