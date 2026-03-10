@@ -5,11 +5,56 @@
 TaskTime — импортозамещение Jira для российского финансового сектора.
 Конкуренты: Т1 Сфера, EVA, Diasoft.
 
-## Текущее состояние (2026-03-09)
+## Текущее состояние (2026-03-10)
 
-**Фаза:** Пересборка с нуля (v2). Старый прототип (vanilla JS + Express) сносится полностью.
+**Фаза:** Пересборка с нуля (v2). Старый прототип удалён.
 **План:** утверждён в `docs/RU/REBUILD_PLAN_V2.md`
-**Статус:** Ожидает финального утверждения PO, затем Sprint 1.
+**Статус:** Sprint 1 ЗАВЕРШЁН. Готов к Sprint 2.
+
+### Sprint 1 — DONE (2026-03-10)
+
+Реализовано всё из плана (задачи 1.1–1.20):
+- Backend skeleton: Express + TypeScript + Prisma 6
+- Prisma schema: User, Project, Issue, Comment, AuditLog
+- Auth module: register, login, refresh, logout, me (JWT + refresh tokens)
+- Users module: CRUD, role management (RBAC)
+- Projects module: CRUD с ключами (DEMO, BACK)
+- Issues module: CRUD + иерархия (EPIC→STORY→TASK→SUBTASK, BUG) + статусы
+- RBAC middleware (ADMIN, MANAGER, USER, VIEWER)
+- Audit logging middleware
+- Validation (Zod DTOs)
+- Error handling middleware
+- Frontend: Vite + React 18 + Ant Design 5 + React Router
+- Login page, Dashboard, Projects list, Project detail + issues list
+- Issue create/edit form
+- Seed script (demo data: 4 пользователя, 2 проекта, 5 задач)
+- Docker Compose (PostgreSQL 16 + Redis 7)
+- Makefile: setup, dev, backend, frontend
+
+**Запуск:** `make setup && make dev` → http://localhost:5173
+**Аккаунты:** admin/manager/dev/viewer @tasktime.ru, пароль: password123
+
+### Sprint 2 — СЛЕДУЮЩИЙ
+
+Scope (из docs/RU/REBUILD_PLAN_V2.md, задачи 2.1–2.10):
+- 2.1 Kanban Board API (задачи по статусам)
+- 2.2 Kanban Board UI (drag-n-drop между колонками)
+- 2.3 Sprints module API: CRUD + start/close
+- 2.4 Sprints UI: backlog ↔ sprint перемещение
+- 2.5 Time tracking module API: start/stop/manual
+- 2.6 Time tracking UI: таймер + ручной ввод
+- 2.7 Comments module API
+- 2.8 Comments UI на странице задачи
+- 2.9 Issue detail page (полная информация)
+- 2.10 Issue history (из audit_log)
+
+**Definition of Done Sprint 2:**
+- Kanban-доска с drag-n-drop
+- Спринты: создание, старт, закрытие
+- Перемещение задач между спринтом и бэклогом
+- Таймер работает
+- Комментарии к задачам
+- История изменений задачи
 
 ## Решения из интервью (8 блоков)
 
@@ -189,28 +234,9 @@ PO выбрал:
 6. PO подтвердил: в репо не должно остаться ничего от старого прототипа — обновлён раздел миграции
 7. PO попросил проверить иерархию задач — проверена, соответствует ответам
 
-### Текущий статус
+### Текущий статус (2026-03-10)
 
-- План создан и запушен в `claude/mvp-project-management-hdAvd`
-- CLAUDE.md создан с полным контекстом
-- **Следующий шаг:** PO утверждает план → очистка репо → Sprint 1
-- Sprint 1 scope: Auth + Users + Projects + Issues (20 задач)
-
-### Существующий прототип (для справки, будет удалён)
-
-Backend (Node.js + Express + vanilla JS):
-- 6 модулей: auth, issues, time, users, projects, admin
-- Каждый модуль: api.js → service.js → repository.js
-- PostgreSQL через pg (сырые SQL запросы)
-- JWT auth, bcryptjs, cookie-parser
-- Роли: user, manager, admin, super-admin, cio, viewer
-- Webhook интеграция с Pixel Office
-- Audit logging
-
-Frontend (vanilla HTML + inline JS):
-- index.html (158 строк) — логин
-- app.html (2376 строк) — основное приложение
-- admin.html (1152 строк) — админ-панель
-- CSS tokens в tokens.css
-
-Scripts: setup-script.sh (Ubuntu), deploy-server.sh
+- Sprint 1 ЗАВЕРШЁН и работает
+- Ветка: `claude/mvp-project-management-hdAvd`
+- Старый прототип полностью удалён
+- **Следующий шаг:** Sprint 2 (Kanban Board + Sprints + Time tracking + Comments)
