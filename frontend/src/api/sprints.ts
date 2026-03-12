@@ -1,17 +1,30 @@
 import api from './client';
-import type { Sprint, Issue } from '../types';
+import type { Sprint, Issue, SprintState } from '../types';
 
 export async function listSprints(projectId: string): Promise<Sprint[]> {
   const { data } = await api.get<Sprint[]>(`/projects/${projectId}/sprints`);
   return data;
 }
 
-export async function createSprint(projectId: string, body: { name: string; goal?: string; startDate?: string; endDate?: string }): Promise<Sprint> {
+interface CreateOrUpdateSprintBody {
+  name?: string;
+  goal?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  projectTeamId?: string | null;
+  businessTeamId?: string | null;
+  flowTeamId?: string | null;
+}
+
+export async function createSprint(
+  projectId: string,
+  body: { name: string; goal?: string; startDate?: string; endDate?: string; projectTeamId?: string; businessTeamId?: string; flowTeamId?: string },
+): Promise<Sprint> {
   const { data } = await api.post<Sprint>(`/projects/${projectId}/sprints`, body);
   return data;
 }
 
-export async function updateSprint(id: string, body: Partial<{ name: string; goal: string | null; startDate: string | null; endDate: string | null }>): Promise<Sprint> {
+export async function updateSprint(id: string, body: Partial<CreateOrUpdateSprintBody>): Promise<Sprint> {
   const { data } = await api.patch<Sprint>(`/sprints/${id}`, body);
   return data;
 }
@@ -37,4 +50,9 @@ export async function getBacklog(projectId: string): Promise<Issue[]> {
 
 export async function moveIssuesToBacklog(projectId: string, issueIds: string[]) {
   await api.post(`/projects/${projectId}/backlog/issues`, { issueIds });
+}
+
+export async function listAllSprints(params?: { state?: SprintState | 'ALL'; projectId?: string; teamId?: string }): Promise<Sprint[]> {
+  const { data } = await api.get<Sprint[]>('/sprints', { params });
+  return data;
 }

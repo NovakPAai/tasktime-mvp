@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Typography, Button, Space, Tag, Table, Modal, Form, Input, message, Popconfirm, Progress } from 'antd';
+import { Typography, Button, Space, Tag, Table, Modal, Form, Input, message, Popconfirm, Progress, Select } from 'antd';
 import { PlusOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons';
 import * as sprintsApi from '../api/sprints';
+import * as teamsApi from '../api/teams';
 import { useAuthStore } from '../store/auth.store';
-import type { Sprint, Issue, SprintState } from '../types';
+import type { Sprint, Issue, SprintState, Team } from '../types';
 
 const STATE_COLORS: Record<SprintState, string> = { PLANNED: 'default', ACTIVE: 'processing', CLOSED: 'green' };
 
@@ -16,16 +17,19 @@ export default function SprintsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBacklog, setSelectedBacklog] = useState<string[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [form] = Form.useForm();
   const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const load = useCallback(async () => {
     if (!projectId) return;
-    const [sp, bl] = await Promise.all([
+    const [sp, bl, ts] = await Promise.all([
       sprintsApi.listSprints(projectId),
       sprintsApi.getBacklog(projectId),
+      teamsApi.listTeams(),
     ]);
     setSprints(sp);
+    setTeams(ts);
 
     setSelectedSprintId(prev => {
       if (!sp.length) return null;
@@ -38,9 +42,15 @@ export default function SprintsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleCreate = async (vals: { name: string; goal?: string }) => {
+  const handleCreate = async (vals: { name: string; goal?: string; projectTeamId?: string; businessTeamId?: string; flowTeamId?: string }) => {
     if (!projectId) return;
-    await sprintsApi.createSprint(projectId, { name: vals.name, goal: vals.goal });
+    await sprintsApi.createSprint(projectId, {
+      name: vals.name,
+      goal: vals.goal,
+      projectTeamId: vals.projectTeamId,
+      businessTeamId: vals.businessTeamId,
+      flowTeamId: vals.flowTeamId,
+    });
     setModalOpen(false);
     form.resetFields();
     load();
@@ -254,6 +264,21 @@ export default function SprintsPage() {
                   <div style={{ fontSize: 12, color: 'var(--t2)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span>Issues: {selectedSprint._count?.issues ?? 0}</span>
                     <span>Created at: {formatDate(selectedSprint.createdAt)}</span>
+                    {selectedSprint.stats && (
+                      <span>
+                        Planning readiness: {selectedSprint.stats.planningReadiness}% (
+                        {selectedSprint.stats.estimatedIssues}/{selectedSprint.stats.totalIssues} estimated)
+                      </span>
+                    )}
+                    {selectedSprint.projectTeam && (
+                      <span>Проектная команда: {selectedSprint.projectTeam.name}</span>
+                    )}
+                    {selectedSprint.businessTeam && (
+                      <span>Бизнес-функциональная команда: {selectedSprint.businessTeam.name}</span>
+                    )}
+                    {selectedSprint.flowTeam && (
+                      <span>Flow-команда: {selectedSprint.flowTeam.name}</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -269,6 +294,24 @@ export default function SprintsPage() {
           </Form.Item>
           <Form.Item name="goal" label="Goal">
             <Input.TextArea rows={2} />
+          </Form.Item>
+          <Form.Item name="projectTeamId" label="Проектная команда">
+            <Select
+              allowClear
+              options={teams.map(t => ({ value: t.id, label: t.name }))}
+            />
+          </Form.Item>
+          <Form.Item name="businessTeamId" label="Бизнес-функциональная команда">
+            <Select
+              allowClear
+              options={teams.map(t => ({ value: t.id, label: t.name }))}
+            />
+          </Form.Item>
+          <Form.Item name="flowTeamId" label="Flow-команда">
+            <Select
+              allowClear
+              options={teams.map(t => ({ value: t.id, label: t.name }))}
+            />
           </Form.Item>
         </Form>
       </Modal>

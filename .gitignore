@@ -30,4 +30,6 @@ backend/src/prisma/migrations/
 # OS
 Thumbs.db
 tt-dev.sh
-tt-dev.sh
+
+# Local MCP servers (not committed)
+mcps/tasktime-issues/

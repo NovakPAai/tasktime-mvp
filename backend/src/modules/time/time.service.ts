@@ -19,6 +19,7 @@ export async function startTimer(issueId: string, userId: string) {
       userId,
       hours: new Decimal(0),
       startedAt: new Date(),
+      source: 'HUMAN',
     },
   });
 }
@@ -34,7 +35,11 @@ export async function stopTimer(issueId: string, userId: string) {
 
   return prisma.timeLog.update({
     where: { id: running.id },
-    data: { stoppedAt: now, hours: new Decimal(Math.round(hours * 100) / 100) },
+    data: {
+      stoppedAt: now,
+      hours: new Decimal(Math.round(hours * 100) / 100),
+      source: 'HUMAN',
+    },
   });
 }
 
@@ -49,6 +54,7 @@ export async function logManual(issueId: string, userId: string, dto: ManualTime
       hours: new Decimal(dto.hours),
       note: dto.note,
       logDate: dto.logDate ? new Date(dto.logDate) : new Date(),
+      source: 'HUMAN',
     },
   });
 }
@@ -56,7 +62,10 @@ export async function logManual(issueId: string, userId: string, dto: ManualTime
 export async function getIssueLogs(issueId: string) {
   return prisma.timeLog.findMany({
     where: { issueId },
-    include: { user: { select: { id: true, name: true } } },
+    include: {
+      user: { select: { id: true, name: true } },
+      agentSession: { select: { model: true, provider: true } },
+    },
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -64,7 +73,12 @@ export async function getIssueLogs(issueId: string) {
 export async function getUserLogs(userId: string) {
   return prisma.timeLog.findMany({
     where: { userId },
-    include: { issue: { select: { id: true, title: true, number: true, project: { select: { key: true } } } } },
+    include: {
+      issue: {
+        select: { id: true, title: true, number: true, project: { select: { key: true } } },
+      },
+      agentSession: { select: { model: true, provider: true } },
+    },
     orderBy: { createdAt: 'desc' },
     take: 100,
   });

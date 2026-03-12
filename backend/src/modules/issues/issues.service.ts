@@ -1,7 +1,20 @@
-import type { IssuePriority, IssueStatus, IssueType, Prisma } from '@prisma/client';
+import type {
+  IssuePriority,
+  IssueStatus,
+  IssueType,
+  Prisma,
+  AiAssigneeType,
+} from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import type { CreateIssueDto, UpdateIssueDto, UpdateStatusDto, AssignDto } from './issues.dto.js';
+import type {
+  CreateIssueDto,
+  UpdateIssueDto,
+  UpdateStatusDto,
+  AssignDto,
+  UpdateAiFlagsDto,
+  UpdateAiStatusDto,
+} from './issues.dto.js';
 
 // Which types can be children (and their allowed parent types)
 const ALLOWED_PARENTS: Record<IssueType, IssueType[]> = {
@@ -91,6 +104,42 @@ export async function listIssues(projectId: string, filters?: ListIssuesFilters)
       _count: { select: { children: true } },
     },
     orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+  });
+}
+
+type MvpLivecodeFilters = {
+  onlyAiEligible?: boolean;
+  assigneeType?: AiAssigneeType | 'ALL';
+};
+
+export async function listActiveIssuesForMvpLivecode(filters?: MvpLivecodeFilters) {
+  const project = await prisma.project.findUnique({ where: { key: 'LIVE' } });
+  if (!project) {
+    throw new AppError(404, 'MVP LiveCode project (LIVE) not found');
+  }
+
+  const where: Prisma.IssueWhereInput = {
+    projectId: project.id,
+    status: { in: ['OPEN', 'IN_PROGRESS', 'REVIEW'] },
+  };
+
+  if (filters?.onlyAiEligible) {
+    where.aiEligible = true;
+  }
+
+  if (filters?.assigneeType && filters.assigneeType !== 'ALL') {
+    where.aiAssigneeType = filters.assigneeType;
+  }
+
+  return prisma.issue.findMany({
+    where,
+    include: {
+      assignee: { select: { id: true, name: true, email: true } },
+      creator: { select: { id: true, name: true } },
+      project: { select: { id: true, name: true, key: true } },
+      _count: { select: { children: true } },
+    },
+    orderBy: [{ status: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
   });
 }
 
@@ -225,6 +274,39 @@ export async function assignIssue(id: string, dto: AssignDto) {
     where: { id },
     data: { assigneeId: dto.assigneeId },
     include: { assignee: { select: { id: true, name: true } } },
+  });
+}
+
+export async function updateAiFlags(id: string, dto: UpdateAiFlagsDto) {
+  const issue = await prisma.issue.findUnique({ where: { id } });
+  if (!issue) throw new AppError(404, 'Issue not found');
+
+  const data: Prisma.IssueUpdateInput = {};
+  if (dto.aiEligible !== undefined) {
+    data.aiEligible = dto.aiEligible;
+  }
+  if (dto.aiAssigneeType !== undefined) {
+    data.aiAssigneeType = dto.aiAssigneeType;
+  }
+
+  return prisma.issue.update({
+    where: { id },
+    data,
+    include: {
+      assignee: { select: { id: true, name: true, email: true } },
+      creator: { select: { id: true, name: true } },
+      project: { select: { id: true, name: true, key: true } },
+    },
+  });
+}
+
+export async function updateAiStatus(id: string, dto: UpdateAiStatusDto) {
+  const issue = await prisma.issue.findUnique({ where: { id } });
+  if (!issue) throw new AppError(404, 'Issue not found');
+
+  return prisma.issue.update({
+    where: { id },
+    data: { aiExecutionStatus: dto.aiExecutionStatus },
   });
 }
 

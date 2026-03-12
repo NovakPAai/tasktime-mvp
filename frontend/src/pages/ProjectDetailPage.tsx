@@ -109,6 +109,13 @@ export default function ProjectDetailPage() {
       ),
     },
     {
+      title: 'AI',
+      dataIndex: 'aiEligible',
+      width: 70,
+      render: (v: boolean | undefined) =>
+        v ? <span className="tt-badge tt-badge-ai">Agent</span> : <span className="tt-badge tt-badge-human">Human</span>,
+    },
+    {
       title: 'Type',
       dataIndex: 'type',
       width: 100,

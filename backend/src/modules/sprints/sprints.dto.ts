@@ -5,6 +5,9 @@ export const createSprintDto = z.object({
   goal: z.string().max(2000).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
+  projectTeamId: z.string().uuid().optional(),
+  businessTeamId: z.string().uuid().optional(),
+  flowTeamId: z.string().uuid().optional(),
 });
 
 export const updateSprintDto = z.object({
@@ -12,6 +15,9 @@ export const updateSprintDto = z.object({
   goal: z.string().max(2000).nullable().optional(),
   startDate: z.string().datetime().nullable().optional(),
   endDate: z.string().datetime().nullable().optional(),
+  projectTeamId: z.string().uuid().nullable().optional(),
+  businessTeamId: z.string().uuid().nullable().optional(),
+  flowTeamId: z.string().uuid().nullable().optional(),
 });
 
 export const moveIssuesToSprintDto = z.object({

@@ -10,6 +10,26 @@ import type { AuthRequest } from '../../shared/types/index.js';
 const router = Router();
 router.use(authenticate);
 
+// Global list of sprints with optional filters
+router.get('/sprints', async (req, res, next) => {
+  try {
+    const { state, projectId, teamId } = req.query as {
+      state?: string;
+      projectId?: string;
+      teamId?: string;
+    };
+
+    const sprints = await sprintsService.listAllSprints({
+      state,
+      projectId,
+      teamId,
+    });
+    res.json(sprints);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // List sprints
 router.get('/projects/:projectId/sprints', async (req, res, next) => {
   try {

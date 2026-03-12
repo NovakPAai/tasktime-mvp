@@ -25,7 +25,18 @@ export const assignDto = z.object({
   assigneeId: z.string().uuid().nullable(),
 });
 
+export const updateAiFlagsDto = z.object({
+  aiEligible: z.boolean().optional(),
+  aiAssigneeType: z.enum(['HUMAN', 'AGENT', 'MIXED']).optional(),
+});
+
+export const updateAiStatusDto = z.object({
+  aiExecutionStatus: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'DONE', 'FAILED']),
+});
+
 export type CreateIssueDto = z.infer<typeof createIssueDto>;
 export type UpdateIssueDto = z.infer<typeof updateIssueDto>;
 export type UpdateStatusDto = z.infer<typeof updateStatusDto>;
 export type AssignDto = z.infer<typeof assignDto>;
+export type UpdateAiFlagsDto = z.infer<typeof updateAiFlagsDto>;
+export type UpdateAiStatusDto = z.infer<typeof updateAiStatusDto>;

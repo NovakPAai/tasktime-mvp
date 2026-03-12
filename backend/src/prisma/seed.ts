@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -67,6 +67,82 @@ async function main() {
     },
   });
 
+  const liveCodeProject = await prisma.project.upsert({
+    where: { key: 'LIVE' },
+    update: {},
+    create: {
+      name: 'TaskTime MVP LiveCode',
+      key: 'LIVE',
+      description: 'Живой проект: задачи для разработки TaskTime MVP (vibe-code) самим TaskTime и агентами',
+    },
+  });
+
+  // Historical sprints for TaskTime MVP (TTMP)
+  const sprint0 = await prisma.sprint.upsert({
+    where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 0 — Развертывание стенда' } },
+    update: {},
+    create: {
+      projectId: mvpProject.id,
+      name: 'Sprint 0 — Развертывание стенда',
+      goal: 'Подготовка стенда, анализ и планирование MVP',
+      startDate: new Date('2026-03-08T09:00:00Z'),
+      endDate: new Date('2026-03-08T18:00:00Z'),
+      state: 'CLOSED',
+    },
+  });
+
+  const sprint1 = await prisma.sprint.upsert({
+    where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 1 — Фундамент системы' } },
+    update: {},
+    create: {
+      projectId: mvpProject.id,
+      name: 'Sprint 1 — Фундамент системы',
+      goal: 'Backend/Frontend фундамент, Auth, Users, Projects, Issues',
+      startDate: new Date('2026-03-09T09:00:00Z'),
+      endDate: new Date('2026-03-10T18:00:00Z'),
+      state: 'CLOSED',
+    },
+  });
+
+  const sprint2 = await prisma.sprint.upsert({
+    where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 2 — Доски, спринты, время, комментарии' } },
+    update: {},
+    create: {
+      projectId: mvpProject.id,
+      name: 'Sprint 2 — Доски, спринты, время, комментарии',
+      goal: 'Kanban Board, Sprints, Time tracking, Comments, Issue history',
+      startDate: new Date('2026-03-10T09:00:00Z'),
+      endDate: new Date('2026-03-10T18:00:00Z'),
+      state: 'CLOSED',
+    },
+  });
+
+  const sprint3 = await prisma.sprint.upsert({
+    where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3 — Teams, Admin, Reports, Redis' } },
+    update: {},
+    create: {
+      projectId: mvpProject.id,
+      name: 'Sprint 3 — Teams, Admin, Reports, Redis',
+      goal: 'Teams, Admin, отчёты и доработка Redis по плану Sprint 3',
+      startDate: new Date('2026-03-11T09:00:00Z'),
+      endDate: new Date('2026-03-11T18:00:00Z'),
+      state: 'CLOSED',
+    },
+  });
+
+  const sprint35 = await prisma.sprint.upsert({
+    where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг' } },
+    update: {},
+    create: {
+      projectId: mvpProject.id,
+      name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг',
+      goal: 'Полиш UX/UI, UAT и стабилизация после Sprint 3',
+      startDate: new Date('2026-03-12T09:00:00Z'),
+      endDate: new Date('2026-03-12T18:00:00Z'),
+      state: 'ACTIVE',
+    },
+  });
+
   // Create issues with hierarchy
   const epic = await prisma.issue.upsert({
     where: { projectId_number: { projectId: project.id, number: 1 } },
@@ -121,12 +197,68 @@ async function main() {
     },
   });
 
+  // MVP LiveCode meta issues (agent vs human work)
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: liveCodeProject.id, number: 1 } },
+    update: {},
+    create: {
+      projectId: liveCodeProject.id,
+      number: 1,
+      title: 'Настроить MVP LiveCode как мета-проект',
+      type: 'EPIC',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      aiEligible: false,
+      aiExecutionStatus: 'NOT_STARTED',
+      aiAssigneeType: 'HUMAN',
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: liveCodeProject.id, number: 2 } },
+    update: {},
+    create: {
+      projectId: liveCodeProject.id,
+      number: 2,
+      title: 'Добавить флаг "делает агент" к задачам',
+      type: 'TASK',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      aiEligible: true,
+      aiExecutionStatus: 'NOT_STARTED',
+      aiAssigneeType: 'AGENT',
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: liveCodeProject.id, number: 3 } },
+    update: {},
+    create: {
+      projectId: liveCodeProject.id,
+      number: 3,
+      title: 'Показать активные задачи MVP LiveCode через API',
+      type: 'TASK',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      aiEligible: true,
+      aiExecutionStatus: 'NOT_STARTED',
+      aiAssigneeType: 'AGENT',
+    },
+  });
+
   // Backlog (MVP project): EPIC — Исследование и планирование MVP
   const epicResearch = await prisma.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 1 } },
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 1,
       title: 'Исследование и планирование MVP',
       type: 'EPIC',
@@ -142,6 +274,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 2,
       title: 'Интервью по 8 блокам и сбор требований Jira Cut',
       type: 'STORY',
@@ -158,6 +291,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 3,
       title: 'Сформировать требования по продукту, пользователям и сценариям',
       type: 'TASK',
@@ -174,6 +308,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 4,
       title: 'Описать интеграции (GitLab, Confluence, Telegram-бот)',
       type: 'TASK',
@@ -190,6 +325,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 5,
       title: 'Зафиксировать требования по безопасности (RBAC, audit log, ФЗ-152)',
       type: 'TASK',
@@ -206,6 +342,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 6,
       title: 'Выбор и фиксация технологического стека',
       type: 'STORY',
@@ -222,6 +359,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 7,
       title: 'Выбрать стек backend (Node 20, Express, TS, Prisma, PostgreSQL, Redis)',
       type: 'TASK',
@@ -238,6 +376,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 8,
       title: 'Выбрать стек frontend (React 18, Vite, Zustand, Ant Design)',
       type: 'TASK',
@@ -254,6 +393,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 9,
       title: 'Зафиксировать архитектуру модульного монолита и доменную модель',
       type: 'TASK',
@@ -270,6 +410,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 10,
       title: 'План пересборки v2',
       type: 'STORY',
@@ -286,6 +427,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 11,
       title: 'Написать документ REBUILD_PLAN_V2 с архитектурой, API, RBAC, спринтами и NFR',
       type: 'TASK',
@@ -302,6 +444,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint0.id,
       number: 12,
       title: 'Зафиксировать требования к ОС, браузерам и стратегии деплоя',
       type: 'TASK',
@@ -319,6 +462,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 13,
       title: 'Спринт 1 — Фундамент системы',
       type: 'EPIC',
@@ -334,6 +478,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 14,
       title: 'Базовый backend и инфраструктура',
       type: 'STORY',
@@ -350,6 +495,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 15,
       title: 'Инициализировать backend-проект (Express + TypeScript + ESLint/Prettier)',
       type: 'TASK',
@@ -366,6 +512,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 16,
       title: 'Настроить Prisma 6 c PostgreSQL 16',
       type: 'TASK',
@@ -414,6 +561,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 19,
       title: 'Модуль аутентификации (Auth)',
       type: 'STORY',
@@ -430,6 +578,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 20,
       title: 'Реализовать API регистрации, логина, refresh, logout и me на JWT + refresh-токенах',
       type: 'TASK',
@@ -446,6 +595,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 21,
       title: 'Настроить хранение и проверку токенов, bcrypt-хэширование паролей',
       type: 'TASK',
@@ -478,6 +628,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 23,
       title: 'Пользователи и роли (Users + RBAC)',
       type: 'STORY',
@@ -494,6 +645,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 24,
       title: 'Реализовать CRUD пользователей и смену ролей (Admin, Manager, User, Viewer)',
       type: 'TASK',
@@ -510,6 +662,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 25,
       title: 'Реализовать RBAC по ролям на уровне middleware',
       type: 'TASK',
@@ -542,6 +695,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 27,
       title: 'Проекты (Projects)',
       type: 'STORY',
@@ -590,6 +744,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 30,
       title: 'Задачи и иерархия (Issues)',
       type: 'STORY',
@@ -606,6 +761,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 31,
       title: 'Описать модель задач с типами EPIC/STORY/TASK/SUBTASK/BUG',
       type: 'TASK',
@@ -622,6 +778,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 32,
       title: 'Реализовать статусы задач (OPEN, IN_PROGRESS, REVIEW, DONE, CANCELLED)',
       type: 'TASK',
@@ -638,6 +795,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 33,
       title: 'Описать связи родитель–потомок и генерацию ключа PROJECT_KEY-NUMBER',
       type: 'TASK',
@@ -654,6 +812,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 34,
       title: 'Аудит и безопасность (AuditLog)',
       type: 'STORY',
@@ -670,6 +829,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 35,
       title: 'Реализовать middleware аудита всех мутаций',
       type: 'TASK',
@@ -702,6 +862,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 37,
       title: 'Frontend — базовая оболочка',
       type: 'STORY',
@@ -718,6 +879,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 38,
       title: 'Инициализировать frontend (Vite + React + Ant Design + Zustand)',
       type: 'TASK',
@@ -750,6 +912,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 40,
       title: 'Frontend — аутентификация и навигация',
       type: 'STORY',
@@ -766,6 +929,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 41,
       title: 'Реализовать LoginPage с интеграцией Auth API',
       type: 'TASK',
@@ -798,6 +962,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 43,
       title: 'Frontend — проекты и задачи',
       type: 'STORY',
@@ -814,6 +979,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 44,
       title: 'Реализовать ProjectsPage (список проектов)',
       type: 'TASK',
@@ -830,6 +996,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 45,
       title: 'Реализовать ProjectDetailPage со списком задач',
       type: 'TASK',
@@ -862,6 +1029,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 47,
       title: 'Seed-данные и локальный запуск',
       type: 'STORY',
@@ -878,6 +1046,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 48,
       title: 'Написать seed-скрипт (4 пользователя, 2 проекта, 5 задач)',
       type: 'TASK',
@@ -894,6 +1063,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint1.id,
       number: 49,
       title: 'Настроить Docker Compose (PostgreSQL 16 + Redis 7)',
       type: 'TASK',
@@ -927,6 +1097,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 51,
       title: 'Спринт 2 — Доски, спринты, время, комментарии',
       type: 'EPIC',
@@ -942,6 +1113,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 52,
       title: 'Kanban Board (backend + UI)',
       type: 'STORY',
@@ -958,6 +1130,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 53,
       title: 'Реализовать API канбан-доски (колонки по статусам, порядок задач)',
       type: 'TASK',
@@ -974,6 +1147,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 54,
       title: 'Добавить drag-n-drop перемещение задач с сохранением порядка и статуса',
       type: 'TASK',
@@ -1006,6 +1180,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 56,
       title: 'Спринты (Sprints)',
       type: 'STORY',
@@ -1022,6 +1197,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 57,
       title: 'Реализовать модель и API спринтов (создание, старт, закрытие)',
       type: 'TASK',
@@ -1038,6 +1214,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 58,
       title: 'Реализовать перенос задач между бэклогом и активным спринтом',
       type: 'TASK',
@@ -1054,6 +1231,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 59,
       title: 'Обеспечить один ACTIVE-спринт на проект',
       type: 'TASK',
@@ -1086,6 +1264,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 61,
       title: 'Учёт времени (Time tracking)',
       type: 'STORY',
@@ -1102,6 +1281,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 62,
       title: 'Реализовать API таймера (старт/стоп) и ручного ввода времени',
       type: 'TASK',
@@ -1118,6 +1298,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 63,
       title: 'Логировать время по пользователю и задаче',
       type: 'TASK',
@@ -1150,6 +1331,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 65,
       title: 'Комментарии к задачам (Comments)',
       type: 'STORY',
@@ -1166,6 +1348,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 66,
       title: 'Реализовать API CRUD комментариев с проверкой прав',
       type: 'TASK',
@@ -1198,6 +1381,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 68,
       title: 'Карточка задачи и история изменений',
       type: 'STORY',
@@ -1214,6 +1398,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint2.id,
       number: 69,
       title: 'Собрать полную карточку задачи (поля, иерархия, связи, время, комментарии)',
       type: 'TASK',
@@ -1247,6 +1432,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint3.id,
       number: 71,
       title: 'Admin, UAT и инженерные улучшения',
       type: 'EPIC',
@@ -1262,6 +1448,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint3.id,
       number: 72,
       title: 'Admin-модуль',
       type: 'STORY',
@@ -1278,6 +1465,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint3.id,
       number: 73,
       title: 'Реализовать admin.service и admin.router с доступом только для ADMIN',
       type: 'TASK',
@@ -1310,6 +1498,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint35.id,
       number: 75,
       title: 'UAT-тесты и онбординг',
       type: 'STORY',
@@ -1326,6 +1515,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint35.id,
       number: 76,
       title: 'Добавить данные UAT-тестов на backend и API для их получения',
       type: 'TASK',
@@ -1358,6 +1548,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint35.id,
       number: 78,
       title: 'E2E и UX-полиш',
       type: 'STORY',
@@ -1374,6 +1565,7 @@ async function main() {
     update: {},
     create: {
       projectId: mvpProject.id,
+      sprintId: sprint35.id,
       number: 79,
       title: 'Настроить Playwright (playwright.config.ts, main-flows.spec.ts) для основных флоу',
       type: 'TASK',
@@ -1400,6 +1592,86 @@ async function main() {
       parentId: storyE2eUx.id,
     },
   });
+
+  // Demo time tracking data for My Time (Pavel + AI)
+  const existingAiSessions = await prisma.aiSession.count();
+  if (existingAiSessions === 0) {
+    const demoIssueMyTime = await prisma.issue.findUnique({
+      where: { projectId_number: { projectId: mvpProject.id, number: 64 } },
+    });
+    const demoIssueBoard = await prisma.issue.findUnique({
+      where: { projectId_number: { projectId: mvpProject.id, number: 55 } },
+    });
+
+    if (demoIssueMyTime && demoIssueBoard) {
+      // Human time logs for Pavel
+      await prisma.timeLog.createMany({
+        data: [
+          {
+            issueId: demoIssueMyTime.id,
+            userId: pavel.id,
+            hours: new Prisma.Decimal(1.5),
+            note: 'Обсуждение требований к отчётам My Time',
+            logDate: new Date(),
+            source: 'HUMAN',
+          },
+          {
+            issueId: demoIssueBoard.id,
+            userId: pavel.id,
+            hours: new Prisma.Decimal(0.75),
+            note: 'Ручное тестирование доски и спринтов',
+            logDate: new Date(),
+            source: 'HUMAN',
+          },
+        ],
+      });
+
+      // One AI session split between two tasks
+      const aiSession = await prisma.aiSession.create({
+        data: {
+          issueId: demoIssueMyTime.id,
+          userId: pavel.id,
+          model: 'gpt-5.1',
+          provider: 'openai',
+          startedAt: new Date(Date.now() - 45 * 60 * 1000),
+          finishedAt: new Date(),
+          tokensInput: 12000,
+          tokensOutput: 8000,
+          costMoney: new Prisma.Decimal(0.8),
+          notes: 'Проектирование учёта времени HUMAN vs AGENT и UI My Time',
+        },
+      });
+
+      const startedAt = aiSession.startedAt;
+      const finishedAt = aiSession.finishedAt;
+      const totalMs = finishedAt.getTime() - startedAt.getTime();
+      const totalHours = totalMs / 3_600_000;
+
+      const splits = [
+        { issue: demoIssueMyTime, ratio: 0.6 },
+        { issue: demoIssueBoard, ratio: 0.4 },
+      ];
+
+      await prisma.timeLog.createMany({
+        data: splits.map((split) => {
+          const hours = totalHours * split.ratio;
+          const cost = 0.8 * split.ratio;
+          return {
+            issueId: split.issue.id,
+            userId: pavel.id,
+            hours: new Prisma.Decimal(Math.round(hours * 100) / 100),
+            note: 'AI: помощь в проектировании и UI',
+            logDate: finishedAt,
+            source: 'AGENT' as const,
+            agentSessionId: aiSession.id,
+            startedAt,
+            stoppedAt: finishedAt,
+            costMoney: new Prisma.Decimal(Math.round(cost * 10_000) / 10_000),
+          };
+        }),
+      });
+    }
+  }
 
   console.log('Seed complete.');
   console.log(`Users: ${admin.email}, ${manager.email}, ${dev.email}, ${viewer.email}, ${pavel.email}`);

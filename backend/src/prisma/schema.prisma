@@ -25,6 +25,7 @@ model User {
   auditLogs      AuditLog[]
   comments       Comment[]
   timeLogs       TimeLog[]
+  aiSessions     AiSession[]
   teamMemberships TeamMember[]
 
   @@map("users")
@@ -78,6 +79,10 @@ model Issue {
   priority    IssuePriority @default(MEDIUM)
   orderIndex  Int           @default(0) @map("order_index")
 
+  aiEligible        Boolean          @default(false)     @map("ai_eligible")
+  aiExecutionStatus AiExecutionStatus @default(NOT_STARTED) @map("ai_execution_status")
+  aiAssigneeType    AiAssigneeType   @default(HUMAN)    @map("ai_assignee_type")
+
   parentId String? @map("parent_id")
   parent   Issue?  @relation("issueHierarchy", fields: [parentId], references: [id])
   children Issue[] @relation("issueHierarchy")
@@ -98,9 +103,11 @@ model Issue {
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   comments Comment[]
   timeLogs TimeLog[]
+  aiSessions AiSession[]
 
   @@unique([projectId, number])
   @@index([projectId, status])
+  @@index([projectId, status, aiEligible])
   @@index([assigneeId])
   @@index([parentId])
   @@index([sprintId])
@@ -130,6 +137,19 @@ enum IssuePriority {
   LOW
 }
 
+enum AiExecutionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+  FAILED
+}
+
+enum AiAssigneeType {
+  HUMAN
+  AGENT
+  MIXED
+}
+
 // ===== SPRINTS =====
 
 model Sprint {
@@ -140,12 +160,19 @@ model Sprint {
   startDate DateTime?   @map("start_date")
   endDate   DateTime?   @map("end_date")
   state     SprintState @default(PLANNED)
+  projectTeamId        String? @map("project_team_id")
+  businessTeamId       String? @map("business_team_id")
+  flowTeamId           String? @map("flow_team_id")
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  issues  Issue[]
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues       Issue[]
+  projectTeam  Team?   @relation("SprintProjectTeam", fields: [projectTeamId], references: [id])
+  businessTeam Team?   @relation("SprintBusinessTeam", fields: [businessTeamId], references: [id])
+  flowTeam     Team?   @relation("SprintFlowTeam", fields: [flowTeamId], references: [id])
 
+  @@unique([projectId, name], map: "sprints_project_id_name_key")
   @@index([projectId])
   @@map("sprints")
 }
@@ -176,22 +203,63 @@ model Comment {
 // ===== TIME TRACKING =====
 
 model TimeLog {
-  id        String    @id @default(uuid())
-  issueId   String    @map("issue_id")
-  userId    String    @map("user_id")
-  hours     Decimal   @db.Decimal(6, 2)
-  note      String?
-  startedAt DateTime? @map("started_at")
-  stoppedAt DateTime? @map("stopped_at")
-  logDate   DateTime  @default(now()) @map("log_date") @db.Date
-  createdAt DateTime  @default(now()) @map("created_at")
+  id             String       @id @default(uuid())
+  issueId        String       @map("issue_id")
+  userId         String?      @map("user_id")
+  hours          Decimal      @db.Decimal(6, 2)
+  note           String?
+  startedAt      DateTime?    @map("started_at")
+  stoppedAt      DateTime?    @map("stopped_at")
+  logDate        DateTime     @default(now()) @map("log_date") @db.Date
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  // Источник времени: человек или агент
+  source         TimeSource   @default(HUMAN)
+
+  // Связь с сессией ИИ (если source = AGENT и лог получен из AiSession)
+  agentSessionId String?      @map("agent_session_id")
+  agentSession   AiSession?   @relation(fields: [agentSessionId], references: [id])
+
+   // Денежная стоимость этого лога (для AGENT-логов — доля costMoney сессии)
+  costMoney      Decimal?     @db.Decimal(10, 4) @map("cost_money")
 
   issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id])
+  user  User? @relation(fields: [userId], references: [id])
 
   @@index([issueId])
   @@index([userId])
+  @@index([agentSessionId])
   @@map("time_logs")
+}
+
+enum TimeSource {
+  HUMAN
+  AGENT
+}
+
+// ===== AI SESSIONS =====
+
+model AiSession {
+  id           String    @id @default(uuid())
+  issueId      String?   @map("issue_id")
+  userId       String?   @map("user_id")
+  model        String
+  provider     String
+  startedAt    DateTime  @map("started_at")
+  finishedAt   DateTime  @map("finished_at")
+  tokensInput  Int       @map("tokens_input")
+  tokensOutput Int       @map("tokens_output")
+  costMoney    Decimal   @db.Decimal(10, 4)
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  issue  Issue? @relation(fields: [issueId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+  logs   TimeLog[]
+
+  @@index([issueId])
+  @@index([userId])
+  @@map("ai_sessions")
 }
 
 // ===== AUDIT =====
@@ -225,6 +293,10 @@ model Team {
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
   members TeamMember[]
+
+  projectSprints  Sprint[] @relation("SprintProjectTeam")
+  businessSprints Sprint[] @relation("SprintBusinessTeam")
+  flowSprints     Sprint[] @relation("SprintFlowTeam")
 
   @@map("teams")
 }

@@ -70,6 +70,15 @@ export default function TimePage() {
   }, [logs, period, projectKey]);
 
   const totalHours = filteredLogs.reduce((sum, l) => sum + Number(l.hours), 0);
+  const humanHours = filteredLogs
+    .filter((l) => l.source === 'HUMAN' || !l.source)
+    .reduce((sum, l) => sum + Number(l.hours), 0);
+  const agentHours = filteredLogs
+    .filter((l) => l.source === 'AGENT')
+    .reduce((sum, l) => sum + Number(l.hours), 0);
+  const agentCost = filteredLogs
+    .filter((l) => l.source === 'AGENT' && l.costMoney != null)
+    .reduce((sum, l) => sum + Number(l.costMoney || 0), 0);
 
   const projectOptions = useMemo(() => {
     const keys = Array.from(
@@ -103,6 +112,37 @@ export default function TimePage() {
       dataIndex: 'hours',
       width: 90,
       render: (h: number) => <span className="tt-mono">{Number(h).toFixed(2)}</span>,
+    },
+    {
+      title: 'Source',
+      dataIndex: 'source',
+      width: 90,
+      render: (src: TimeLog['source']) =>
+        src === 'AGENT' ? (
+          <span className="tt-badge tt-badge-purple">AI</span>
+        ) : (
+          <span className="tt-badge tt-badge-blue">Human</span>
+        ),
+    },
+    {
+      title: 'Model',
+      key: 'model',
+      width: 140,
+      render: (_: unknown, r: TimeLog) =>
+        r.source === 'AGENT' && r.agentSession
+          ? `${r.agentSession.model}`
+          : '-',
+    },
+    {
+      title: 'AI Cost',
+      dataIndex: 'costMoney',
+      width: 90,
+      render: (c: number | null | undefined, r: TimeLog) =>
+        r.source === 'AGENT' && c != null ? (
+          <span className="tt-mono">{Number(c).toFixed(4)}</span>
+        ) : (
+          '-'
+        ),
     },
     { title: 'Note', dataIndex: 'note', width: 200, render: (n: string) => n || '-' },
     {
@@ -199,6 +239,20 @@ export default function TimePage() {
             ({filteredLogs.length} of {logs.length} entries)
           </span>
         )}
+      </div>
+
+      <div className="tt-time-summary-row">
+        <span className="tt-time-summary-label">By source</span>
+        <span className="tt-time-summary-muted">
+          Human: <span className="tt-mono">{humanHours.toFixed(2)}h</span> · AI:{' '}
+          <span className="tt-mono">{agentHours.toFixed(2)}h</span>
+          {agentCost > 0 && (
+            <>
+              {' '}
+              · AI cost: <span className="tt-mono">{agentCost.toFixed(4)}</span>
+            </>
+          )}
+        </span>
       </div>
 
       <div className="tt-table tt-time-table">

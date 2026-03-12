@@ -2,6 +2,8 @@ export type UserRole = 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
 export type IssueType = 'EPIC' | 'STORY' | 'TASK' | 'SUBTASK' | 'BUG';
 export type IssueStatus = 'OPEN' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'CANCELLED';
 export type IssuePriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type AiExecutionStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'DONE' | 'FAILED';
+export type AiAssigneeType = 'HUMAN' | 'AGENT' | 'MIXED';
 
 export interface User {
   id: string;
@@ -30,6 +32,9 @@ export interface Issue {
   type: IssueType;
   status: IssueStatus;
   priority: IssuePriority;
+  aiEligible?: boolean;
+  aiExecutionStatus?: AiExecutionStatus;
+  aiAssigneeType?: AiAssigneeType;
   parentId?: string;
   assigneeId?: string;
   creatorId: string;
@@ -55,6 +60,11 @@ export interface Sprint {
   state: SprintState;
   createdAt: string;
   _count?: { issues: number };
+  project?: { id: string; name: string; key: string };
+  projectTeam?: Team;
+  businessTeam?: Team;
+  flowTeam?: Team;
+  stats?: { totalIssues: number; estimatedIssues: number; planningReadiness: number };
 }
 
 export interface Comment {
@@ -70,7 +80,7 @@ export interface Comment {
 export interface TimeLog {
   id: string;
   issueId: string;
-  userId: string;
+  userId?: string | null;
   hours: number;
   note?: string;
   startedAt?: string;
@@ -79,6 +89,10 @@ export interface TimeLog {
   createdAt: string;
   user?: { id: string; name: string };
   issue?: { id: string; title: string; number: number; project?: { key: string } };
+  source?: 'HUMAN' | 'AGENT';
+  agentSessionId?: string | null;
+  costMoney?: number | null;
+  agentSession?: { model: string; provider: string };
 }
 
 export interface AuditEntry {

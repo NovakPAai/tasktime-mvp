@@ -3,7 +3,14 @@ import type { IssuePriority, IssueStatus, IssueType } from '@prisma/client';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
-import { createIssueDto, updateIssueDto, updateStatusDto, assignDto } from './issues.dto.js';
+import {
+  createIssueDto,
+  updateIssueDto,
+  updateStatusDto,
+  assignDto,
+  updateAiFlagsDto,
+  updateAiStatusDto,
+} from './issues.dto.js';
 import * as issuesService from './issues.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
@@ -38,6 +45,30 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
       from,
       to,
       search,
+    });
+    res.json(issues);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Active MVP LiveCode issues (meta-project LIVE)
+router.get('/mvp-livecode/issues/active', async (req, res, next) => {
+  try {
+    const { onlyAiEligible, assigneeType } = req.query as {
+      onlyAiEligible?: string;
+      assigneeType?: string;
+    };
+
+    const onlyAi = onlyAiEligible === 'true';
+    const assignee =
+      assigneeType === 'HUMAN' || assigneeType === 'AGENT' || assigneeType === 'MIXED'
+        ? assigneeType
+        : 'ALL';
+
+    const issues = await issuesService.listActiveIssuesForMvpLivecode({
+      onlyAiEligible: onlyAi,
+      assigneeType: assignee,
     });
     res.json(issues);
   } catch (err) {
@@ -105,6 +136,38 @@ router.patch(
       next(err);
     }
   }
+);
+
+// Update AI flags (eligibility and assignee type)
+router.patch(
+  '/issues/:id/ai-flags',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(updateAiFlagsDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const issue = await issuesService.updateAiFlags(req.params.id as string, req.body);
+      await logAudit(req, 'issue.ai_flags_updated', 'issue', req.params.id as string, req.body);
+      res.json(issue);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Update AI execution status
+router.patch(
+  '/issues/:id/ai-status',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(updateAiStatusDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const issue = await issuesService.updateAiStatus(req.params.id as string, req.body);
+      await logAudit(req, 'issue.ai_status_updated', 'issue', req.params.id as string, req.body);
+      res.json(issue);
+    } catch (err) {
+      next(err);
+    }
+  },
 );
 
 // Bulk operations on issues (status / assignee)

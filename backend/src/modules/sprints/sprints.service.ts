@@ -2,12 +2,38 @@ import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateSprintDto, UpdateSprintDto } from './sprints.dto.js';
 
+function mapSprintWithStats(sprint: any) {
+  const totalIssues = sprint.issues?.length ?? 0;
+  const estimatedIssues = sprint.issues?.filter((i: any) => i.estimatedHours != null).length ?? 0;
+  const planningReadiness =
+    totalIssues === 0 ? 0 : Math.round((estimatedIssues / totalIssues) * 100);
+
+  const { issues, ...rest } = sprint;
+  return {
+    ...rest,
+    stats: {
+      totalIssues,
+      estimatedIssues,
+      planningReadiness,
+    },
+  };
+}
+
 export async function listSprints(projectId: string) {
-  return prisma.sprint.findMany({
+  const sprints = await prisma.sprint.findMany({
     where: { projectId },
-    include: { _count: { select: { issues: true } } },
+    include: {
+      _count: { select: { issues: true } },
+      issues: { select: { id: true, estimatedHours: true } },
+      project: { select: { id: true, name: true, key: true } },
+      projectTeam: { select: { id: true, name: true } },
+      businessTeam: { select: { id: true, name: true } },
+      flowTeam: { select: { id: true, name: true } },
+    },
     orderBy: { createdAt: 'desc' },
   });
+
+  return sprints.map(mapSprintWithStats);
 }
 
 export async function createSprint(projectId: string, dto: CreateSprintDto) {
@@ -21,6 +47,9 @@ export async function createSprint(projectId: string, dto: CreateSprintDto) {
       goal: dto.goal,
       startDate: dto.startDate ? new Date(dto.startDate) : undefined,
       endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+      projectTeamId: dto.projectTeamId,
+      businessTeamId: dto.businessTeamId,
+      flowTeamId: dto.flowTeamId,
     },
   });
 }
@@ -36,6 +65,9 @@ export async function updateSprint(id: string, dto: UpdateSprintDto) {
       ...(dto.goal !== undefined && { goal: dto.goal }),
       ...(dto.startDate !== undefined && { startDate: dto.startDate ? new Date(dto.startDate) : null }),
       ...(dto.endDate !== undefined && { endDate: dto.endDate ? new Date(dto.endDate) : null }),
+      ...(dto.projectTeamId !== undefined && { projectTeamId: dto.projectTeamId }),
+      ...(dto.businessTeamId !== undefined && { businessTeamId: dto.businessTeamId }),
+      ...(dto.flowTeamId !== undefined && { flowTeamId: dto.flowTeamId }),
     },
   });
 }
@@ -90,4 +122,45 @@ export async function getBacklog(projectId: string) {
     },
     orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
   });
+}
+
+interface ListAllSprintsFilters {
+  state?: string;
+  projectId?: string;
+  teamId?: string;
+}
+
+export async function listAllSprints(filters: ListAllSprintsFilters) {
+  const where: any = {};
+
+  if (filters.state) {
+    where.state = filters.state;
+  }
+
+  if (filters.projectId) {
+    where.projectId = filters.projectId;
+  }
+
+  if (filters.teamId) {
+    where.OR = [
+      { projectTeamId: filters.teamId },
+      { businessTeamId: filters.teamId },
+      { flowTeamId: filters.teamId },
+    ];
+  }
+
+  const sprints = await prisma.sprint.findMany({
+    where,
+    include: {
+      _count: { select: { issues: true } },
+      issues: { select: { id: true, estimatedHours: true } },
+      project: { select: { id: true, name: true, key: true } },
+      projectTeam: { select: { id: true, name: true } },
+      businessTeam: { select: { id: true, name: true } },
+      flowTeam: { select: { id: true, name: true } },
+    },
+    orderBy: [{ state: 'asc' }, { createdAt: 'desc' }],
+  });
+
+  return sprints.map(mapSprintWithStats);
 }

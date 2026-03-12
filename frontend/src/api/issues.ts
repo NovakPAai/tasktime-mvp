@@ -1,5 +1,12 @@
 import api from './client';
-import type { Issue, IssueType, IssuePriority, IssueStatus } from '../types';
+import type {
+  Issue,
+  IssueType,
+  IssuePriority,
+  IssueStatus,
+  AiAssigneeType,
+  AiExecutionStatus,
+} from '../types';
 
 export interface IssueFilters {
   status?: IssueStatus[];
@@ -66,5 +73,34 @@ export async function bulkUpdateIssues(
   body: { issueIds: string[]; status?: IssueStatus; assigneeId?: string | null },
 ): Promise<{ updatedCount: number }> {
   const { data } = await api.post<{ updatedCount: number }>(`/projects/${projectId}/issues/bulk`, body);
+  return data;
+}
+
+export async function updateAiFlags(
+  id: string,
+  body: { aiEligible?: boolean; aiAssigneeType?: AiAssigneeType },
+): Promise<Issue> {
+  const { data } = await api.patch<Issue>(`/issues/${id}/ai-flags`, body);
+  return data;
+}
+
+export async function updateAiStatus(
+  id: string,
+  aiExecutionStatus: AiExecutionStatus,
+): Promise<Issue> {
+  const { data } = await api.patch<Issue>(`/issues/${id}/ai-status`, { aiExecutionStatus });
+  return data;
+}
+
+export async function listMvpLivecodeActiveIssues(params?: {
+  onlyAiEligible?: boolean;
+  assigneeType?: AiAssigneeType | 'ALL';
+}): Promise<Issue[]> {
+  const { data } = await api.get<Issue[]>('/mvp-livecode/issues/active', {
+    params: {
+      ...(params?.onlyAiEligible !== undefined && { onlyAiEligible: params.onlyAiEligible }),
+      ...(params?.assigneeType && { assigneeType: params.assigneeType }),
+    },
+  });
   return data;
 }

@@ -17,6 +17,7 @@ import {
   InputNumber,
   Form,
   Modal,
+  Switch,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -52,6 +53,7 @@ export default function IssueDetailPage() {
   const [activeTimer, setActiveTimer] = useState<TimeLog | null>(null);
   const [timeModalOpen, setTimeModalOpen] = useState(false);
   const [timeForm] = Form.useForm();
+  const canEditAi = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -114,6 +116,21 @@ export default function IssueDetailPage() {
     setTimeModalOpen(false);
     timeForm.resetFields();
     load();
+  };
+
+  const handleToggleAiEligible = async (checked: boolean) => {
+    if (!id || !issue) return;
+    try {
+      await issuesApi.updateAiFlags(id, {
+        aiEligible: checked,
+        aiAssigneeType: checked ? 'AGENT' : 'HUMAN',
+      });
+      const updated = await issuesApi.getIssue(id);
+      setIssue(updated);
+      message.success(checked ? 'Marked as agent-eligible' : 'Marked as human-only');
+    } catch {
+      message.error('Could not update agent flag');
+    }
   };
 
   if (!issue) return <div style={{ padding: 24 }}>Loading...</div>;
@@ -342,6 +359,60 @@ export default function IssueDetailPage() {
           </div>
 
           <div className="tt-panel">
+            <div className="tt-panel-header">AI Execution</div>
+            <div className="tt-panel-body">
+              <div className="tt-panel-row">
+                <span>Agent can do this</span>
+                <Switch
+                  size="small"
+                  checked={!!issue.aiEligible}
+                  disabled={!canEditAi}
+                  onChange={handleToggleAiEligible}
+                />
+              </div>
+              <div className="tt-panel-row">
+                <span>Executor</span>
+                <span>
+                  {issue.aiAssigneeType === 'AGENT' || (issue.aiEligible && !issue.aiAssigneeType)
+                    ? 'Agent'
+                    : issue.aiAssigneeType === 'MIXED'
+                      ? 'Agent + Human'
+                      : 'Human'}
+                </span>
+              </div>
+              <div className="tt-panel-row">
+                <span>Agent status</span>
+                {canEditAi ? (
+                  <Select
+                    size="small"
+                    style={{ width: 140 }}
+                    value={issue.aiExecutionStatus ?? 'NOT_STARTED'}
+                    onChange={async (val) => {
+                      if (!id) return;
+                      try {
+                        await issuesApi.updateAiStatus(id, val as any);
+                        const updated = await issuesApi.getIssue(id);
+                        setIssue(updated);
+                        message.success('Agent status updated');
+                      } catch {
+                        message.error('Could not update agent status');
+                      }
+                    }}
+                    options={[
+                      { value: 'NOT_STARTED', label: 'NOT_STARTED' },
+                      { value: 'IN_PROGRESS', label: 'IN_PROGRESS' },
+                      { value: 'DONE', label: 'DONE' },
+                      { value: 'FAILED', label: 'FAILED' },
+                    ]}
+                  />
+                ) : (
+                  <span>{issue.aiExecutionStatus ?? 'NOT_STARTED'}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="tt-panel">
             <div className="tt-panel-header">
               <span>
                 <ClockCircleOutlined style={{ marginRight: 6 }} />
@@ -377,22 +448,44 @@ export default function IssueDetailPage() {
                 <List
                   size="small"
                   dataSource={timeLogs}
-                  renderItem={(log) => (
-                    <List.Item style={{ paddingInline: 0 }}>
-                      <Space size={6}>
-                        <strong>{Number(log.hours).toFixed(2)}h</strong>
-                        <span>{log.user?.name}</span>
-                        {log.note && (
+                  renderItem={(log) => {
+                    const isAgent = log.source === 'AGENT';
+                    const modelLabel =
+                      isAgent && log.agentSession
+                        ? `${log.agentSession.model}`
+                        : undefined;
+
+                    return (
+                      <List.Item style={{ paddingInline: 0 }}>
+                        <Space size={6}>
+                          <strong>{Number(log.hours).toFixed(2)}h</strong>
+                          {isAgent ? (
+                            <Tag color="purple" style={{ marginInlineEnd: 0 }}>
+                              AI{modelLabel ? ` · ${modelLabel}` : ''}
+                            </Tag>
+                          ) : (
+                            <Tag color="blue" style={{ marginInlineEnd: 0 }}>
+                              Human
+                            </Tag>
+                          )}
+                          {!isAgent && <span>{log.user?.name}</span>}
+                          {isAgent && log.costMoney != null && (
+                            <Typography.Text type="secondary" className="tt-mono">
+                              · {Number(log.costMoney).toFixed(4)}
+                            </Typography.Text>
+                          )}
+                          {log.note && (
+                            <Typography.Text type="secondary">
+                              — {log.note}
+                            </Typography.Text>
+                          )}
                           <Typography.Text type="secondary">
-                            — {log.note}
+                            {new Date(log.createdAt).toLocaleDateString()}
                           </Typography.Text>
-                        )}
-                        <Typography.Text type="secondary">
-                          {new Date(log.createdAt).toLocaleDateString()}
-                        </Typography.Text>
-                      </Space>
-                    </List.Item>
-                  )}
+                        </Space>
+                      </List.Item>
+                    );
+                  }}
                 />
               )}
             </div>
