@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Typography, Table, Button, Modal, Form, Input, message } from 'antd';
+import { Table, Button, Modal, Form, Input, message, Tag } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useProjectsStore } from '../store/projects.store';
@@ -34,7 +34,16 @@ export default function ProjectsPage() {
   };
 
   const columns = [
-    { title: 'Key', dataIndex: 'key', width: 100 },
+    {
+      title: 'Key',
+      dataIndex: 'key',
+      width: 90,
+      render: (key: string) => (
+        <Tag className="tt-mono">
+          {key}
+        </Tag>
+      ),
+    },
     { title: 'Name', dataIndex: 'name', render: (name: string, record: Project) => (
       <a onClick={() => navigate(`/projects/${record.id}`)}>{name}</a>
     )},
@@ -43,19 +52,43 @@ export default function ProjectsPage() {
   ];
 
   return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={3} style={{ margin: 0 }}>Projects</Typography.Title>
-        {canCreate && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-            New Project
-          </Button>
-        )}
+    <div className="tt-page">
+      <div className="tt-page-header">
+        <div>
+          <h1 className="tt-page-title">Projects</h1>
+          <p className="tt-page-subtitle">
+            Overview of all projects in this workspace
+          </p>
+        </div>
+        <div className="tt-page-actions">
+          {canCreate && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setModalOpen(true)}
+            >
+              New Project
+            </Button>
+          )}
+        </div>
       </div>
 
-      <Table dataSource={projects} columns={columns} rowKey="id" loading={loading} pagination={false} />
+      <Table
+        className="tt-table tt-projects-table"
+        dataSource={projects}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        pagination={false}
+      />
 
-      <Modal title="New Project" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()} okText="Create">
+      <Modal
+        title="New Project"
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        onOk={() => form.submit()}
+        okText="Create"
+      >
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Form.Item name="name" label="Name" rules={[{ required: true }]}>
             <Input />
@@ -68,6 +101,6 @@ export default function ProjectsPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   );
 }

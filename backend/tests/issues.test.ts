@@ -89,6 +89,35 @@ describe('Issues API', () => {
     expect(res.body.length).toBe(2);
   });
 
+  it('GET /api/projects/:projectId/issues - supports filters and search', async () => {
+    await request.post(`/api/projects/${projectId}/issues`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'Open task', status: 'OPEN' });
+    const doneIssue = await request.post(`/api/projects/${projectId}/issues`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'Done bug', type: 'BUG' });
+
+    // Move second issue to DONE status via dedicated status endpoint
+    await request
+      .patch(`/api/issues/${doneIssue.body.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'DONE' });
+
+    const resStatus = await request
+      .get(`/api/projects/${projectId}/issues`)
+      .query({ status: 'DONE' })
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(resStatus.status).toBe(200);
+    expect(resStatus.body.length).toBe(1);
+
+    const resSearch = await request
+      .get(`/api/projects/${projectId}/issues`)
+      .query({ search: 'bug' })
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(resSearch.status).toBe(200);
+    expect(resSearch.body.length).toBe(1);
+  });
+
   it('PATCH /api/issues/:id/status - changes status', async () => {
     const create = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -132,5 +161,28 @@ describe('Issues API', () => {
       .send({ title: 'Second' });
     expect(i1.body.number).toBe(1);
     expect(i2.body.number).toBe(2);
+  });
+
+  it('POST /api/projects/:projectId/issues/bulk - updates status for multiple issues', async () => {
+    const i1 = await request.post(`/api/projects/${projectId}/issues`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'Bulk 1' });
+    const i2 = await request.post(`/api/projects/${projectId}/issues`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'Bulk 2' });
+
+    const res = await request.post(`/api/projects/${projectId}/issues/bulk`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ issueIds: [i1.body.id, i2.body.id], status: 'IN_PROGRESS' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.updatedCount).toBe(2);
+
+    const list = await request
+      .get(`/api/projects/${projectId}/issues`)
+      .query({ status: 'IN_PROGRESS' })
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body.length).toBe(2);
   });
 });

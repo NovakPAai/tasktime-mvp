@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, Typography, message, Tabs } from 'antd';
+import { Form, Input, Button, Typography, message, Tabs } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 
@@ -35,23 +35,49 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f0f2f5' }}>
-      <Card style={{ width: 400 }}>
-        <Typography.Title level={2} style={{ textAlign: 'center' }}>TaskTime</Typography.Title>
+    <div className="tt-login-shell">
+      <div className="tt-login-panel">
+        <div className="tt-login-header">
+          <div>
+            <div className="tt-login-title">TaskTime</div>
+            <div className="tt-login-subtitle">Sign in to your workspace</div>
+          </div>
+        </div>
         <Tabs
+          className="tt-login-tabs"
           items={[
             {
               key: 'login',
               label: 'Login',
               children: (
-                <Form onFinish={handleLogin} layout="vertical">
-                  <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
-                    <Input />
+                <Form
+                  onFinish={handleLogin}
+                  layout="vertical"
+                  className="tt-login-form"
+                >
+                  <Form.Item
+                    name="email"
+                    label="Email"
+                    rules={[{ required: true, type: 'email' }]}
+                    className="tt-login-form-item"
+                  >
+                    <Input className="tt-login-input" />
                   </Form.Item>
-                  <Form.Item name="password" label="Password" rules={[{ required: true }]}>
-                    <Input.Password />
+                  <Form.Item
+                    name="password"
+                    label="Password"
+                    rules={[{ required: true }]}
+                    className="tt-login-form-item"
+                  >
+                    <Input.Password className="tt-login-input" />
                   </Form.Item>
-                  <Button type="primary" htmlType="submit" loading={loading} block>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={loading}
+                    block
+                    className="tt-login-btn-primary"
+                  >
                     Login
                   </Button>
                 </Form>
@@ -61,17 +87,42 @@ export default function LoginPage() {
               key: 'register',
               label: 'Register',
               children: (
-                <Form onFinish={handleRegister} layout="vertical">
-                  <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-                    <Input />
+                <Form
+                  onFinish={handleRegister}
+                  layout="vertical"
+                  className="tt-login-form"
+                >
+                  <Form.Item
+                    name="name"
+                    label="Name"
+                    rules={[{ required: true }]}
+                    className="tt-login-form-item"
+                  >
+                    <Input className="tt-login-input" />
                   </Form.Item>
-                  <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
-                    <Input />
+                  <Form.Item
+                    name="email"
+                    label="Email"
+                    rules={[{ required: true, type: 'email' }]}
+                    className="tt-login-form-item"
+                  >
+                    <Input className="tt-login-input" />
                   </Form.Item>
-                  <Form.Item name="password" label="Password" rules={[{ required: true, min: 8 }]}>
-                    <Input.Password />
+                  <Form.Item
+                    name="password"
+                    label="Password"
+                    rules={[{ required: true, min: 8 }]}
+                    className="tt-login-form-item"
+                  >
+                    <Input.Password className="tt-login-input" />
                   </Form.Item>
-                  <Button type="primary" htmlType="submit" loading={loading} block>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={loading}
+                    block
+                    className="tt-login-btn-primary"
+                  >
                     Register
                   </Button>
                 </Form>
@@ -79,7 +130,7 @@ export default function LoginPage() {
             },
           ]}
         />
-      </Card>
+      </div>
     </div>
   );
 }

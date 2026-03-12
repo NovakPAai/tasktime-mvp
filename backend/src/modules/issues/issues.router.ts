@@ -11,10 +11,33 @@ const router = Router();
 
 router.use(authenticate);
 
-// List issues for a project
+// List issues for a project with filters
 router.get('/projects/:projectId/issues', async (req, res, next) => {
   try {
-    const issues = await issuesService.listIssues(req.params.projectId as string);
+    const { status, type, priority, assigneeId, sprintId, from, to, search } = req.query as {
+      status?: string | string[];
+      type?: string | string[];
+      priority?: string | string[];
+      assigneeId?: string;
+      sprintId?: string;
+      from?: string;
+      to?: string;
+      search?: string;
+    };
+
+    const toArray = (value?: string | string[]) =>
+      typeof value === 'string' ? value.split(',').filter(Boolean) : value;
+
+    const issues = await issuesService.listIssues(req.params.projectId as string, {
+      status: toArray(status),
+      type: toArray(type),
+      priority: toArray(priority),
+      assigneeId,
+      sprintId,
+      from,
+      to,
+      search,
+    });
     res.json(issues);
   } catch (err) {
     next(err);
@@ -68,15 +91,56 @@ router.patch('/issues/:id/status', validate(updateStatusDto), async (req: AuthRe
 });
 
 // Assign issue
-router.patch('/issues/:id/assign', requireRole('ADMIN', 'MANAGER'), validate(assignDto), async (req: AuthRequest, res, next) => {
-  try {
-    const issue = await issuesService.assignIssue(req.params.id as string, req.body);
-    await logAudit(req, 'issue.assigned', 'issue', req.params.id as string, req.body);
-    res.json(issue);
-  } catch (err) {
-    next(err);
+router.patch(
+  '/issues/:id/assign',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(assignDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const issue = await issuesService.assignIssue(req.params.id as string, req.body);
+      await logAudit(req, 'issue.assigned', 'issue', req.params.id as string, req.body);
+      res.json(issue);
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
+
+// Bulk operations on issues (status / assignee)
+router.post(
+  '/projects/:projectId/issues/bulk',
+  requireRole('ADMIN', 'MANAGER'),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const { issueIds, status, assigneeId } = req.body as {
+        issueIds?: string[];
+        status?: string;
+        assigneeId?: string | null;
+      };
+
+      if (!issueIds || !Array.isArray(issueIds) || issueIds.length === 0) {
+        res.status(400).json({ error: 'issueIds is required' });
+        return;
+      }
+
+      const result = await issuesService.bulkUpdateIssues(req.params.projectId as string, {
+        issueIds,
+        status,
+        assigneeId,
+      });
+
+      await logAudit(req, 'issues.bulk_updated', 'project', req.params.projectId as string, {
+        issueIds,
+        status,
+        assigneeId,
+      });
+
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // Delete issue
 router.delete('/issues/:id', requireRole('ADMIN'), async (req: AuthRequest, res, next) => {

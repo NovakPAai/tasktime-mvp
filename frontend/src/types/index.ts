@@ -97,6 +97,25 @@ export interface BoardData {
   columns: Record<IssueStatus, Issue[]>;
 }
 
+export interface TeamMember {
+  id: string;
+  userId: string;
+  teamId: string;
+  role?: string | null;
+  createdAt: string;
+  user: User;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  members?: TeamMember[];
+  _count?: { members: number };
+}
+
 export interface AuthResponse {
   user: User;
   accessToken: string;

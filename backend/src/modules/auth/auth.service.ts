@@ -3,6 +3,7 @@ import { prisma } from '../../prisma/client.js';
 import { hashPassword, comparePassword } from '../../shared/utils/password.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../shared/utils/jwt.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { setUserSession, deleteUserSession } from '../../shared/redis.js';
 import type { RegisterDto, LoginDto } from './auth.dto.js';
 
 function generateRefreshExpiry(): Date {
@@ -33,12 +34,20 @@ export async function register(dto: RegisterDto) {
     },
   });
 
+  const nowIso = new Date().toISOString();
+  void setUserSession(user.id, {
+    email: user.email,
+    role: user.role,
+    createdAt: nowIso,
+    lastSeenAt: nowIso,
+  });
+
   return { user, accessToken, refreshToken };
 }
 
 export async function login(dto: LoginDto) {
   const user = await prisma.user.findUnique({ where: { email: dto.email } });
-  if (!user || !user.isActive) {
+  if (!user || user.isActive === false) {
     throw new AppError(401, 'Invalid credentials');
   }
 
@@ -51,12 +60,22 @@ export async function login(dto: LoginDto) {
   const accessToken = signAccessToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
 
+  await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+
   await prisma.refreshToken.create({
     data: {
       token: crypto.createHash('sha256').update(refreshToken).digest('hex'),
       userId: user.id,
       expiresAt: generateRefreshExpiry(),
     },
+  });
+
+  const nowIso = new Date().toISOString();
+  void setUserSession(user.id, {
+    email: user.email,
+    role: user.role,
+    createdAt: nowIso,
+    lastSeenAt: nowIso,
   });
 
   return {
@@ -81,7 +100,7 @@ export async function refresh(refreshToken: string) {
   }
 
   const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-  if (!user || !user.isActive) {
+  if (!user || user.isActive === false) {
     throw new AppError(401, 'User not found or deactivated');
   }
 
@@ -100,12 +119,27 @@ export async function refresh(refreshToken: string) {
     },
   });
 
+  const nowIso = new Date().toISOString();
+  void setUserSession(user.id, {
+    email: user.email,
+    role: user.role,
+    createdAt: stored.createdAt.toISOString?.() ?? nowIso,
+    lastSeenAt: nowIso,
+  });
+
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }
 
 export async function logout(refreshToken: string) {
   const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+  const stored = await prisma.refreshToken.findUnique({ where: { token: tokenHash } });
+
   await prisma.refreshToken.deleteMany({ where: { token: tokenHash } });
+
+  if (stored?.userId) {
+    void deleteUserSession(stored.userId);
+  }
 }
 
 export async function getMe(userId: string) {

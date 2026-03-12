@@ -1,5 +1,5 @@
 import api from './client';
-import type { Project } from '../types';
+import type { Project, IssueStatus, IssueType, IssuePriority } from '../types';
 
 export async function listProjects(): Promise<Project[]> {
   const { data } = await api.get<Project[]>('/projects');
@@ -23,4 +23,31 @@ export async function updateProject(id: string, body: { name?: string; descripti
 
 export async function deleteProject(id: string): Promise<void> {
   await api.delete(`/projects/${id}`);
+}
+
+export interface ProjectDashboard {
+  project: {
+    id: string;
+    name: string;
+    key: string;
+  };
+  issuesByStatus: { status: IssueStatus; _count: { _all: number } }[];
+  issuesByType: { type: IssueType; _count: { _all: number } }[];
+  issuesByPriority: { priority: IssuePriority; _count: { _all: number } }[];
+  totals: {
+    totalIssues: number;
+    doneIssues: number;
+  };
+  activeSprint: {
+    id: string;
+    name: string;
+    state: string;
+    totalIssues: number;
+    doneIssues: number;
+  } | null;
+}
+
+export async function getProjectDashboard(id: string): Promise<ProjectDashboard> {
+  const { data } = await api.get<ProjectDashboard>(`/projects/${id}/dashboard`);
+  return data;
 }

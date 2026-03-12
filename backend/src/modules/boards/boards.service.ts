@@ -32,12 +32,14 @@ export async function getBoard(projectId: string, sprintId?: string) {
   return { projectId, sprintId: sprintId ?? null, columns };
 }
 
-export async function reorderIssues(updates: { id: string; status: string; orderIndex: number }[]) {
+type ReorderUpdate = { id: string; status: string; orderIndex: number };
+
+export async function reorderIssues(updates: ReorderUpdate[]) {
   await prisma.$transaction(
     updates.map((u) =>
       prisma.issue.update({
         where: { id: u.id },
-        data: { status: u.status as any, orderIndex: u.orderIndex },
+        data: { status: u.status as never, orderIndex: u.orderIndex },
       })
     )
   );

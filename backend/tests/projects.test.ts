@@ -84,4 +84,39 @@ describe('Projects API', () => {
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(204);
   });
+
+  it('GET /api/projects/:id/dashboard - returns project dashboard data', async () => {
+    const create = await request.post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Dash', key: 'DASH' });
+
+    const projectId = create.body.id as string;
+
+    // create a couple of issues with different statuses
+    const issue1 = await prisma.issue.create({
+      data: {
+        projectId,
+        number: 1,
+        title: 'Issue 1',
+        type: 'TASK',
+        status: 'OPEN',
+        priority: 'MEDIUM',
+        creatorId: (await prisma.user.findFirstOrThrow({ where: { email: 'admin@test.com' } })).id,
+      },
+    });
+
+    await prisma.issue.update({
+      where: { id: issue1.id },
+      data: { status: 'DONE' },
+    });
+
+    const res = await request.get(`/api/projects/${projectId}/dashboard`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.project.id).toBe(projectId);
+    expect(res.body.totals.totalIssues).toBe(1);
+    expect(res.body.totals.doneIssues).toBe(1);
+    expect(Array.isArray(res.body.issuesByStatus)).toBe(true);
+  });
 });

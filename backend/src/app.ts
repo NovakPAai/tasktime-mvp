@@ -12,6 +12,8 @@ import boardsRouter from './modules/boards/boards.router.js';
 import sprintsRouter from './modules/sprints/sprints.router.js';
 import commentsRouter from './modules/comments/comments.router.js';
 import timeRouter from './modules/time/time.router.js';
+import teamsRouter from './modules/teams/teams.router.js';
+import adminRouter from './modules/admin/admin.router.js';
 
 export function createApp() {
   const app = express();
@@ -37,6 +39,8 @@ export function createApp() {
   app.use('/api', sprintsRouter);
   app.use('/api', commentsRouter);
   app.use('/api', timeRouter);
+  app.use('/api', teamsRouter);
+  app.use('/api', adminRouter);
 
   // Error handler (must be last)
   app.use(errorHandler);

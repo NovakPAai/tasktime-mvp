@@ -39,6 +39,15 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+router.get('/:id/dashboard', async (req, res, next) => {
+  try {
+    const dashboard = await projectsService.getProjectDashboard(req.params.id as string);
+    res.json(dashboard);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/:id', requireRole('ADMIN', 'MANAGER'), validate(updateProjectDto), async (req: AuthRequest, res, next) => {
   try {
     const project = await projectsService.updateProject(req.params.id as string, req.body);

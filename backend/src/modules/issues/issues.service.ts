@@ -3,15 +3,6 @@ import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateIssueDto, UpdateIssueDto, UpdateStatusDto, AssignDto } from './issues.dto.js';
 
-// Hierarchy rules: parent type -> allowed child types
-const HIERARCHY_RULES: Record<IssueType, IssueType[]> = {
-  EPIC: ['STORY', 'TASK'],
-  STORY: ['TASK', 'SUBTASK'],
-  TASK: ['SUBTASK'],
-  SUBTASK: [],
-  BUG: ['SUBTASK'],
-};
-
 // Which types can be children (and their allowed parent types)
 const ALLOWED_PARENTS: Record<IssueType, IssueType[]> = {
   EPIC: [], // top-level only
@@ -50,9 +41,53 @@ async function getNextNumber(projectId: string): Promise<number> {
   return (last?.number ?? 0) + 1;
 }
 
-export async function listIssues(projectId: string) {
+type ListIssuesFilters = {
+  status?: string[];
+  type?: string[];
+  priority?: string[];
+  assigneeId?: string;
+  sprintId?: string;
+  from?: string;
+  to?: string;
+  search?: string;
+};
+
+export async function listIssues(projectId: string, filters?: ListIssuesFilters) {
+  const where: Record<string, unknown> = { projectId };
+
+  if (filters?.status && filters.status.length > 0) {
+    where.status = { in: filters.status };
+  }
+  if (filters?.type && filters.type.length > 0) {
+    where.type = { in: filters.type };
+  }
+  if (filters?.priority && filters.priority.length > 0) {
+    where.priority = { in: filters.priority };
+  }
+  if (filters?.assigneeId) {
+    where.assigneeId = filters.assigneeId === 'UNASSIGNED' ? null : filters.assigneeId;
+  }
+  if (filters?.sprintId) {
+    where.sprintId = filters.sprintId === 'BACKLOG' ? null : filters.sprintId;
+  }
+  if (filters?.from || filters?.to) {
+    where.createdAt = {};
+    if (filters.from) {
+      where.createdAt.gte = new Date(filters.from);
+    }
+    if (filters.to) {
+      where.createdAt.lte = new Date(filters.to);
+    }
+  }
+  if (filters?.search) {
+    where.OR = [
+      { title: { contains: filters.search, mode: 'insensitive' } },
+      { description: { contains: filters.search, mode: 'insensitive' } },
+    ];
+  }
+
   return prisma.issue.findMany({
-    where: { projectId },
+    where,
     include: {
       assignee: { select: { id: true, name: true, email: true } },
       creator: { select: { id: true, name: true } },
@@ -60,6 +95,43 @@ export async function listIssues(projectId: string) {
     },
     orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
   });
+}
+
+export async function bulkUpdateIssues(projectId: string, params: {
+  issueIds: string[];
+  status?: string;
+  assigneeId?: string | null;
+}) {
+  if (!params.status && params.assigneeId === undefined) {
+    throw new AppError(400, 'No bulk update fields provided');
+  }
+
+  const issues = await prisma.issue.findMany({
+    where: { id: { in: params.issueIds }, projectId },
+    select: { id: true },
+  });
+
+  if (issues.length !== params.issueIds.length) {
+    throw new AppError(400, 'Some issues not found in this project');
+  }
+
+  if (params.assigneeId) {
+    const user = await prisma.user.findUnique({ where: { id: params.assigneeId } });
+    if (!user) {
+      throw new AppError(404, 'Assignee not found');
+    }
+  }
+
+  const data: Record<string, unknown> = {};
+  if (params.status) data.status = params.status;
+  if (params.assigneeId !== undefined) data.assigneeId = params.assigneeId;
+
+  await prisma.issue.updateMany({
+    where: { id: { in: params.issueIds } },
+    data,
+  });
+
+  return { updatedCount: params.issueIds.length };
 }
 
 export async function getIssue(id: string) {

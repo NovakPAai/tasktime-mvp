@@ -1,7 +1,16 @@
 import { Layout, Menu, Button, Typography } from 'antd';
-import { ProjectOutlined, LogoutOutlined, DashboardOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import {
+  ProjectOutlined,
+  LogoutOutlined,
+  DashboardOutlined,
+  ClockCircleOutlined,
+  TeamOutlined,
+  SettingOutlined,
+  CheckCircleOutlined,
+} from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
+import UatOnboardingOverlay from '../uat/UatOnboardingOverlay';
 
 const { Header, Sider, Content } = Layout;
 
@@ -15,37 +24,84 @@ export default function AppLayout() {
     navigate('/login');
   };
 
-  const menuItems = [
+  const mainItems = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/projects', icon: <ProjectOutlined />, label: 'Projects' },
     { key: '/time', icon: <ClockCircleOutlined />, label: 'My Time' },
+    { key: '/teams', icon: <TeamOutlined />, label: 'Teams' },
+    ...(user?.role === 'ADMIN'
+      ? [{ key: '/admin', icon: <SettingOutlined />, label: 'Admin' } as const]
+      : []),
+  ];
+
+  const toolsItems = [
+    {
+      key: '/uat',
+      icon: <CheckCircleOutlined />,
+      label: 'UAT чек-листы (MVP)',
+    },
+  ];
+
+  const menuItems = [
+    {
+      type: 'group' as const,
+      key: 'main',
+      label: 'Навигация',
+      children: mainItems,
+    },
+    {
+      type: 'group' as const,
+      key: 'tools',
+      label: 'Инструменты MVP',
+      children: toolsItems,
+    },
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider breakpoint="lg" collapsedWidth="80">
-        <div style={{ padding: '16px', textAlign: 'center' }}>
-          <Typography.Title level={4} style={{ color: '#fff', margin: 0 }}>
+    <Layout className="tt-app-shell">
+      <Sider
+        width={220}
+        theme="dark"
+        breakpoint="lg"
+        collapsedWidth={80}
+        className="tt-sidebar"
+      >
+        <div className="tt-sidebar-header">
+          <div className="tt-workspace-dot" />
+          <Typography.Text className="tt-sidebar-workspace-name">
             TaskTime
-          </Typography.Title>
+          </Typography.Text>
         </div>
         <Menu
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          className="tt-sidebar-menu"
+          onClick={({ key }) => {
+            if (typeof key === 'string' && key.startsWith('/')) {
+              navigate(key);
+            }
+          }}
         />
       </Sider>
-      <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
-          <Typography.Text>{user?.name} ({user?.role})</Typography.Text>
-          <Button icon={<LogoutOutlined />} onClick={handleLogout}>
+      <Layout className="tt-main">
+        <Header className="tt-topbar">
+          <Typography.Text className="tt-topbar-user">
+            {user?.name} ({user?.role})
+          </Typography.Text>
+          <Button
+            size="small"
+            icon={<LogoutOutlined />}
+            className="tt-topbar-logout"
+            onClick={handleLogout}
+          >
             Logout
           </Button>
         </Header>
-        <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8 }}>
+        <Content className="tt-content">
           <Outlet />
+          <UatOnboardingOverlay />
         </Content>
       </Layout>
     </Layout>

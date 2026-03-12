@@ -25,6 +25,7 @@ model User {
   auditLogs      AuditLog[]
   comments       Comment[]
   timeLogs       TimeLog[]
+  teamMemberships TeamMember[]
 
   @@map("users")
 }
@@ -212,4 +213,33 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ===== TEAMS =====
+
+model Team {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  members TeamMember[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String   @map("team_id")
+  userId    String   @map("user_id")
+  role      String?  // optional per-team role, e.g. "LEAD", "DEVELOPER"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
 }

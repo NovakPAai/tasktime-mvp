@@ -1,10 +1,15 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Typography, Tag, Select, Space } from 'antd';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Typography, Tag, Select, Space, Button, Modal, Form, Input, message } from 'antd';
+import { AppstoreOutlined, ThunderboltOutlined, PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import * as boardApi from '../api/board';
 import * as sprintsApi from '../api/sprints';
-import type { Issue, IssueStatus, Sprint } from '../types';
+import * as projectsApi from '../api/projects';
+import * as issuesApi from '../api/issues';
+import type { Issue, IssueStatus, Sprint, Project, IssueType, IssuePriority } from '../types';
+import { useAuthStore } from '../store/auth.store';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const STATUS_ORDER: IssueStatus[] = ['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'];
 const COLUMN_LABELS: Record<IssueStatus, string> = {
@@ -17,14 +22,35 @@ const TYPE_COLORS: Record<string, string> = { EPIC: 'purple', STORY: 'green', TA
 
 export default function BoardPage() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [columns, setColumns] = useState<Record<IssueStatus, Issue[]>>({} as any);
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+
+  const [columns, setColumns] = useState<Record<IssueStatus, Issue[]>>({} as Record<IssueStatus, Issue[]>);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [selectedSprint, setSelectedSprint] = useState<string | undefined>();
+  const [project, setProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [form] = Form.useForm<issuesApi.CreateIssueBody>();
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+
+  const canCreate = user?.role !== 'VIEWER';
 
   const load = useCallback(async () => {
     if (!projectId) return;
-    const board = await boardApi.getBoard(projectId, selectedSprint);
-    setColumns(board.columns);
+    setLoading(true);
+    try {
+      const [board, proj] = await Promise.all([
+        boardApi.getBoard(projectId, selectedSprint),
+        projectsApi.getProject(projectId),
+      ]);
+      setColumns(board.columns);
+      setProject(proj);
+    } finally {
+      setLoading(false);
+    }
   }, [projectId, selectedSprint]);
 
   useEffect(() => {
@@ -63,38 +89,150 @@ export default function BoardPage() {
     await boardApi.reorderBoard(projectId, updates);
   };
 
+  const handleCreateIssue = async (values: issuesApi.CreateIssueBody) => {
+    if (!projectId) return;
+    try {
+      setCreateLoading(true);
+      await issuesApi.createIssue(projectId, values);
+      message.success('Issue created');
+      setCreateOpen(false);
+      form.resetFields();
+      load();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      message.error(error.response?.data?.error || 'Failed to create issue');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  if (loading || !project) {
+    return <LoadingSpinner />;
+  }
+
+  const allBoardIssues = STATUS_ORDER.flatMap((status) => columns[status] || []);
+
   return (
-    <div>
-      <Space style={{ marginBottom: 16 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>Board</Typography.Title>
-        <Select allowClear placeholder="All issues" value={selectedSprint} onChange={setSelectedSprint}
-          style={{ width: 200 }} options={sprints.map(s => ({ value: s.id, label: s.name }))} />
-      </Space>
+    <div className="tt-page tt-board-page">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(`/projects/${projectId}`)}
+          style={{ padding: '4px 8px', color: 'var(--t2)' }}
+        >
+          Back to project
+        </Button>
+      </div>
+
+      <div className="tt-board-header">
+        <div className="tt-board-header-main">
+          <h1 className="tt-page-title tt-board-title">
+            {project.name}
+            <span className="tt-board-key">{project.key}</span>
+          </h1>
+          <p className="tt-page-subtitle tt-board-subtitle">Kanban board</p>
+        </div>
+        <div className="tt-board-header-actions">
+          <Space.Compact>
+            <Button
+              icon={<AppstoreOutlined />}
+              type="primary"
+              size="small"
+            >
+              Board
+            </Button>
+            <Button
+              icon={<ThunderboltOutlined />}
+              size="small"
+              onClick={() => navigate(`/projects/${projectId}/sprints`)}
+            >
+              Sprints
+            </Button>
+          </Space.Compact>
+          {canCreate && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              className="tt-board-new-issue-btn"
+              onClick={() => setCreateOpen(true)}
+            >
+              New Issue
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="tt-board-toolbar">
+        <Space size="middle" wrap>
+          <Select
+            allowClear
+            placeholder="All sprints"
+            value={selectedSprint}
+            onChange={setSelectedSprint}
+            style={{ minWidth: 220 }}
+            options={sprints.map((s) => ({
+              value: s.id,
+              label: s.name,
+            }))}
+          />
+        </Space>
+      </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12 }}>
+        <div className="tt-board-columns">
           {STATUS_ORDER.map(status => (
             <Droppable droppableId={status} key={status}>
               {(provided, snapshot) => (
-                <div ref={provided.innerRef} {...provided.droppableProps}
-                  style={{
-                    minWidth: 240, width: 240, background: snapshot.isDraggingOver ? '#f0f5ff' : COLUMN_COLORS[status],
-                    borderRadius: 8, padding: 8, minHeight: 400,
-                  }}>
-                  <Typography.Text strong style={{ display: 'block', marginBottom: 8, textAlign: 'center' }}>
-                    {COLUMN_LABELS[status]} ({columns[status]?.length || 0})
-                  </Typography.Text>
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={`tt-board-column ${snapshot.isDraggingOver ? 'tt-board-column--active' : ''}`}
+                  style={{ backgroundColor: COLUMN_COLORS[status] }}
+                >
+                  <div className="tt-board-column-header">
+                    <span className={`tt-board-column-chip tt-board-column-chip--${status.toLowerCase()}`}>
+                      {COLUMN_LABELS[status]}
+                    </span>
+                    <span className="tt-board-column-count">
+                      {columns[status]?.length || 0}
+                    </span>
+                  </div>
                   {(columns[status] || []).map((issue, idx) => (
                     <Draggable key={issue.id} draggableId={issue.id} index={idx}>
                       {(prov) => (
-                        <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps}
-                          style={{ ...prov.draggableProps.style, background: '#fff', borderRadius: 6, padding: 8, marginBottom: 6, boxShadow: '0 1px 3px rgba(0,0,0,.08)' }}>
-                          <Link to={`/issues/${issue.id}`} style={{ fontWeight: 500 }}>
+                        <div
+                          ref={prov.innerRef}
+                          {...prov.draggableProps}
+                          {...prov.dragHandleProps}
+                          className={`tt-board-card ${selectedIssueId === issue.id ? 'tt-board-card--selected' : ''}`}
+                          style={prov.draggableProps.style as React.CSSProperties}
+                          onClick={() => setSelectedIssueId(issue.id)}
+                        >
+                          <div className="tt-board-card-top-row">
+                            <span className="tt-board-card-id">
+                              {project.key}-{issue.number}
+                            </span>
+                            <Tag
+                              color={TYPE_COLORS[issue.type]}
+                              className="tt-board-card-type"
+                            >
+                              {issue.type}
+                            </Tag>
+                          </div>
+                          <Link to={`/issues/${issue.id}`} className="tt-board-card-title">
                             {issue.title}
                           </Link>
-                          <div style={{ marginTop: 4 }}>
-                            <Tag color={TYPE_COLORS[issue.type]} style={{ fontSize: 10 }}>{issue.type}</Tag>
-                            {issue.assignee && <Tag style={{ fontSize: 10 }}>{issue.assignee.name}</Tag>}
+                          <div className="tt-board-card-meta">
+                            <span className={`tt-board-status-pill tt-board-status-pill--${issue.status.toLowerCase()}`}>
+                              {COLUMN_LABELS[issue.status]}
+                            </span>
+                            {issue.assignee && (
+                              <span className="tt-board-card-assignee">
+                                {issue.assignee.name}
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
@@ -107,6 +245,73 @@ export default function BoardPage() {
           ))}
         </div>
       </DragDropContext>
+
+      <Modal
+        title="New Issue"
+        open={createOpen}
+        onCancel={() => setCreateOpen(false)}
+        onOk={() => form.submit()}
+        okText="Create"
+        confirmLoading={createLoading}
+        width={520}
+      >
+        <Form<issuesApi.CreateIssueBody>
+          form={form}
+          layout="vertical"
+          onFinish={handleCreateIssue}
+          initialValues={{ type: 'TASK', priority: 'MEDIUM' }}
+        >
+          <Form.Item
+            name="title"
+            label="Title"
+            rules={[{ required: true, message: 'Please enter a title' }]}
+          >
+            <Input />
+          </Form.Item>
+          <Space size="middle" style={{ width: '100%' }}>
+            <Form.Item<IssueType>
+              name="type"
+              label="Type"
+              style={{ flex: 1 }}
+            >
+              <Select<IssueType>
+                options={(['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG'] as IssueType[]).map((v) => ({
+                  value: v,
+                  label: v,
+                }))}
+              />
+            </Form.Item>
+            <Form.Item<IssuePriority>
+              name="priority"
+              label="Priority"
+              style={{ flex: 1 }}
+            >
+              <Select<IssuePriority>
+                options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map((v) => ({
+                  value: v,
+                  label: v,
+                }))}
+              />
+            </Form.Item>
+          </Space>
+          <Form.Item name="parentId" label="Parent Issue">
+            <Select
+              allowClear
+              placeholder="None (top level)"
+              style={{ width: '100%' }}
+              options={allBoardIssues
+                .filter((i) => ['EPIC', 'STORY', 'TASK'].includes(i.type))
+                .map((i) => ({
+                  value: i.id,
+                  label: `${project.key}-${i.number} ${i.title}`,
+                }))}
+            />
+          </Form.Item>
+          <Form.Item name="description" label="Description">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
