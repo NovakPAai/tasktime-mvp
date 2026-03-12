@@ -1,4 +1,4 @@
-import type { IssueType } from '@prisma/client';
+import type { IssuePriority, IssueStatus, IssueType, Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateIssueDto, UpdateIssueDto, UpdateStatusDto, AssignDto } from './issues.dto.js';
@@ -42,9 +42,9 @@ async function getNextNumber(projectId: string): Promise<number> {
 }
 
 type ListIssuesFilters = {
-  status?: string[];
-  type?: string[];
-  priority?: string[];
+  status?: IssueStatus[];
+  type?: IssueType[];
+  priority?: IssuePriority[];
   assigneeId?: string;
   sprintId?: string;
   from?: string;
@@ -53,7 +53,7 @@ type ListIssuesFilters = {
 };
 
 export async function listIssues(projectId: string, filters?: ListIssuesFilters) {
-  const where: Record<string, unknown> = { projectId };
+  const where: Prisma.IssueWhereInput = { projectId };
 
   if (filters?.status && filters.status.length > 0) {
     where.status = { in: filters.status };
@@ -71,13 +71,10 @@ export async function listIssues(projectId: string, filters?: ListIssuesFilters)
     where.sprintId = filters.sprintId === 'BACKLOG' ? null : filters.sprintId;
   }
   if (filters?.from || filters?.to) {
-    where.createdAt = {};
-    if (filters.from) {
-      where.createdAt.gte = new Date(filters.from);
-    }
-    if (filters.to) {
-      where.createdAt.lte = new Date(filters.to);
-    }
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (filters.from) createdAt.gte = new Date(filters.from);
+    if (filters.to) createdAt.lte = new Date(filters.to);
+    where.createdAt = createdAt;
   }
   if (filters?.search) {
     where.OR = [

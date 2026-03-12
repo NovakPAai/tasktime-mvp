@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Typography, Space } from 'antd';
+import { Typography } from 'antd';
 import { ProjectOutlined, UserOutlined, BugOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useProjectsStore } from '../store/projects.store';
 import { useAuthStore } from '../store/auth.store';

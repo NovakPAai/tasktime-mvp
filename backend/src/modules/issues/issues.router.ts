@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { IssuePriority, IssueStatus, IssueType } from '@prisma/client';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
@@ -29,9 +30,9 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
       typeof value === 'string' ? value.split(',').filter(Boolean) : value;
 
     const issues = await issuesService.listIssues(req.params.projectId as string, {
-      status: toArray(status),
-      type: toArray(type),
-      priority: toArray(priority),
+      status: toArray(status) as IssueStatus[] | undefined,
+      type: toArray(type) as IssueType[] | undefined,
+      priority: toArray(priority) as IssuePriority[] | undefined,
       assigneeId,
       sprintId,
       from,

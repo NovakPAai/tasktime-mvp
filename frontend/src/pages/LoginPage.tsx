@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Input, Button, Typography, message, Tabs } from 'antd';
+import { Form, Input, Button, message, Tabs } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 

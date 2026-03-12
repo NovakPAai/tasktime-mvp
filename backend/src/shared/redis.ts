@@ -1,13 +1,15 @@
 import { createClient, type RedisClientType } from 'redis';
 import { config } from '../config.js';
 
-let client: RedisClientType | null = null;
-let connecting: Promise<RedisClientType | null> | null = null;
+type RedisClient = RedisClientType<any, any, any>;
+
+let client: RedisClient | null = null;
+let connecting: Promise<RedisClient | null> | null = null;
 
 // 7 days in seconds — синхронизировано с refresh-токеном
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-async function getRedisClientInternal(): Promise<RedisClientType | null> {
+async function getRedisClientInternal(): Promise<RedisClient | null> {
   if (process.env.NODE_ENV === 'test') {
     return null;
   }
@@ -21,7 +23,7 @@ async function getRedisClientInternal(): Promise<RedisClientType | null> {
   }
 
   if (!connecting) {
-    const instance = createClient({ url: config.REDIS_URL });
+    const instance = createClient({ url: config.REDIS_URL }) as RedisClient;
 
     instance.on('error', (err) => {
       // eslint-disable-next-line no-console

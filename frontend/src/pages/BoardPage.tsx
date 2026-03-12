@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Typography, Tag, Select, Space, Button, Modal, Form, Input, message } from 'antd';
+import { Tag, Select, Space, Button, Modal, Form, Input, message } from 'antd';
 import { AppstoreOutlined, ThunderboltOutlined, PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import * as boardApi from '../api/board';

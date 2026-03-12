@@ -4,7 +4,7 @@ export interface UatStep {
   id: string;
   title: string;
   description: string;
-  expectedResult?: string;
+  expectedResult?: string | null;
 }
 
 export interface UatTest {

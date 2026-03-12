@@ -72,7 +72,12 @@ export default function SprintsPage() {
     { title: 'Title', dataIndex: 'title', render: (t: string, r: Issue) => <Link to={`/issues/${r.id}`}>{t}</Link> },
     { title: 'Type', dataIndex: 'type', width: 80, render: (t: string) => <Tag>{t}</Tag> },
     { title: 'Priority', dataIndex: 'priority', width: 80 },
-    { title: 'Assignee', dataIndex: ['assignee', 'name'], width: 100, render: (n: string) => n || '-' },
+    {
+      title: 'Assignee',
+      dataIndex: ['assignee', 'name'],
+      width: 100,
+      render: (n: string) => <span>{n || '-'}</span>,
+    },
   ];
 
   const selectedSprint = sprints.find(s => s.id === selectedSprintId) ?? null;

@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { getCachedJson, setCachedJson } from '../../shared/redis.js';
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
@@ -125,14 +126,15 @@ type IssuesByStatusRow = { status: string; _count: { _all: number } };
 type IssuesByAssigneeRow = { assigneeId: string | null; _count: { _all: number } };
 
 export async function getIssuesByStatusReport(params: IssuesReportParams) {
-  const where: Record<string, unknown> = { projectId: params.projectId };
+  const where: Prisma.IssueWhereInput = { projectId: params.projectId };
   if (params.sprintId) {
     where.sprintId = params.sprintId;
   }
   if (params.from || params.to) {
-    where.createdAt = {};
-    if (params.from) where.createdAt.gte = new Date(params.from);
-    if (params.to) where.createdAt.lte = new Date(params.to);
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (params.from) createdAt.gte = new Date(params.from);
+    if (params.to) createdAt.lte = new Date(params.to);
+    where.createdAt = createdAt;
   }
 
   const cacheKey = `admin:report:issuesByStatus:${params.projectId}:${params.sprintId ?? 'all'}:${params.from ?? 'none'}:${
@@ -156,14 +158,15 @@ export async function getIssuesByStatusReport(params: IssuesReportParams) {
 }
 
 export async function getIssuesByAssigneeReport(params: IssuesReportParams) {
-  const where: Record<string, unknown> = { projectId: params.projectId };
+  const where: Prisma.IssueWhereInput = { projectId: params.projectId };
   if (params.sprintId) {
     where.sprintId = params.sprintId;
   }
   if (params.from || params.to) {
-    where.createdAt = {};
-    if (params.from) where.createdAt.gte = new Date(params.from);
-    if (params.to) where.createdAt.lte = new Date(params.to);
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (params.from) createdAt.gte = new Date(params.from);
+    if (params.to) createdAt.lte = new Date(params.to);
+    where.createdAt = createdAt;
   }
 
   const cacheKey = `admin:report:issuesByAssignee:${params.projectId}:${params.sprintId ?? 'all'}:${params.from ?? 'none'}:${
