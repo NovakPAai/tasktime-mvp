@@ -23,7 +23,7 @@ jobs:
       SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       SOURCE_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ env.SOURCE_SHA }}
 
@@ -71,6 +71,8 @@ jobs:
           file: backend/Dockerfile
           push: true
           tags: ${{ steps.vars.outputs.backend_tags }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
 
       - uses: docker/build-push-action@v6
         with:
@@ -78,3 +80,5 @@ jobs:
           file: frontend/Dockerfile
           push: true
           tags: ${{ steps.vars.outputs.web_tags }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web

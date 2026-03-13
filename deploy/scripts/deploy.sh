@@ -38,6 +38,7 @@ fi
 
 set -a
 . "$COMPOSE_ENV_FILE"
+. "$BACKEND_ENV_FILE"
 set +a
 
 HEALTH_URL="http://127.0.0.1:${WEB_HTTP_PORT:-80}/healthz"
@@ -55,11 +56,44 @@ if ! docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm b
 fi
 
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" pull
+
+# Auto-backup before migrations (skip on first deploy when postgres has no data yet)
+if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" ps postgres --status running -q 2>/dev/null | grep -q .; then
+  echo "Creating pre-deploy backup..."
+  BACKUP_DIR="deploy/backups/$ENVIRONMENT"
+  mkdir -p "$BACKUP_DIR"
+  TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+  docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
+    pg_dump -U "${POSTGRES_USER:-tasktime}" -d "${POSTGRES_DB:-tasktime}" \
+    > "$BACKUP_DIR/pre-deploy-$TIMESTAMP.sql" 2>/dev/null || echo "Warning: backup failed (first deploy?), continuing..."
+else
+  echo "Postgres not running yet, skipping pre-deploy backup"
+fi
+
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npx prisma migrate deploy
-docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npm run db:bootstrap
+if [ "${BOOTSTRAP_ENABLED:-}" = "true" ]; then
+  docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npm run db:bootstrap
+else
+  echo "Skipping bootstrap: BOOTSTRAP_ENABLED is not true in $BACKEND_ENV_FILE"
+fi
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" up -d
 
-sleep 10
+MAX_RETRIES=12
+RETRY_INTERVAL=5
+echo "Waiting for health check at $HEALTH_URL ..."
+for i in $(seq 1 "$MAX_RETRIES"); do
+  if curl --fail --silent --show-error "$HEALTH_URL" >/dev/null 2>&1; then
+    echo "Health check passed (attempt $i/$MAX_RETRIES)"
+    break
+  fi
+  if [ "$i" -eq "$MAX_RETRIES" ]; then
+    echo "Health check failed after $MAX_RETRIES attempts"
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" ps
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" logs --tail=50 backend
+    exit 1
+  fi
+  echo "  attempt $i/$MAX_RETRIES failed, retrying in ${RETRY_INTERVAL}s..."
+  sleep "$RETRY_INTERVAL"
+done
 
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" ps
-curl --fail --silent --show-error "$HEALTH_URL" >/dev/null
