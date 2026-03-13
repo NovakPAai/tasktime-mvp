@@ -13,6 +13,7 @@
     "db:bootstrap": "node dist/prisma/bootstrap.js",
     "db:seed": "npm run db:seed:dev",
     "db:seed:dev": "tsx src/prisma/seed.ts",
+    "db:seed:ttmp": "SEED_SCOPE=TTMP_ONLY tsx src/prisma/seed.ts",
     "db:sync:prod-to-dev": "tsx src/prisma/prod-sync.ts",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
