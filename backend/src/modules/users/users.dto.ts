@@ -6,7 +6,7 @@ export const updateUserDto = z.object({
 });
 
 export const changeRoleDto = z.object({
-  role: z.enum(['ADMIN', 'MANAGER', 'USER', 'VIEWER']),
+  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'USER', 'VIEWER']),
 });
 
 export type UpdateUserDto = z.infer<typeof updateUserDto>;

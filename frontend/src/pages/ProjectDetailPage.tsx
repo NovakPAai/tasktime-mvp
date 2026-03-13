@@ -9,6 +9,7 @@ import * as issuesApi from '../api/issues';
 import * as authApi from '../api/auth';
 import type { Project, Issue, IssueType, IssuePriority, IssueStatus, User } from '../types';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { hasAnyRequiredRole } from '../lib/roles';
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +40,7 @@ export default function ProjectDetailPage() {
   }, [id, fetchIssues]);
 
   const canCreate = user?.role !== 'VIEWER';
-  const canBulkEdit = user && (user.role === 'ADMIN' || user.role === 'MANAGER');
+  const canBulkEdit = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const handleCreate = async (values: issuesApi.CreateIssueBody) => {
     if (!id) return;

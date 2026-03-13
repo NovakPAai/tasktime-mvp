@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 import { useUatOnboardingStore } from '../store/uatOnboarding.store';
 import * as uatApi from '../api/uat';
+import { hasAnyRequiredRole, hasRequiredRole } from '../lib/roles';
 
 type UatRole = uatApi.UatRole;
 type UatTest = uatApi.UatTest;
@@ -16,7 +17,10 @@ export default function UatTestsPage() {
   const startTest = useUatOnboardingStore((s) => s.startTest);
   const [loading, setLoading] = useState(false);
   const [tests, setTests] = useState<UatTest[]>([]);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>(() => (user?.role as UatRole | undefined) ?? 'ALL');
+  const initialRoleFilter = hasRequiredRole(user?.role, 'ADMIN')
+    ? 'ADMIN'
+    : (user?.role as UatRole | undefined) ?? 'ALL';
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>(initialRoleFilter);
   const [completedIds, setCompletedIds] = useState<string[]>([]);
 
   const availableRoles: RoleFilter[] = useMemo(() => {
@@ -35,9 +39,11 @@ export default function UatTestsPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const roleParam = user?.role && ['ADMIN', 'MANAGER', 'USER', 'VIEWER'].includes(user.role)
-          ? (user.role as uatApi.UatRole)
-          : undefined;
+        const roleParam = hasRequiredRole(user?.role, 'ADMIN')
+          ? 'ADMIN'
+          : hasAnyRequiredRole(user?.role, ['MANAGER', 'USER', 'VIEWER'])
+            ? (user!.role as uatApi.UatRole)
+            : undefined;
         const data = await uatApi.listUatTests({ role: roleParam });
         setTests(data);
       } finally {

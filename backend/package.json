@@ -8,6 +8,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
+    "user:promote-super-admin": "tsx src/scripts/promote-super-admin.ts",
+    "user:rotate-password": "tsx src/scripts/rotate-password.ts",
     "db:bootstrap": "node dist/prisma/bootstrap.js",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",

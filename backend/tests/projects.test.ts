@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { request } from './helpers.js';
+import { request, createSuperAdminUser } from './helpers.js';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 let adminToken: string;
 let userToken: string;
+let superAdminToken: string;
 
 beforeEach(async () => {
   await prisma.auditLog.deleteMany();
@@ -27,6 +28,9 @@ beforeEach(async () => {
     email: 'user@test.com', password: 'password123', name: 'User',
   });
   userToken = userReg.body.accessToken;
+
+  const superAdmin = await createSuperAdminUser();
+  superAdminToken = superAdmin.accessToken;
 });
 
 describe('Projects API', () => {
@@ -36,6 +40,14 @@ describe('Projects API', () => {
       .send({ name: 'Test Project', key: 'TEST' });
     expect(res.status).toBe(201);
     expect(res.body.key).toBe('TEST');
+  });
+
+  it('POST /api/projects - super admin can create project', async () => {
+    const res = await request.post('/api/projects')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ name: 'Super Project', key: 'SUPR' });
+    expect(res.status).toBe(201);
+    expect(res.body.key).toBe('SUPR');
   });
 
   it('POST /api/projects - user cannot create project', async () => {

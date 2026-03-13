@@ -1,5 +1,6 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { isSuperAdmin } from '../../shared/auth/roles.js';
 import type { UpdateUserDto, ChangeRoleDto } from './users.dto.js';
 
 const userSelect = {
@@ -34,9 +35,30 @@ export async function updateUser(id: string, dto: UpdateUserDto) {
   return prisma.user.update({ where: { id }, data: dto, select: userSelect });
 }
 
-export async function changeRole(id: string, dto: ChangeRoleDto) {
+type RoleChangeActor = {
+  userId: string;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
+};
+
+export async function changeRole(actor: RoleChangeActor, id: string, dto: ChangeRoleDto) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
+
+  const actorIsSuperAdmin = isSuperAdmin(actor.role);
+
+  if (!actorIsSuperAdmin) {
+    if (dto.role === 'SUPER_ADMIN') {
+      throw new AppError(403, 'Only super admins can assign SUPER_ADMIN');
+    }
+
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      throw new AppError(403, 'Only super admins can manage ADMIN or SUPER_ADMIN users');
+    }
+  }
+
+  if (actor.userId === id && actor.role === 'SUPER_ADMIN' && dto.role !== 'SUPER_ADMIN') {
+    throw new AppError(403, 'Super admin cannot remove their own SUPER_ADMIN role');
+  }
 
   return prisma.user.update({
     where: { id },

@@ -6,6 +6,7 @@ import { useProjectsStore } from '../store/projects.store';
 import { useAuthStore } from '../store/auth.store';
 import * as projectsApi from '../api/projects';
 import type { Project } from '../types';
+import { hasAnyRequiredRole } from '../lib/roles';
 
 export default function ProjectsPage() {
   const { projects, loading, fetchProjects } = useProjectsStore();
@@ -18,7 +19,7 @@ export default function ProjectsPage() {
     fetchProjects();
   }, [fetchProjects]);
 
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canCreate = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const handleCreate = async (values: { name: string; key: string; description?: string }) => {
     try {

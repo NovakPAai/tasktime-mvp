@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { request, createAdminUser, createManagerUser } from './helpers.js';
+import { request, createAdminUser, createManagerUser, createSuperAdminUser, createTestUser } from './helpers.js';
 
 const prisma = new PrismaClient();
 
 let adminToken: string;
 let managerToken: string;
+let superAdminToken: string;
+let userToken: string;
 
 beforeEach(async () => {
   await prisma.auditLog.deleteMany();
@@ -19,6 +21,12 @@ beforeEach(async () => {
 
   const manager = await createManagerUser();
   managerToken = manager.accessToken;
+
+  const superAdmin = await createSuperAdminUser();
+  superAdminToken = superAdmin.accessToken;
+
+  const user = await createTestUser('viewer-of-admin@test.com', 'password123', 'Regular User');
+  userToken = user.accessToken;
 });
 
 describe('Admin API', () => {
@@ -29,11 +37,20 @@ describe('Admin API', () => {
 
     const resManager = await request.get('/api/admin/stats').set('Authorization', `Bearer ${managerToken}`);
     expect(resManager.status).toBe(200);
+
+    const resSuperAdmin = await request.get('/api/admin/stats').set('Authorization', `Bearer ${superAdminToken}`);
+    expect(resSuperAdmin.status).toBe(200);
+
+    const resUser = await request.get('/api/admin/stats').set('Authorization', `Bearer ${userToken}`);
+    expect(resUser.status).toBe(403);
   });
 
   it('GET /api/admin/users - only ADMIN can access', async () => {
     const resAdmin = await request.get('/api/admin/users').set('Authorization', `Bearer ${adminToken}`);
     expect(resAdmin.status).toBe(200);
+
+    const resSuperAdmin = await request.get('/api/admin/users').set('Authorization', `Bearer ${superAdminToken}`);
+    expect(resSuperAdmin.status).toBe(200);
 
     const resManager = await request.get('/api/admin/users').set('Authorization', `Bearer ${managerToken}`);
     expect(resManager.status).toBe(403);

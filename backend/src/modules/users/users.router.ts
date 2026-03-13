@@ -41,7 +41,10 @@ router.patch('/:id', validate(updateUserDto), async (req: AuthRequest, res, next
 
 router.patch('/:id/role', requireRole('ADMIN'), validate(changeRoleDto), async (req: AuthRequest, res, next) => {
   try {
-    const user = await usersService.changeRole(req.params.id as string, req.body);
+    const user = await usersService.changeRole({
+      userId: req.user!.userId,
+      role: req.user!.role,
+    }, req.params.id as string, req.body);
     await logAudit(req, 'user.role_changed', 'user', req.params.id as string, req.body);
     res.json(user);
   } catch (err) {
