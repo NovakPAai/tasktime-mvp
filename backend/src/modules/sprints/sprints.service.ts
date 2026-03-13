@@ -1,16 +1,27 @@
+import type { Prisma, SprintState } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateSprintDto, UpdateSprintDto } from './sprints.dto.js';
 
-function mapSprintWithStats(sprint: any) {
+type SprintStatsIssue = {
+  estimatedHours: Prisma.Decimal | number | null;
+};
+
+type SprintWithStatsSource = {
+  issues?: SprintStatsIssue[] | null;
+};
+
+function mapSprintWithStats<TSprint extends SprintWithStatsSource>(sprint: TSprint) {
   const totalIssues = sprint.issues?.length ?? 0;
-  const estimatedIssues = sprint.issues?.filter((i: any) => i.estimatedHours != null).length ?? 0;
+  const estimatedIssues = sprint.issues?.filter((issue) => issue.estimatedHours != null).length ?? 0;
   const planningReadiness =
     totalIssues === 0 ? 0 : Math.round((estimatedIssues / totalIssues) * 100);
 
-  const { issues, ...rest } = sprint;
+  const sprintData = { ...sprint };
+  delete (sprintData as Partial<TSprint> & SprintWithStatsSource).issues;
+
   return {
-    ...rest,
+    ...sprintData,
     stats: {
       totalIssues,
       estimatedIssues,
@@ -47,6 +58,7 @@ export async function getSprintIssues(id: string) {
           projectId: true,
           number: true,
           title: true,
+          estimatedHours: true,
           type: true,
           status: true,
           priority: true,
@@ -66,10 +78,9 @@ export async function getSprintIssues(id: string) {
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
   const mappedSprint = mapSprintWithStats(sprint);
-  const { issues, ...sprintWithoutIssues } = mappedSprint;
 
   return {
-    sprint: sprintWithoutIssues,
+    sprint: mappedSprint,
     issues: sprint.issues,
   };
 }
@@ -169,10 +180,10 @@ interface ListAllSprintsFilters {
 }
 
 export async function listAllSprints(filters: ListAllSprintsFilters) {
-  const where: any = {};
+  const where: Prisma.SprintWhereInput = {};
 
   if (filters.state) {
-    where.state = filters.state;
+    where.state = filters.state as SprintState;
   }
 
   if (filters.projectId) {
