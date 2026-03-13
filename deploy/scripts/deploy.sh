@@ -56,6 +56,7 @@ fi
 
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" pull
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npx prisma migrate deploy
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npm run db:bootstrap
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" up -d
 
 sleep 10
