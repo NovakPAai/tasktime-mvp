@@ -5,6 +5,7 @@ import { useProjectsStore } from '../store/projects.store';
 import { useAuthStore } from '../store/auth.store';
 import * as adminApi from '../api/admin';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { hasAnyRequiredRole } from '../lib/roles';
 
 export default function DashboardPage() {
   const { projects, loading, fetchProjects } = useProjectsStore();
@@ -17,7 +18,7 @@ export default function DashboardPage() {
   }, [fetchProjects]);
 
   useEffect(() => {
-    const canViewAdminStats = user && ['ADMIN', 'MANAGER', 'VIEWER'].includes(user.role);
+    const canViewAdminStats = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER', 'VIEWER']);
     if (!canViewAdminStats || adminStatsLoaded) return;
 
     const loadStats = async () => {
