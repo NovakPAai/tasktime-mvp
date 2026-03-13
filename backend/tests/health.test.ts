@@ -70,4 +70,5 @@ describe('Health API', () => {
       redis: 'down',
     });
   });
+
 });

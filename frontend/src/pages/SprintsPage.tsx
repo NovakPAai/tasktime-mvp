@@ -8,6 +8,7 @@ import * as teamsApi from '../api/teams';
 import { useAuthStore } from '../store/auth.store';
 import type { Sprint, Issue, SprintState, Team } from '../types';
 import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
+import { hasAnyRequiredRole } from '../lib/roles';
 
 const STATE_TONE_CLASS: Record<SprintState, string> = { PLANNED: 'planned', ACTIVE: 'active', CLOSED: 'closed' };
 
@@ -28,7 +29,7 @@ export default function SprintsPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [form] = Form.useForm();
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const load = useCallback(async () => {
     if (!projectId) return;

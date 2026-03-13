@@ -74,6 +74,27 @@ describe('Auth API', () => {
     expect(res.body.email).toBe('me@test.com');
   });
 
+  it('POST /api/auth/login and GET /api/auth/me - should preserve SUPER_ADMIN role', async () => {
+    const reg = await request.post('/api/auth/register').send({
+      email: 'super-auth@test.com', password: 'password123', name: 'Super Auth',
+    });
+
+    await prisma.$executeRawUnsafe(
+      `UPDATE users SET role = 'SUPER_ADMIN' WHERE id = '${reg.body.user.id}'`,
+    );
+
+    const login = await request.post('/api/auth/login').send({
+      email: 'super-auth@test.com', password: 'password123',
+    });
+    expect(login.status).toBe(200);
+    expect(login.body.user.role).toBe('SUPER_ADMIN');
+
+    const me = await request.get('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.accessToken}`);
+    expect(me.status).toBe(200);
+    expect(me.body.role).toBe('SUPER_ADMIN');
+  });
+
   it('GET /api/auth/me - should reject without token', async () => {
     const res = await request.get('/api/auth/me');
     expect(res.status).toBe(401);

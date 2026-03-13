@@ -5,6 +5,7 @@ import type { Team, User } from '../types';
 import * as teamsApi from '../api/teams';
 import * as usersApi from '../api/auth';
 import { useAuthStore } from '../store/auth.store';
+import { hasAnyRequiredRole } from '../lib/roles';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -17,7 +18,7 @@ export default function TeamsPage() {
   const [form] = Form.useForm();
   const [membersForm] = Form.useForm();
   const { user } = useAuthStore();
-  const canManageTeams = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManageTeams = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const load = async () => {
     setLoading(true);

@@ -1,48 +1,22 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+
+import { BOOTSTRAP_USERS, bootstrapDefaultUsers } from './bootstrap.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
 
-  // Create users
-  const passwordHash = await bcrypt.hash('password123', 12);
+  const defaultPassword = 'password123';
+  await bootstrapDefaultUsers(prisma, defaultPassword);
 
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@tasktime.ru' },
-    update: {},
-    create: { email: 'admin@tasktime.ru', passwordHash, name: 'Admin User', role: 'ADMIN' },
-  });
-
-  const pavel = await prisma.user.upsert({
-    where: { email: 'novak.pavel@tasktime.ru' },
-    update: {},
-    create: {
-      email: 'novak.pavel@tasktime.ru',
-      passwordHash,
-      name: 'Novak Pavel',
-      role: 'ADMIN',
-    },
-  });
-
-  const manager = await prisma.user.upsert({
-    where: { email: 'manager@tasktime.ru' },
-    update: {},
-    create: { email: 'manager@tasktime.ru', passwordHash, name: 'Project Manager', role: 'MANAGER' },
-  });
-
-  const dev = await prisma.user.upsert({
-    where: { email: 'dev@tasktime.ru' },
-    update: {},
-    create: { email: 'dev@tasktime.ru', passwordHash, name: 'Developer', role: 'USER' },
-  });
-
-  const viewer = await prisma.user.upsert({
-    where: { email: 'viewer@tasktime.ru' },
-    update: {},
-    create: { email: 'viewer@tasktime.ru', passwordHash, name: 'CIO Viewer', role: 'VIEWER' },
-  });
+  const [admin, pavel, manager, dev, viewer] = await Promise.all(
+    BOOTSTRAP_USERS.map((user) =>
+      prisma.user.findUniqueOrThrow({
+        where: { email: user.email },
+      }),
+    ),
+  );
 
   // Create projects
   const project = await prisma.project.upsert({
@@ -1675,7 +1649,7 @@ async function main() {
 
   console.log('Seed complete.');
   console.log(`Users: ${admin.email}, ${manager.email}, ${dev.email}, ${viewer.email}, ${pavel.email}`);
-  console.log(`Password for all: password123`);
+  console.log(`Password for all: ${defaultPassword}`);
   console.log(`Projects: ${project.key}, ${backendProject.key}`);
 }
 
