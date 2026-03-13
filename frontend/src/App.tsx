@@ -6,6 +6,8 @@ import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectsPage from './pages/ProjectsPage';
+import BusinessTeamsPage from './pages/BusinessTeamsPage';
+import FlowTeamsPage from './pages/FlowTeamsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import IssueDetailPage from './pages/IssueDetailPage';
 import BoardPage from './pages/BoardPage';
@@ -58,6 +60,8 @@ export default function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="projects" element={<ProjectsPage />} />
+            <Route path="business-teams" element={<BusinessTeamsPage />} />
+            <Route path="flow-teams" element={<FlowTeamsPage />} />
             <Route path="projects/:id" element={<ProjectDetailPage />} />
             <Route path="projects/:id/board" element={<BoardPage />} />
             <Route path="projects/:id/sprints" element={<SprintsPage />} />

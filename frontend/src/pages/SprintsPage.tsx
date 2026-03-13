@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import type { AxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import { Typography, Button, Space, Tag, Table, Modal, Form, Input, message, Popconfirm, Progress, Select } from 'antd';
 import { PlusOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons';
@@ -6,8 +7,15 @@ import * as sprintsApi from '../api/sprints';
 import * as teamsApi from '../api/teams';
 import { useAuthStore } from '../store/auth.store';
 import type { Sprint, Issue, SprintState, Team } from '../types';
+import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
 
-const STATE_COLORS: Record<SprintState, string> = { PLANNED: 'default', ACTIVE: 'processing', CLOSED: 'green' };
+const STATE_TONE_CLASS: Record<SprintState, string> = { PLANNED: 'planned', ACTIVE: 'active', CLOSED: 'closed' };
+
+const STATE_LABEL_RU: Record<SprintState, string> = {
+  PLANNED: 'Планируется',
+  ACTIVE: 'Активен',
+  CLOSED: 'Закрыт',
+};
 
 export default function SprintsPage() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -17,6 +25,7 @@ export default function SprintsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBacklog, setSelectedBacklog] = useState<string[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [form] = Form.useForm();
   const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
@@ -58,12 +67,18 @@ export default function SprintsPage() {
 
   const handleStart = async (id: string) => {
     try { await sprintsApi.startSprint(id); load(); message.success('Sprint started'); }
-    catch (e: any) { message.error(e.response?.data?.error || 'Error'); }
+    catch (e) {
+      const error = e as AxiosError<{ error?: string }>;
+      message.error(error.response?.data?.error || 'Error');
+    }
   };
 
   const handleClose = async (id: string) => {
     try { await sprintsApi.closeSprint(id); load(); message.success('Sprint closed. Incomplete issues moved to backlog.'); }
-    catch (e: any) { message.error(e.response?.data?.error || 'Error'); }
+    catch (e) {
+      const error = e as AxiosError<{ error?: string }>;
+      message.error(error.response?.data?.error || 'Error');
+    }
   };
 
   const handleMoveToSprint = async (sprintId: string) => {
@@ -157,7 +172,9 @@ export default function SprintsPage() {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontWeight: 500, color: 'var(--t1)' }}>{sprint.name}</span>
-                        <Tag color={STATE_COLORS[sprint.state]}>{sprint.state}</Tag>
+                        <span className={`tt-sprint-state-pill tt-sprint-state-pill-${STATE_TONE_CLASS[sprint.state]}`}>
+                          {STATE_LABEL_RU[sprint.state]}
+                        </span>
                         <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                           {sprint._count?.issues ?? 0} issues
                         </Typography.Text>
@@ -233,11 +250,11 @@ export default function SprintsPage() {
         <div className="tt-two-column-aside">
           <div className="tt-panel">
             <div className="tt-panel-header">
-              <span>Sprint details</span>
+              <span>Детали спринта</span>
             </div>
             <div className="tt-panel-body">
               {!selectedSprint ? (
-                <div className="tt-panel-empty">Select a sprint on the left to see its details.</div>
+                <div className="tt-panel-empty">Выберите спринт слева, чтобы увидеть детали.</div>
               ) : (
                 <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -247,7 +264,9 @@ export default function SprintsPage() {
                         {formatDateRange(selectedSprint.startDate, selectedSprint.endDate)}
                       </div>
                     </div>
-                    <Tag color={STATE_COLORS[selectedSprint.state]}>{selectedSprint.state}</Tag>
+                    <span className={`tt-sprint-state-pill tt-sprint-state-pill-${STATE_TONE_CLASS[selectedSprint.state]}`}>
+                      {STATE_LABEL_RU[selectedSprint.state]}
+                    </span>
                   </div>
 
                   {selectedSprint.goal && (
@@ -260,6 +279,10 @@ export default function SprintsPage() {
                     <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 4 }}>Time progress</div>
                     <Progress percent={getTimeProgress(selectedSprint)} size="small" />
                   </div>
+
+                  <Button className="tt-sprint-open-details-btn" onClick={() => setDetailsOpen(true)}>
+                    Открыть детали
+                  </Button>
 
                   <div style={{ fontSize: 12, color: 'var(--t2)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span>Issues: {selectedSprint._count?.issues ?? 0}</span>
@@ -315,6 +338,12 @@ export default function SprintsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <SprintIssuesDrawer
+        open={detailsOpen}
+        sprintId={selectedSprintId}
+        onClose={() => setDetailsOpen(false)}
+      />
     </div>
   );
 }

@@ -74,8 +74,11 @@ info "Backend dependencies installed"
 npx prisma generate
 info "Prisma client generated"
 
-npx prisma db push
-info "Database schema pushed"
+if npx prisma migrate deploy; then
+  info "Database migrations applied"
+else
+  error "Prisma migrations failed. If this local database was created before tracked migrations were added, run 'make db-reset' to recreate it from migrations."
+fi
 
 npm run db:seed 2>/dev/null && info "Database seeded" || warn "Seed skipped (already seeded?)"
 

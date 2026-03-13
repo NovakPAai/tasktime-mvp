@@ -63,6 +63,44 @@ describe('Sprint 2 APIs: sprints, time, comments, history', () => {
     expect(closeRes.body.state).toBe('CLOSED');
   });
 
+  it('returns sprint details with issues for drill-down view', async () => {
+    const sprintRes = await request.post(`/api/projects/${projectId}/sprints`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Sprint Detail' });
+    expect(sprintRes.status).toBe(201);
+
+    const sprintId = sprintRes.body.id as string;
+
+    const moveRes = await request.post(`/api/sprints/${sprintId}/issues`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ issueIds: [issueId] });
+    expect(moveRes.status).toBe(200);
+
+    const detailRes = await request.get(`/api/sprints/${sprintId}/issues`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(detailRes.status).toBe(200);
+    expect(detailRes.body.sprint.id).toBe(sprintId);
+    expect(detailRes.body.sprint.name).toBe('Sprint Detail');
+    expect(Array.isArray(detailRes.body.issues)).toBe(true);
+    expect(detailRes.body.issues).toHaveLength(1);
+    expect(detailRes.body.issues[0]).toMatchObject({
+      id: issueId,
+      projectId,
+      title: 'Issue for sprint',
+      type: 'TASK',
+      status: 'OPEN',
+      priority: 'MEDIUM',
+      project: {
+        id: projectId,
+        key: 'SPR',
+        name: 'Sprint Project',
+      },
+    });
+    expect(detailRes.body.issues[0].number).toBeTypeOf('number');
+    expect(detailRes.body.issues[0].updatedAt).toBeTypeOf('string');
+  });
+
   it('logs time via timer and manual entry', async () => {
     const start = await request.post(`/api/issues/${issueId}/time/start`)
       .set('Authorization', `Bearer ${adminToken}`);

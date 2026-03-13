@@ -1,7 +1,7 @@
 import { createClient, type RedisClientType } from 'redis';
 import { config } from '../config.js';
 
-type RedisClient = RedisClientType<any, any, any>;
+type RedisClient = RedisClientType;
 
 let client: RedisClient | null = null;
 let connecting: Promise<RedisClient | null> | null = null;
@@ -26,7 +26,6 @@ async function getRedisClientInternal(): Promise<RedisClient | null> {
     const instance = createClient({ url: config.REDIS_URL }) as RedisClient;
 
     instance.on('error', (err) => {
-      // eslint-disable-next-line no-console
       console.error('Redis client error:', err);
     });
 
@@ -37,7 +36,6 @@ async function getRedisClientInternal(): Promise<RedisClient | null> {
         return instance;
       })
       .catch((err) => {
-        // eslint-disable-next-line no-console
         console.error('Failed to connect to Redis, caching disabled:', err);
         client = null;
         return null;
@@ -55,9 +53,8 @@ export async function getCachedJson<T>(key: string): Promise<T | null> {
     const raw = await redis.get(key);
     if (!raw) return null;
     return JSON.parse(raw) as T;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to read from Redis cache:', err);
+  } catch (err) {
+    console.error('Failed to read from Redis cache:', err);
     return null;
   }
 }
@@ -69,7 +66,6 @@ export async function setCachedJson<T>(key: string, value: T, ttlSeconds = confi
   try {
     await redis.set(key, JSON.stringify(value), { EX: ttlSeconds });
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('Failed to write to Redis cache:', err);
   }
 }
@@ -100,7 +96,6 @@ export async function setUserSession(userId: string, session: Omit<UserSession, 
   try {
     await redis.set(buildSessionKey(userId), JSON.stringify(fullSession), { EX: SESSION_TTL_SECONDS });
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('Failed to write user session to Redis:', err);
   }
 }
@@ -114,7 +109,6 @@ export async function getUserSession(userId: string): Promise<UserSession | null
     if (!raw) return null;
     return JSON.parse(raw) as UserSession;
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('Failed to read user session from Redis:', err);
     return null;
   }
@@ -127,8 +121,19 @@ export async function deleteUserSession(userId: string): Promise<void> {
   try {
     await redis.del(buildSessionKey(userId));
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('Failed to delete user session from Redis:', err);
+  }
+}
+
+export async function isRedisReady(): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return false;
+
+  try {
+    const response = await redis.ping();
+    return response === 'PONG';
+  } catch {
+    return false;
   }
 }
 

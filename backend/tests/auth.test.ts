@@ -91,6 +91,22 @@ describe('Auth API', () => {
     expect(res.body.refreshToken).toBeDefined();
   });
 
+  it('POST /api/auth/refresh - should reject repeated use of rotated refresh token', async () => {
+    const reg = await request.post('/api/auth/register').send({
+      email: 'refresh-reuse@test.com', password: 'password123', name: 'Refresh Reuse',
+    });
+
+    const firstRefresh = await request.post('/api/auth/refresh').send({
+      refreshToken: reg.body.refreshToken,
+    });
+    expect(firstRefresh.status).toBe(200);
+
+    const secondRefresh = await request.post('/api/auth/refresh').send({
+      refreshToken: reg.body.refreshToken,
+    });
+    expect(secondRefresh.status).toBe(401);
+  });
+
   it('POST /api/auth/logout - should invalidate refresh token', async () => {
     const reg = await request.post('/api/auth/register').send({
       email: 'logout@test.com', password: 'password123', name: 'Logout',

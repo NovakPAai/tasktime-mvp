@@ -104,8 +104,17 @@ export async function refresh(refreshToken: string) {
     throw new AppError(401, 'User not found or deactivated');
   }
 
-  // Rotate refresh token
-  await prisma.refreshToken.delete({ where: { id: stored.id } });
+  // Rotation must be idempotent: concurrent refresh attempts can observe the
+  // same stored token, but only one of them is allowed to rotate it.
+  const deleteResult = await prisma.refreshToken.deleteMany({
+    where: {
+      id: stored.id,
+      token: tokenHash,
+    },
+  });
+  if (deleteResult.count === 0) {
+    throw new AppError(401, 'Refresh token expired or revoked');
+  }
 
   const newPayload = { userId: user.id, email: user.email, role: user.role };
   const newAccessToken = signAccessToken(newPayload);

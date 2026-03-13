@@ -38,6 +38,13 @@ router.get('/projects/:projectId/sprints', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/sprints/:id/issues', async (req, res, next) => {
+  try {
+    const sprintDetails = await sprintsService.getSprintIssues(req.params.id as string);
+    res.json(sprintDetails);
+  } catch (err) { next(err); }
+});
+
 // Backlog (issues without sprint)
 router.get('/projects/:projectId/backlog', async (req, res, next) => {
   try {

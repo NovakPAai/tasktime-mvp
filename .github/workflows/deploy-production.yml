@@ -1,0 +1,35 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to deploy
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.PRODUCTION_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync deploy assets
+        run: |
+          rsync -az deploy/ "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}:${{ secrets.PRODUCTION_DEPLOY_PATH }}/deploy/"
+
+      - name: Run remote deploy
+        run: |
+          ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" \
+            "cd '${{ secrets.PRODUCTION_DEPLOY_PATH }}' && chmod +x deploy/scripts/*.sh && ./deploy/scripts/deploy.sh production '${{ github.event.inputs.image_tag }}'"

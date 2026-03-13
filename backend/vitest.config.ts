@@ -5,7 +5,7 @@ export default defineConfig({
     fileParallelism: false,
     globals: true,
     environment: 'node',
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./tests/env.ts', './tests/setup.ts'],
     testTimeout: 10000,
   },
 });

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config.js';
 
@@ -16,6 +17,7 @@ export function signAccessToken(payload: TokenPayload): string {
 export function signRefreshToken(payload: TokenPayload): string {
   return jwt.sign(payload, config.JWT_REFRESH_SECRET, {
     expiresIn: config.JWT_REFRESH_EXPIRES_IN as string & { __brand: 'StringValue' },
+    jwtid: crypto.randomUUID(),
   } as jwt.SignOptions);
 }
 

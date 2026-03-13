@@ -36,6 +36,44 @@ export async function listSprints(projectId: string) {
   return sprints.map(mapSprintWithStats);
 }
 
+export async function getSprintIssues(id: string) {
+  const sprint = await prisma.sprint.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { issues: true } },
+      issues: {
+        select: {
+          id: true,
+          projectId: true,
+          number: true,
+          title: true,
+          type: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          assignee: { select: { id: true, name: true } },
+          project: { select: { id: true, name: true, key: true } },
+        },
+        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+      },
+      project: { select: { id: true, name: true, key: true } },
+      projectTeam: { select: { id: true, name: true } },
+      businessTeam: { select: { id: true, name: true } },
+      flowTeam: { select: { id: true, name: true } },
+    },
+  });
+
+  if (!sprint) throw new AppError(404, 'Sprint not found');
+
+  const mappedSprint = mapSprintWithStats(sprint);
+  const { issues, ...sprintWithoutIssues } = mappedSprint;
+
+  return {
+    sprint: sprintWithoutIssues,
+    issues: sprint.issues,
+  };
+}
+
 export async function createSprint(projectId: string, dto: CreateSprintDto) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');

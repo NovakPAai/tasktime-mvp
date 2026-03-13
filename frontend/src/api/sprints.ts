@@ -1,5 +1,5 @@
 import api from './client';
-import type { Sprint, Issue, SprintState } from '../types';
+import type { Sprint, Issue, SprintState, SprintDetailsResponse } from '../types';
 
 export async function listSprints(projectId: string): Promise<Sprint[]> {
   const { data } = await api.get<Sprint[]>(`/projects/${projectId}/sprints`);
@@ -54,5 +54,10 @@ export async function moveIssuesToBacklog(projectId: string, issueIds: string[])
 
 export async function listAllSprints(params?: { state?: SprintState | 'ALL'; projectId?: string; teamId?: string }): Promise<Sprint[]> {
   const { data } = await api.get<Sprint[]>('/sprints', { params });
+  return data;
+}
+
+export async function getSprintIssues(id: string): Promise<SprintDetailsResponse> {
+  const { data } = await api.get<SprintDetailsResponse>(`/sprints/${id}/issues`);
   return data;
 }

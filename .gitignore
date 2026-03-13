@@ -24,12 +24,19 @@ npm-debug.log*
 # Testing
 coverage/
 
-# Prisma
-backend/src/prisma/migrations/
-
 # OS
 Thumbs.db
 tt-dev.sh
 
 # Local MCP servers (not committed)
 mcps/tasktime-issues/
+
+# Local Claude worktrees (not committed)
+.claude/worktrees/
+
+# Deploy environment files (not committed)
+deploy/env/.env.staging
+deploy/env/.env.production
+deploy/env/backend.staging.env
+deploy/env/backend.production.env
+deploy/backups/

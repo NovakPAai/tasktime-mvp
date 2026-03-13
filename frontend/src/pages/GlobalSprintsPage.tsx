@@ -1,15 +1,22 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Typography, Select, Tag, Progress, Card, Space } from 'antd';
+import { Typography, Select, Progress, Card, Space, Button } from 'antd';
 import { useAuthStore } from '../store/auth.store';
 import type { Project, Sprint, SprintState, Team } from '../types';
 import apiClient from '../api/client';
 import * as sprintsApi from '../api/sprints';
 import * as teamsApi from '../api/teams';
+import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
 
-const STATE_COLORS: Record<SprintState, string> = {
-  PLANNED: 'default',
-  ACTIVE: 'processing',
-  CLOSED: 'green',
+const STATE_TONE_CLASS: Record<SprintState, string> = {
+  PLANNED: 'planned',
+  ACTIVE: 'active',
+  CLOSED: 'closed',
+};
+
+const STATE_LABEL_RU: Record<SprintState, string> = {
+  PLANNED: 'Планируется',
+  ACTIVE: 'Активен',
+  CLOSED: 'Закрыт',
 };
 
 export default function GlobalSprintsPage() {
@@ -20,6 +27,8 @@ export default function GlobalSprintsPage() {
   const [stateFilter, setStateFilter] = useState<'ALL' | SprintState>('ALL');
   const [projectFilter, setProjectFilter] = useState<string | undefined>();
   const [teamFilter, setTeamFilter] = useState<string | undefined>();
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadLookups() {
@@ -68,21 +77,23 @@ export default function GlobalSprintsPage() {
       <Card
         key={sprint.id}
         size="small"
-        className="tt-panel"
+        className="tt-panel tt-sprint-card"
         style={{ marginBottom: 8 }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Typography.Text strong style={{ color: 'var(--t1)' }}>
+        <div className="tt-sprint-card-body">
+          <div className="tt-sprint-card-main">
+            <div className="tt-sprint-card-title-row">
+              <Typography.Text strong className="tt-sprint-card-title">
                 {sprint.name}
               </Typography.Text>
-              <Tag color={STATE_COLORS[sprint.state]}>{sprint.state}</Tag>
+              <span className={`tt-sprint-state-pill tt-sprint-state-pill-${STATE_TONE_CLASS[sprint.state]}`}>
+                {STATE_LABEL_RU[sprint.state]}
+              </span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
+            <div className="tt-sprint-card-meta">
               {projectLabel}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div className="tt-sprint-card-teams">
               {sprint.projectTeam && (
                 <span>Проектная команда: {sprint.projectTeam.name}</span>
               )}
@@ -94,14 +105,24 @@ export default function GlobalSprintsPage() {
               )}
             </div>
           </div>
-          <div style={{ minWidth: 160, textAlign: 'right' }}>
-            <div style={{ fontSize: 11, color: 'var(--t3)' }}>Готовность спринта</div>
+          <div className="tt-sprint-card-side">
+            <div className="tt-sprint-card-side-label">Готовность спринта</div>
             <Progress percent={readiness} size="small" />
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>
+            <div className="tt-sprint-card-side-meta">
               {sprint.stats
                 ? `${sprint.stats.estimatedIssues}/${sprint.stats.totalIssues} задач с оценкой`
                 : 'Нет задач'}
             </div>
+            <Button
+              size="small"
+              className="tt-sprint-open-details-btn"
+              onClick={() => {
+                setSelectedSprintId(sprint.id);
+                setDetailsOpen(true);
+              }}
+            >
+              Открыть детали
+            </Button>
           </div>
         </div>
       </Card>
@@ -124,7 +145,7 @@ export default function GlobalSprintsPage() {
         </div>
       </div>
 
-      <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className="tt-filters-row" style={{ marginBottom: 16 }}>
         <Select
           placeholder="Все состояния"
           value={stateFilter}
@@ -161,63 +182,65 @@ export default function GlobalSprintsPage() {
         />
       </div>
 
-      <div className="tt-two-column">
-        <div className="tt-two-column-main">
-          <div className="tt-panel">
-            <div className="tt-panel-header">
-              <span>Planned sprints</span>
-              <span style={{ fontSize: 11, color: 'var(--t3)' }}>
-                {grouped.PLANNED.length} спринтов
-              </span>
-            </div>
-            <div className="tt-panel-body">
-              {grouped.PLANNED.length === 0 ? (
-                <div className="tt-panel-empty">Нет планируемых спринтов.</div>
-              ) : (
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  {grouped.PLANNED.map(renderSprintCard)}
-                </Space>
-              )}
-            </div>
-          </div>
-
-          <div className="tt-panel" style={{ marginTop: 24 }}>
-            <div className="tt-panel-header">
-              <span>Active sprints</span>
-              <span style={{ fontSize: 11, color: 'var(--t3)' }}>
-                {grouped.ACTIVE.length} спринтов
-              </span>
-            </div>
-            <div className="tt-panel-body">
-              {grouped.ACTIVE.length === 0 ? (
-                <div className="tt-panel-empty">Нет активных спринтов.</div>
-              ) : (
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  {grouped.ACTIVE.map(renderSprintCard)}
-                </Space>
-              )}
-            </div>
-          </div>
-
-          <div className="tt-panel" style={{ marginTop: 24 }}>
-            <div className="tt-panel-header">
-              <span>Closed sprints</span>
-              <span style={{ fontSize: 11, color: 'var(--t3)' }}>
-                {grouped.CLOSED.length} спринтов
-              </span>
-            </div>
-            <div className="tt-panel-body">
-              {grouped.CLOSED.length === 0 ? (
-                <div className="tt-panel-empty">Нет закрытых спринтов.</div>
-              ) : (
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  {grouped.CLOSED.map(renderSprintCard)}
-                </Space>
-              )}
-            </div>
-          </div>
+      <div className="tt-panel">
+        <div className="tt-panel-header">
+          <span>Planned sprints</span>
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>
+            {grouped.PLANNED.length} спринтов
+          </span>
+        </div>
+        <div className="tt-panel-body">
+          {grouped.PLANNED.length === 0 ? (
+            <div className="tt-panel-empty">Нет планируемых спринтов.</div>
+          ) : (
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {grouped.PLANNED.map(renderSprintCard)}
+            </Space>
+          )}
         </div>
       </div>
+
+      <div className="tt-panel" style={{ marginTop: 24 }}>
+        <div className="tt-panel-header">
+          <span>Active sprints</span>
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>
+            {grouped.ACTIVE.length} спринтов
+          </span>
+        </div>
+        <div className="tt-panel-body">
+          {grouped.ACTIVE.length === 0 ? (
+            <div className="tt-panel-empty">Нет активных спринтов.</div>
+          ) : (
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {grouped.ACTIVE.map(renderSprintCard)}
+            </Space>
+          )}
+        </div>
+      </div>
+
+      <div className="tt-panel" style={{ marginTop: 24 }}>
+        <div className="tt-panel-header">
+          <span>Closed sprints</span>
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>
+            {grouped.CLOSED.length} спринтов
+          </span>
+        </div>
+        <div className="tt-panel-body">
+          {grouped.CLOSED.length === 0 ? (
+            <div className="tt-panel-empty">Нет закрытых спринтов.</div>
+          ) : (
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {grouped.CLOSED.map(renderSprintCard)}
+            </Space>
+          )}
+        </div>
+      </div>
+
+      <SprintIssuesDrawer
+        open={detailsOpen}
+        sprintId={selectedSprintId}
+        onClose={() => setDetailsOpen(false)}
+      />
     </div>
   );
 }

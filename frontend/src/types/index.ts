@@ -67,6 +67,11 @@ export interface Sprint {
   stats?: { totalIssues: number; estimatedIssues: number; planningReadiness: number };
 }
 
+export interface SprintDetailsResponse {
+  sprint: Sprint;
+  issues: Issue[];
+}
+
 export interface Comment {
   id: string;
   issueId: string;

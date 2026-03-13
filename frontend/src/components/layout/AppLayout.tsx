@@ -8,6 +8,8 @@ import {
   SettingOutlined,
   CheckCircleOutlined,
   CalendarOutlined,
+  ApartmentOutlined,
+  DeploymentUnitOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
@@ -28,6 +30,16 @@ export default function AppLayout() {
   const mainItems = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/projects', icon: <ProjectOutlined />, label: 'Projects' },
+    {
+      key: '/business-teams',
+      icon: <ApartmentOutlined />,
+      label: 'Бизнес-функциональные команды',
+    },
+    {
+      key: '/flow-teams',
+      icon: <DeploymentUnitOutlined />,
+      label: 'Потоковые команды',
+    },
     { key: '/sprints', icon: <CalendarOutlined />, label: 'Sprints' },
     { key: '/time', icon: <ClockCircleOutlined />, label: 'My Time' },
     { key: '/teams', icon: <TeamOutlined />, label: 'Teams' },

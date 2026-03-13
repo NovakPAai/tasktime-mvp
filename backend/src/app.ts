@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 
 import { errorHandler } from './shared/middleware/error-handler.js';
+import { getReadinessStatus } from './shared/health.js';
 import authRouter from './modules/auth/auth.router.js';
 import usersRouter from './modules/users/users.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
@@ -28,6 +29,11 @@ export function createApp() {
   // Health check
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  app.get('/api/ready', async (_req, res) => {
+    const readiness = await getReadinessStatus();
+    res.status(readiness.status === 'ok' ? 200 : 503).json(readiness);
   });
 
   // Routes

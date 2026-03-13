@@ -29,10 +29,10 @@ seed:
 	cd backend && npm run db:seed
 
 db-push:
-	cd backend && npx prisma db push
+	cd backend && npm run db:migrate:deploy
 
 db-reset:
-	cd backend && npx prisma db push --force-reset && npm run db:seed
+	cd backend && npm run db:migrate:reset && npm run db:seed
 
 db-studio:
 	cd backend && npx prisma studio
@@ -40,6 +40,11 @@ db-studio:
 # --- Quality ---
 test:
 	cd backend && npm test
+
+# Security: dependency vulnerabilities (run periodically and before release)
+audit:
+	cd backend && npm audit
+	cd frontend && npm audit
 
 test-cov:
 	cd backend && npm run test:coverage
