@@ -14,6 +14,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:reset": "prisma migrate reset --force --skip-generate",
     "db:seed": "npx tsx src/prisma/seed.ts",
+    "db:seed:ttmp": "SEED_SCOPE=TTMP_ONLY node dist/prisma/seed.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

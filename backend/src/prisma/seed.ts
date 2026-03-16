@@ -30,16 +30,22 @@ export function resolveSeedActors(users: Pick<User, 'id' | 'email' | 'name' | 'r
   };
 }
 
-async function main() {
-  console.log('Seeding database...');
+export type SeedOptions = { scope?: string };
+
+async function main(prismaClient?: PrismaClient, scope?: string) {
+  const client = prismaClient ?? prisma;
+  const ttmpOnly = scope === 'TTMP_ONLY';
+  console.log(`Seeding database${ttmpOnly ? ' (TTMP_ONLY)' : ''}...`);
 
   const defaultPassword = 'password123';
   const bootstrapUsers = getBootstrapUsers();
-  await bootstrapDefaultUsers(prisma, defaultPassword, bootstrapUsers);
+  if (!ttmpOnly) {
+    await bootstrapDefaultUsers(client, defaultPassword, bootstrapUsers);
+  }
 
   const seededUsers = await Promise.all(
     bootstrapUsers.map((user) =>
-      prisma.user.findUniqueOrThrow({
+      client.user.findUniqueOrThrow({
         where: { email: user.email },
       }),
     ),
@@ -49,20 +55,23 @@ async function main() {
     process.env.BOOTSTRAP_OWNER_ADMIN_EMAIL,
   );
 
-  // Create projects
-  const project = await prisma.project.upsert({
-    where: { key: 'DEMO' },
-    update: {},
-    create: { name: 'Demo Project', key: 'DEMO', description: 'Demo project for testing' },
-  });
+  // Create projects (DEMO/BACK/LIVE only when not TTMP_ONLY)
+  let project: { id: string; key: string } | null = null;
+  let backendProject: { id: string; key: string } | null = null;
+  if (!ttmpOnly) {
+    project = await client.project.upsert({
+      where: { key: 'DEMO' },
+      update: {},
+      create: { name: 'Demo Project', key: 'DEMO', description: 'Demo project for testing' },
+    });
+    backendProject = await client.project.upsert({
+      where: { key: 'BACK' },
+      update: {},
+      create: { name: 'Backend Services', key: 'BACK', description: 'Backend microservices' },
+    });
+  }
 
-  const backendProject = await prisma.project.upsert({
-    where: { key: 'BACK' },
-    update: {},
-    create: { name: 'Backend Services', key: 'BACK', description: 'Backend microservices' },
-  });
-
-  const mvpProject = await prisma.project.upsert({
+  const mvpProject = await client.project.upsert({
     where: { key: 'TTMP' },
     update: {},
     create: {
@@ -72,18 +81,21 @@ async function main() {
     },
   });
 
-  const liveCodeProject = await prisma.project.upsert({
-    where: { key: 'LIVE' },
-    update: {},
-    create: {
-      name: 'TaskTime MVP LiveCode',
-      key: 'LIVE',
-      description: 'Живой проект: задачи для разработки TaskTime MVP (vibe-code) самим TaskTime и агентами',
-    },
-  });
+  let liveCodeProject: { id: string; key: string } | null = null;
+  if (!ttmpOnly) {
+    liveCodeProject = await client.project.upsert({
+      where: { key: 'LIVE' },
+      update: {},
+      create: {
+        name: 'TaskTime MVP LiveCode',
+        key: 'LIVE',
+        description: 'Живой проект: задачи для разработки TaskTime MVP (vibe-code) самим TaskTime и агентами',
+      },
+    });
+  }
 
   // Historical sprints for TaskTime MVP (TTMP)
-  const sprint0 = await prisma.sprint.upsert({
+  const sprint0 = await client.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 0 — Развертывание стенда' } },
     update: {},
     create: {
@@ -96,7 +108,7 @@ async function main() {
     },
   });
 
-  const sprint1 = await prisma.sprint.upsert({
+  const sprint1 = await client.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 1 — Фундамент системы' } },
     update: {},
     create: {
@@ -109,7 +121,7 @@ async function main() {
     },
   });
 
-  const sprint2 = await prisma.sprint.upsert({
+  const sprint2 = await client.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 2 — Доски, спринты, время, комментарии' } },
     update: {},
     create: {
@@ -122,7 +134,7 @@ async function main() {
     },
   });
 
-  const sprint3 = await prisma.sprint.upsert({
+  const sprint3 = await client.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3 — Teams, Admin, Reports, Redis' } },
     update: {},
     create: {
@@ -135,7 +147,7 @@ async function main() {
     },
   });
 
-  const sprint35 = await prisma.sprint.upsert({
+  const sprint35 = await client.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг' } },
     update: { state: 'ACTIVE' },
     create: {
@@ -148,7 +160,7 @@ async function main() {
     },
   });
 
-  const sprint4 = await prisma.sprint.upsert({
+  const sprint4 = await client.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 4 — AI + Интеграции + Polish' } },
     update: { state: 'PLANNED' },
     create: {
@@ -161,8 +173,9 @@ async function main() {
     },
   });
 
-  // Create issues with hierarchy
-  const epic = await prisma.issue.upsert({
+  // Create issues with hierarchy (DEMO/LIVE only when not TTMP_ONLY)
+  if (!ttmpOnly && project && liveCodeProject) {
+  const epic = await client.issue.upsert({
     where: { projectId_number: { projectId: project.id, number: 1 } },
     update: {},
     create: {
@@ -171,7 +184,7 @@ async function main() {
     },
   });
 
-  const story = await prisma.issue.upsert({
+  const story = await client.issue.upsert({
     where: { projectId_number: { projectId: project.id, number: 2 } },
     update: {},
     create: {
@@ -181,7 +194,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: project.id, number: 3 } },
     update: {},
     create: {
@@ -191,7 +204,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: project.id, number: 4 } },
     update: {},
     create: {
@@ -201,7 +214,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: project.id, number: 5 } },
     update: {},
     create: {
@@ -216,7 +229,7 @@ async function main() {
   });
 
   // MVP LiveCode meta issues (agent vs human work)
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: liveCodeProject.id, number: 1 } },
     update: {},
     create: {
@@ -234,7 +247,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: liveCodeProject.id, number: 2 } },
     update: {},
     create: {
@@ -252,7 +265,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: liveCodeProject.id, number: 3 } },
     update: {},
     create: {
@@ -269,9 +282,10 @@ async function main() {
       aiAssigneeType: 'AGENT',
     },
   });
+  }
 
   // Backlog (MVP project): EPIC — Исследование и планирование MVP
-  const epicResearch = await prisma.issue.upsert({
+  const epicResearch = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 1 } },
     update: {},
     create: {
@@ -287,7 +301,7 @@ async function main() {
     },
   });
 
-  const storyInterview = await prisma.issue.upsert({
+  const storyInterview = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 2 } },
     update: {},
     create: {
@@ -304,7 +318,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 3 } },
     update: {},
     create: {
@@ -321,7 +335,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 4 } },
     update: {},
     create: {
@@ -338,7 +352,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 5 } },
     update: {},
     create: {
@@ -355,7 +369,7 @@ async function main() {
     },
   });
 
-  const storyStack = await prisma.issue.upsert({
+  const storyStack = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 6 } },
     update: {},
     create: {
@@ -372,7 +386,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 7 } },
     update: {},
     create: {
@@ -389,7 +403,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 8 } },
     update: {},
     create: {
@@ -406,7 +420,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 9 } },
     update: {},
     create: {
@@ -423,7 +437,7 @@ async function main() {
     },
   });
 
-  const storyRebuildPlan = await prisma.issue.upsert({
+  const storyRebuildPlan = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 10 } },
     update: {},
     create: {
@@ -440,7 +454,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 11 } },
     update: {},
     create: {
@@ -457,7 +471,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 12 } },
     update: {},
     create: {
@@ -475,7 +489,7 @@ async function main() {
   });
 
   // Backlog (MVP project): EPIC — Спринт 1 — Фундамент системы
-  const epicSprint1 = await prisma.issue.upsert({
+  const epicSprint1 = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 13 } },
     update: {},
     create: {
@@ -491,7 +505,7 @@ async function main() {
     },
   });
 
-  const storyBackendInfra = await prisma.issue.upsert({
+  const storyBackendInfra = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 14 } },
     update: {},
     create: {
@@ -508,7 +522,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 15 } },
     update: {},
     create: {
@@ -525,7 +539,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 16 } },
     update: {},
     create: {
@@ -542,7 +556,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 17 } },
     update: {},
     create: {
@@ -558,7 +572,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 18 } },
     update: {},
     create: {
@@ -574,7 +588,7 @@ async function main() {
     },
   });
 
-  const storyAuthModule = await prisma.issue.upsert({
+  const storyAuthModule = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 19 } },
     update: {},
     create: {
@@ -591,7 +605,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 20 } },
     update: {},
     create: {
@@ -608,7 +622,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 21 } },
     update: {},
     create: {
@@ -625,7 +639,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 22 } },
     update: {},
     create: {
@@ -641,7 +655,7 @@ async function main() {
     },
   });
 
-  const storyUsersRbac = await prisma.issue.upsert({
+  const storyUsersRbac = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 23 } },
     update: {},
     create: {
@@ -658,7 +672,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 24 } },
     update: {},
     create: {
@@ -675,7 +689,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 25 } },
     update: {},
     create: {
@@ -692,7 +706,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 26 } },
     update: {},
     create: {
@@ -708,7 +722,7 @@ async function main() {
     },
   });
 
-  const storyProjects = await prisma.issue.upsert({
+  const storyProjects = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 27 } },
     update: {},
     create: {
@@ -725,7 +739,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 28 } },
     update: {},
     create: {
@@ -741,7 +755,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 29 } },
     update: {},
     create: {
@@ -757,7 +771,7 @@ async function main() {
     },
   });
 
-  const storyIssues = await prisma.issue.upsert({
+  const storyIssues = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 30 } },
     update: {},
     create: {
@@ -774,7 +788,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 31 } },
     update: {},
     create: {
@@ -791,7 +805,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 32 } },
     update: {},
     create: {
@@ -808,7 +822,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 33 } },
     update: {},
     create: {
@@ -825,7 +839,7 @@ async function main() {
     },
   });
 
-  const storyAudit = await prisma.issue.upsert({
+  const storyAudit = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 34 } },
     update: {},
     create: {
@@ -842,7 +856,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 35 } },
     update: {},
     create: {
@@ -859,7 +873,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 36 } },
     update: {},
     create: {
@@ -875,7 +889,7 @@ async function main() {
     },
   });
 
-  const storyFrontendShell = await prisma.issue.upsert({
+  const storyFrontendShell = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 37 } },
     update: {},
     create: {
@@ -892,7 +906,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 38 } },
     update: {},
     create: {
@@ -909,7 +923,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 39 } },
     update: {},
     create: {
@@ -925,7 +939,7 @@ async function main() {
     },
   });
 
-  const storyFrontendAuthNav = await prisma.issue.upsert({
+  const storyFrontendAuthNav = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 40 } },
     update: {},
     create: {
@@ -942,7 +956,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 41 } },
     update: {},
     create: {
@@ -959,7 +973,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 42 } },
     update: {},
     create: {
@@ -975,7 +989,7 @@ async function main() {
     },
   });
 
-  const storyFrontendProjectsIssues = await prisma.issue.upsert({
+  const storyFrontendProjectsIssues = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 43 } },
     update: {},
     create: {
@@ -992,7 +1006,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 44 } },
     update: {},
     create: {
@@ -1009,7 +1023,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 45 } },
     update: {},
     create: {
@@ -1026,7 +1040,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 46 } },
     update: {},
     create: {
@@ -1042,7 +1056,7 @@ async function main() {
     },
   });
 
-  const storySeedLocal = await prisma.issue.upsert({
+  const storySeedLocal = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 47 } },
     update: {},
     create: {
@@ -1059,7 +1073,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 48 } },
     update: {},
     create: {
@@ -1076,7 +1090,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 49 } },
     update: {},
     create: {
@@ -1093,7 +1107,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 50 } },
     update: {},
     create: {
@@ -1110,7 +1124,7 @@ async function main() {
   });
 
   // Backlog (MVP project): EPIC — Спринт 2 — Доски, спринты, время, комментарии
-  const epicSprint2 = await prisma.issue.upsert({
+  const epicSprint2 = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 51 } },
     update: {},
     create: {
@@ -1126,7 +1140,7 @@ async function main() {
     },
   });
 
-  const storyBoard = await prisma.issue.upsert({
+  const storyBoard = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 52 } },
     update: {},
     create: {
@@ -1143,7 +1157,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 53 } },
     update: {},
     create: {
@@ -1160,7 +1174,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 54 } },
     update: {},
     create: {
@@ -1177,7 +1191,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 55 } },
     update: {},
     create: {
@@ -1193,7 +1207,7 @@ async function main() {
     },
   });
 
-  const storySprints = await prisma.issue.upsert({
+  const storySprints = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 56 } },
     update: {},
     create: {
@@ -1210,7 +1224,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 57 } },
     update: {},
     create: {
@@ -1227,7 +1241,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 58 } },
     update: {},
     create: {
@@ -1244,7 +1258,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 59 } },
     update: {},
     create: {
@@ -1261,7 +1275,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 60 } },
     update: {},
     create: {
@@ -1277,7 +1291,7 @@ async function main() {
     },
   });
 
-  const storyTime = await prisma.issue.upsert({
+  const storyTime = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 61 } },
     update: {},
     create: {
@@ -1294,7 +1308,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 62 } },
     update: {},
     create: {
@@ -1311,7 +1325,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 63 } },
     update: {},
     create: {
@@ -1328,7 +1342,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 64 } },
     update: {},
     create: {
@@ -1344,7 +1358,7 @@ async function main() {
     },
   });
 
-  const storyComments = await prisma.issue.upsert({
+  const storyComments = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 65 } },
     update: {},
     create: {
@@ -1361,7 +1375,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 66 } },
     update: {},
     create: {
@@ -1378,7 +1392,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 67 } },
     update: {},
     create: {
@@ -1394,7 +1408,7 @@ async function main() {
     },
   });
 
-  const storyIssueCardHistory = await prisma.issue.upsert({
+  const storyIssueCardHistory = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 68 } },
     update: {},
     create: {
@@ -1411,7 +1425,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 69 } },
     update: {},
     create: {
@@ -1428,7 +1442,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 70 } },
     update: {},
     create: {
@@ -1445,7 +1459,7 @@ async function main() {
   });
 
   // Backlog (MVP project): EPIC — Admin, UAT и инженерные улучшения
-  const epicAdminUat = await prisma.issue.upsert({
+  const epicAdminUat = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 71 } },
     update: {},
     create: {
@@ -1461,7 +1475,7 @@ async function main() {
     },
   });
 
-  const storyAdminModule = await prisma.issue.upsert({
+  const storyAdminModule = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 72 } },
     update: {},
     create: {
@@ -1478,7 +1492,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 73 } },
     update: {},
     create: {
@@ -1495,7 +1509,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 74 } },
     update: {},
     create: {
@@ -1511,7 +1525,7 @@ async function main() {
     },
   });
 
-  const storyUatOnboarding = await prisma.issue.upsert({
+  const storyUatOnboarding = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 75 } },
     update: {},
     create: {
@@ -1528,7 +1542,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 76 } },
     update: {},
     create: {
@@ -1545,7 +1559,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 77 } },
     update: {},
     create: {
@@ -1561,7 +1575,7 @@ async function main() {
     },
   });
 
-  const storyE2eUx = await prisma.issue.upsert({
+  const storyE2eUx = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 78 } },
     update: {},
     create: {
@@ -1578,7 +1592,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 79 } },
     update: {},
     create: {
@@ -1595,7 +1609,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 80 } },
     update: {},
     create: {
@@ -1612,7 +1626,7 @@ async function main() {
   });
 
   // Sprint 4 — AI + Интеграции + Polish (TTMP-81..96)
-  const epicSprint4 = await prisma.issue.upsert({
+  const epicSprint4 = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 81 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1628,7 +1642,7 @@ async function main() {
     },
   });
 
-  const storyS4Ai = await prisma.issue.upsert({
+  const storyS4Ai = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 82 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1645,7 +1659,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 83 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1662,7 +1676,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 84 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1679,7 +1693,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 85 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1696,7 +1710,7 @@ async function main() {
     },
   });
 
-  const storyS4GitLab = await prisma.issue.upsert({
+  const storyS4GitLab = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 86 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1713,7 +1727,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 87 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1730,7 +1744,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 88 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1747,7 +1761,7 @@ async function main() {
     },
   });
 
-  const storyS4Telegram = await prisma.issue.upsert({
+  const storyS4Telegram = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 89 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1764,7 +1778,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 90 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1781,7 +1795,7 @@ async function main() {
     },
   });
 
-  const storyS4Export = await prisma.issue.upsert({
+  const storyS4Export = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 91 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1798,7 +1812,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 92 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1815,7 +1829,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 93 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1832,7 +1846,7 @@ async function main() {
     },
   });
 
-  const storyS4Docs = await prisma.issue.upsert({
+  const storyS4Docs = await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 94 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1849,7 +1863,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 95 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1866,7 +1880,7 @@ async function main() {
     },
   });
 
-  await prisma.issue.upsert({
+  await client.issue.upsert({
     where: { projectId_number: { projectId: mvpProject.id, number: 96 } },
     update: { sprintId: sprint4.id },
     create: {
@@ -1884,26 +1898,27 @@ async function main() {
   });
 
   // Idempotent sync: sprint states and issue statuses by sprint
-  await prisma.issue.updateMany({ where: { sprintId: sprint0.id }, data: { status: 'DONE' } });
-  await prisma.issue.updateMany({ where: { sprintId: sprint1.id }, data: { status: 'DONE' } });
-  await prisma.issue.updateMany({ where: { sprintId: sprint2.id }, data: { status: 'DONE' } });
-  await prisma.issue.updateMany({ where: { sprintId: sprint3.id }, data: { status: 'DONE' } });
-  await prisma.issue.updateMany({ where: { sprintId: sprint35.id }, data: { status: 'IN_PROGRESS' } });
-  await prisma.issue.updateMany({ where: { sprintId: sprint4.id }, data: { status: 'OPEN' } });
+  await client.issue.updateMany({ where: { sprintId: sprint0.id }, data: { status: 'DONE' } });
+  await client.issue.updateMany({ where: { sprintId: sprint1.id }, data: { status: 'DONE' } });
+  await client.issue.updateMany({ where: { sprintId: sprint2.id }, data: { status: 'DONE' } });
+  await client.issue.updateMany({ where: { sprintId: sprint3.id }, data: { status: 'DONE' } });
+  await client.issue.updateMany({ where: { sprintId: sprint35.id }, data: { status: 'IN_PROGRESS' } });
+  await client.issue.updateMany({ where: { sprintId: sprint4.id }, data: { status: 'OPEN' } });
 
-  // Demo time tracking data for My Time (Pavel + AI)
-  const existingAiSessions = await prisma.aiSession.count();
+  // Demo time tracking data for My Time (Pavel + AI) — only in full seed
+  if (!ttmpOnly) {
+  const existingAiSessions = await client.aiSession.count();
   if (existingAiSessions === 0) {
-    const demoIssueMyTime = await prisma.issue.findUnique({
+    const demoIssueMyTime = await client.issue.findUnique({
       where: { projectId_number: { projectId: mvpProject.id, number: 64 } },
     });
-    const demoIssueBoard = await prisma.issue.findUnique({
+    const demoIssueBoard = await client.issue.findUnique({
       where: { projectId_number: { projectId: mvpProject.id, number: 55 } },
     });
 
     if (demoIssueMyTime && demoIssueBoard) {
       // Human time logs for Pavel
-      await prisma.timeLog.createMany({
+      await client.timeLog.createMany({
         data: [
           {
             issueId: demoIssueMyTime.id,
@@ -1925,7 +1940,7 @@ async function main() {
       });
 
       // One AI session split between two tasks
-      const aiSession = await prisma.aiSession.create({
+      const aiSession = await client.aiSession.create({
         data: {
           issueId: demoIssueMyTime.id,
           userId: owner.id,
@@ -1950,7 +1965,7 @@ async function main() {
         { issue: demoIssueBoard, ratio: 0.4 },
       ];
 
-      await prisma.timeLog.createMany({
+      await client.timeLog.createMany({
         data: splits.map((split) => {
           const hours = totalHours * split.ratio;
           const cost = 0.8 * split.ratio;
@@ -1970,18 +1985,23 @@ async function main() {
       });
     }
   }
+  }
 
   console.log('Seed complete.');
   console.log(`Users: ${admin.email}, ${manager.email}, ${dev.email}, ${viewer.email}, ${owner.email}`);
   console.log(`Password for all: ${defaultPassword}`);
-  console.log(`Projects: ${project.key}, ${backendProject.key}`);
+  if (project && backendProject) console.log(`Projects: ${project.key}, ${backendProject.key}`);
+}
+
+export async function seedDatabase(prismaClient: PrismaClient, options?: SeedOptions): Promise<void> {
+  await main(prismaClient, options?.scope);
 }
 
 const isExecutedDirectly = process.argv[1] !== undefined
   && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isExecutedDirectly) {
-  main()
+  main(prisma, process.env.SEED_SCOPE)
     .catch((e) => { console.error(e); process.exit(1); })
     .finally(() => prisma.$disconnect());
 }
