@@ -25,7 +25,7 @@ function verifyGitLabSecret(req: { headers: Record<string, string | undefined> }
  */
 router.post('/webhooks/gitlab', async (req, res, next) => {
   try {
-    if (!verifyGitLabSecret(req)) {
+    if (!verifyGitLabSecret({ headers: req.headers as Record<string, string | undefined> })) {
       res.status(401).json({ error: 'Invalid webhook secret' });
       return;
     }
