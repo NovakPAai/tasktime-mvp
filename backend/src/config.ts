@@ -12,6 +12,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   REDIS_URL: z.string().optional(),
   REDIS_CACHE_TTL_SECONDS: z.coerce.number().min(1).max(3600).default(30),
+  GITLAB_WEBHOOK_SECRET: z.string().optional(),
+  GITLAB_SYSTEM_USER_ID: z.string().uuid().optional(),
 });
 
 export const config = envSchema.parse(process.env);

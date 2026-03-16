@@ -1,0 +1,97 @@
+---
+description: Правила раскладки UI — карточки, панели и боковые колонки должны корректно распределяться по ширине окна
+globs: frontend/src/**/*.tsx, frontend/src/**/*.css
+alwaysApply: false
+---
+# Правило раскладки UI (FRONTEND LAYOUT)
+
+Все карточки, панели и боковые колонки должны **равномерно распределяться** по ширине окна. Контент не должен «съезжать» влево, оставляя пустое пространство справа.
+
+---
+
+## 1. Типы страничных раскладок
+
+### Полная ширина (без сайдбара)
+
+Страницы **без бокового блока** (Dashboard, Projects, My Time, Board, GlobalSprints, UAT) используют `tt-page` напрямую. Панели и таблицы занимают всю доступную ширину.
+
+**Запрещено:** оборачивать контент в `tt-two-column` / `tt-two-column-main`, если нет `tt-two-column-aside`.
+
+```tsx
+// ✅ Правильно — полная ширина
+<div className="tt-page">
+  <div className="tt-panel">...</div>
+</div>
+
+// ❌ Неправильно — двухколоночная обёртка без сайдбара
+<div className="tt-page">
+  <div className="tt-two-column">
+    <div className="tt-two-column-main">
+      <div className="tt-panel">...</div>
+    </div>
+  </div>
+</div>
+```
+
+### Двухколоночная (с сайдбаром)
+
+Страницы **с боковым блоком** (Teams, Admin, Sprints, ProjectDetail, IssueDetail) используют flex-контейнер + aside.
+
+```tsx
+<div className="tt-two-column">
+  <div className="tt-two-column-main">...</div>
+  <aside className="tt-two-column-aside">...</aside>
+</div>
+```
+
+---
+
+## 2. CSS-правила
+
+### Основная колонка (`tt-two-column-main`, `tt-issue-main-body`)
+
+- `flex: 1 1 auto` — заполняет всё доступное пространство.
+- `min-width: 0` — предотвращает overflow flex-элемента.
+- **Без `max-width`** — основная колонка растягивается до края aside.
+
+### Боковая колонка (`tt-two-column-aside`, `tt-issue-main-aside`)
+
+- Фиксированная ширина: `width: 260px; flex-shrink: 0;`
+
+### Сетки (tt-stats-grid, tt-panel-grid)
+
+- `tt-stats-grid`: `grid-template-columns: repeat(4, minmax(0, 1fr))` — 4 равные колонки.
+- `tt-panel-grid`: `grid-template-columns: repeat(2, minmax(0, 1fr))` — 2 равные колонки.
+- Используй `minmax(0, 1fr)` вместо `1fr` для предотвращения overflow.
+
+---
+
+## 3. Запреты
+
+| Запрет | Причина |
+|--------|---------|
+| `max-width` на `.tt-two-column-main` или `.tt-issue-main-body` | Заставляет контент «съезжать» влево |
+| `tt-two-column` без `tt-two-column-aside` | Ограничивает ширину без причины |
+| Фиксированная ширина `width: Npx` на основном контенте | Не адаптируется к размеру экрана |
+| Inline `style={{ maxWidth: N }}` на контейнерах страниц | То же самое — контент теряет ширину |
+
+---
+
+## 4. Адаптивность
+
+На экранах `≤ 1100px`:
+- `tt-issue-main` переходит в `flex-direction: column`
+- `tt-issue-main-aside` занимает `width: 100%` и выстраивается горизонтально
+- `tt-stats-grid` сворачивается в 2 колонки
+- `tt-panel-grid` сворачивается в 1 колонку
+
+---
+
+## 5. Чеклист при создании новой страницы
+
+1. Нужен ли сайдбар (aside)?
+   - **Нет** → `tt-page` + контент напрямую
+   - **Да** → `tt-two-column` + `tt-two-column-main` + `tt-two-column-aside`
+2. Убедись, что основной контент **не имеет `max-width`**
+3. Убедись, что сетки используют `minmax(0, 1fr)`
+4. Проверь на широком экране (1920px+): контент не «съезжает» влево

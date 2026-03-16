@@ -2,39 +2,24 @@ import { pathToFileURL } from 'node:url';
 
 import { PrismaClient, Prisma, type User } from '@prisma/client';
 
-import { BOOTSTRAP_USERS, bootstrapDefaultUsers } from './bootstrap.js';
+import { bootstrapDefaultUsers, getBootstrapUsers } from './bootstrap.js';
 
 const prisma = new PrismaClient();
 
-export type SeedScope = 'FULL_DEV' | 'TTMP_ONLY';
-
-type SeedActors = {
-  admin: Pick<User, 'id' | 'email' | 'name' | 'role'>;
-  owner: Pick<User, 'id' | 'email' | 'name' | 'role'>;
-  manager: Pick<User, 'id' | 'email' | 'name' | 'role'>;
-  dev: Pick<User, 'id' | 'email' | 'name' | 'role'>;
-  viewer: Pick<User, 'id' | 'email' | 'name' | 'role'>;
-};
-
-type SeedOptions = {
-  scope?: SeedScope;
-  bootstrapPassword?: string;
-};
-
-export function resolveSeedActors(
-  users: Pick<User, 'id' | 'email' | 'name' | 'role'>[],
-): SeedActors {
+export function resolveSeedActors(users: Pick<User, 'id' | 'email' | 'name' | 'role'>[], ownerAdminEmail?: string) {
   const usersByEmail = new Map(users.map((user) => [user.email.toLowerCase(), user]));
 
   const admin = usersByEmail.get('admin@tasktime.ru');
-  const owner = usersByEmail.get('novak.pavel@tasktime.ru') ?? admin;
   const manager = usersByEmail.get('manager@tasktime.ru');
   const dev = usersByEmail.get('dev@tasktime.ru');
   const viewer = usersByEmail.get('viewer@tasktime.ru');
 
-  if (!admin || !owner || !manager || !dev || !viewer) {
+  if (!admin || !manager || !dev || !viewer) {
     throw new Error('Seed requires built-in bootstrap users to exist.');
   }
+
+  const normalizedOwnerAdminEmail = ownerAdminEmail?.trim().toLowerCase();
+  const owner = (normalizedOwnerAdminEmail && usersByEmail.get(normalizedOwnerAdminEmail)) || admin;
 
   return {
     admin,
@@ -45,62 +30,39 @@ export function resolveSeedActors(
   };
 }
 
-function resolveSeedScope(env: NodeJS.ProcessEnv = process.env): SeedScope {
-  return env.SEED_SCOPE?.trim().toUpperCase() === 'TTMP_ONLY'
-    ? 'TTMP_ONLY'
-    : 'FULL_DEV';
-}
+async function main() {
+  console.log('Seeding database...');
 
-export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOptions = {}) {
-  const scope = options.scope ?? resolveSeedScope();
-  const isFullDevSeed = scope === 'FULL_DEV';
+  const defaultPassword = 'password123';
+  const bootstrapUsers = getBootstrapUsers();
+  await bootstrapDefaultUsers(prisma, defaultPassword, bootstrapUsers);
 
-  if (isFullDevSeed) {
-    console.log('Seeding development/demo data...');
-    console.log('This seed script provides development/demo data and is not the production source of truth.');
-  } else {
-    console.log('Seeding TTMP project data only...');
-    console.log('This mode creates only the TTMP project, its historical sprints, and implementation tasks.');
-  }
-
-  const defaultPassword = options.bootstrapPassword ?? 'password123';
-  if (isFullDevSeed) {
-    await bootstrapDefaultUsers(seedPrisma, defaultPassword);
-  }
-
-  const users = await seedPrisma.user.findMany({
-    where: {
-      email: {
-        in: BOOTSTRAP_USERS.map((user) => user.email),
-      },
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-    },
-  });
-  const { admin, owner, manager, dev, viewer } = resolveSeedActors(users);
+  const seededUsers = await Promise.all(
+    bootstrapUsers.map((user) =>
+      prisma.user.findUniqueOrThrow({
+        where: { email: user.email },
+      }),
+    ),
+  );
+  const { admin, owner, manager, dev, viewer } = resolveSeedActors(
+    seededUsers,
+    process.env.BOOTSTRAP_OWNER_ADMIN_EMAIL,
+  );
 
   // Create projects
-  const project = isFullDevSeed
-    ? await seedPrisma.project.upsert({
-        where: { key: 'DEMO' },
-        update: {},
-        create: { name: 'Demo Project', key: 'DEMO', description: 'Demo project for testing' },
-      })
-    : null;
+  const project = await prisma.project.upsert({
+    where: { key: 'DEMO' },
+    update: {},
+    create: { name: 'Demo Project', key: 'DEMO', description: 'Demo project for testing' },
+  });
 
-  const backendProject = isFullDevSeed
-    ? await seedPrisma.project.upsert({
-        where: { key: 'BACK' },
-        update: {},
-        create: { name: 'Backend Services', key: 'BACK', description: 'Backend microservices' },
-      })
-    : null;
+  const backendProject = await prisma.project.upsert({
+    where: { key: 'BACK' },
+    update: {},
+    create: { name: 'Backend Services', key: 'BACK', description: 'Backend microservices' },
+  });
 
-  const mvpProject = await seedPrisma.project.upsert({
+  const mvpProject = await prisma.project.upsert({
     where: { key: 'TTMP' },
     update: {},
     create: {
@@ -110,20 +72,18 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-  const liveCodeProject = isFullDevSeed
-    ? await seedPrisma.project.upsert({
-        where: { key: 'LIVE' },
-        update: {},
-        create: {
-          name: 'TaskTime MVP LiveCode',
-          key: 'LIVE',
-          description: 'Живой проект: задачи для разработки TaskTime MVP (vibe-code) самим TaskTime и агентами',
-        },
-      })
-    : null;
+  const liveCodeProject = await prisma.project.upsert({
+    where: { key: 'LIVE' },
+    update: {},
+    create: {
+      name: 'TaskTime MVP LiveCode',
+      key: 'LIVE',
+      description: 'Живой проект: задачи для разработки TaskTime MVP (vibe-code) самим TaskTime и агентами',
+    },
+  });
 
   // Historical sprints for TaskTime MVP (TTMP)
-  const sprint0 = await seedPrisma.sprint.upsert({
+  const sprint0 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 0 — Развертывание стенда' } },
     update: {},
     create: {
@@ -136,7 +96,7 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-  const sprint1 = await seedPrisma.sprint.upsert({
+  const sprint1 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 1 — Фундамент системы' } },
     update: {},
     create: {
@@ -149,7 +109,7 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-  const sprint2 = await seedPrisma.sprint.upsert({
+  const sprint2 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 2 — Доски, спринты, время, комментарии' } },
     update: {},
     create: {
@@ -162,7 +122,7 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-  const sprint3 = await seedPrisma.sprint.upsert({
+  const sprint3 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3 — Teams, Admin, Reports, Redis' } },
     update: {},
     create: {
@@ -175,7 +135,7 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-  const sprint35 = await seedPrisma.sprint.upsert({
+  const sprint35 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг' } },
     update: {},
     create: {
@@ -188,55 +148,51 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-  if (isFullDevSeed) {
-    const demoProject = project!;
-    const metaProject = liveCodeProject!;
-
-    // Create issues with hierarchy
-    const epic = await prisma.issue.upsert({
-    where: { projectId_number: { projectId: demoProject.id, number: 1 } },
+  // Create issues with hierarchy
+  const epic = await prisma.issue.upsert({
+    where: { projectId_number: { projectId: project.id, number: 1 } },
     update: {},
     create: {
-      projectId: demoProject.id, number: 1, title: 'User Authentication System',
+      projectId: project.id, number: 1, title: 'User Authentication System',
       type: 'EPIC', priority: 'HIGH', creatorId: manager.id, assigneeId: dev.id,
     },
   });
 
   const story = await prisma.issue.upsert({
-    where: { projectId_number: { projectId: demoProject.id, number: 2 } },
+    where: { projectId_number: { projectId: project.id, number: 2 } },
     update: {},
     create: {
-      projectId: demoProject.id, number: 2, title: 'Login & Registration Flow',
+      projectId: project.id, number: 2, title: 'Login & Registration Flow',
       type: 'STORY', priority: 'HIGH', creatorId: manager.id, assigneeId: dev.id,
       parentId: epic.id, status: 'IN_PROGRESS',
     },
   });
 
-    await prisma.issue.upsert({
-    where: { projectId_number: { projectId: demoProject.id, number: 3 } },
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: project.id, number: 3 } },
     update: {},
     create: {
-      projectId: demoProject.id, number: 3, title: 'Implement JWT token generation',
+      projectId: project.id, number: 3, title: 'Implement JWT token generation',
       type: 'TASK', priority: 'HIGH', creatorId: manager.id, assigneeId: dev.id,
       parentId: story.id, status: 'DONE',
     },
   });
 
-    await prisma.issue.upsert({
-    where: { projectId_number: { projectId: demoProject.id, number: 4 } },
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: project.id, number: 4 } },
     update: {},
     create: {
-      projectId: demoProject.id, number: 4, title: 'Create login form UI',
+      projectId: project.id, number: 4, title: 'Create login form UI',
       type: 'TASK', priority: 'MEDIUM', creatorId: manager.id, assigneeId: dev.id,
       parentId: story.id, status: 'IN_PROGRESS',
     },
   });
 
-    await prisma.issue.upsert({
-    where: { projectId_number: { projectId: demoProject.id, number: 5 } },
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: project.id, number: 5 } },
     update: {},
     create: {
-      projectId: demoProject.id,
+      projectId: project.id,
       number: 5,
       title: 'Fix password validation bug',
       type: 'BUG',
@@ -246,12 +202,12 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-    // MVP LiveCode meta issues (agent vs human work)
-    await prisma.issue.upsert({
-    where: { projectId_number: { projectId: metaProject.id, number: 1 } },
+  // MVP LiveCode meta issues (agent vs human work)
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: liveCodeProject.id, number: 1 } },
     update: {},
     create: {
-      projectId: metaProject.id,
+      projectId: liveCodeProject.id,
       number: 1,
       title: 'Настроить MVP LiveCode как мета-проект',
       type: 'EPIC',
@@ -265,11 +221,11 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-    await prisma.issue.upsert({
-    where: { projectId_number: { projectId: metaProject.id, number: 2 } },
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: liveCodeProject.id, number: 2 } },
     update: {},
     create: {
-      projectId: metaProject.id,
+      projectId: liveCodeProject.id,
       number: 2,
       title: 'Добавить флаг "делает агент" к задачам',
       type: 'TASK',
@@ -283,11 +239,11 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
     },
   });
 
-    await prisma.issue.upsert({
-    where: { projectId_number: { projectId: metaProject.id, number: 3 } },
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: liveCodeProject.id, number: 3 } },
     update: {},
     create: {
-      projectId: metaProject.id,
+      projectId: liveCodeProject.id,
       number: 3,
       title: 'Показать активные задачи MVP LiveCode через API',
       type: 'TASK',
@@ -300,8 +256,6 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
       aiAssigneeType: 'AGENT',
     },
   });
-
-  }
 
   // Backlog (MVP project): EPIC — Исследование и планирование MVP
   const epicResearch = await prisma.issue.upsert({
@@ -1645,99 +1599,89 @@ export async function seedDatabase(seedPrisma: PrismaClient, options: SeedOption
   });
 
   // Demo time tracking data for My Time (Pavel + AI)
-  if (isFullDevSeed) {
-    const existingAiSessions = await prisma.aiSession.count();
-    if (existingAiSessions === 0) {
-      const demoIssueMyTime = await prisma.issue.findUnique({
-        where: { projectId_number: { projectId: mvpProject.id, number: 64 } },
-      });
-      const demoIssueBoard = await prisma.issue.findUnique({
-        where: { projectId_number: { projectId: mvpProject.id, number: 55 } },
-      });
+  const existingAiSessions = await prisma.aiSession.count();
+  if (existingAiSessions === 0) {
+    const demoIssueMyTime = await prisma.issue.findUnique({
+      where: { projectId_number: { projectId: mvpProject.id, number: 64 } },
+    });
+    const demoIssueBoard = await prisma.issue.findUnique({
+      where: { projectId_number: { projectId: mvpProject.id, number: 55 } },
+    });
 
-      if (demoIssueMyTime && demoIssueBoard) {
-        // Human time logs for the owner/admin demo account
-        await prisma.timeLog.createMany({
-          data: [
-            {
-              issueId: demoIssueMyTime.id,
-              userId: owner.id,
-              hours: new Prisma.Decimal(1.5),
-              note: 'Обсуждение требований к отчётам My Time',
-              logDate: new Date(),
-              source: 'HUMAN',
-            },
-            {
-              issueId: demoIssueBoard.id,
-              userId: owner.id,
-              hours: new Prisma.Decimal(0.75),
-              note: 'Ручное тестирование доски и спринтов',
-              logDate: new Date(),
-              source: 'HUMAN',
-            },
-          ],
-        });
-
-        // One AI session split between two tasks
-        const aiSession = await prisma.aiSession.create({
-          data: {
+    if (demoIssueMyTime && demoIssueBoard) {
+      // Human time logs for Pavel
+      await prisma.timeLog.createMany({
+        data: [
+          {
             issueId: demoIssueMyTime.id,
             userId: owner.id,
-            model: 'gpt-5.1',
-            provider: 'openai',
-            startedAt: new Date(Date.now() - 45 * 60 * 1000),
-            finishedAt: new Date(),
-            tokensInput: 12000,
-            tokensOutput: 8000,
-            costMoney: new Prisma.Decimal(0.8),
-            notes: 'Проектирование учёта времени HUMAN vs AGENT и UI My Time',
+            hours: new Prisma.Decimal(1.5),
+            note: 'Обсуждение требований к отчётам My Time',
+            logDate: new Date(),
+            source: 'HUMAN',
           },
-        });
+          {
+            issueId: demoIssueBoard.id,
+            userId: owner.id,
+            hours: new Prisma.Decimal(0.75),
+            note: 'Ручное тестирование доски и спринтов',
+            logDate: new Date(),
+            source: 'HUMAN',
+          },
+        ],
+      });
 
-        const startedAt = aiSession.startedAt;
-        const finishedAt = aiSession.finishedAt;
-        const totalMs = finishedAt.getTime() - startedAt.getTime();
-        const totalHours = totalMs / 3_600_000;
+      // One AI session split between two tasks
+      const aiSession = await prisma.aiSession.create({
+        data: {
+          issueId: demoIssueMyTime.id,
+          userId: owner.id,
+          model: 'gpt-5.1',
+          provider: 'openai',
+          startedAt: new Date(Date.now() - 45 * 60 * 1000),
+          finishedAt: new Date(),
+          tokensInput: 12000,
+          tokensOutput: 8000,
+          costMoney: new Prisma.Decimal(0.8),
+          notes: 'Проектирование учёта времени HUMAN vs AGENT и UI My Time',
+        },
+      });
 
-        const splits = [
-          { issue: demoIssueMyTime, ratio: 0.6 },
-          { issue: demoIssueBoard, ratio: 0.4 },
-        ];
+      const startedAt = aiSession.startedAt;
+      const finishedAt = aiSession.finishedAt;
+      const totalMs = finishedAt.getTime() - startedAt.getTime();
+      const totalHours = totalMs / 3_600_000;
 
-        await prisma.timeLog.createMany({
-          data: splits.map((split) => {
-            const hours = totalHours * split.ratio;
-            const cost = 0.8 * split.ratio;
-            return {
-              issueId: split.issue.id,
-              userId: owner.id,
-              hours: new Prisma.Decimal(Math.round(hours * 100) / 100),
-              note: 'AI: помощь в проектировании и UI',
-              logDate: finishedAt,
-              source: 'AGENT' as const,
-              agentSessionId: aiSession.id,
-              startedAt,
-              stoppedAt: finishedAt,
-              costMoney: new Prisma.Decimal(Math.round(cost * 10_000) / 10_000),
-            };
-          }),
-        });
-      }
+      const splits = [
+        { issue: demoIssueMyTime, ratio: 0.6 },
+        { issue: demoIssueBoard, ratio: 0.4 },
+      ];
+
+      await prisma.timeLog.createMany({
+        data: splits.map((split) => {
+          const hours = totalHours * split.ratio;
+          const cost = 0.8 * split.ratio;
+          return {
+            issueId: split.issue.id,
+            userId: owner.id,
+            hours: new Prisma.Decimal(Math.round(hours * 100) / 100),
+            note: 'AI: помощь в проектировании и UI',
+            logDate: finishedAt,
+            source: 'AGENT' as const,
+            agentSessionId: aiSession.id,
+            startedAt,
+            stoppedAt: finishedAt,
+            costMoney: new Prisma.Decimal(Math.round(cost * 10_000) / 10_000),
+          };
+        }),
+      });
     }
   }
 
   console.log('Seed complete.');
   console.log(`Users: ${admin.email}, ${manager.email}, ${dev.email}, ${viewer.email}, ${owner.email}`);
-  if (isFullDevSeed) {
-    console.log(`Password for all: ${defaultPassword}`);
-    console.log(`Projects: ${project!.key}, ${backendProject!.key}, ${liveCodeProject!.key}, ${mvpProject.key}`);
-  } else {
-    console.log(`Projects: ${mvpProject.key}`);
-  }
-}
-
-async function main() {
-  await seedDatabase(prisma);
+  console.log(`Password for all: ${defaultPassword}`);
+  console.log(`Projects: ${project.key}, ${backendProject.key}`);
 }
 
 const isExecutedDirectly = process.argv[1] !== undefined

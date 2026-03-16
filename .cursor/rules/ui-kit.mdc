@@ -1,0 +1,383 @@
+---
+description: MOEX Flow Universe — UI Kit. Визуальная система проекта: цвета, типографика, радиусы, тени, компоненты, паттерны.
+globs: frontend/src/**/*.tsx, frontend/src/**/*.css
+alwaysApply: false
+---
+# MOEX Flow Universe — UI Kit
+
+Справочный документ по визуальной системе. Не менять существующий код — только описание того, что уже работает.
+
+---
+
+## 1. Цветовая система
+
+Все переменные объявлены в `frontend/src/styles.css` в `:root`.
+
+### Фоны
+
+| Переменная | Значение | Назначение |
+|---|---|---|
+| `--bg` | `#111117` | Основной фон страницы |
+| `--bg-sb` | `#08080b` | Фон сайдбара (почти чёрный) |
+| `--bg-el` | `#181821` | Фон карточек, панелей |
+| `--bg-input` | `#1e1e28` | Фон инпутов |
+
+Разрыв между `--bg-sb` и `--bg-el` — основа объёма: сайдбар тёмнее, контент светлее.
+
+### Границы
+
+| Переменная | Значение | Назначение |
+|---|---|---|
+| `--b` | `rgba(255,255,255,0.07)` | Основная граница |
+| `--b2` | `rgba(255,255,255,0.04)` | Разделители внутри компонентов |
+| `--b3` | `rgba(255,255,255,0.02)` | Едва видимые разделители |
+| `--b-focus` | `#5e6ad2` | Граница при фокусе |
+
+### Текст
+
+| Переменная | Значение | Назначение |
+|---|---|---|
+| `--t1` | `#e2e2e8` | Основной текст |
+| `--t2` | `#8c8c9e` | Вторичный текст, подписи |
+| `--t3` | `#555566` | Приглушённый, лейблы, метки |
+| `--t4` | `#3a3a4a` | Плейсхолдеры, очень тихий текст |
+
+### Акцент
+
+| Переменная | Значение | Назначение |
+|---|---|---|
+| `--acc` | `#7b86ff` | Основной акцент (кнопки, ссылки, активные элементы) |
+| `--acc-h` | `#9aa4ff` | Hover-состояние акцента |
+| `--acc-bg` | `rgba(123,134,255,0.1)` | Фон активного nav-пункта |
+
+> Акцент на экране логина отличается: `#6b5cf6`. Это намеренно — логин отдельная вселенная.
+
+### Статусы задач
+
+| Переменная | Цвет | Статус |
+|---|---|---|
+| `--s-todo` | `#6b7280` | TODO |
+| `--s-inprog` | `#7b86ff` | IN_PROGRESS |
+| `--s-done` | `#34a474` | DONE |
+| `--s-cancelled` | `#4b4b5a` | CANCELLED |
+| `--s-urgent` | `#e05252` | URGENT / OPEN |
+
+### Типы задач (лейблы)
+
+| Переменная | Назначение |
+|---|---|
+| `--lbl-bug` | BUG |
+| `--lbl-feat` | EPIC / STORY |
+| `--lbl-imp` | Улучшение |
+| `--lbl-perf` | Performance |
+
+---
+
+## 2. Типографика
+
+### Шрифты
+
+- **Inter** — основной шрифт приложения (300, 400, 500)
+- **Syne** — заголовки, логотип (400–800). Используется только на экране логина и в лого сайдбара
+- **ui-monospace / SF Mono / Menlo** — ключи задач, код
+
+### Размеры
+
+| Переменная | Значение |
+|---|---|
+| `--fs-xs` | `11px` |
+| `--fs-sm` | `12px` |
+| `--fs-md` | `13px` |
+| `--fs-lg` | `14px` |
+
+### Межстрочный интервал
+
+| Переменная | Значение |
+|---|---|
+| `--lh-tight` | `1.3` |
+| `--lh-normal` | `1.5` |
+| `--lh-relaxed` | `1.6` |
+
+---
+
+## 3. Радиусы, тени, отступы
+
+### Радиусы
+
+| Переменная | Значение | Применение |
+|---|---|---|
+| `--r` | `10px` | Карточки, панели, крупные блоки |
+| `--r2` | `6px` | Кнопки, инпуты, теги |
+| `--r3` | `4px` | Пилли, бейджи, мелкие элементы |
+
+### Тени
+
+| Переменная | Применение |
+|---|---|
+| `--shadow-sm` | Мелкие всплывающие элементы |
+| `--shadow-md` | Карточки второго плана |
+| `--shadow-lg` | Дроэры, модалки |
+| `--shadow-err` | Ошибки, деструктивные действия |
+
+### Сетка отступов
+
+| Переменная | Значение |
+|---|---|
+| `--space-1` | `2px` |
+| `--space-2` | `4px` |
+| `--space-3` | `6px` |
+| `--space-4` | `8px` |
+| `--space-5` | `12px` |
+| `--space-6` | `16px` |
+
+### Layout
+
+| Переменная | Значение |
+|---|---|
+| `--sidebar-w` | `220px` |
+| `--topbar-h` | `38px` |
+| `--sprint-drawer-w` | `900px` |
+
+---
+
+## 4. Техника «выпуклых поверхностей»
+
+Все поднятые элементы строятся по одной формуле. Это главный визуальный паттерн системы.
+
+```css
+background:
+  radial-gradient(circle at 0 0, rgba(94, 106, 210, 0.12–0.2), transparent 55%),
+  linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
+  var(--bg-el);
+
+border: 1px solid rgba(255, 255, 255, 0.06–0.08);
+border-radius: var(--r);
+box-shadow: 0 Npx Mpx rgba(0, 0, 0, 0.7–0.9);
+```
+
+Что делает каждый слой:
+
+| Слой | Эффект |
+|---|---|
+| `radial-gradient` из угла 0 0 | Фиолетовый блик — имитация источника света сверху-слева |
+| `linear-gradient` сверху вниз | Белёсый блеск на верхней грани |
+| `var(--bg-el)` | Базовый фон, светлее чем `--bg` — создаёт контраст |
+| `border rgba(255,255,255,0.06)` | Тонкая стеклянная кромка |
+| `box-shadow 0 Npx Mpx rgba(0,0,0,0.75+)` | Глубокая тень — «отрыв» от фона |
+
+---
+
+## 5. Компоненты
+
+### 5.1 Оболочка (tt-app-shell)
+
+Grid: `220px 1fr`. Сайдбар на `--bg-sb`, контент на `--bg`.
+
+Контент-область визуально «приподнята» псевдоэлементом `tt-main::before`:
+
+```css
+.tt-main::before {
+  content: '';
+  position: absolute;
+  top: 6px; bottom: 6px; left: -6px; right: 8px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 0 0, rgba(94, 106, 210, 0.18), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
+    var(--bg-el);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  z-index: 0;
+}
+```
+
+`border-radius: 26px` — скругляет «поднос». `box-shadow` с большим blur и opacity 0.9 создаёт глубину. `left: -6px` — поднос чуть выходит за границу сайдбара, перекрывая его край.
+
+### 5.2 Сайдбар (tt-sidebar)
+
+- Фон: `--bg-sb` (#08080b)
+- Правая граница: `1px solid var(--b)`
+- Живые звёзды на `<canvas>` — 55–80 точек, мерцание через `Math.sin`
+- Одна туманность: `radial-gradient` с `filter: blur(28–50px)`, `opacity 0.3–0.5`, анимация дрейфа 18–22s
+- Лого: Syne 700, иконка-созвездие в рамке `rgba(123,134,255,0.1)`
+
+**Nav-пункт в покое:**
+```css
+color: var(--t2);
+border: 1px solid transparent;
+border-radius: var(--r3);
+```
+
+**Nav-пункт активный:**
+```css
+background: var(--acc-bg);       /* rgba(123,134,255,0.1) */
+color: var(--acc-h);
+border-color: rgba(123,134,255,0.14);
+```
+
+### 5.3 Топбар (tt-topbar)
+
+- Высота: `--topbar-h` (38px)
+- Фон: `--bg`
+- Граница снизу: `1px solid var(--b)`
+- `z-index: 1` — поверх `::before` псевдоэлемента
+
+### 5.4 Стат-карточки (tt-stats-grid / tt-stats-card)
+
+Метрики объединены в единый монолит — `gap: 0`, одна внешняя рамка:
+
+```css
+.tt-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), transparent);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+```
+
+Каждая карточка — полная формула выпуклой поверхности + тяжёлая тень:
+
+```css
+.tt-stats-card {
+  background:
+    radial-gradient(circle at 0 0, rgba(94,106,210,0.2), transparent 55%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), transparent 40%),
+    var(--bg-el);
+  box-shadow: 0 14px 32px rgba(0,0,0,0.75);
+  padding: 12px 16px 14px;
+}
+```
+
+Разделитель между карточками — `border-left: 1px solid rgba(255,255,255,0.05)`.
+
+**Вариант B (текущий dashboard):** 2px акцентная полоса сверху через `border-top`:
+- Projects → `--acc` (#7b86ff)
+- Total Issues → `#e8c060`
+- Users → `--s-done` (#34a474)
+- Time Logs → `#6ba8e0`
+
+### 5.5 Панели (tt-panel)
+
+Issues by Status, Issues by Assignee и аналогичные:
+
+```css
+.tt-panel {
+  background:
+    radial-gradient(circle at 0 0, rgba(94,106,210,0.16), transparent 55%),
+    var(--bg-el);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--r);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.75);
+}
+```
+
+**Заголовок панели (tt-panel-header):**
+```css
+padding: 10px 14px 9px;
+font-size: 12px; font-weight: 600;
+text-transform: uppercase; letter-spacing: 0.3px;
+color: #ffffff;
+border-bottom: 1px solid var(--b2);
+```
+
+**Строка внутри панели (tt-panel-row):**
+- `padding: 10–12px 14–18px`
+- `border-bottom: 1px solid var(--b)`
+- Hover: `background: var(--bg-hover)`
+
+### 5.6 Статус-пилли
+
+```css
+.pill {
+  font-size: 10px; font-weight: 500;
+  padding: 2px 7px; border-radius: var(--r3);
+  text-transform: uppercase;
+}
+.pill-open     { background: rgba(224,82,82,0.1);   color: var(--s-urgent); }
+.pill-done     { background: rgba(52,164,116,0.1);  color: var(--s-done); }
+.pill-progress { background: rgba(123,134,255,0.1); color: var(--acc-h); }
+```
+
+### 5.7 Аватары
+
+```css
+.tt-ava {
+  width: 22–26px; height: 22–26px;
+  border-radius: 50%;
+  background: var(--bg-input);
+  border: 1px solid var(--b);
+  font-size: 9px; font-weight: 600;
+  color: var(--t2);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+```
+
+---
+
+## 6. Специальные экраны
+
+### 6.1 Логин (отдельная система)
+
+Полностью отдельная палитра — не наследует переменные основного приложения.
+
+| Элемент | Значение |
+|---|---|
+| Фон страницы | `#0a0a0f` |
+| Левая панель | `#0f0f1a` |
+| Акцент | `#6b5cf6` |
+| Акцент hover | `#a78bfa` |
+| Шрифт заголовков | Syne 800 |
+| Шрифт формы | Inter |
+
+**Правая панель** — анимированная космическая сцена:
+- Canvas со звёздами (~180 точек, мерцание через `requestAnimationFrame`)
+- 3 туманности (`filter: blur(80px)`, анимация `moex-drift`)
+- 4 орбитальных кольца (`animation: moex-rotate-*`)
+- Центральный орб (`animation: moex-pulse-orb`)
+- Hero-текст: "MOEX" (Syne 600, 13px, letter-spacing 5px) + "Flow Universe" (Syne 800, 52px, градиентный)
+
+### 6.2 Канбан
+
+Колонки и карточки с той же формулой градиентов. Статусы и типы задач — цветные пилли/чипы из палитры `--s-*` и `--lbl-*`.
+
+### 6.3 Дроэры (Sprint Drawer, Task Preview)
+
+- Ширина: `--sprint-drawer-w` (900px)
+- Та же палитра `--bg-el`, `--b`, `--t1`–`--t3`
+- **Не трогать** — дроэры работают независимо от dashboard-стилей
+
+---
+
+## 7. Ant Design ConfigProvider
+
+В `App.tsx`:
+
+```tsx
+<ConfigProvider theme={{
+  algorithm: antdTheme.darkAlgorithm,
+  token: {
+    colorPrimary: '#7b86ff',      // --acc
+    colorBgBase: '#111117',       // --bg
+    colorBorder: 'rgba(255,255,255,0.07)', // --b
+    colorText: '#e2e2e8',         // --t1
+    borderRadius: 4,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+  }
+}}>
+```
+
+Кнопки, таблицы, инпуты, карточки Ant Design переопределены в `styles.css` под эти переменные.
+
+---
+
+## 8. Правила расширения
+
+1. **Новые карточки** — всегда используй формулу из п. 4. Не изобретай новые тени.
+2. **Новые цвета** — только через CSS-переменные. Не хардкодить hex в компонентах.
+3. **Статусы** — только из `--s-*`. Новый статус = новая переменная в `:root`.
+4. **Шрифты** — Inter везде. Syne только для лого и экрана логина.
+5. **Дроэры и модалки** — не менять существующие, добавлять по той же схеме.
+6. **Логин** — изолированная система, не смешивать переменные с основным приложением.

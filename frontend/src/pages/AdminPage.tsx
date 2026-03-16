@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [usersMap, setUsersMap] = useState<Record<string, User>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
@@ -66,6 +67,8 @@ export default function AdminPage() {
         if (allProjects.length > 0) {
           setSelectedProjectId(allProjects[0].id);
         }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load admin data');
       } finally {
         setLoading(false);
       }
@@ -124,7 +127,15 @@ export default function AdminPage() {
     void loadSprints();
   }, [selectedProjectId]);
 
-  if (loading || !stats) return <LoadingSpinner />;
+  if (loading) return <LoadingSpinner />;
+  if (error || !stats) return (
+    <div className="tt-page">
+      <div className="tt-page-header">
+        <h1 className="tt-page-title">Admin</h1>
+      </div>
+      <Typography.Text type="danger">{error ?? 'Failed to load admin data'}</Typography.Text>
+    </div>
+  );
 
   const issuesByStatus = stats.issuesByStatus.reduce<Record<string, number>>((acc, item) => {
     acc[item.status] = item._count._all;

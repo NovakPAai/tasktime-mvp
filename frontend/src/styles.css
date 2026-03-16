@@ -959,6 +959,24 @@ body {
 
 /* === SPRINT DRAWER === */
 
+.tt-sprint-drawer-root {
+  position: fixed !important;
+  inset: 0 !important;
+}
+
+.tt-sprint-drawer-root::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  background: var(--bg);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  z-index: 1000;
+}
+
 .tt-sprint-drawer-root .ant-drawer-mask {
   background: rgba(4, 4, 8, 0.72);
   backdrop-filter: blur(6px);
@@ -976,6 +994,7 @@ body {
   max-width: min(var(--sprint-drawer-w), calc(100vw - 24px));
   border-radius: 12px 0 0 12px;
   overflow: hidden;
+  z-index: 1001;
 }
 
 .tt-sprint-drawer .ant-drawer-content {
@@ -2081,161 +2100,401 @@ body {
   }
 }
 
-/* === LOGIN PAGE === */
+/* === LOGIN PAGE (MOEX Flow Universe) === */
 
-.tt-login-shell {
-  flex: 1;
+@keyframes moex-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(30px, -20px) scale(1.1); }
+}
+
+@keyframes moex-rotate-cw {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes moex-rotate-ccw {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(-360deg); }
+}
+
+@keyframes moex-pulse-orb {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 20px rgba(107, 92, 246, 0.4), 0 0 60px rgba(107, 92, 246, 0.2);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    box-shadow: 0 0 40px rgba(107, 92, 246, 0.7), 0 0 100px rgba(107, 92, 246, 0.35);
+  }
+}
+
+@keyframes moex-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(107, 92, 246, 0.4), 0 0 60px rgba(107, 92, 246, 0.2); }
+  50%       { transform: scale(1.05); box-shadow: 0 0 40px rgba(107, 92, 246, 0.7), 0 0 100px rgba(107, 92, 246, 0.35); }
+}
+
+.moex-shell {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  min-width: 900px;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+}
+
+/* ── Левая панель ── */
+
+.moex-left {
+  width: 420px;
+  flex-shrink: 0;
+  background: #0f0f1a;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 40px 48px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+.moex-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: auto;
+}
+
+.moex-logo-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #6b5cf6, #a78bfa);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  background-color: var(--bg);
+  flex-shrink: 0;
 }
 
-.tt-login-panel {
-  width: 380px;
-  padding: 18px 20px 20px;
-  background-color: var(--bg-modal);
-  border-radius: var(--r);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
-}
-
-.tt-login-header {
-  margin-bottom: 12px;
-}
-
-.tt-login-title {
-  font-size: 22px;
+.moex-logo-text {
+  font-family: 'Syne', sans-serif;
   font-weight: 700;
-  letter-spacing: -0.5px;
-  color: var(--t1);
-  margin: 0 0 4px;
+  font-size: 14px;
+  color: #e2e2f0;
+  letter-spacing: 0;
 }
 
-.tt-login-subtitle {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: var(--t2);
-  margin: 0;
-}
-
-.tt-login-tabs .ant-tabs-nav {
-  margin: 6px 0 14px;
-}
-
-.tt-login-tabs .ant-tabs-nav::before {
-  border-bottom: none;
-}
-
-.tt-login-tabs .ant-tabs-tab {
-  padding: 4px 10px;
-  margin: 0 8px 0 0;
-  border: none;
-  background: transparent;
-  border-radius: 999px;
-}
-
-.tt-login-tabs .ant-tabs-tab:hover {
-  background-color: var(--bg-hover);
-}
-
-.tt-login-tabs .ant-tabs-tab-btn {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--t2);
-}
-
-.tt-login-tabs .ant-tabs-tab-active {
-  background-color: var(--acc-bg);
-}
-
-.tt-login-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--t1);
-}
-
-.tt-login-tabs .ant-tabs-ink-bar {
-  display: none;
-}
-
-.tt-login-form .ant-form-item-label > label {
-  font-size: 11px;
-  line-height: 1.3;
-  color: var(--t3);
-}
-
-.tt-login-input,
-.tt-login-input .ant-input {
-  background-color: var(--bg-input);
-  border: 1px solid var(--b2);
-  border-radius: var(--r2);
-  color: var(--t1);
-}
-
-.tt-login-input::placeholder,
-.tt-login-input .ant-input::placeholder {
-  color: var(--t4);
-}
-
-.tt-login-input:hover,
-.tt-login-input:focus,
-.tt-login-input.ant-input-affix-wrapper-focused,
-.tt-login-input .ant-input:hover,
-.tt-login-input .ant-input:focus {
-  border-color: var(--b-focus);
-  box-shadow: none;
-  outline: none;
-}
-
-.tt-login-input input {
-  background-color: transparent;
-  border: none;
-  box-shadow: none;
-  outline: none;
-}
-
-.tt-login-input input:focus-visible {
-  outline: none;
-}
-
-.ant-btn.tt-login-btn-primary {
-  margin-top: 4px;
-  display: inline-flex;
-  align-items: center;
+.moex-form-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
+  padding: 40px 0;
+}
+
+.moex-heading {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  color: #f0eeff;
+  margin: 0 0 8px;
+  letter-spacing: -0.3px;
+}
+
+.moex-subheading {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0 0 24px;
+}
+
+.moex-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  padding: 3px;
+  width: fit-content;
+  margin-bottom: 28px;
+}
+
+.moex-tab {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 5px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.moex-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.moex-tab--active {
+  background: rgba(107, 92, 246, 0.2);
+  color: #c4b8ff;
+  border-color: rgba(107, 92, 246, 0.3);
+}
+
+.moex-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.moex-field {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  padding: 5px 11px;
-  width: 100%;
+}
+
+.moex-label {
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 500;
-  border-radius: var(--r2);
-  border: none;
-  background-color: var(--acc);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.moex-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #e2e2f0;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+}
+
+.moex-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.moex-input:focus {
+  border-color: #6b5cf6;
+  box-shadow: 0 0 0 3px rgba(107, 92, 246, 0.25);
+}
+
+.moex-btn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 11px 0;
+  background: #6b5cf6;
   color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
   cursor: pointer;
-  user-select: none;
-  transition: background-color 0.12s ease-out, transform 0.06s ease-out, box-shadow 0.06s ease-out;
+  transition: background 0.15s ease, transform 0.06s ease, opacity 0.15s ease;
+  outline: none;
 }
 
-.ant-btn.tt-login-btn-primary:hover:not(.ant-btn-disabled):not([disabled]) {
-  background-color: var(--acc-h);
+.moex-btn:hover:not(:disabled) {
+  background: #7c6ef7;
 }
 
-.ant-btn.tt-login-btn-primary:active:not(.ant-btn-disabled):not([disabled]) {
+.moex-btn:active:not(:disabled) {
   transform: translateY(0.5px);
 }
 
-.ant-btn.tt-login-btn-primary.ant-btn-loading {
-  background-color: var(--acc);
-  cursor: default;
+.moex-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
-.ant-btn.tt-login-btn-primary.ant-btn-disabled,
-.ant-btn.tt-login-btn-primary[disabled] {
-  background-color: var(--bg-hover);
-  color: var(--t3);
-  cursor: not-allowed;
-  box-shadow: none;
+.moex-footer {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.2);
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+/* ── Правая панель (космос) ── */
+
+.moex-right {
+  flex: 1;
+  background: #0a0a0f;
+  position: relative;
+  overflow: hidden;
+}
+
+.moex-stars-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Туманности */
+
+.moex-nebula {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  animation: moex-drift 12s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.moex-nebula--1 {
+  width: 400px;
+  height: 400px;
+  background: #4f35b8;
+  top: -80px;
+  left: -80px;
+  animation-delay: 0s;
+}
+
+.moex-nebula--2 {
+  width: 350px;
+  height: 350px;
+  background: #1a3a6e;
+  top: 30%;
+  right: -60px;
+  animation-delay: -4s;
+}
+
+.moex-nebula--3 {
+  width: 300px;
+  height: 300px;
+  background: #6b2f7a;
+  bottom: -60px;
+  left: 30%;
+  animation-delay: -8s;
+}
+
+/* Орбитальные кольца */
+
+.moex-orbits {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.moex-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.moex-orbit--1 {
+  width: 240px;
+  height: 240px;
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: moex-rotate-cw 30s linear infinite;
+}
+
+.moex-orbit--2 {
+  width: 400px;
+  height: 400px;
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: moex-rotate-ccw 50s linear infinite;
+}
+
+.moex-orbit--3 {
+  width: 580px;
+  height: 580px;
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: moex-rotate-cw 80s linear infinite;
+}
+
+.moex-orbit--4 {
+  width: 760px;
+  height: 760px;
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: moex-rotate-ccw 120s linear infinite;
+}
+
+.moex-orbit::before,
+.moex-orbit::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(107, 92, 246, 0.8);
+  box-shadow: 0 0 6px rgba(107, 92, 246, 0.6);
+}
+
+.moex-orbit::before {
+  top: -2.5px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.moex-orbit::after {
+  bottom: -2.5px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Центральный орб */
+
+.moex-orb {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  top: 50%;
+  left: 50%;
+  margin-left: -40px;
+  margin-top: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #8b77f5, #3b25b3 60%, #1a0f5e);
+  animation: moex-pulse 4s ease-in-out infinite;
+}
+
+/* Hero-текст */
+
+.moex-hero {
+  position: absolute;
+  bottom: 60px;
+  left: 60px;
+  right: 60px;
+  pointer-events: none;
+}
+
+.moex-hero-label {
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: rgba(167, 139, 250, 0.45);
+  margin-bottom: 8px;
+}
+
+.moex-hero-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: -2px;
+  background: linear-gradient(135deg, #f0eeff, #a78bfa, #6b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+}
+
+.moex-hero-desc {
+  font-family: 'Inter', sans-serif;
+  font-weight: 300;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.6;
 }
 
 /* === BOARD PAGE (KANBAN) === */

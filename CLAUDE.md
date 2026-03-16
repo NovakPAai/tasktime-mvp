@@ -273,3 +273,36 @@ PO выбрал:
 - `developer`, `tester`, `system-analyst` → **Sonnet** (default)
 - `corporate-architect`, `infosec` → **Opus**
 - `deploy-tasktime`, `docs-tasktime`, `tasktime-inbox` → **Haiku**
+
+## CI/CD Pipeline (2026-03-13)
+
+### Архитектура
+
+```
+CI (push/PR) → Build & Publish (workflow_run, main only) → Deploy Staging (auto) → Deploy Production (manual)
+```
+
+4 workflow в `.github/workflows/`: `ci.yml`, `build-and-publish.yml`, `deploy-staging.yml`, `deploy-production.yml`.
+
+### Аудит и фиксы (ветка claude/mvp-project-management-hdAvd)
+
+**Коммиты:** `2ad8ed3`, `32eb187` — CI зелёный, в main ещё НЕ смержены.
+
+**Что исправлено:**
+- Redis 7 service container добавлен в CI (был в env, но контейнер отсутствовал)
+- actions/checkout v4→v6, setup-node v4→v6, setup-buildx v3→v4 (Node.js 20 deprecation June 2026)
+- Docker layer caching (GHA, scope per image) в Build & Publish
+- `deploy.sh`: retry loop (12×5s) вместо `sleep 10`, диагностика при падении, автобэкап Postgres перед миграциями
+- `rollback.sh`: добавлен health-check с retry loop
+- `nginx.conf`: rate-limiting (auth 5r/s, api 30r/s), security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), client_max_body_size 10m, proxy buffering
+
+### Открытые проблемы
+
+- **P1 (блокер для staging):** секреты staging environment не настроены в GitHub → Deploy Staging всегда failure. Нужно: Settings → Environments → staging → добавить `STAGING_DEPLOY_SSH_KEY`, `STAGING_DEPLOY_HOST`, `STAGING_DEPLOY_USER`, `STAGING_DEPLOY_PATH`. Или отключить auto-deploy staging (`if: false`).
+
+### История проблем при деплоях
+
+1. TypeScript ошибки (Prisma типы, Redis типизация, unused imports) ломали CI после merge в main — фиксы `2c3340e`, `44b9d6b`, `8df88bf`
+2. Health-check возвращал 200 на пустую БД (проверял `SELECT 1` вместо наличия таблиц) — фикс `20970f0`
+3. Bootstrap-скрипт не вызывался при деплое — фикс `20970f0`
+4. Секреты production environment не были настроены при первом деплое — фикс вручную в GitHub Settings

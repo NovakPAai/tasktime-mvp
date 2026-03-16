@@ -4,13 +4,23 @@ import { PrismaClient, type UserRole } from '@prisma/client';
 
 import { hashPassword } from '../shared/utils/password.js';
 
+type BootstrapUser = {
+  email: string;
+  name: string;
+  role: UserRole;
+};
+
+type BootstrapEnv = Partial<Record<
+  'BOOTSTRAP_DEFAULT_PASSWORD' | 'BOOTSTRAP_ENABLED' | 'BOOTSTRAP_OWNER_ADMIN_EMAIL',
+  string | undefined
+>>;
+
 export const BOOTSTRAP_USERS: ReadonlyArray<{
   email: string;
   name: string;
   role: UserRole;
 }> = [
   { email: 'admin@tasktime.ru', name: 'Admin User', role: 'ADMIN' },
-  { email: 'novak.pavel@tasktime.ru', name: 'Novak Pavel', role: 'ADMIN' },
   { email: 'manager@tasktime.ru', name: 'Project Manager', role: 'MANAGER' },
   { email: 'dev@tasktime.ru', name: 'Developer', role: 'USER' },
   { email: 'viewer@tasktime.ru', name: 'CIO Viewer', role: 'VIEWER' },
@@ -18,22 +28,38 @@ export const BOOTSTRAP_USERS: ReadonlyArray<{
 
 type BootstrapPrismaClient = Pick<PrismaClient, 'user'>;
 
-// Bootstrap is intentionally limited to default users only.
-export async function bootstrapDefaultUsers(prisma: BootstrapPrismaClient, password: string): Promise<void> {
-  const passwordHash = await hashPassword(password);
-  await prisma.user.createMany({
-    data: BOOTSTRAP_USERS.map((user) => ({
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      passwordHash,
-    })),
-    skipDuplicates: true,
-  });
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
 }
 
-function getBootstrapPassword(): string | null {
-  const password = process.env.BOOTSTRAP_DEFAULT_PASSWORD?.trim();
+export function getBootstrapUsers(env: BootstrapEnv = process.env): BootstrapUser[] {
+  const users = [...BOOTSTRAP_USERS];
+  const ownerAdminEmail = env.BOOTSTRAP_OWNER_ADMIN_EMAIL?.trim();
+
+  if (!ownerAdminEmail) {
+    return users;
+  }
+
+  const normalizedOwnerAdminEmail = normalizeEmail(ownerAdminEmail);
+  if (users.some((user) => normalizeEmail(user.email) === normalizedOwnerAdminEmail)) {
+    return users;
+  }
+
+  users.push({
+    email: ownerAdminEmail,
+    name: 'Owner Admin',
+    role: 'ADMIN',
+  });
+
+  return users;
+}
+
+export function isBootstrapEnabled(env: BootstrapEnv = process.env): boolean {
+  return env.BOOTSTRAP_ENABLED?.trim().toLowerCase() === 'true';
+}
+
+function getBootstrapPassword(env: BootstrapEnv = process.env): string | null {
+  const password = env.BOOTSTRAP_DEFAULT_PASSWORD?.trim();
   if (!password) {
     return null;
   }
@@ -41,19 +67,45 @@ function getBootstrapPassword(): string | null {
   return password;
 }
 
+export async function bootstrapDefaultUsers(
+  prisma: BootstrapPrismaClient,
+  password: string,
+  users: ReadonlyArray<BootstrapUser> = BOOTSTRAP_USERS,
+): Promise<void> {
+  const passwordHash = await hashPassword(password);
+
+  for (const user of users) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {},
+      create: {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        passwordHash,
+      },
+    });
+  }
+}
+
 async function main() {
+  if (!isBootstrapEnabled()) {
+    console.log('Skipping bootstrap: BOOTSTRAP_ENABLED is not true.');
+    return;
+  }
+
   const password = getBootstrapPassword();
   if (!password) {
     console.log('Skipping bootstrap: BOOTSTRAP_DEFAULT_PASSWORD is not set.');
     return;
   }
 
+  const users = getBootstrapUsers();
   const prisma = new PrismaClient();
 
   try {
-    await bootstrapDefaultUsers(prisma, password);
-    console.log(`Bootstrapped ${BOOTSTRAP_USERS.length} default users.`);
-    console.log('Bootstrap responsibility: default users only.');
+    await bootstrapDefaultUsers(prisma, password, users);
+    console.log(`Bootstrapped ${users.length} default users.`);
   } finally {
     await prisma.$disconnect();
   }
