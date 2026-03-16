@@ -43,6 +43,8 @@ export interface Issue {
   parent?: { id: string; title: string; type: IssueType; number: number };
   children?: Issue[];
   project?: { id: string; name: string; key: string };
+  releaseId?: string | null;
+  estimatedHours?: number | null;
   _count?: { children: number };
   createdAt: string;
   updatedAt: string;
@@ -70,6 +72,23 @@ export interface Sprint {
 export interface SprintDetailsResponse {
   sprint: Sprint;
   issues: Issue[];
+}
+
+export type ReleaseLevel = 'MINOR' | 'MAJOR';
+export type ReleaseState = 'DRAFT' | 'READY' | 'RELEASED';
+
+export interface Release {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string | null;
+  level: ReleaseLevel;
+  state: ReleaseState;
+  releaseDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { issues: number };
+  project?: { id: string; name: string; key: string };
 }
 
 export interface Comment {

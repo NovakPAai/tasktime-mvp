@@ -40,6 +40,11 @@ export async function getIssue(id: string): Promise<Issue> {
   return data;
 }
 
+export async function getIssueByKey(key: string): Promise<Issue> {
+  const { data } = await api.get<Issue>(`/issues/key/${encodeURIComponent(key)}`);
+  return data;
+}
+
 export interface CreateIssueBody {
   title: string;
   description?: string;

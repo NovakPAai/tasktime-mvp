@@ -1,5 +1,13 @@
 # TaskTime Deployment Guide
 
+## Production URL (боевой стенд)
+
+Текущий известный адрес продакшена (по данным деплоя и транскриптов):
+
+- **http://6805797-ei959240:8080** — хост `6805797-ei959240`, порт 8080 (WEB_HTTP_PORT на сервере).
+
+Если у хостера другой формат доступа (домен, другой порт) — обнови этот раздел. Секрет `PRODUCTION_DEPLOY_HOST` в GitHub Environment `production` задаёт тот же хост, на который деплоится приложение.
+
 ## Overview
 
 TaskTime deploys to a single Linux/VPS host with Docker Compose:

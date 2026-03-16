@@ -13,6 +13,7 @@ import IssueDetailPage from './pages/IssueDetailPage';
 import BoardPage from './pages/BoardPage';
 import SprintsPage from './pages/SprintsPage';
 import GlobalSprintsPage from './pages/GlobalSprintsPage';
+import ReleasesPage from './pages/ReleasesPage';
 import TimePage from './pages/TimePage';
 import TeamsPage from './pages/TeamsPage';
 import AdminPage from './pages/AdminPage';
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="projects/:id" element={<ProjectDetailPage />} />
             <Route path="projects/:id/board" element={<BoardPage />} />
             <Route path="projects/:id/sprints" element={<SprintsPage />} />
+            <Route path="projects/:id/releases" element={<ReleasesPage />} />
             <Route path="sprints" element={<GlobalSprintsPage />} />
             <Route path="issues/:id" element={<IssueDetailPage />} />
             <Route path="time" element={<TimePage />} />

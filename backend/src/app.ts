@@ -11,11 +11,13 @@ import projectsRouter from './modules/projects/projects.router.js';
 import issuesRouter from './modules/issues/issues.router.js';
 import boardsRouter from './modules/boards/boards.router.js';
 import sprintsRouter from './modules/sprints/sprints.router.js';
+import releasesRouter from './modules/releases/releases.router.js';
 import commentsRouter from './modules/comments/comments.router.js';
 import timeRouter from './modules/time/time.router.js';
 import teamsRouter from './modules/teams/teams.router.js';
 import adminRouter from './modules/admin/admin.router.js';
 import aiSessionsRouter from './modules/ai/ai-sessions.router.js';
+import aiRouter from './modules/ai/ai.router.js';
 import webhooksRouter from './modules/webhooks/webhooks.router.js';
 
 export function createApp() {
@@ -45,11 +47,13 @@ export function createApp() {
   app.use('/api', issuesRouter);
   app.use('/api', boardsRouter);
   app.use('/api', sprintsRouter);
+  app.use('/api', releasesRouter);
   app.use('/api', commentsRouter);
   app.use('/api', timeRouter);
   app.use('/api', teamsRouter);
   app.use('/api', adminRouter);
   app.use('/api', aiSessionsRouter);
+  app.use('/api', aiRouter);
   app.use('/api', webhooksRouter);
 
   // Error handler (must be last)

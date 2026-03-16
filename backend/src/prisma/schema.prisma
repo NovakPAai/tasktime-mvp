@@ -60,8 +60,9 @@ model Project {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  issues  Issue[]
-  sprints Sprint[]
+  issues   Issue[]
+  sprints  Sprint[]
+  releases Release[]
 
   @@map("projects")
 }
@@ -92,8 +93,10 @@ model Issue {
   assignee   User?   @relation("assignee", fields: [assigneeId], references: [id])
   creator    User    @relation("creator", fields: [creatorId], references: [id])
 
-  sprintId String? @map("sprint_id")
-  sprint   Sprint? @relation(fields: [sprintId], references: [id])
+  sprintId  String?  @map("sprint_id")
+  sprint    Sprint?  @relation(fields: [sprintId], references: [id])
+  releaseId String? @map("release_id")
+  release   Release? @relation(fields: [releaseId], references: [id])
 
   estimatedHours Decimal? @map("estimated_hours") @db.Decimal(6, 2)
 
@@ -111,6 +114,7 @@ model Issue {
   @@index([assigneeId])
   @@index([parentId])
   @@index([sprintId])
+  @@index([releaseId])
   @@map("issues")
 }
 
@@ -181,6 +185,39 @@ enum SprintState {
   PLANNED
   ACTIVE
   CLOSED
+}
+
+// ===== RELEASES =====
+
+model Release {
+  id          String       @id @default(uuid())
+  projectId   String       @map("project_id")
+  name        String       // e.g. "1.2.0", "2.0.0"
+  description String?      // optional release notes
+  level       ReleaseLevel @default(MINOR)
+  state       ReleaseState @default(DRAFT)
+  releaseDate DateTime?    @map("release_date") @db.Date
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues  Issue[]
+
+  @@unique([projectId, name], map: "releases_project_id_name_key")
+  @@index([projectId])
+  @@index([projectId, state])
+  @@map("releases")
+}
+
+enum ReleaseLevel {
+  MINOR   // мелкие улучшения, баг-фиксы
+  MAJOR   // новые фичи
+}
+
+enum ReleaseState {
+  DRAFT    // сбор задач
+  READY    // готов к выпуску
+  RELEASED // выпущен
 }
 
 // ===== COMMENTS =====

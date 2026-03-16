@@ -29,10 +29,13 @@ import {
   DeleteOutlined,
   MoreOutlined,
   EditOutlined,
+  ThunderboltOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons';
 import * as issuesApi from '../api/issues';
 import * as commentsApi from '../api/comments';
 import * as timeApi from '../api/time';
+import * as aiApi from '../api/ai';
 import { useAuthStore } from '../store/auth.store';
 import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority } from '../types';
 import api from '../api/client';
@@ -53,6 +56,8 @@ export default function IssueDetailPage() {
   const [activeTimer, setActiveTimer] = useState<TimeLog | null>(null);
   const [timeModalOpen, setTimeModalOpen] = useState(false);
   const [timeForm] = Form.useForm();
+  const [aiEstimateLoading, setAiEstimateLoading] = useState(false);
+  const [aiDecomposeLoading, setAiDecomposeLoading] = useState(false);
   const canEditAi = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const load = useCallback(async () => {
@@ -130,6 +135,40 @@ export default function IssueDetailPage() {
       message.success(checked ? 'Marked as agent-eligible' : 'Marked as human-only');
     } catch {
       message.error('Could not update agent flag');
+    }
+  };
+
+  const handleAiEstimate = async () => {
+    if (!id) return;
+    setAiEstimateLoading(true);
+    try {
+      await aiApi.estimateIssue({ issueId: id });
+      await load();
+      message.success('Оценка трудоёмкости обновлена');
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : null;
+      message.error(msg || 'Не удалось оценить трудоёмкость');
+    } finally {
+      setAiEstimateLoading(false);
+    }
+  };
+
+  const handleAiDecompose = async () => {
+    if (!id) return;
+    setAiDecomposeLoading(true);
+    try {
+      const res = await aiApi.decomposeIssue({ issueId: id });
+      await load();
+      message.success(`Создано подзадач: ${res.createdCount}`);
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : null;
+      message.error(msg || 'Не удалось декомпозировать задачу');
+    } finally {
+      setAiDecomposeLoading(false);
     }
   };
 
@@ -351,6 +390,12 @@ export default function IssueDetailPage() {
                   {issueKey}
                 </span>
               </div>
+              {(issue.estimatedHours != null && issue.estimatedHours !== undefined) && (
+                <div className="tt-panel-row">
+                  <span>Estimated</span>
+                  <span className="tt-mono">{Number(issue.estimatedHours).toFixed(1)} h</span>
+                </div>
+              )}
               <div className="tt-panel-row">
                 <span>Created</span>
                 <span>{new Date(issue.createdAt).toLocaleDateString()}</span>
@@ -408,6 +453,27 @@ export default function IssueDetailPage() {
                 ) : (
                   <span>{issue.aiExecutionStatus ?? 'NOT_STARTED'}</span>
                 )}
+              </div>
+              <div className="tt-panel-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                <Button
+                  type="default"
+                  size="small"
+                  icon={<ThunderboltOutlined />}
+                  loading={aiEstimateLoading}
+                  onClick={handleAiEstimate}
+                >
+                  Оценить трудоёмкость
+                </Button>
+                <Button
+                  type="default"
+                  size="small"
+                  icon={<ApartmentOutlined />}
+                  loading={aiDecomposeLoading}
+                  onClick={handleAiDecompose}
+                  disabled={!['EPIC', 'STORY', 'TASK'].includes(issue.type)}
+                >
+                  Декомпозировать в подзадачи
+                </Button>
               </div>
             </div>
           </div>

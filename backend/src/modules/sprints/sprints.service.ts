@@ -126,11 +126,7 @@ export async function startSprint(id: string) {
   if (!sprint) throw new AppError(404, 'Sprint not found');
   if (sprint.state !== 'PLANNED') throw new AppError(400, 'Only PLANNED sprints can be started');
 
-  // Only one active sprint per project
-  const active = await prisma.sprint.findFirst({
-    where: { projectId: sprint.projectId, state: 'ACTIVE' },
-  });
-  if (active) throw new AppError(400, `Sprint "${active.name}" is already active`);
+  // Multiple active sprints per project are allowed (parallel sprints)
 
   return prisma.sprint.update({
     where: { id },

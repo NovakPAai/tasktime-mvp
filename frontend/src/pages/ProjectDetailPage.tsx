@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Table, Button, Space, Modal, Form, Input, Select, message, Progress } from 'antd';
-import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ThunderboltOutlined, TagOutlined } from '@ant-design/icons';
 import { useIssuesStore } from '../store/issues.store';
 import { useAuthStore } from '../store/auth.store';
 import * as projectsApi from '../api/projects';
@@ -359,6 +359,9 @@ export default function ProjectDetailPage() {
             </Button>
             <Button icon={<ThunderboltOutlined />} onClick={() => navigate(`/projects/${id}/sprints`)}>
               Sprints
+            </Button>
+            <Button icon={<TagOutlined />} onClick={() => navigate(`/projects/${id}/releases`)}>
+              Релизы
             </Button>
             {canCreate && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>

@@ -137,7 +137,7 @@ async function main() {
 
   const sprint35 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг' } },
-    update: {},
+    update: { state: 'ACTIVE' },
     create: {
       projectId: mvpProject.id,
       name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг',
@@ -148,16 +148,16 @@ async function main() {
     },
   });
 
-  await prisma.sprint.upsert({
+  const sprint4 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 4 — AI + Интеграции + Polish' } },
-    update: {},
+    update: { state: 'PLANNED' },
     create: {
       projectId: mvpProject.id,
       name: 'Sprint 4 — AI + Интеграции + Polish',
       goal: 'AI-оценка трудоёмкости, декомпозиция задач, GitLab webhook, Telegram-бот, финальный polish',
       startDate: new Date('2026-03-17T09:00:00Z'),
       endDate: new Date('2026-03-31T18:00:00Z'),
-      state: 'PLANNING',
+      state: 'PLANNED',
     },
   });
 
@@ -1610,6 +1610,286 @@ async function main() {
       parentId: storyE2eUx.id,
     },
   });
+
+  // Sprint 4 — AI + Интеграции + Polish (TTMP-81..96)
+  const epicSprint4 = await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 81 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 81,
+      title: 'Sprint 4 — AI + Интеграции + Polish',
+      type: 'EPIC',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+    },
+  });
+
+  const storyS4Ai = await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 82 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 82,
+      title: 'AI-модуль: оценка и декомпозиция задач',
+      type: 'STORY',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: epicSprint4.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 83 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 83,
+      title: 'Реализовать AI-оценку трудоёмкости задач (POST /ai/estimate)',
+      type: 'TASK',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Ai.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 84 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 84,
+      title: 'Реализовать AI-декомпозицию задач на подзадачи (POST /ai/decompose)',
+      type: 'TASK',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Ai.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 85 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 85,
+      title: 'Добавить UI AI-ассистента в карточку задачи (оценка + декомпозиция)',
+      type: 'TASK',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Ai.id,
+    },
+  });
+
+  const storyS4GitLab = await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 86 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 86,
+      title: 'GitLab-интеграция (webhook)',
+      type: 'STORY',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: epicSprint4.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 87 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 87,
+      title: 'Настроить приём GitLab webhook-событий (push, MR, pipeline)',
+      type: 'TASK',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4GitLab.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 88 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 88,
+      title: 'Реализовать автообновление статуса задачи по GitLab MR/pipeline-событиям',
+      type: 'TASK',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4GitLab.id,
+    },
+  });
+
+  const storyS4Telegram = await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 89 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 89,
+      title: 'Telegram-бот (нотификации)',
+      type: 'STORY',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: epicSprint4.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 90 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 90,
+      title: 'Реализовать Telegram-бот с нотификациями о назначении и смене статуса задач',
+      type: 'TASK',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Telegram.id,
+    },
+  });
+
+  const storyS4Export = await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 91 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 91,
+      title: 'Экспорт отчётов',
+      type: 'STORY',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: epicSprint4.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 92 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 92,
+      title: 'Добавить экспорт отчётов по задачам в CSV',
+      type: 'TASK',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Export.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 93 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 93,
+      title: 'Добавить экспорт отчётов по задачам в PDF',
+      type: 'TASK',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Export.id,
+    },
+  });
+
+  const storyS4Docs = await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 94 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 94,
+      title: 'Документация и security audit',
+      type: 'STORY',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: epicSprint4.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 95 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 95,
+      title: 'Настроить Swagger/OpenAPI документацию по всем модулям',
+      type: 'TASK',
+      priority: 'MEDIUM',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Docs.id,
+    },
+  });
+
+  await prisma.issue.upsert({
+    where: { projectId_number: { projectId: mvpProject.id, number: 96 } },
+    update: { sprintId: sprint4.id },
+    create: {
+      projectId: mvpProject.id,
+      sprintId: sprint4.id,
+      number: 96,
+      title: 'Провести security audit: rate-limiting, input sanitization, OWASP Top 10',
+      type: 'TASK',
+      priority: 'HIGH',
+      status: 'OPEN',
+      creatorId: manager.id,
+      assigneeId: dev.id,
+      parentId: storyS4Docs.id,
+    },
+  });
+
+  // Idempotent sync: sprint states and issue statuses by sprint
+  await prisma.issue.updateMany({ where: { sprintId: sprint0.id }, data: { status: 'DONE' } });
+  await prisma.issue.updateMany({ where: { sprintId: sprint1.id }, data: { status: 'DONE' } });
+  await prisma.issue.updateMany({ where: { sprintId: sprint2.id }, data: { status: 'DONE' } });
+  await prisma.issue.updateMany({ where: { sprintId: sprint3.id }, data: { status: 'DONE' } });
+  await prisma.issue.updateMany({ where: { sprintId: sprint35.id }, data: { status: 'IN_PROGRESS' } });
+  await prisma.issue.updateMany({ where: { sprintId: sprint4.id }, data: { status: 'OPEN' } });
 
   // Demo time tracking data for My Time (Pavel + AI)
   const existingAiSessions = await prisma.aiSession.count();
