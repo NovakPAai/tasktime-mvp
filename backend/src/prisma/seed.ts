@@ -140,7 +140,7 @@ async function main(scope?: string) {
 
   const sprint35 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг' } },
-    update: {},
+    update: { state: 'ACTIVE' },
     create: {
       projectId: mvpProject.id,
       name: 'Sprint 3.5 — UX/UI адаптация и багфиксинг',
@@ -153,7 +153,7 @@ async function main(scope?: string) {
 
   const sprint4 = await prisma.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 4 — AI + Интеграции + Polish' } },
-    update: {},
+    update: { state: 'PLANNED' },
     create: {
       projectId: mvpProject.id,
       name: 'Sprint 4 — AI + Интеграции + Polish',
