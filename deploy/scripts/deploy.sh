@@ -55,7 +55,18 @@ if ! docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm b
   exit 1
 fi
 
-docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" pull
+PULL_RETRIES=3
+for pull_attempt in $(seq 1 "$PULL_RETRIES"); do
+  if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" pull; then
+    break
+  fi
+  if [ "$pull_attempt" -eq "$PULL_RETRIES" ]; then
+    echo "docker compose pull failed after $PULL_RETRIES attempts"
+    exit 1
+  fi
+  echo "  pull attempt $pull_attempt/$PULL_RETRIES failed, retrying in 10s..."
+  sleep 10
+done
 
 # Auto-backup before migrations (skip on first deploy when postgres has no data yet)
 if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" ps postgres --status running -q 2>/dev/null | grep -q .; then
