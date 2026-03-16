@@ -180,6 +180,38 @@ export async function bulkUpdateIssues(projectId: string, params: {
   return { updatedCount: params.issueIds.length };
 }
 
+const ISSUE_KEY_REGEX = /^([A-Z]{2,10})-(\d+)$/;
+
+export function parseIssueKey(issueKey: string): { projectKey: string; number: number } | null {
+  const m = issueKey.trim().toUpperCase().match(ISSUE_KEY_REGEX);
+  if (!m) return null;
+  return { projectKey: m[1], number: parseInt(m[2], 10) };
+}
+
+export async function getIssueByKey(issueKey: string) {
+  const parsed = parseIssueKey(issueKey);
+  if (!parsed) throw new AppError(400, `Invalid issue key: ${issueKey}`);
+
+  const project = await prisma.project.findUnique({ where: { key: parsed.projectKey } });
+  if (!project) throw new AppError(404, `Project ${parsed.projectKey} not found`);
+
+  const issue = await prisma.issue.findUnique({
+    where: { projectId_number: { projectId: project.id, number: parsed.number } },
+    include: {
+      assignee: { select: { id: true, name: true, email: true } },
+      creator: { select: { id: true, name: true } },
+      parent: { select: { id: true, title: true, type: true, number: true, projectId: true } },
+      children: {
+        select: { id: true, title: true, type: true, status: true, number: true, assignee: { select: { id: true, name: true } } },
+        orderBy: { orderIndex: 'asc' },
+      },
+      project: { select: { id: true, name: true, key: true } },
+    },
+  });
+  if (!issue) throw new AppError(404, `Issue ${issueKey} not found`);
+  return issue;
+}
+
 export async function getIssue(id: string) {
   const issue = await prisma.issue.findUnique({
     where: { id },

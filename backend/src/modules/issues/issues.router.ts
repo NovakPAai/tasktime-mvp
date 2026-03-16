@@ -90,6 +90,16 @@ router.post('/projects/:projectId/issues', validate(createIssueDto), async (req:
   }
 });
 
+// Get issue by key (e.g. TTMP-83) — for agents and automation
+router.get('/issues/key/:key', async (req, res, next) => {
+  try {
+    const issue = await issuesService.getIssueByKey(req.params.key as string);
+    res.json(issue);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Get issue detail
 router.get('/issues/:id', async (req, res, next) => {
   try {
