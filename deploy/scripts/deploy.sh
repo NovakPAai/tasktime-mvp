@@ -47,14 +47,7 @@ if [ -n "$IMAGE_TAG_OVERRIDE" ]; then
   export IMAGE_TAG="$IMAGE_TAG_OVERRIDE"
 fi
 
-if ! docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npx prisma migrate status >/tmp/tasktime-migrate-status.log 2>&1; then
-  cat /tmp/tasktime-migrate-status.log
-  echo "Prisma migration preflight failed."
-  echo "If this environment was created before tracked migrations, baseline it first:"
-  echo "  npx prisma migrate resolve --applied 20260312222000_init"
-  exit 1
-fi
-
+# Pull first so we fail fast if the image tag doesn't exist; preflight (migrate status) runs after pull.
 PULL_RETRIES=3
 for pull_attempt in $(seq 1 "$PULL_RETRIES"); do
   if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" pull; then
