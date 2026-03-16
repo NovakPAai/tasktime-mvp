@@ -24,7 +24,7 @@ export const BOOTSTRAP_USERS: ReadonlyArray<{
   { email: 'manager@tasktime.ru', name: 'Project Manager', role: 'MANAGER' },
   { email: 'dev@tasktime.ru', name: 'Developer', role: 'USER' },
   { email: 'viewer@tasktime.ru', name: 'CIO Viewer', role: 'VIEWER' },
-  { email: 'e.dubovic@tasktime.ru', name: 'Егор Дубовик', role: 'SUPER_ADMIN' },
+  { email: 'g.dubovik@tasktime.ru', name: 'Георгий Дубовик', role: 'SUPER_ADMIN' },
 ];
 
 type BootstrapPrismaClient = Pick<PrismaClient, 'user'>;
