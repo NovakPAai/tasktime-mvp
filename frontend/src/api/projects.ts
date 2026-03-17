@@ -11,7 +11,13 @@ export async function getProject(id: string): Promise<Project> {
   return data;
 }
 
-export async function createProject(body: { name: string; key: string; description?: string }): Promise<Project> {
+export async function createProject(body: {
+  name: string;
+  key: string;
+  description?: string;
+  ownerId?: string | null;
+  categoryId?: string | null;
+}): Promise<Project> {
   const { data } = await api.post<Project>('/projects', body);
   return data;
 }

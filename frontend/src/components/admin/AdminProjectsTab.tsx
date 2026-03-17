@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, message, Dropdown, Space, Typography,
 } from 'antd';
-import { MoreOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { MoreOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import * as projectsApi from '../../api/projects';
 import * as categoriesApi from '../../api/project-categories';
@@ -85,6 +85,7 @@ export default function AdminProjectsTab() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // create / edit share the same modal — editProject===null means "create"
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
@@ -113,6 +114,21 @@ export default function AdminProjectsTab() {
 
   useEffect(() => { void load(); }, []);
 
+  // Reload categories/users fresh every time the modal opens so edits
+  // made in the Categories tab are reflected without a full page refresh.
+  const refreshSelectData = () => {
+    Promise.all([categoriesApi.listCategories(), adminApi.listAdminUsers()])
+      .then(([c, u]) => { setCategories(c); setUsers(u); })
+      .catch(() => {});
+  };
+
+  const openCreate = () => {
+    setEditProject(null);
+    editForm.resetFields();
+    refreshSelectData();
+    setEditModalOpen(true);
+  };
+
   const openEdit = (project: Project) => {
     setEditProject(project);
     editForm.setFieldsValue({
@@ -121,19 +137,37 @@ export default function AdminProjectsTab() {
       ownerId: project.owner?.id ?? null,
       categoryId: project.category?.id ?? null,
     });
+    refreshSelectData();
     setEditModalOpen(true);
   };
 
-  const handleEdit = async (values: { name: string; description?: string; ownerId?: string | null; categoryId?: string | null }) => {
-    if (!editProject) return;
+  const handleSave = async (values: {
+    name: string;
+    key?: string;
+    description?: string;
+    ownerId?: string | null;
+    categoryId?: string | null;
+  }) => {
     setEditLoading(true);
     try {
-      const updated = await projectsApi.updateProject(editProject.id, values);
-      setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      void message.success('Проект обновлён');
+      if (editProject) {
+        const updated = await projectsApi.updateProject(editProject.id, values);
+        setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+        void message.success('Проект обновлён');
+      } else {
+        const created = await projectsApi.createProject({
+          name: values.name,
+          key: values.key!,
+          description: values.description,
+          ownerId: values.ownerId,
+          categoryId: values.categoryId,
+        });
+        setProjects((prev) => [created, ...prev]);
+        void message.success('Проект создан');
+      }
       setEditModalOpen(false);
     } catch {
-      void message.error('Ошибка при обновлении');
+      void message.error(editProject ? 'Ошибка при обновлении' : 'Ошибка при создании');
     } finally {
       setEditLoading(false);
     }
@@ -203,8 +237,16 @@ export default function AdminProjectsTab() {
     },
   ];
 
+  const isCreate = editProject === null;
+
   return (
     <>
+      <div style={{ marginBottom: 16 }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          Создать проект
+        </Button>
+      </div>
+
       <Table
         className="tt-table"
         rowKey="id"
@@ -215,20 +257,33 @@ export default function AdminProjectsTab() {
         size="small"
       />
 
-      {/* Edit modal */}
+      {/* Create / Edit modal */}
       <Modal
         open={editModalOpen}
-        title="Редактировать проект"
+        title={isCreate ? 'Создать проект' : 'Редактировать проект'}
         onCancel={() => setEditModalOpen(false)}
         onOk={() => editForm.submit()}
         okText="Сохранить"
         cancelText="Отменить"
         confirmLoading={editLoading}
       >
-        <Form form={editForm} layout="vertical" onFinish={(v) => { void handleEdit(v); }}>
+        <Form form={editForm} layout="vertical" onFinish={(v) => { void handleSave(v); }}>
           <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
             <Input />
           </Form.Item>
+          {isCreate && (
+            <Form.Item
+              name="key"
+              label="Код проекта"
+              rules={[
+                { required: true, message: 'Введите код' },
+                { pattern: /^[A-Z][A-Z0-9]*$/, message: 'Заглавные латинские буквы и цифры, первый — буква' },
+              ]}
+              extra="Например: PROJ, BACK, DEMO"
+            >
+              <Input style={{ textTransform: 'uppercase' }} maxLength={10} />
+            </Form.Item>
+          )}
           <Form.Item name="description" label="Описание">
             <Input.TextArea rows={3} />
           </Form.Item>
