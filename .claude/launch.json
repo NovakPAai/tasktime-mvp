@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "./backend/node_modules/.bin/tsx",
+      "runtimeArgs": ["watch", "backend/src/server.ts"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "./frontend/node_modules/.bin/vite",
+      "runtimeArgs": ["--config", "frontend/vite.config.ts", "--root", "frontend"],
+      "port": 5173
+    }
+  ]
+}

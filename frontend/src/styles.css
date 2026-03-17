@@ -1726,24 +1726,29 @@ body {
 }
 
 .tt-issue-preview-drawer-root .ant-drawer-content-wrapper {
-  right: calc(min(var(--sprint-drawer-w), 100vw - 24px) + var(--drawer-gap)) !important;
+  right: min(var(--sprint-drawer-w), calc(100vw - 24px)) !important;
   left: auto !important;
-  inset-inline-end: calc(min(var(--sprint-drawer-w), 100vw - 24px) + var(--drawer-gap)) !important;
+  inset-inline-end: min(var(--sprint-drawer-w), calc(100vw - 24px)) !important;
   inset-inline-start: auto !important;
   width: min(860px, calc(100vw - 40px)) !important;
   max-width: min(860px, calc(100vw - 40px));
-  box-shadow: 12px 0 36px rgba(0, 0, 0, 0.46);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.72);
 }
 
 .tt-issue-preview-drawer .ant-drawer-content {
   background: rgba(14, 16, 26, 0.98);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
 }
 
 .tt-issue-preview-drawer .ant-drawer-header {
   padding: 16px 18px 14px;
   background: rgba(14, 16, 26, 0.98);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px 12px 0 0;
 }
 
 .tt-issue-preview-drawer .ant-drawer-title {
@@ -1812,9 +1817,9 @@ body {
 @media (min-width: 1440px) {
   .tt-issue-preview-drawer-root .ant-drawer-content-wrapper {
     left: calc(var(--sidebar-w) + var(--drawer-gap));
-    right: calc(min(var(--sprint-drawer-w), 100vw - 24px) + var(--drawer-gap));
+    right: min(var(--sprint-drawer-w), calc(100vw - 24px));
     inset-inline-start: calc(var(--sidebar-w) + var(--drawer-gap)) !important;
-    inset-inline-end: calc(min(var(--sprint-drawer-w), 100vw - 24px) + var(--drawer-gap)) !important;
+    inset-inline-end: min(var(--sprint-drawer-w), calc(100vw - 24px)) !important;
     width: auto !important;
     max-width: none;
   }
