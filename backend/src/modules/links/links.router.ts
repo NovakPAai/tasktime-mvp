@@ -46,7 +46,7 @@ router.delete('/issues/:id/links/:linkId', async (req: AuthRequest, res, next) =
 // ===== Link Types (Admin) =====
 
 // GET /admin/link-types — список всех типов связей
-router.get('/admin/link-types', requireRole('MANAGER'), async (req, res, next) => {
+router.get('/admin/link-types', requireRole('MANAGER', 'ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const includeInactive = req.query.includeInactive === 'true';
     const types = await linksService.listLinkTypes(includeInactive);
