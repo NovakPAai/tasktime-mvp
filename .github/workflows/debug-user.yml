@@ -5,6 +5,9 @@ on:
     inputs:
       email:
         required: true
+      sql:
+        description: 'Optional custom SQL to run'
+        required: false
 
 jobs:
   debug:
@@ -18,17 +21,21 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.PRODUCTION_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Query user from DB
+      - name: Query/exec user in DB
         env:
           EMAIL: ${{ github.event.inputs.email }}
+          CUSTOM_SQL: ${{ github.event.inputs.sql }}
           DEPLOY_PATH: ${{ secrets.PRODUCTION_DEPLOY_PATH }}
         run: |
+          EMAIL_B64=$(printf '%s' "$EMAIL" | base64 -w0)
+          SQL_B64=$(printf '%s' "${CUSTOM_SQL:-SELECT email, role, is_active, length(password_hash) as hash_len, left(password_hash, 20) as hash_prefix FROM users WHERE email = '$EMAIL';}" | base64 -w0)
+          DEPLOY_PATH_B64=$(printf '%s' "$DEPLOY_PATH" | base64 -w0)
           ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" \
-            bash -s "$EMAIL" "$DEPLOY_PATH" << 'REMOTE'
-          EMAIL="$1"
-          DEPLOY_PATH="$2"
+            bash -s "$EMAIL_B64" "$SQL_B64" "$DEPLOY_PATH_B64" << 'REMOTE'
+          EMAIL=$(echo "$1" | base64 -d)
+          SQL=$(echo "$2" | base64 -d)
+          DEPLOY_PATH=$(echo "$3" | base64 -d)
           set -a; . "$DEPLOY_PATH/deploy/env/.env.production"; set +a
-          SQL="SELECT email, role, is_active, length(password_hash) as hash_len, left(password_hash, 20) as hash_prefix FROM users WHERE email = '$EMAIL';"
           cd "$DEPLOY_PATH"
           docker compose --env-file deploy/env/.env.production -f deploy/docker-compose.production.yml exec -T postgres \
             psql -U "${POSTGRES_USER:-tasktime}" -d "${POSTGRES_DB:-tasktime}" -c "$SQL"
