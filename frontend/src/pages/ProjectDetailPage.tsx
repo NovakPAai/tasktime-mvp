@@ -451,6 +451,11 @@ export default function ProjectDetailPage() {
               }))}
             />
           </Form.Item>
+          <Form.Item name="assigneeId" label="Assignee">
+            <Select allowClear placeholder="Unassigned" style={{ width: '100%' }}
+              options={allUsers.map(u => ({ value: u.id, label: `${u.name} (${u.email})` }))}
+            />
+          </Form.Item>
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={4} />
           </Form.Item>

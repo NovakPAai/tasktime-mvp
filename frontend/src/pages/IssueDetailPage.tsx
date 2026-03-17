@@ -36,8 +36,9 @@ import * as issuesApi from '../api/issues';
 import * as commentsApi from '../api/comments';
 import * as timeApi from '../api/time';
 import * as aiApi from '../api/ai';
+import * as authApi from '../api/auth';
 import { useAuthStore } from '../store/auth.store';
-import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority } from '../types';
+import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, User } from '../types';
 import api from '../api/client';
 import { hasAnyRequiredRole, hasRequiredRole } from '../lib/roles';
 
@@ -59,7 +60,9 @@ export default function IssueDetailPage() {
   const [timeForm] = Form.useForm();
   const [aiEstimateLoading, setAiEstimateLoading] = useState(false);
   const [aiDecomposeLoading, setAiDecomposeLoading] = useState(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+  const canAssign = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -77,6 +80,7 @@ export default function IssueDetailPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { timeApi.getActiveTimer().then(setActiveTimer); }, []);
+  useEffect(() => { authApi.listUsers().then(setAllUsers).catch(() => {}); }, []);
 
   const handleStatusChange = async (status: IssueStatus) => {
     if (!id) return;
@@ -122,6 +126,17 @@ export default function IssueDetailPage() {
     setTimeModalOpen(false);
     timeForm.resetFields();
     load();
+  };
+
+  const handleAssigneeChange = async (assigneeId: string | null) => {
+    if (!id) return;
+    try {
+      await issuesApi.assignIssue(id, assigneeId);
+      load();
+      message.success('Assignee updated');
+    } catch {
+      message.error('Could not update assignee');
+    }
   };
 
   const handleToggleAiEligible = async (checked: boolean) => {
@@ -383,7 +398,19 @@ export default function IssueDetailPage() {
               </div>
               <div className="tt-panel-row">
                 <span>Assignee</span>
-                <span>{issue.assignee?.name || 'Unassigned'}</span>
+                {canAssign ? (
+                  <Select
+                    allowClear
+                    size="small"
+                    style={{ width: 160 }}
+                    placeholder="Unassigned"
+                    value={issue.assigneeId ?? undefined}
+                    onChange={(val) => handleAssigneeChange(val ?? null)}
+                    options={allUsers.map((u) => ({ value: u.id, label: u.name }))}
+                  />
+                ) : (
+                  <span>{issue.assignee?.name || 'Unassigned'}</span>
+                )}
               </div>
               <div className="tt-panel-row">
                 <span>Key</span>

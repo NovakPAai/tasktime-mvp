@@ -81,6 +81,11 @@ export async function bulkUpdateIssues(
   return data;
 }
 
+export async function assignIssue(id: string, assigneeId: string | null): Promise<Issue> {
+  const { data } = await api.patch<Issue>(`/issues/${id}/assign`, { assigneeId });
+  return data;
+}
+
 export async function updateAiFlags(
   id: string,
   body: { aiEligible?: boolean; aiAssigneeType?: AiAssigneeType },
