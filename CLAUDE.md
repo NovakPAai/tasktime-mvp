@@ -32,6 +32,7 @@ TaskTime — импортозамещение Jira для российского
 - Makefile: setup, dev, backend, frontend
 
 **Запуск:** `make setup && make dev` → http://localhost:5173
+**Прод:** http://5.129.242.171:8080/
 **Аккаунты:** admin/manager/dev/viewer @tasktime.ru, пароль: password123
 
 ### Sprint 2 — DONE (2026-03-10)
