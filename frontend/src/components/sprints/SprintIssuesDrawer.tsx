@@ -228,6 +228,7 @@ export default function SprintIssuesDrawer({ open, sprintId, onClose }: SprintIs
       }}
       placement="right"
       width={900}
+      push={false}
       destroyOnClose={false}
     >
       {loading ? (
