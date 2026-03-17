@@ -1,0 +1,32 @@
+{
+  "TTMP-84": {
+    "id": "047f165a-bad1-4c91-9e7c-0fa954b56f09",
+    "number": 84,
+    "title": "Настройка темы для пользователя",
+    "description": "Сделать раздел настроек системы для пользователя и вынести туда настройку переключения светлой и темной темы интерфейса.",
+    "status": "OPEN",
+    "aiExecutionStatus": "DONE",
+    "type": "SUBTASK",
+    "projectKey": "TTMP"
+  },
+  "TTMP-83": {
+    "id": "e6102ec7-53dc-42c9-b448-b572962065c6",
+    "number": 83,
+    "title": "Визуал для светлой темы.",
+    "description": "Создать отдельную светлую тему интерфейса. Светлый фон - темные шрифты.",
+    "status": "OPEN",
+    "aiExecutionStatus": "DONE",
+    "type": "SUBTASK",
+    "projectKey": "TTMP"
+  },
+  "TTMP-82": {
+    "id": "f4edec48-ce80-462d-bdf9-bf16c6f937dc",
+    "number": 82,
+    "title": "Сделать светлую тему для интерфейса",
+    "description": "",
+    "status": "OPEN",
+    "aiExecutionStatus": "DONE",
+    "type": "TASK",
+    "projectKey": "TTMP"
+  }
+}

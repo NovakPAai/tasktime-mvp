@@ -76,6 +76,59 @@
   --space-6: 16px;
 }
 
+/* ============================================================
+   TTMP-83 — Светлая тема: белый фон, тёмные шрифты
+   ============================================================ */
+[data-theme='light'] {
+  /* === BACKGROUNDS === */
+  --bg: #f5f5f7;
+  --bg-sb: #eaeaed;
+  --bg-el: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+  --bg-sel: rgba(94, 106, 210, 0.1);
+  --bg-input: #ffffff;
+  --bg-modal: #ffffff;
+
+  /* === BORDERS === */
+  --b: rgba(0, 0, 0, 0.08);
+  --b2: rgba(0, 0, 0, 0.12);
+  --b3: rgba(0, 0, 0, 0.16);
+  --b-focus: #5e6ad2;
+
+  /* === TEXT === */
+  --t1: #1a1a2e;
+  --t2: #5a5a72;
+  --t3: #9a9aaa;
+  --t4: #c0c0cc;
+
+  /* === ACCENT === */
+  --acc: #5e6ad2;
+  --acc-h: #4a56c4;
+  --acc-bg: rgba(94, 106, 210, 0.12);
+
+  /* === STATUS COLORS === */
+  --s-todo: #8888a0;
+  --s-inprog: #d4a017;
+  --s-done: #5e6ad2;
+  --s-cancelled: #aaaabc;
+  --s-urgent: #d94040;
+  --s-high: #d46a20;
+  --s-medium: #d4a017;
+
+  /* === LABEL COLORS === */
+  --lbl-bug: #d94040;
+  --lbl-feat: #5e6ad2;
+  --lbl-imp: #7c3aed;
+  --lbl-perf: #2e8a5a;
+
+  /* === SHADOWS === */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-err: 0 0 0 2px rgba(217, 64, 64, 0.25);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -96,6 +149,11 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   font-variant-numeric: tabular-nums;
   color-scheme: dark;
+}
+
+[data-theme='light'] body,
+[data-theme='light'] {
+  color-scheme: light;
 }
 
 /* === Ant Design base overrides for dark Linear theme === */

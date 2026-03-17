@@ -1,4 +1,4 @@
-import { Layout, Menu, Button, Typography } from 'antd';
+import { Layout, Menu, Button, Typography, Switch, Tooltip } from 'antd';
 import {
   ProjectOutlined,
   LogoutOutlined,
@@ -10,9 +10,12 @@ import {
   CalendarOutlined,
   ApartmentOutlined,
   DeploymentUnitOutlined,
+  BulbOutlined,
+  BulbFilled,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
+import { useThemeStore } from '../../store/theme.store';
 import UatOnboardingOverlay from '../uat/UatOnboardingOverlay';
 import { hasRequiredRole } from '../../lib/roles';
 
@@ -22,6 +25,8 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const { mode, toggle } = useThemeStore();
+  const isLight = mode === 'light';
 
   const handleLogout = async () => {
     await logout();
@@ -47,6 +52,7 @@ export default function AppLayout() {
     ...(hasRequiredRole(user?.role, 'ADMIN')
       ? [{ key: '/admin', icon: <SettingOutlined />, label: 'Admin' } as const]
       : []),
+    { key: '/settings', icon: <SettingOutlined />, label: 'Настройки' } as const,
   ];
 
   const toolsItems = [
@@ -76,7 +82,7 @@ export default function AppLayout() {
     <Layout className="tt-app-shell">
       <Sider
         width={220}
-        theme="dark"
+        theme={isLight ? 'light' : 'dark'}
         breakpoint="lg"
         collapsedWidth={80}
         className="tt-sidebar"
@@ -88,7 +94,7 @@ export default function AppLayout() {
           </Typography.Text>
         </div>
         <Menu
-          theme="dark"
+          theme={isLight ? 'light' : 'dark'}
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
@@ -105,14 +111,25 @@ export default function AppLayout() {
           <Typography.Text className="tt-topbar-user">
             {user?.name} ({user?.role})
           </Typography.Text>
-          <Button
-            size="small"
-            icon={<LogoutOutlined />}
-            className="tt-topbar-logout"
-            onClick={handleLogout}
-          >
-            Logout
-          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Tooltip title={isLight ? 'Переключить на тёмную тему' : 'Переключить на светлую тему'}>
+              <Switch
+                size="small"
+                checked={isLight}
+                onChange={toggle}
+                checkedChildren={<BulbFilled />}
+                unCheckedChildren={<BulbOutlined />}
+              />
+            </Tooltip>
+            <Button
+              size="small"
+              icon={<LogoutOutlined />}
+              className="tt-topbar-logout"
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
+          </div>
         </Header>
         <Content className="tt-content">
           <Outlet />

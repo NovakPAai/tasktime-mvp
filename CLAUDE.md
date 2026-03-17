@@ -323,6 +323,13 @@ PO выбрал:
 - `corporate-architect`, `infosec` → **Opus**
 - `deploy-tasktime`, `docs-tasktime`, `tasktime-inbox` → **Haiku**
 
+## Battle (боевой сервер)
+
+- **URL:** http://5.129.242.171
+- **Логин:** admin@tasktime.ru / password123
+- **Sync-скрипт:** `backend/scripts/sync-issue-with-battle.mjs`
+- **Пример pull:** `TASKTIME_BASE_URL=http://5.129.242.171 TASKTIME_ACCESS_TOKEN=<token> node scripts/sync-issue-with-battle.mjs pull TTMP-82 TTMP-83 TTMP-84 --set-in-progress`
+
 ## CI/CD Pipeline (2026-03-13)
 
 ### Архитектура
