@@ -19,6 +19,7 @@ import adminRouter from './modules/admin/admin.router.js';
 import aiSessionsRouter from './modules/ai/ai-sessions.router.js';
 import aiRouter from './modules/ai/ai.router.js';
 import webhooksRouter from './modules/webhooks/webhooks.router.js';
+import linksRouter from './modules/links/links.router.js';
 
 export function createApp() {
   const app = express();
@@ -55,6 +56,7 @@ export function createApp() {
   app.use('/api', aiSessionsRouter);
   app.use('/api', aiRouter);
   app.use('/api', webhooksRouter);
+  app.use('/api', linksRouter);
 
   // Error handler (must be last)
   app.use(errorHandler);

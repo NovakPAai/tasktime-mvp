@@ -50,6 +50,26 @@ export interface Issue {
   updatedAt: string;
 }
 
+export interface IssueLinkType {
+  id: string;
+  name: string;
+  outboundName: string;
+  inboundName: string;
+  isActive: boolean;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IssueLink {
+  id: string;
+  createdAt: string;
+  linkType: Pick<IssueLinkType, 'id' | 'name' | 'outboundName' | 'inboundName'>;
+  sourceIssue: { id: string; number: number; title: string; type: IssueType; status: IssueStatus; project: { key: string } };
+  targetIssue: { id: string; number: number; title: string; type: IssueType; status: IssueStatus; project: { key: string } };
+  createdBy: { id: string; name: string };
+}
+
 export type SprintState = 'PLANNED' | 'ACTIVE' | 'CLOSED';
 
 export interface Sprint {

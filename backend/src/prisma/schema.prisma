@@ -27,6 +27,7 @@ model User {
   timeLogs       TimeLog[]
   aiSessions     AiSession[]
   teamMemberships TeamMember[]
+  createdLinks    IssueLink[]
 
   @@map("users")
 }
@@ -108,6 +109,8 @@ model Issue {
   comments Comment[]
   timeLogs TimeLog[]
   aiSessions AiSession[]
+  sourceLinks IssueLink[] @relation("linkSource")
+  targetLinks IssueLink[] @relation("linkTarget")
 
   @@unique([projectId, number])
   @@index([projectId, status])
@@ -319,6 +322,42 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ===== ISSUE LINKS =====
+
+model IssueLinkType {
+  id           String      @id @default(uuid())
+  name         String      @unique
+  outboundName String      @map("outbound_name")
+  inboundName  String      @map("inbound_name")
+  isActive     Boolean     @default(true) @map("is_active")
+  isSystem     Boolean     @default(false) @map("is_system")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  links IssueLink[]
+
+  @@map("issue_link_types")
+}
+
+model IssueLink {
+  id            String   @id @default(uuid())
+  sourceIssueId String   @map("source_issue_id")
+  targetIssueId String   @map("target_issue_id")
+  linkTypeId    String   @map("link_type_id")
+  createdById   String   @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  sourceIssue Issue         @relation("linkSource", fields: [sourceIssueId], references: [id], onDelete: Cascade)
+  targetIssue Issue         @relation("linkTarget", fields: [targetIssueId], references: [id], onDelete: Cascade)
+  linkType    IssueLinkType @relation(fields: [linkTypeId], references: [id])
+  createdBy   User          @relation(fields: [createdById], references: [id])
+
+  @@unique([sourceIssueId, targetIssueId, linkTypeId])
+  @@index([sourceIssueId])
+  @@index([targetIssueId])
+  @@map("issue_links")
 }
 
 // ===== TEAMS =====

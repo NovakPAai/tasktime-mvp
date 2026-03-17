@@ -37,6 +37,7 @@ import * as commentsApi from '../api/comments';
 import * as timeApi from '../api/time';
 import * as aiApi from '../api/ai';
 import * as authApi from '../api/auth';
+import IssueLinksSection from '../components/issues/IssueLinksSection';
 import { useAuthStore } from '../store/auth.store';
 import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, User } from '../types';
 import api from '../api/client';
@@ -278,6 +279,8 @@ export default function IssueDetailPage() {
               />
             </section>
           )}
+
+          <IssueLinksSection issueId={issue.id} projectId={issue.projectId} />
 
           <section className="tt-issue-activity">
             <h3 className="tt-issue-section-title">
