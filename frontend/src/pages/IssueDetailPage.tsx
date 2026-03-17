@@ -39,7 +39,7 @@ import * as aiApi from '../api/ai';
 import * as authApi from '../api/auth';
 import IssueLinksSection from '../components/issues/IssueLinksSection';
 import { useAuthStore } from '../store/auth.store';
-import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, User } from '../types';
+import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, IssueType, User } from '../types';
 import api from '../api/client';
 import { hasAnyRequiredRole, hasRequiredRole } from '../lib/roles';
 
@@ -63,6 +63,8 @@ export default function IssueDetailPage() {
   const [aiEstimateLoading, setAiEstimateLoading] = useState(false);
   const [aiDecomposeLoading, setAiDecomposeLoading] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editForm] = Form.useForm();
   const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
   const canAssign = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
@@ -173,6 +175,45 @@ export default function IssueDetailPage() {
     }
   };
 
+  const handleEditOpen = () => {
+    if (!issue) return;
+    editForm.setFieldsValue({
+      title: issue.title,
+      type: issue.type,
+      priority: issue.priority,
+      assigneeId: issue.assigneeId ?? undefined,
+      description: issue.description ?? '',
+      acceptanceCriteria: issue.acceptanceCriteria ?? '',
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleEditSave = async (vals: {
+    title: string;
+    type: IssueType;
+    priority: IssuePriority;
+    assigneeId?: string;
+    description?: string;
+    acceptanceCriteria?: string;
+  }) => {
+    if (!id) return;
+    try {
+      await issuesApi.updateIssue(id, {
+        title: vals.title,
+        type: vals.type,
+        priority: vals.priority,
+        assigneeId: vals.assigneeId,
+        description: vals.description || undefined,
+        acceptanceCriteria: vals.acceptanceCriteria || undefined,
+      });
+      setEditModalOpen(false);
+      await load();
+      message.success('Issue updated');
+    } catch {
+      message.error('Could not save changes');
+    }
+  };
+
   const handleAiDecompose = async () => {
     if (!id) return;
     setAiDecomposeLoading(true);
@@ -238,7 +279,7 @@ export default function IssueDetailPage() {
           </div>
         </div>
         <div className="tt-issue-header-actions">
-          <Button size="small" icon={<EditOutlined />}>
+          <Button size="small" icon={<EditOutlined />} onClick={handleEditOpen}>
             Edit
           </Button>
           <Button size="small" icon={<MoreOutlined />} />
@@ -601,6 +642,52 @@ export default function IssueDetailPage() {
           </div>
         </aside>
       </div>
+
+      <Modal
+        title="Edit Issue"
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
+        onOk={() => editForm.submit()}
+        okText="Save"
+        cancelText="Cancel"
+        width={600}
+        destroyOnClose
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEditSave}>
+          <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Title is required' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="type" label="Type" rules={[{ required: true }]}>
+            <Select
+              options={(['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG'] as IssueType[]).map((v) => ({
+                value: v,
+                label: v,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="priority" label="Priority" rules={[{ required: true }]}>
+            <Select
+              options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map((v) => ({
+                value: v,
+                label: v,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="assigneeId" label="Assignee">
+            <Select
+              allowClear
+              placeholder="Unassigned"
+              options={allUsers.map((u) => ({ value: u.id, label: u.name }))}
+            />
+          </Form.Item>
+          <Form.Item name="description" label="Description">
+            <Input.TextArea rows={4} />
+          </Form.Item>
+          <Form.Item name="acceptanceCriteria" label="Acceptance Criteria">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="Log Time"
