@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend infra stop clean seed test lint setup
+.PHONY: dev backend frontend infra stop clean seed test lint setup sync pr ship merge branches
 
 # --- First time setup ---
 setup:
@@ -52,6 +52,24 @@ test-cov:
 lint:
 	cd backend && npm run lint
 	cd frontend && npm run lint
+
+# --- Git workflow ---
+sync:
+	@git fetch origin
+	@git rebase origin/main
+	@echo "Synced with origin/main"
+
+pr:
+	@git push -u origin $$(git branch --show-current)
+	@gh pr create --fill
+
+ship: sync lint pr
+
+merge:
+	@gh pr merge --squash --delete-branch
+
+branches:
+	@git branch -a --format='%(refname:short) %(committerdate:relative)' | grep -E 'claude/|cursor/' | sort
 
 # --- Cleanup ---
 stop:

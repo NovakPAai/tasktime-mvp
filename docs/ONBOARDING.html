@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Онбординг — TaskTime MVP</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      color: #1a1a2e;
+      background: #f4f6fb;
+    }
+
+    /* Layout */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      background: #1a1a2e;
+      color: #c8d0e7;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 28px 0 40px;
+    }
+    .sidebar-logo {
+      padding: 0 24px 20px;
+      border-bottom: 1px solid #2a2a45;
+      margin-bottom: 16px;
+    }
+    .sidebar-logo h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+    .sidebar-logo p {
+      font-size: 12px;
+      color: #7a85a3;
+      margin-top: 2px;
+    }
+    .nav-section {
+      padding: 0 16px;
+      margin-bottom: 6px;
+    }
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #4a5270;
+      padding: 10px 8px 4px;
+    }
+    .nav-link {
+      display: block;
+      padding: 7px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #9aa3bf;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-link:hover { background: #252545; color: #fff; }
+    .nav-link.active { background: #2e4ff5; color: #fff; }
+    .nav-num {
+      display: inline-block;
+      width: 18px;
+      font-size: 11px;
+      color: #4a5270;
+      margin-right: 2px;
+    }
+
+    /* Main */
+    .main {
+      flex: 1;
+      padding: 48px 56px;
+      max-width: 860px;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, #2e4ff5 0%, #7c3aed 100%);
+      border-radius: 14px;
+      padding: 36px 40px;
+      color: #fff;
+      margin-bottom: 48px;
+    }
+    .hero h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+    .hero p { font-size: 15px; opacity: 0.85; }
+    .hero .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    /* Part sections */
+    .part {
+      margin-bottom: 60px;
+      scroll-margin-top: 24px;
+    }
+    .part-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .part-num {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: #2e4ff5;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .part-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+
+    /* Sub-sections */
+    .section {
+      margin-bottom: 32px;
+      padding-left: 54px;
+      scroll-margin-top: 24px;
+    }
+    .section h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2e4ff5;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+    .section p { margin-bottom: 10px; color: #334; }
+    .section p:last-child { margin-bottom: 0; }
+
+    /* Code blocks */
+    pre {
+      background: #0f1117;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 12px 0;
+      overflow-x: auto;
+      position: relative;
+    }
+    pre code {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: #e2e8f0;
+    }
+    .comment { color: #8b9cc8; }
+    .cmd { color: #7ee787; }
+    .flag { color: #ffa657; }
+    .str { color: #a5d6ff; }
+
+    /* Inline code */
+    code {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      background: #e8ecf8;
+      color: #2e4ff5;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    pre code { background: none; color: #e2e8f0; padding: 0; font-size: 12.5px; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13.5px;
+    }
+    th {
+      background: #eef0fb;
+      color: #1a1a2e;
+      font-weight: 600;
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid #d0d5f0;
+    }
+    td {
+      padding: 9px 14px;
+      border-bottom: 1px solid #e8ebf5;
+      color: #334;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f7f8ff; }
+
+    /* Callouts */
+    .callout {
+      border-radius: 8px;
+      padding: 14px 16px 14px 44px;
+      margin: 14px 0;
+      font-size: 13.5px;
+      position: relative;
+    }
+    .callout::before {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      font-size: 16px;
+    }
+    .callout-info { background: #eff6ff; border-left: 3px solid #3b82f6; color: #1e40af; }
+    .callout-info::before { content: 'ℹ'; }
+    .callout-warn { background: #fffbeb; border-left: 3px solid #f59e0b; color: #92400e; }
+    .callout-warn::before { content: '⚠'; }
+    .callout-danger { background: #fef2f2; border-left: 3px solid #ef4444; color: #991b1b; }
+    .callout-danger::before { content: '✗'; }
+    .callout-ok { background: #f0fdf4; border-left: 3px solid #22c55e; color: #166534; }
+    .callout-ok::before { content: '✓'; }
+
+    /* Steps */
+    .steps { counter-reset: step; margin: 12px 0; }
+    .step {
+      counter-increment: step;
+      display: flex;
+      gap: 14px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #2e4ff5;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body { flex: 1; }
+    .step-body strong { display: block; margin-bottom: 4px; color: #1a1a2e; }
+
+    /* Branch diagram */
+    .branch-diagram {
+      background: #0f1117;
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      color: #e2e8f0;
+      margin: 12px 0;
+    }
+    .branch-main { color: #ff7b72; font-weight: 700; }
+    .branch-jack { color: #7ee787; }
+    .branch-alex { color: #ffa657; }
+    .branch-fix  { color: #a5d6ff; }
+
+    /* Conflict markers */
+    .conflict-block {
+      background: #0f1117;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 12px 0;
+      font-family: monospace;
+      font-size: 12.5px;
+      line-height: 1.8;
+    }
+    .conflict-ours   { color: #7ee787; }
+    .conflict-sep    { color: #4a5270; }
+    .conflict-theirs { color: #ffa657; }
+    .conflict-end    { color: #4a5270; }
+
+    /* Good/bad examples */
+    .examples { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+    .example-good, .example-bad {
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .example-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 6px 14px;
+    }
+    .example-good .example-label { background: #22c55e; color: #fff; }
+    .example-bad .example-label  { background: #ef4444; color: #fff; }
+    .example-good pre, .example-bad pre { border-radius: 0; margin: 0; }
+
+    /* Divider */
+    hr { border: none; border-top: 1px solid #e0e4f0; margin: 32px 0; }
+
+    /* Footer */
+    .footer {
+      margin-top: 60px;
+      padding: 28px 32px;
+      background: #1a1a2e;
+      border-radius: 12px;
+      color: #7a85a3;
+      font-size: 13px;
+    }
+    .footer strong { color: #fff; }
+    .footer a { color: #6b8aff; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { padding: 24px 20px; }
+      .examples { grid-template-columns: 1fr; }
+      .section { padding-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <h1>TaskTime MVP</h1>
+      <p>Онбординг · St1tcher86</p>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Начало</div>
+      <a class="nav-link" href="#part1"><span class="nav-num">1</span> Установка инструментов</a>
+      <a class="nav-link" href="#part2"><span class="nav-num">2</span> Доступ к репозиторию</a>
+      <a class="nav-link" href="#part3"><span class="nav-num">3</span> Клонирование и запуск</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Работа</div>
+      <a class="nav-link" href="#part4"><span class="nav-num">4</span> Ежедневный флоу</a>
+      <a class="nav-link" href="#part5"><span class="nav-num">5</span> Ревью чужих PR</a>
+      <a class="nav-link" href="#part6"><span class="nav-num">6</span> Rebase и конфликты</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Справочник</div>
+      <a class="nav-link" href="#part7"><span class="nav-num">7</span> Полезные команды</a>
+      <a class="nav-link" href="#part8"><span class="nav-num">8</span> Структура проекта</a>
+      <a class="nav-link" href="#part9"><span class="nav-num">9</span> Устранение проблем</a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="badge">TaskTime MVP</div>
+      <h1>Онбординг — St1tcher86</h1>
+      <p>Полная инструкция для начала работы. Выполняй шаги строго по порядку.</p>
+    </div>
+
+    <!-- Part 1 -->
+    <div class="part" id="part1">
+      <div class="part-header">
+        <div class="part-num">1</div>
+        <div class="part-title">Установка инструментов</div>
+      </div>
+
+      <div class="section" id="s1-1">
+        <h3>1.1 · Node.js 20 LTS</h3>
+        <p>Проверь версию:</p>
+        <pre><code>node -v</code></pre>
+        <p>Должно быть <code>v20.x.x</code> или выше. Если нет — установи:</p>
+        <p><strong>macOS:</strong></p>
+        <pre><code><span class="cmd">brew install node@20</span>
+<span class="cmd">echo</span> <span class="str">'export PATH="/opt/homebrew/opt/node@20/bin:$PATH"'</span> >> ~/.zshrc
+<span class="cmd">source</span> ~/.zshrc
+node -v  <span class="comment"># проверь: v20.x.x</span></code></pre>
+        <p><strong>Windows (WSL2 / Ubuntu):</strong></p>
+        <pre><code><span class="cmd">curl</span> -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+<span class="cmd">sudo apt-get install</span> -y nodejs
+node -v</code></pre>
+      </div>
+
+      <div class="section" id="s1-2">
+        <h3>1.2 · Docker Desktop</h3>
+        <p>Нужен для PostgreSQL и Redis.</p>
+        <ul style="margin: 8px 0 12px 18px; color: #334;">
+          <li><strong>macOS / Windows:</strong> скачай с <a href="https://www.docker.com/products/docker-desktop">docker.com/products/docker-desktop</a> и установи</li>
+          <li>После установки запусти Docker Desktop и дождись иконки в трее</li>
+        </ul>
+        <p>Проверь:</p>
+        <pre><code>docker --version        <span class="comment"># Docker version 24+</span>
+docker compose version  <span class="comment"># Docker Compose version 2+</span></code></pre>
+      </div>
+
+      <div class="section" id="s1-3">
+        <h3>1.3 · GitHub CLI</h3>
+        <pre><code><span class="comment"># macOS:</span>
+<span class="cmd">brew install gh</span>
+
+<span class="comment"># Ubuntu/WSL:</span>
+<span class="cmd">sudo apt install gh</span></code></pre>
+        <p>Войди в аккаунт:</p>
+        <pre><code><span class="cmd">gh auth login</span>
+<span class="comment"># Выбери: GitHub.com → HTTPS → Yes → Login with a web browser
+# Скопируй код, нажми Enter, вставь код в браузере</span></code></pre>
+        <p>Проверь:</p>
+        <pre><code><span class="cmd">gh auth status</span>
+<span class="comment"># Должно быть: Logged in to github.com as St1tcher86</span></code></pre>
+      </div>
+
+      <div class="section" id="s1-4">
+        <h3>1.4 · SSH-ключ для GitHub</h3>
+        <p>Проверь, есть ли ключ:</p>
+        <pre><code>ls ~/.ssh/id_ed25519.pub 2>/dev/null && echo <span class="str">"ключ есть"</span> || echo <span class="str">"нет ключа"</span></code></pre>
+        <p>Если нет — создай:</p>
+        <pre><code><span class="cmd">ssh-keygen</span> -t ed25519 -C <span class="str">"твой@email.com"</span>
+<span class="comment"># Нажимай Enter на всех вопросах</span></code></pre>
+        <p>Добавь в GitHub:</p>
+        <pre><code>cat ~/.ssh/id_ed25519.pub
+<span class="comment"># Скопируй вывод</span></code></pre>
+        <p>Перейди: <strong>github.com → Settings → SSH and GPG keys → New SSH key</strong> → вставь и сохрани.</p>
+        <p>Проверь соединение:</p>
+        <pre><code><span class="cmd">ssh</span> -T git@github.com
+<span class="comment"># Hi St1tcher86! You've successfully authenticated...</span></code></pre>
+      </div>
+
+      <div class="section" id="s1-5">
+        <h3>1.5 · Claude Code CLI (если используешь)</h3>
+        <pre><code><span class="cmd">npm install</span> -g @anthropic-ai/claude-code
+claude --version</code></pre>
+        <p>При первом запуске выполни <code>claude</code> и войди через браузер.</p>
+      </div>
+
+      <div class="section" id="s1-6">
+        <h3>1.6 · Cursor (если используешь)</h3>
+        <p>Скачай с <a href="https://cursor.sh">cursor.sh</a> и установи. Войди в аккаунт Cursor или используй API-ключ.</p>
+      </div>
+    </div>
+
+    <!-- Part 2 -->
+    <div class="part" id="part2">
+      <div class="part-header">
+        <div class="part-num">2</div>
+        <div class="part-title">Получение доступа к репозиторию</div>
+      </div>
+      <div class="section">
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Убедись, что jackrescuer-gif добавил тебя как collaborator</strong>
+              Напиши ему если ещё не добавил.
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Прими приглашение</strong>
+              Придёт на email или найди на <a href="https://github.com/notifications">github.com/notifications</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Part 3 -->
+    <div class="part" id="part3">
+      <div class="part-header">
+        <div class="part-num">3</div>
+        <div class="part-title">Клонирование и первый запуск</div>
+      </div>
+
+      <div class="section" id="s3-1">
+        <h3>3.1 · Клонировать репозиторий</h3>
+        <pre><code><span class="cmd">git clone</span> git@github.com:jackrescuer-gif/tasktime-mvp.git
+<span class="cmd">cd</span> tasktime-mvp</code></pre>
+        <div class="callout callout-info">Используй SSH (<code>git@github.com:...</code>), не HTTPS. Так работает без ввода пароля.</div>
+      </div>
+
+      <div class="section" id="s3-2">
+        <h3>3.2 · Первоначальная настройка (один раз)</h3>
+        <pre><code><span class="cmd">make setup</span></code></pre>
+        <p>Скрипт сделает автоматически:</p>
+        <ul style="margin: 8px 0 12px 18px; color: #334;">
+          <li>Запустит PostgreSQL 16 и Redis 7 в Docker</li>
+          <li>Установит зависимости backend и frontend</li>
+          <li>Создаст <code>.env</code> файлы из <code>.env.example</code></li>
+          <li>Применит все миграции БД</li>
+          <li>Загрузит тестовые данные (seed)</li>
+        </ul>
+        <p>Ожидаемый финальный вывод:</p>
+        <pre><code><span class="comment">=========================================
+  Setup complete!
+=========================================
+  Start dev servers:
+    make dev  — backend + frontend
+  Open http://localhost:5173 in your browser</span></code></pre>
+        <div class="callout callout-warn">Если setup упал — смотри <a href="#part9">Часть 9: Устранение проблем</a></div>
+      </div>
+
+      <div class="section" id="s3-3">
+        <h3>3.3 · Запуск в dev-режиме</h3>
+        <pre><code><span class="cmd">make dev</span></code></pre>
+        <table>
+          <tr><th>Адрес</th><th>Что</th></tr>
+          <tr><td><a href="http://localhost:5173">http://localhost:5173</a></td><td>Frontend (React)</td></tr>
+          <tr><td><a href="http://localhost:3000">http://localhost:3000</a></td><td>Backend API</td></tr>
+        </table>
+      </div>
+
+      <div class="section" id="s3-4">
+        <h3>3.4 · Проверить что всё работает</h3>
+        <p>Открой <a href="http://localhost:5173">http://localhost:5173</a> в браузере.</p>
+        <table>
+          <tr><th>Email</th><th>Пароль</th><th>Роль</th></tr>
+          <tr><td>admin@tasktime.ru</td><td>password123</td><td>Admin</td></tr>
+          <tr><td>manager@tasktime.ru</td><td>password123</td><td>Manager</td></tr>
+          <tr><td>dev@tasktime.ru</td><td>password123</td><td>Developer</td></tr>
+          <tr><td>viewer@tasktime.ru</td><td>password123</td><td>Viewer</td></tr>
+        </table>
+        <div class="callout callout-ok">Если видишь дашборд с проектами — всё готово.</div>
+      </div>
+    </div>
+
+    <!-- Part 4 -->
+    <div class="part" id="part4">
+      <div class="part-header">
+        <div class="part-num">4</div>
+        <div class="part-title">Ежедневный рабочий флоу</div>
+      </div>
+
+      <div class="section" id="s4-1">
+        <h3>4.1 · Синхронизация (каждый раз перед началом)</h3>
+        <pre><code><span class="cmd">git checkout</span> main
+<span class="cmd">git fetch</span> origin
+<span class="cmd">git rebase</span> origin/main</code></pre>
+        <div class="callout callout-danger">Это обязательно. Без синхронизации рискуешь работать на устаревшей базе.</div>
+      </div>
+
+      <div class="section" id="s4-2">
+        <h3>4.2 · Создать ветку</h3>
+        <div class="callout callout-warn"><strong>Твой префикс — всегда <code>claude/alex-</code> или <code>cursor/alex-</code>.</strong></div>
+        <pre><code><span class="comment"># Для работы через Claude Code:</span>
+<span class="cmd">git checkout</span> -b <span class="str">claude/alex-&lt;краткое-описание&gt;</span>
+
+<span class="comment"># Для работы через Cursor:</span>
+<span class="cmd">git checkout</span> -b <span class="str">cursor/alex-&lt;краткое-описание&gt;</span></code></pre>
+        <p>Примеры хороших имён:</p>
+        <pre><code>claude/alex-fix-timer-display
+claude/alex-add-issue-export
+cursor/alex-update-kanban-ui</code></pre>
+        <div class="callout callout-warn">
+          <strong>Важно для Claude Code:</strong> Claude автоматически создаёт ветки со случайными именами вроде <code>claude/sharp-elbakyan</code>. Это не твой префикс. Сразу переименуй:
+          <pre style="margin-top:8px"><code>git branch -m claude/alex-&lt;описание&gt;</code></pre>
+        </div>
+      </div>
+
+      <div class="section" id="s4-3">
+        <h3>4.3 · Работа и коммиты</h3>
+        <p>Коммить по логическим единицам, не по файлам:</p>
+        <div class="examples">
+          <div class="example-good">
+            <div class="example-label">ХОРОШО</div>
+            <pre><code>git add backend/src/modules/time/
+git commit -m <span class="str">"fix: расчёт времени при смене таймзоны"</span></code></pre>
+          </div>
+          <div class="example-bad">
+            <div class="example-label">ПЛОХО</div>
+            <pre><code>git add .
+git commit -m <span class="str">"changes"</span></code></pre>
+          </div>
+        </div>
+        <p>Формат: <code>&lt;тип&gt;: &lt;описание&gt;</code></p>
+        <table>
+          <tr><th>Тип</th><th>Когда</th></tr>
+          <tr><td><code>feat</code></td><td>новая функциональность</td></tr>
+          <tr><td><code>fix</code></td><td>исправление бага</td></tr>
+          <tr><td><code>refactor</code></td><td>рефакторинг без изменения поведения</td></tr>
+          <tr><td><code>test</code></td><td>тесты</td></tr>
+          <tr><td><code>chore</code></td><td>зависимости, конфиги</td></tr>
+          <tr><td><code>docs</code></td><td>документация</td></tr>
+        </table>
+      </div>
+
+      <div class="section" id="s4-4">
+        <h3>4.4 · Push ветки</h3>
+        <pre><code><span class="cmd">git push</span> -u origin claude/alex-fix-timer-display</code></pre>
+        <p>Флаг <code>-u</code> нужен только при первом push этой ветки. Последующие — просто <code>git push</code>.</p>
+      </div>
+
+      <div class="section" id="s4-5">
+        <h3>4.5 · Создать Pull Request</h3>
+        <pre><code><span class="cmd">gh pr create</span> \
+  --title <span class="str">"fix: исправить расчёт времени при смене таймзоны"</span> \
+  --body <span class="str">"Опиши что сделал и зачем"</span> \
+  --reviewer jackrescuer-gif</code></pre>
+        <p>После создания GitHub пришлёт ссылку на PR. Отправь её jackrescuer-gif в чат.</p>
+        <div class="callout callout-info">GitHub автоматически добавит чеклист из <code>.github/PULL_REQUEST_TEMPLATE.md</code> — заполни его.</div>
+      </div>
+
+      <div class="section" id="s4-6">
+        <h3>4.6 · CI проверки</h3>
+        <p>После создания PR автоматически запустятся:</p>
+        <ul style="margin: 8px 0 12px 18px; color: #334;">
+          <li><code>backend</code> — TypeScript build + ESLint + тесты</li>
+          <li><code>frontend</code> — TypeScript build + ESLint + тесты</li>
+        </ul>
+        <pre><code><span class="cmd">gh pr checks</span>           <span class="comment"># посмотреть статус</span>
+<span class="cmd">gh pr checks</span> --watch   <span class="comment"># ждать завершения</span></code></pre>
+      </div>
+
+      <div class="section" id="s4-7">
+        <h3>4.7 · После аппрува — мёрдж</h3>
+        <p>Когда jackrescuer-gif апрувит PR:</p>
+        <pre><code><span class="cmd">gh pr merge</span> --squash --delete-branch</code></pre>
+        <ul style="margin: 8px 0 0 18px; color: #334;">
+          <li><code>--squash</code> — все коммиты ветки сложатся в один коммит в main</li>
+          <li><code>--delete-branch</code> — ветка удалится после мёрджа</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Part 5 -->
+    <div class="part" id="part5">
+      <div class="part-header">
+        <div class="part-num">5</div>
+        <div class="part-title">Ревью чужих PR</div>
+      </div>
+      <div class="section">
+        <p>Когда jackrescuer-gif просит тебя апрувить его PR:</p>
+        <pre><code><span class="cmd">gh pr list</span>           <span class="comment"># список открытых PR</span>
+<span class="cmd">gh pr view</span> &lt;номер&gt;   <span class="comment"># посмотреть PR</span></code></pre>
+        <p>Или открой ссылку в браузере.</p>
+        <p>Если всё нормально:</p>
+        <pre><code><span class="cmd">gh pr review</span> &lt;номер&gt; --approve</code></pre>
+        <p>Если есть замечания:</p>
+        <pre><code><span class="cmd">gh pr review</span> &lt;номер&gt; --comment --body <span class="str">"Комментарий к PR"</span>
+<span class="comment"># или оставляй комментарии в браузере на конкретных строках кода</span></code></pre>
+      </div>
+    </div>
+
+    <!-- Part 6 -->
+    <div class="part" id="part6">
+      <div class="part-header">
+        <div class="part-num">6</div>
+        <div class="part-title">Rebase и разрешение конфликтов</div>
+      </div>
+
+      <div class="section">
+        <h3>6.1 · Когда main ушёл вперёд</h3>
+        <p>Если после создания ветки кто-то смёрджил другой PR в main:</p>
+        <pre><code><span class="cmd">git fetch</span> origin
+<span class="cmd">git rebase</span> origin/main</code></pre>
+        <p>Если конфликтов нет — сразу:</p>
+        <pre><code><span class="cmd">git push</span> --force-with-lease  <span class="comment"># безопаснее --force</span></code></pre>
+      </div>
+
+      <div class="section">
+        <h3>6.2 · Если есть конфликты</h3>
+        <p>Git покажет какие файлы конфликтуют:</p>
+        <pre><code><span class="comment">CONFLICT (content): Merge conflict in backend/src/modules/issues/issues.service.ts</span></code></pre>
+        <p>Открой файл. Найди маркеры и реши конфликт:</p>
+        <div class="conflict-block">
+          <span class="conflict-ours">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD<br>  // твой код<br></span>
+          <span class="conflict-sep">=======<br></span>
+          <span class="conflict-theirs">  // код из main<br></span>
+          <span class="conflict-end">&gt;&gt;&gt;&gt;&gt;&gt;&gt; origin/main</span>
+        </div>
+        <p>Оставь правильный вариант, удали маркеры, затем:</p>
+        <pre><code><span class="cmd">git add</span> backend/src/modules/issues/issues.service.ts
+<span class="cmd">git rebase</span> --continue
+<span class="comment"># Повтори для каждого конфликтного файла</span>
+<span class="cmd">git push</span> --force-with-lease</code></pre>
+        <div class="callout callout-warn">
+          Если запутался — отмени rebase и позови jackrescuer-gif:
+          <pre style="margin-top:8px"><code>git rebase --abort</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Part 7 -->
+    <div class="part" id="part7">
+      <div class="part-header">
+        <div class="part-num">7</div>
+        <div class="part-title">Полезные команды</div>
+      </div>
+      <div class="section">
+        <pre><code><span class="comment"># Запуск</span>
+<span class="cmd">make dev</span>              <span class="comment"># backend + frontend + docker</span>
+<span class="cmd">make backend</span>          <span class="comment"># только backend (port 3000)</span>
+<span class="cmd">make frontend</span>         <span class="comment"># только frontend (port 5173)</span>
+<span class="cmd">make stop</span>             <span class="comment"># остановить всё</span>
+
+<span class="comment"># База данных</span>
+<span class="cmd">make db-studio</span>        <span class="comment"># GUI для БД в браузере (localhost:5555)</span>
+<span class="cmd">make seed</span>             <span class="comment"># перезалить тестовые данные</span>
+<span class="cmd">make db-reset</span>         <span class="comment"># сбросить БД (УДАЛЯЕТ ДАННЫЕ)</span>
+
+<span class="comment"># Если добавил новое поле в Prisma schema:</span>
+cd backend && npx prisma migrate dev --name <span class="str">&lt;название-миграции&gt;</span>
+
+<span class="comment"># Качество кода</span>
+<span class="cmd">make lint</span>             <span class="comment"># ESLint для backend + frontend</span>
+<span class="cmd">make test</span>             <span class="comment"># тесты backend</span>
+
+<span class="comment"># GitHub</span>
+<span class="cmd">gh pr list</span>            <span class="comment"># список открытых PR</span>
+<span class="cmd">gh pr view</span>            <span class="comment"># текущий PR</span>
+<span class="cmd">gh pr checks</span>          <span class="comment"># статус CI</span>
+<span class="cmd">gh pr diff</span>            <span class="comment"># diff текущего PR</span></code></pre>
+      </div>
+    </div>
+
+    <!-- Part 8 -->
+    <div class="part" id="part8">
+      <div class="part-header">
+        <div class="part-num">8</div>
+        <div class="part-title">Структура проекта</div>
+      </div>
+      <div class="section">
+        <pre><code>tasktime-mvp/
+├── backend/
+│   ├── src/
+│   │   ├── modules/         <span class="comment"># бизнес-логика по модулям</span>
+│   │   │   ├── auth/        <span class="comment"># регистрация, логин, JWT</span>
+│   │   │   ├── users/       <span class="comment"># управление пользователями</span>
+│   │   │   ├── projects/    <span class="comment"># проекты</span>
+│   │   │   ├── issues/      <span class="comment"># задачи (EPIC/STORY/TASK/SUBTASK/BUG)</span>
+│   │   │   ├── boards/      <span class="comment"># Kanban-доски</span>
+│   │   │   ├── sprints/     <span class="comment"># спринты</span>
+│   │   │   ├── time/        <span class="comment"># учёт времени</span>
+│   │   │   ├── teams/       <span class="comment"># команды</span>
+│   │   │   ├── comments/    <span class="comment"># комментарии</span>
+│   │   │   └── admin/       <span class="comment"># административные функции</span>
+│   │   ├── middleware/      <span class="comment"># auth, RBAC, audit, error</span>
+│   │   └── app.ts           <span class="comment"># точка входа Express</span>
+│   └── prisma/
+│       └── schema.prisma    <span class="comment"># схема БД — сюда смотреть для понимания модели</span>
+├── frontend/
+│   └── src/
+│       ├── pages/           <span class="comment"># страницы (Board, Issues, Sprints, Time...)</span>
+│       ├── components/      <span class="comment"># переиспользуемые компоненты</span>
+│       ├── api/             <span class="comment"># клиент для запросов к backend</span>
+│       └── store/           <span class="comment"># Zustand stores</span>
+├── prisma/migrations/       <span class="comment"># история миграций БД</span>
+├── .github/workflows/       <span class="comment"># CI/CD (ci.yml — основной)</span>
+├── CLAUDE.md                <span class="comment"># контекст и правила для AI-агентов</span>
+└── CONTRIBUTING.md          <span class="comment"># краткое описание флоу</span></code></pre>
+        <div class="callout callout-info"><strong>Правило модульности:</strong> каждый модуль — <code>router.ts → service.ts → prisma</code>. Модули не импортируют друг друга напрямую.</div>
+      </div>
+    </div>
+
+    <!-- Part 9 -->
+    <div class="part" id="part9">
+      <div class="part-header">
+        <div class="part-num">9</div>
+        <div class="part-title">Устранение проблем</div>
+      </div>
+
+      <div class="section">
+        <h3>make setup упал на Docker</h3>
+        <pre><code><span class="comment"># Убедись что Docker Desktop запущен (иконка в трее)</span>
+docker ps  <span class="comment"># должен вернуть список контейнеров (пустой — норма)</span></code></pre>
+      </div>
+
+      <div class="section">
+        <h3>make setup упал на миграциях</h3>
+        <pre><code><span class="cmd">make db-reset</span>  <span class="comment"># сбросить и пересоздать БД</span></code></pre>
+      </div>
+
+      <div class="section">
+        <h3>Порты 3000 или 5173 заняты</h3>
+        <pre><code>lsof -i :3000   <span class="comment"># найти что занимает порт</span>
+lsof -i :5173
+kill -9 &lt;PID&gt;  <span class="comment"># убить процесс</span></code></pre>
+        <p>Или просто:</p>
+        <pre><code><span class="cmd">make stop</span>
+<span class="cmd">make dev</span></code></pre>
+      </div>
+
+      <div class="section">
+        <h3>git push отклонён</h3>
+        <pre><code><span class="comment"># "Updates were rejected because the tip of your current branch is behind"</span>
+<span class="cmd">git pull</span> --rebase origin claude/alex-&lt;имя-ветки&gt;
+<span class="cmd">git push</span></code></pre>
+      </div>
+
+      <div class="section">
+        <h3>CI упал: TypeScript errors</h3>
+        <pre><code>cd backend && npm run build   <span class="comment"># увидишь конкретные ошибки</span>
+cd frontend && npm run build</code></pre>
+        <p>Исправь ошибки, закоммить, запушь — CI перезапустится автоматически.</p>
+      </div>
+
+      <div class="section">
+        <h3>Claude Code создал ветку с чужим именем</h3>
+        <pre><code><span class="cmd">git branch</span> --show-current                    <span class="comment"># посмотреть имя</span>
+<span class="cmd">git branch</span> -m claude/alex-&lt;описание&gt;          <span class="comment"># переименовать</span>
+<span class="cmd">git push</span> -u origin claude/alex-&lt;описание&gt;     <span class="comment"># запушить</span></code></pre>
+      </div>
+
+      <div class="section">
+        <h3>Не знаю какой модуль трогать</h3>
+        <p>Открой <code>backend/prisma/schema.prisma</code> — там вся модель данных. По модели понятно, какой модуль что делает.</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>Вопросы?</strong> Пиши <strong>jackrescuer-gif</strong> в Telegram или открывай issue в репозитории на GitHub.</p>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // Highlight active nav link on scroll
+  const parts = document.querySelectorAll('.part');
+  const links = document.querySelectorAll('.nav-link');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3 });
+  parts.forEach(p => observer.observe(p));
+</script>
+
+</body>
+</html>

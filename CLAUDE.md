@@ -1,5 +1,53 @@
 # TaskTime MVP — Контекст проекта
 
+## Участники и совместная работа
+
+### Команда
+
+| GitHub | Роль | Инструменты | Префикс веток |
+|--------|------|-------------|---------------|
+| jackrescuer-gif | PO / Lead | Claude Code + Cursor | `claude/jack-*`, `cursor/jack-*` |
+| St1tcher86 | Contributor | Claude Code + Cursor | `claude/alex-*`, `cursor/alex-*` |
+
+### Флоу работы
+
+```
+main (защищена: CI + 1 аппрув)
+  ↑
+  ├── claude/jack-<описание>   ← jackrescuer-gif через Claude Code
+  ├── cursor/jack-<описание>   ← jackrescuer-gif через Cursor
+  ├── claude/alex-<описание>   ← St1tcher86 через Claude Code
+  └── cursor/alex-<описание>   ← St1tcher86 через Cursor
+```
+
+**Жизненный цикл ветки:**
+1. `git fetch origin && git rebase origin/main` — синхронизация перед началом
+2. Создать ветку от `main` с нужным префиксом
+3. Коммиты по логическим единицам (feat/fix/chore/docs/refactor/test)
+4. `git push -u origin <ветка>`
+5. `gh pr create` → CI зелёный → аппрув второго участника → `gh pr merge --squash`
+
+### Правила мёрджа
+
+- Стратегия: **squash merge** (один коммит в main на PR)
+- Ветку после мёрджа удалять (`--delete-branch`)
+- Rebase перед PR если main ушёл вперёд: `git rebase origin/main`
+- Прямой push в `main` — **запрещён**
+
+### Координация (предотвращение конфликтов)
+
+- Перед началом работы над модулем — сообщить в командный чат: «беру backend/issues»
+- Не держать ветку открытой > 2 дней
+- Короткие PR (< 400 строк diff) — легче ревьюить
+
+### Code review
+
+- Автор PR **не мёрджит сам** без аппрува
+- Ревьюер проверяет: логику, типы, тесты, CI
+- Если аппрув некому дать (оба заняты одновременно) — допустим self-merge после явного согласования в чате
+
+---
+
 ## Что это
 
 TaskTime — импортозамещение Jira для российского финансового сектора.
