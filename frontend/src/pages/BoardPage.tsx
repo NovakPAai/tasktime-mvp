@@ -18,7 +18,7 @@ const COLUMN_LABELS: Record<IssueStatus, string> = {
 const COLUMN_COLORS: Record<IssueStatus, string> = {
   OPEN: '#e6f7ff', IN_PROGRESS: '#fff7e6', REVIEW: '#f6ffed', DONE: '#f9f0ff', CANCELLED: '#fff1f0',
 };
-const TYPE_COLORS: Record<string, string> = { EPIC: 'purple', STORY: 'green', TASK: 'blue', SUBTASK: 'cyan', BUG: 'red' };
+const TYPE_COLORS: Record<string, string> = { EPIC: '#8b5cf6', STORY: '#22c55e', TASK: '#3b82f6', SUBTASK: '#6b7280', BUG: '#ef4444' };
 
 export default function BoardPage() {
   const { id: projectId } = useParams<{ id: string }>();

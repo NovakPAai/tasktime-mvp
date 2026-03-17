@@ -1312,33 +1312,33 @@ body {
 }
 
 .tt-sprint-drawer-type-epic {
-  background: rgba(139, 92, 246, 0.14);
-  border-color: rgba(139, 92, 246, 0.3);
-  color: #d9c2ff;
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #ffffff;
 }
 
 .tt-sprint-drawer-type-story {
-  background: rgba(94, 106, 210, 0.16);
-  border-color: rgba(94, 106, 210, 0.34);
-  color: #d3d7ff;
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #ffffff;
 }
 
 .tt-sprint-drawer-type-task {
-  background: var(--bg-hover);
-  border-color: var(--b2);
-  color: var(--t2);
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
 }
 
 .tt-sprint-drawer-type-subtask {
-  background: rgba(76, 175, 125, 0.12);
-  border-color: rgba(76, 175, 125, 0.28);
-  color: #b8f0d2;
+  background: #6b7280;
+  border-color: #6b7280;
+  color: #ffffff;
 }
 
 .tt-sprint-drawer-type-bug {
-  background: rgba(229, 83, 75, 0.12);
-  border-color: rgba(229, 83, 75, 0.3);
-  color: #ffb8b2;
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
 }
 
 .tt-sprint-card.ant-card {
@@ -1988,6 +1988,31 @@ body {
   font-weight: 500;
   background-color: var(--bg-hover);
   color: var(--t2);
+}
+
+.tt-issue-tag-epic {
+  background-color: #8b5cf6;
+  color: #ffffff;
+}
+
+.tt-issue-tag-story {
+  background-color: #22c55e;
+  color: #ffffff;
+}
+
+.tt-issue-tag-task {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+.tt-issue-tag-subtask {
+  background-color: #6b7280;
+  color: #ffffff;
+}
+
+.tt-issue-tag-bug {
+  background-color: #ef4444;
+  color: #ffffff;
 }
 
 .tt-issue-status-cell {
