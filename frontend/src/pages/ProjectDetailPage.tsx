@@ -162,6 +162,12 @@ export default function ProjectDetailPage() {
       width: 140,
       render: (n: string) => n || '-',
     },
+    {
+      title: 'Author',
+      dataIndex: ['creator', 'name'],
+      width: 140,
+      render: (n: string) => n || '-',
+    },
   ];
 
   const rowSelection = canBulkEdit
