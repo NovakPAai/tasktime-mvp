@@ -14,6 +14,13 @@ const decomposeSchema = z.object({
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 512;
 
+function extractJson(raw: string): string {
+  // Strip markdown code blocks: ```json ... ``` or ``` ... ```
+  const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (match) return match[1].trim();
+  return raw.trim();
+}
+
 export class AnthropicProvider implements LlmProvider {
   private client: Anthropic;
 
@@ -40,7 +47,7 @@ export class AnthropicProvider implements LlmProvider {
     });
 
     const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
-    const json = JSON.parse(text.trim());
+    const json = JSON.parse(extractJson(text));
     return estimateSchema.parse(json);
   }
 
@@ -68,7 +75,7 @@ export class AnthropicProvider implements LlmProvider {
     });
 
     const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
-    const json = JSON.parse(text.trim());
+    const json = JSON.parse(extractJson(text));
     return decomposeSchema.parse(json);
   }
 }
