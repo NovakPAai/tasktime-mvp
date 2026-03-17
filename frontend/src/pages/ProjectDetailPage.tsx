@@ -1,15 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Table, Button, Space, Modal, Form, Input, Select, message, Progress } from 'antd';
-import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ThunderboltOutlined, TagOutlined } from '@ant-design/icons';
+import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ThunderboltOutlined, TagOutlined, ApartmentOutlined } from '@ant-design/icons';
+import type { Issue } from '../types';
 import { useIssuesStore } from '../store/issues.store';
 import { useAuthStore } from '../store/auth.store';
 import * as projectsApi from '../api/projects';
 import * as issuesApi from '../api/issues';
 import * as authApi from '../api/auth';
-import type { Project, Issue, IssueType, IssuePriority, IssueStatus, User } from '../types';
+import type { Project, IssueType, IssuePriority, IssueStatus, User } from '../types';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { hasAnyRequiredRole } from '../lib/roles';
+
+function buildTree(issues: Issue[]): Issue[] {
+  const map = new Map(issues.map((i) => [i.id, { ...i, children: [] as Issue[] }]));
+  const roots: Issue[] = [];
+  for (const issue of map.values()) {
+    if (issue.parentId && map.has(issue.parentId)) {
+      map.get(issue.parentId)!.children!.push(issue);
+    } else {
+      roots.push(issue);
+    }
+  }
+  return roots;
+}
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +38,7 @@ export default function ProjectDetailPage() {
   const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<IssueStatus | undefined>(undefined);
   const [bulkAssigneeId, setBulkAssigneeId] = useState<string | undefined>(undefined);
+  const [treeMode, setTreeMode] = useState(true);
 
   useEffect(() => {
     if (id) {
@@ -370,6 +385,13 @@ export default function ProjectDetailPage() {
             <Button icon={<TagOutlined />} onClick={() => navigate(`/projects/${id}/releases`)}>
               Релизы
             </Button>
+            <Button
+              icon={<ApartmentOutlined />}
+              type={treeMode ? 'primary' : 'default'}
+              onClick={() => setTreeMode((v) => !v)}
+            >
+              {treeMode ? 'Tree' : 'Flat'}
+            </Button>
             {canCreate && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
                 New Issue
@@ -378,7 +400,7 @@ export default function ProjectDetailPage() {
           </div>
 
           <Table
-            dataSource={issues}
+            dataSource={treeMode ? buildTree(issues) : issues}
             columns={columns}
             rowKey="id"
             loading={issuesLoading}
@@ -391,6 +413,7 @@ export default function ProjectDetailPage() {
               onClick: () => navigate(`/issues/${record.id}`),
               style: { cursor: 'pointer' },
             })}
+            expandable={treeMode ? { defaultExpandAllRows: false } : undefined}
           />
         </div>
 
