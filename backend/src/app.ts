@@ -23,6 +23,7 @@ import aiSessionsRouter from './modules/ai/ai-sessions.router.js';
 import aiRouter from './modules/ai/ai.router.js';
 import webhooksRouter from './modules/webhooks/webhooks.router.js';
 import linksRouter from './modules/links/links.router.js';
+import projectCategoriesRouter from './modules/project-categories/project-categories.router.js';
 
 export function createApp() {
   const app = express();
@@ -59,6 +60,7 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/projects', projectsRouter);
+  app.use('/api/project-categories', projectCategoriesRouter);
   // Issues router has mixed paths: /api/projects/:projectId/issues and /api/issues/:id
   app.use('/api', issuesRouter);
   app.use('/api', boardsRouter);

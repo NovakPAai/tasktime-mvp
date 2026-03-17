@@ -16,7 +16,10 @@ export async function createProject(body: { name: string; key: string; descripti
   return data;
 }
 
-export async function updateProject(id: string, body: { name?: string; description?: string }): Promise<Project> {
+export async function updateProject(
+  id: string,
+  body: { name?: string; description?: string; ownerId?: string | null; categoryId?: string | null },
+): Promise<Project> {
   const { data } = await api.patch<Project>(`/projects/${id}`, body);
   return data;
 }

@@ -3,9 +3,15 @@ import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson } from '../../shared/redis.js';
 import type { CreateProjectDto, UpdateProjectDto } from './projects.dto.js';
 
+const projectInclude = {
+  _count: { select: { issues: true } },
+  owner: { select: { id: true, name: true, email: true } },
+  category: { select: { id: true, name: true } },
+} as const;
+
 export async function listProjects() {
   return prisma.project.findMany({
-    include: { _count: { select: { issues: true } } },
+    include: projectInclude,
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -13,7 +19,7 @@ export async function listProjects() {
 export async function getProject(id: string) {
   const project = await prisma.project.findUnique({
     where: { id },
-    include: { _count: { select: { issues: true } } },
+    include: projectInclude,
   });
   if (!project) throw new AppError(404, 'Project not found');
   return project;
@@ -23,14 +29,14 @@ export async function createProject(dto: CreateProjectDto) {
   const existing = await prisma.project.findUnique({ where: { key: dto.key } });
   if (existing) throw new AppError(409, 'Project key already exists');
 
-  return prisma.project.create({ data: dto });
+  return prisma.project.create({ data: dto, include: projectInclude });
 }
 
 export async function updateProject(id: string, dto: UpdateProjectDto) {
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  return prisma.project.update({ where: { id }, data: dto });
+  return prisma.project.update({ where: { id }, data: dto, include: projectInclude });
 }
 
 export async function deleteProject(id: string) {

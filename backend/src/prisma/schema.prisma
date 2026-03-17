@@ -28,6 +28,7 @@ model User {
   aiSessions     AiSession[]
   teamMemberships TeamMember[]
   createdLinks    IssueLink[]
+  ownedProjects   Project[]      @relation("project_owner")
 
   @@map("users")
 }
@@ -54,14 +55,30 @@ model RefreshToken {
 
 // ===== PROJECTS =====
 
+model ProjectCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  projects Project[]
+
+  @@map("project_categories")
+}
+
 model Project {
   id          String   @id @default(uuid())
   name        String
   key         String   @unique
   description String?
+  ownerId     String?  @map("owner_id")
+  categoryId  String?  @map("category_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  owner    User?            @relation("project_owner", fields: [ownerId], references: [id], onDelete: SetNull)
+  category ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   issues   Issue[]
   sprints  Sprint[]
   releases Release[]

@@ -72,12 +72,12 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     project = await client.project.upsert({
       where: { key: 'DEMO' },
       update: {},
-      create: { name: 'Demo Project', key: 'DEMO', description: 'Demo project for testing' },
+      create: { name: 'Demo Project', key: 'DEMO', description: 'Demo project for testing', ownerId: admin.id },
     });
     backendProject = await client.project.upsert({
       where: { key: 'BACK' },
       update: {},
-      create: { name: 'Backend Services', key: 'BACK', description: 'Backend microservices' },
+      create: { name: 'Backend Services', key: 'BACK', description: 'Backend microservices', ownerId: admin.id },
     });
   }
 
@@ -88,6 +88,7 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
       name: 'TaskTime MVP (vibe-code)',
       key: 'TTMP',
       description: 'MVP системы управления проектами и задачами на vibe-code',
+      ownerId: admin.id,
     },
   });
 
@@ -100,9 +101,13 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
         name: 'TaskTime MVP LiveCode',
         key: 'LIVE',
         description: 'Живой проект: задачи для разработки TaskTime MVP (vibe-code) самим TaskTime и агентами',
+        ownerId: admin.id,
       },
     });
   }
+
+  // TTMP-132: set admin as owner for any projects still missing an owner
+  await client.project.updateMany({ where: { ownerId: null }, data: { ownerId: admin.id } });
 
   // Historical sprints for TaskTime MVP (TTMP)
   const sprint0 = await client.sprint.upsert({

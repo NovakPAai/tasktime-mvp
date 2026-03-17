@@ -9,6 +9,8 @@ import type { User, Project, Sprint, IssueLinkType } from '../types';
 import * as projectsApi from '../api/projects';
 import * as sprintsApi from '../api/sprints';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import AdminProjectsTab from '../components/admin/AdminProjectsTab';
+import AdminCategoriesTab from '../components/admin/AdminCategoriesTab';
 
 interface AdminUserRow {
   id: string;
@@ -518,6 +520,8 @@ export default function AdminPage() {
         onChange={(key) => { if (key === 'link-types' && linkTypes.length === 0) void loadLinkTypes(); }}
         items={[
           { key: 'dashboard', label: 'Дашборд', children: dashboardTab },
+          { key: 'projects', label: 'Проекты', children: <AdminProjectsTab /> },
+          { key: 'categories', label: 'Категории проектов', children: <AdminCategoriesTab /> },
           { key: 'link-types', label: 'Виды связей', children: linkTypesTab },
         ]}
       />

@@ -19,7 +19,8 @@ export default function ProjectsPage() {
     fetchProjects();
   }, [fetchProjects]);
 
-  const canCreate = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+  // TTMP-137: project creation moved to Admin → Projects section (ADMIN only)
+  const canCreate = hasAnyRequiredRole(user?.role, ['ADMIN']);
 
   const handleCreate = async (values: { name: string; key: string; description?: string }) => {
     try {
