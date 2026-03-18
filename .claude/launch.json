@@ -3,16 +3,15 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "./backend/node_modules/.bin/tsx",
-      "runtimeArgs": ["watch", "backend/src/server.ts"],
-      "port": 3000,
-      "autoPort": true
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "PORT=3002 ./backend/node_modules/.bin/tsx watch backend/src/server.ts"],
+      "port": 3002
     },
     {
       "name": "frontend",
-      "runtimeExecutable": "./frontend/node_modules/.bin/vite",
-      "runtimeArgs": ["--config", "frontend/vite.config.ts", "--root", "frontend"],
-      "port": 5173
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd frontend && node_modules/.bin/vite --port 5180"],
+      "port": 5180
     }
   ]
 }
