@@ -11,6 +11,7 @@ import * as sprintsApi from '../api/sprints';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import AdminProjectsTab from '../components/admin/AdminProjectsTab';
 import AdminCategoriesTab from '../components/admin/AdminCategoriesTab';
+import AdminMonitoringTab from '../components/admin/AdminMonitoringTab';
 
 interface AdminUserRow {
   id: string;
@@ -520,6 +521,7 @@ export default function AdminPage() {
         onChange={(key) => { if (key === 'link-types' && linkTypes.length === 0) void loadLinkTypes(); }}
         items={[
           { key: 'dashboard', label: 'Дашборд', children: dashboardTab },
+          { key: 'monitoring', label: 'Мониторинг', children: <AdminMonitoringTab /> },
           { key: 'projects', label: 'Проекты', children: <AdminProjectsTab /> },
           { key: 'categories', label: 'Категории проектов', children: <AdminCategoriesTab /> },
           { key: 'link-types', label: 'Виды связей', children: linkTypesTab },

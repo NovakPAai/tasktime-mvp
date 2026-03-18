@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 
 import { errorHandler } from './shared/middleware/error-handler.js';
+import { metricsMiddleware } from './shared/middleware/metrics.js';
 import { getReadinessStatus } from './shared/health.js';
 import { features } from './shared/features.js';
 import { swaggerSpec } from './shared/openapi.js';
@@ -24,6 +25,7 @@ import aiRouter from './modules/ai/ai.router.js';
 import webhooksRouter from './modules/webhooks/webhooks.router.js';
 import linksRouter from './modules/links/links.router.js';
 import projectCategoriesRouter from './modules/project-categories/project-categories.router.js';
+import monitoringRouter from './modules/monitoring/monitoring.router.js';
 
 export function createApp() {
   const app = express();
@@ -31,6 +33,7 @@ export function createApp() {
   // Global middleware
   app.use(helmet());
   app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+  app.use(metricsMiddleware);
   app.use(express.json());
   app.use(cookieParser());
 
@@ -83,6 +86,7 @@ export function createApp() {
   }
 
   app.use('/api', linksRouter);
+  app.use('/api/monitoring', monitoringRouter);
 
   // Error handler (must be last)
   app.use(errorHandler);
