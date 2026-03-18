@@ -85,7 +85,7 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     where: { key: 'TTMP' },
     update: {},
     create: {
-      name: 'TaskTime MVP (vibe-code)',
+      name: 'Flow Universe MVP (vibe-code)',
       key: 'TTMP',
       description: 'MVP системы управления проектами и задачами на vibe-code',
       ownerId: admin.id,
@@ -98,9 +98,9 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
       where: { key: 'LIVE' },
       update: {},
       create: {
-        name: 'TaskTime MVP LiveCode',
+        name: 'Flow Universe MVP LiveCode',
         key: 'LIVE',
-        description: 'Живой проект: задачи для разработки TaskTime MVP (vibe-code) самим TaskTime и агентами',
+        description: 'Живой проект: задачи для разработки Flow Universe MVP (vibe-code) самим Flow Universe и агентами',
         ownerId: admin.id,
       },
     });
@@ -109,7 +109,7 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   // TTMP-132: set admin as owner for any projects still missing an owner
   await client.project.updateMany({ where: { ownerId: null }, data: { ownerId: admin.id } });
 
-  // Historical sprints for TaskTime MVP (TTMP)
+  // Historical sprints for Flow Universe MVP (TTMP)
   const sprint0 = await client.sprint.upsert({
     where: { projectId_name: { projectId: mvpProject.id, name: 'Sprint 0 — Развертывание стенда' } },
     update: {},

@@ -1,4 +1,4 @@
-# TaskTime — System Architecture (Final Summary)
+# Flow Universe — System Architecture (Final Summary)
 
 **Purpose:** Single entry point for architecture: diagram, domain model, module layout, and migration roadmap. Start here for any architecture understanding or MVP implementation.  
 **Date:** March 2025

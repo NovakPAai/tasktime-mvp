@@ -1,4 +1,4 @@
-# TaskTime — Kanban Board Architecture
+# Flow Universe — Kanban Board Architecture
 
 **Purpose:** Design a performant Kanban board: drag-and-drop, optimistic updates, issue ordering, and column structure.  
 **Date:** March 2025

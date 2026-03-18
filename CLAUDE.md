@@ -1,4 +1,4 @@
-# TaskTime MVP — Контекст проекта
+# Flow Universe MVP — Контекст проекта
 
 ## Участники и совместная работа
 
@@ -50,7 +50,7 @@ main (защищена: CI + 1 аппрув)
 
 ## Что это
 
-TaskTime — импортозамещение Jira для российского финансового сектора.
+Flow Universe — импортозамещение Jira для российского финансового сектора.
 Конкуренты: Т1 Сфера, EVA, Diasoft.
 
 ## Текущее состояние (2026-03-11)
@@ -305,7 +305,7 @@ MCP_SERVICE_TOKEN=<jwt> docker compose --profile mcp up -d mcp-tasktime
 }
 ```
 
-После подключения Claude Desktop видит инструменты TaskTime и может управлять задачами через natural language.
+После подключения Claude Desktop видит инструменты Flow Universe и может управлять задачами через natural language.
 
 **Swagger UI:** `GET /api/docs` — интерактивная документация API.
 **OpenAPI JSON:** `GET /api/docs/json` — для openapi-to-mcp и других клиентов.

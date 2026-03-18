@@ -106,27 +106,31 @@ export default function LoginPage() {
         {/* Логотип */}
         <div className="moex-logo">
           <div className="moex-logo-icon">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <line x1="8" y1="8" x2="3" y2="3" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
-              <line x1="8" y1="8" x2="13" y2="4" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
-              <line x1="8" y1="8" x2="13" y2="12" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
-              <line x1="8" y1="8" x2="4" y2="13" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
-              <line x1="8" y1="8" x2="8" y2="2" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
-              <circle cx="8" cy="8" r="2.2" fill="white" />
-              <circle cx="3" cy="3" r="1.2" fill="rgba(255,255,255,0.7)" />
-              <circle cx="13" cy="4" r="1.2" fill="rgba(255,255,255,0.7)" />
-              <circle cx="13" cy="12" r="1.2" fill="rgba(255,255,255,0.7)" />
-              <circle cx="4" cy="13" r="1.2" fill="rgba(255,255,255,0.7)" />
-              <circle cx="8" cy="2" r="1.2" fill="rgba(255,255,255,0.7)" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Логотип Flow Universe - стилизованные волны и поток */}
+              <defs>
+                <linearGradient id="fuGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,1)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0.8)" />
+                </linearGradient>
+              </defs>
+              {/* Верхняя волна */}
+              <path d="M 4 12 Q 8 8, 12 12 T 20 12" stroke="url(#fuGrad)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+              {/* Средняя волна */}
+              <path d="M 3 15 Q 8 11, 12 15 T 21 15" stroke="url(#fuGrad)" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.7" />
+              {/* Нижняя волна */}
+              <path d="M 4 18 Q 8 14, 12 18 T 20 18" stroke="url(#fuGrad)" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.5" />
+              {/* Центральная точка потока */}
+              <circle cx="12" cy="12" r="2.5" fill="white" opacity="0.9" />
             </svg>
           </div>
-          <span className="moex-logo-text">MOEX Flow Universe</span>
+          <span className="moex-logo-text">Flow Universe</span>
         </div>
 
         {/* Форма */}
         <div className="moex-form-wrap">
           <h1 className="moex-heading">Войти в систему</h1>
-          <p className="moex-subheading">Добро пожаловать в MOEX Flow Universe</p>
+          <p className="moex-subheading">Добро пожаловать в Flow Universe</p>
 
           {/* Табы */}
           <div className="moex-tabs">
@@ -218,7 +222,7 @@ export default function LoginPage() {
         </div>
 
         {/* Футер */}
-        <div className="moex-footer">© 2025 MOEX Flow Universe</div>
+        <div className="moex-footer">© 2025 Flow Universe</div>
       </div>
 
       {/* ─── Правая панель (космос) ─── */}

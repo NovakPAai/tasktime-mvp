@@ -139,4 +139,4 @@
 | **TTMP-83** | TASK | Backend: `POST /api/ai/estimate` с `issueId`/`issueKey`, DTO и `getIssueByKey` в порядке. Frontend: кнопка «Оценить трудоёмкость», блок Details с «Estimated X.X h». Готово к DONE. |
 | **TTMP-84** | TASK | Backend: `POST /api/ai/decompose` с `issueId`/`issueKey`, создание SUBTASK из пунктов описания. Frontend: кнопка «Декомпозировать в подзадачи», блок Sub-issues. Готово к DONE. |
 
-**Примечание:** MCP `user-user-tasktime-issues` при проверке вернул ошибку (бэкенд TaskTime мог быть недоступен). Статусы `aiExecutionStatus` (IN_PROGRESS/DONE) при необходимости обнови вручную в UI или повтори вызов MCP при запущенном бэкенде.
+**Примечание:** MCP `user-user-tasktime-issues` при проверке вернул ошибку (бэкенд Flow Universe мог быть недоступен). Статусы `aiExecutionStatus` (IN_PROGRESS/DONE) при необходимости обнови вручную в UI или повтори вызов MCP при запущенном бэкенде.

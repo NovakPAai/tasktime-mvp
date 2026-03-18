@@ -1,4 +1,4 @@
-# TaskTime MVP — Simplified Domain Model
+# Flow Universe MVP — Simplified Domain Model
 
 **Purpose:** Minimal domain model for the MVP. Reduces complexity to speed up delivery; advanced features are documented as future scope.  
 **Date:** March 2025

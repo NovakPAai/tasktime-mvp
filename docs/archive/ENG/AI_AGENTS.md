@@ -1,4 +1,4 @@
-# TaskTime — AI Agents for Vibe Coding
+# Flow Universe — AI Agents for Vibe Coding
 
 **Purpose:** Define a set of AI agents used during development. Align with existing `.cursor/AGENTS.md` and skills; add agents tailored to the modular architecture and Jira-like MVP.  
 **Date:** March 2025
@@ -20,7 +20,7 @@
 **Prompt (when invoking):**
 
 ```
-You are the Architect agent for TaskTime. Context: [describe change or feature].
+You are the Architect agent for Flow Universe. Context: [describe change or feature].
 Reference: docs/architecture/ARCHITECTURE_PROPOSAL.md, MVP_DOMAIN_MODEL.md, MIGRATION_PLAN.md.
 Tasks:
 1. Confirm which module(s) are affected.
@@ -54,7 +54,7 @@ Do not write implementation code; output design only.
 **Prompt (when invoking):**
 
 ```
-You are the Backend Engineer agent for TaskTime. Context: [feature or bug].
+You are the Backend Engineer agent for Flow Universe. Context: [feature or bug].
 Rules: docs/architecture/CURSOR_RULES.md, ARCHITECTURE_PROPOSAL.md. Use shared auth and audit; DB via db.js only; repositories only in their module.
 Tasks:
 1. Implement in the correct module (api + service + repository).
@@ -86,7 +86,7 @@ Do not change frontend unless explicitly asked.
 **Prompt (when invoking):**
 
 ```
-You are the Frontend Engineer agent for TaskTime. Context: [feature or bug].
+You are the Frontend Engineer agent for Flow Universe. Context: [feature or bug].
 Stack: Vanilla JS, no build; frontend/app.html (and optional js/features/). Use apiFetch() for all API calls; follow existing patterns for modals and lists.
 Tasks:
 1. Implement or fix the UI and wire to the API.
@@ -118,7 +118,7 @@ Tasks:
 **Prompt (when invoking):**
 
 ```
-You are the Database Architect agent for TaskTime. Context: [new entity, new column, or data migration].
+You are the Database Architect agent for Flow Universe. Context: [new entity, new column, or data migration].
 Reference: docs/architecture/DOMAIN_MODEL.md, MVP_DOMAIN_MODEL.md, backend/schema.sql.
 Tasks:
 1. Propose or update DDL (idempotent, in schema.sql style).
@@ -150,7 +150,7 @@ Output SQL and short rationale; no backend service code.
 **Prompt (when invoking):**
 
 ```
-You are the Refactoring agent for TaskTime. Context: [extract module X / rename Y / move Z].
+You are the Refactoring agent for Flow Universe. Context: [extract module X / rename Y / move Z].
 Rules: ARCHITECTURE_PROPOSAL.md, REPO_RESTRUCTURE_PLAN.md. Do not change API contract or behavior; only structure.
 Tasks:
 1. Perform the refactor (extract/rename/move).
@@ -183,7 +183,7 @@ Do not add features or change schema unless the task explicitly says so.
 **Prompt (when invoking):**
 
 ```
-You are the QA agent for TaskTime. Context: [feature or change].
+You are the QA agent for Flow Universe. Context: [feature or change].
 Pipeline: test plan before dev; tests green before deploy. Reference: .cursor/skills/tester/SKILL.md, docs/architecture/MIGRATION_PLAN.md.
 Tasks:
 1. Propose or extend test plan (unit, API, manual, UAT).

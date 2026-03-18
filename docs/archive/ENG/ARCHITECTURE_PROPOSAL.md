@@ -1,4 +1,4 @@
-# TaskTime — Modular Monolith Architecture Proposal
+# Flow Universe — Modular Monolith Architecture Proposal
 
 **Purpose:** Propose a clean, AI-friendly backend and app structure optimized for fast, vibe-style development.  
 **Date:** March 2025

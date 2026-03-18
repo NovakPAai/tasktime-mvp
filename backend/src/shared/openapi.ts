@@ -1,13 +1,13 @@
 /**
- * TaskTime OpenAPI спецификация.
+ * Flow Universe OpenAPI спецификация.
  * Используется swagger-ui-express для /api/docs и openapi-to-mcp для MCP-прокси.
  */
 export const swaggerSpec = {
   openapi: '3.0.0',
   info: {
-    title: 'TaskTime API',
+    title: 'Flow Universe API',
     version: '1.0.0',
-    description: 'REST API для TaskTime MVP — управление проектами и задачами',
+    description: 'REST API для Flow Universe MVP — управление проектами и задачами',
   },
   servers: [{ url: '/api', description: 'API' }],
   components: {

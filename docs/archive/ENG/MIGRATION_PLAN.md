@@ -1,4 +1,4 @@
-# TaskTime — Safe Incremental Migration Plan
+# Flow Universe — Safe Incremental Migration Plan
 
 **Purpose:** Phased migration from current monolith to modular architecture and (optionally) to the new domain model, without breaking the running MVP.  
 **Date:** March 2025

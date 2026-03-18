@@ -59,7 +59,7 @@ describe('seedDatabase', () => {
       {
         id: ttmpProject?.id,
         key: 'TTMP',
-        name: 'TaskTime MVP (vibe-code)',
+        name: 'Flow Universe MVP (vibe-code)',
       },
     ]);
     expect(await prisma.sprint.count()).toBe(6);

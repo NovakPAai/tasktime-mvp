@@ -1,4 +1,4 @@
-# Contributing to TaskTime MVP
+# Contributing to Flow Universe MVP
 
 > Руководство для участников проекта. Язык разработки — TypeScript, стек описан в `CLAUDE.md`.
 

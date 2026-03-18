@@ -1,4 +1,4 @@
-# TaskTime MVP — План пересборки с нуля (v2)
+# Flow Universe MVP — План пересборки с нуля (v2)
 
 **Дата:** 2026-03-09
 **Статус:** В работе (Sprint 2 запущен)
@@ -672,7 +672,7 @@ model AuditLog {
 
 ### Sprint 5: AI Dev Loop + OpenAPI → MCP
 
-**Цель:** Замена ручного MCP-сервера на автогенерацию инструментов из OpenAPI-спецификации; подключение Claude Desktop к TaskTime через MCP-прокси; переключаемый LLM-провайдер.
+**Цель:** Замена ручного MCP-сервера на автогенерацию инструментов из OpenAPI-спецификации; подключение Claude Desktop к Flow Universe через MCP-прокси; переключаемый LLM-провайдер.
 
 **Контекст:** Оценка подхода "OpenAPI as MCP replacement" — вместо написания кастомного MCP-сервера генерировать инструменты из существующей OpenAPI-спецификации через `openapi-to-mcp`. Это устраняет дублирование контракта и позволяет автоматически добавлять новые эндпоинты в Claude Desktop без ручной поддержки MCP-слоя.
 
@@ -688,7 +688,7 @@ model AuditLog {
 - `GET /api/docs` — Swagger UI с полной спецификацией API
 - `GET /api/docs/json` — OpenAPI JSON для внешних клиентов
 - `docker compose --profile mcp up mcp-tasktime` — MCP-прокси запускается
-- Claude Desktop видит инструменты TaskTime и может управлять задачами через natural language
+- Claude Desktop видит инструменты Flow Universe и может управлять задачами через natural language
 - AI-провайдер переключается через `AI_PROVIDER=anthropic|heuristic` без правки кода
 - Feature flags управляют регистрацией роутеров (AI, GitLab, MCP) при старте
 

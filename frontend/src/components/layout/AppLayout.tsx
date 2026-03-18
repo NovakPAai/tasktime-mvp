@@ -127,7 +127,7 @@ export default function AppLayout() {
         <div className="tt-sidebar-header">
           <div className="tt-workspace-dot" />
           <Typography.Text className="tt-sidebar-workspace-name">
-            TaskTime
+            Flow Universe
           </Typography.Text>
           {/* Кнопка закрытия — видна только на мобиле внутри сайдбара */}
           <Button
