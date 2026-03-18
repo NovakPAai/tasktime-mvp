@@ -40,21 +40,40 @@ export default function App() {
   const antTheme = {
     algorithm: isLight ? antdTheme.defaultAlgorithm : antdTheme.darkAlgorithm,
     token: {
+      // Передаём конкретные hex-значения — Ant Design разрешает токены в JS,
+      // CSS vars там не работают. colorBgElevated фиксирует тёмный фон
+      // для Select/Dropdown/Modal/Popover попапов
       colorPrimary: isLight ? '#5e6ad2' : '#7b86ff',
+      colorPrimaryHover: isLight ? '#7b86ff' : '#9aa4ff',
       colorBgBase: isLight ? '#f5f5f7' : '#111117',
       colorBgContainer: isLight ? '#ffffff' : '#181821',
-      colorBgElevated: isLight ? '#ffffff' : '#1c1c24',
+      colorBgElevated: isLight ? '#ffffff' : '#1e1e2a',   // попапы, модалки, дропдауны
+      colorBgSpotlight: isLight ? '#f0f0f4' : '#252535',  // тултипы
       colorBgLayout: isLight ? '#eaeaed' : '#08080b',
       colorText: isLight ? '#1a1a2e' : '#e2e2e8',
+      colorTextBase: isLight ? '#1a1a2e' : '#e2e2e8',
       colorTextSecondary: isLight ? '#5a5a72' : '#8c8c9e',
-      colorTextTertiary: isLight ? '#9a9aaa' : '#6e6e82',
-      colorTextDisabled: isLight ? '#c0c0cc' : '#52526a',
-      colorTextPlaceholder: isLight ? '#c0c0cc' : '#52526a',
+      colorTextTertiary: isLight ? '#9a9aaa' : '#555566',
+      colorTextDisabled: isLight ? '#c0c0cc' : '#3a3a4a',
+      colorTextPlaceholder: isLight ? '#c0c0cc' : '#3a3a4a',
+      colorFill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+      colorFillSecondary: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+      colorFillTertiary: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+      colorSplit: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)',
       colorBorder: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.10)',
       colorBorderSecondary: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.07)',
-      borderRadius: 4,
+      borderRadius: 6,
+      borderRadiusSM: 4,
+      borderRadiusLG: 10,
       fontFamily: 'Inter, -apple-system, system-ui, sans-serif',
-      fontSize: 14,
+      fontSize: 13,
+      fontSizeSM: 12,
+      controlHeight: 32,
+      controlHeightSM: 26,
+      controlHeightLG: 38,
+      lineWidth: 1,
+      motionDurationMid: '0.12s',
+      motionDurationSlow: '0.18s',
     },
   };
 

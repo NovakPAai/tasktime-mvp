@@ -421,22 +421,64 @@ body {
   background-color: transparent;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   padding: 0 16px;
-  gap: 12px;
+  gap: 10px;
+}
+
+/* Гамбургер — по умолчанию скрыт, появляется только на мобиле */
+.tt-mobile-hamburger {
+  display: none !important;
+  color: var(--t2) !important;
+  border: none !important;
+  background: transparent !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  flex-shrink: 0;
+}
+
+.tt-mobile-hamburger:hover {
+  color: var(--t1) !important;
+  background: var(--bg-hover) !important;
+}
+
+/* Правая часть топбара */
+.tt-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 
 .tt-topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tt-topbar-user-name {
   font-size: 13px;
   color: var(--t2);
 }
 
-.tt-topbar-logout {
-  border-color: var(--b2);
-  background: transparent;
-  font-size: 12px;
+.tt-topbar-role {
+  font-size: 11px;
   font-weight: 500;
-  color: var(--t2);
+  color: var(--t3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--b);
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.2px;
+}
+
+.tt-topbar-logout {
+  border-color: var(--b2) !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  color: var(--t2) !important;
+  height: 26px !important;
 }
 
 .tt-topbar-logout:hover {
@@ -2879,5 +2921,482 @@ body {
 .tt-time-summary-muted {
   font-size: 12px;
   color: var(--t4);
+}
+
+/* =========================================================
+   ANT DESIGN DROPDOWN / SELECT POPUP — ТЁМНАЯ ТЕМА
+   Ant Design передаёт colorBgElevated в попапы, но для
+   надёжности дублируем через CSS-классы
+   ========================================================= */
+
+/* Select popup */
+.ant-select-dropdown {
+  background-color: #1e1e2a !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75), 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+  border-radius: 8px !important;
+  padding: 4px !important;
+}
+
+.ant-select-item {
+  color: #8c8c9e !important;
+  font-size: 12.5px !important;
+  border-radius: 5px !important;
+  min-height: 30px !important;
+  padding: 5px 8px !important;
+}
+
+.ant-select-item-option-active:not(.ant-select-item-option-disabled),
+.ant-select-item:hover:not(.ant-select-item-option-disabled) {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #e2e2e8 !important;
+}
+
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: rgba(123, 134, 255, 0.15) !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+.ant-select-item-option-selected .ant-select-item-option-state {
+  color: #7b86ff !important;
+}
+
+.ant-select-item-group {
+  color: #555566 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Dropdown меню (Table column filters, Button.Dropdown, etc.) */
+.ant-dropdown .ant-dropdown-menu,
+.ant-dropdown-menu {
+  background-color: #1e1e2a !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75) !important;
+  border-radius: 8px !important;
+  padding: 4px !important;
+}
+
+.ant-dropdown-menu-item,
+.ant-dropdown-menu-submenu-title {
+  color: #8c8c9e !important;
+  font-size: 12.5px !important;
+  border-radius: 5px !important;
+}
+
+.ant-dropdown-menu-item:hover,
+.ant-dropdown-menu-submenu-title:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #e2e2e8 !important;
+}
+
+.ant-dropdown-menu-item-selected,
+.ant-dropdown-menu-item.ant-dropdown-menu-item-active {
+  background-color: rgba(123, 134, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+.ant-dropdown-menu-item-divider {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* Popover */
+.ant-popover .ant-popover-inner {
+  background-color: #1e1e2a !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75) !important;
+  border-radius: 8px !important;
+}
+
+.ant-popover .ant-popover-arrow::before,
+.ant-popover .ant-popover-arrow::after {
+  background: #1e1e2a !important;
+}
+
+/* Tooltip */
+.ant-tooltip .ant-tooltip-inner {
+  background-color: #252535 !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  color: #e2e2e8 !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+}
+
+.ant-tooltip .ant-tooltip-arrow::before {
+  background: #252535 !important;
+}
+
+/* Modal */
+.ant-modal .ant-modal-content {
+  background-color: #1c1c28 !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.85) !important;
+  border-radius: 12px !important;
+}
+
+.ant-modal .ant-modal-header {
+  background-color: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.ant-modal .ant-modal-title {
+  color: #e2e2e8 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+.ant-modal .ant-modal-close {
+  color: #8c8c9e !important;
+}
+
+.ant-modal .ant-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #e2e2e8 !important;
+}
+
+.ant-modal .ant-modal-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: transparent !important;
+}
+
+/* DatePicker / TimePicker popup */
+.ant-picker-dropdown .ant-picker-panel-container {
+  background-color: #1e1e2a !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75) !important;
+  border-radius: 8px !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell-in-view {
+  color: #e2e2e8 !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell:not(.ant-picker-cell-in-view) {
+  color: #3a3a4a !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell-selected .ant-picker-cell-inner {
+  background-color: #7b86ff !important;
+}
+
+/* =========================================================
+   ТАБЛИЦЫ — горизонтальный скролл, sticky первая колонка
+   ========================================================= */
+
+/* Обёртка таблицы должна скроллиться горизонтально */
+.tt-table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Таблица не сужается меньше минимума */
+.tt-table .ant-table {
+  min-width: 600px;
+}
+
+/* Первая колонка — sticky */
+.tt-table .ant-table-thead > tr > th:first-child,
+.tt-table .ant-table-tbody > tr > td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background-color: #14141a;
+}
+
+.tt-table .ant-table-tbody > tr > td:first-child {
+  background-color: #181821;
+}
+
+.tt-table .ant-table-tbody > tr:hover > td:first-child {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Бордер-тень для sticky колонки */
+.tt-table .ant-table-thead > tr > th:first-child::after,
+.tt-table .ant-table-tbody > tr > td:first-child::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  bottom: 0;
+  width: 8px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.25), transparent);
+  pointer-events: none;
+}
+
+/* =========================================================
+   МОБИЛЬНЫЙ САЙДБАР — overlay-паттерн
+   ========================================================= */
+
+/* Backdrop под сайдбаром */
+.tt-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(3px);
+  z-index: 999;
+  cursor: pointer;
+}
+
+/* Кнопка закрытия внутри сайдбара — скрыта на десктопе */
+.tt-sidebar-close-btn {
+  display: none !important;
+  margin-left: auto;
+  color: var(--t3) !important;
+}
+
+/* =========================================================
+   RESPONSIVE BREAKPOINTS
+   ========================================================= */
+
+/* --- Планшет (≤1024px) --- */
+@media (max-width: 1024px) {
+  .tt-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tt-two-column {
+    flex-direction: column;
+  }
+
+  .tt-two-column-aside {
+    width: 100%;
+  }
+
+  .tt-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tt-team-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* --- Мобильный (≤768px) --- */
+@media (max-width: 768px) {
+
+  /* Показываем гамбургер */
+  .tt-mobile-hamburger {
+    display: flex !important;
+  }
+
+  /* Сайдбар — фиксированный оверлей, скрытый по умолчанию */
+  .tt-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    z-index: 1000 !important;
+    transform: translateX(-100%);
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.22s ease;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  /* Сайдбар открыт */
+  .tt-sidebar--open {
+    transform: translateX(0) !important;
+    box-shadow: 4px 0 40px rgba(0, 0, 0, 0.75) !important;
+  }
+
+  /* Backdrop активен */
+  .tt-sidebar-backdrop {
+    display: block;
+  }
+
+  /* Кнопка закрытия внутри сайдбара */
+  .tt-sidebar-close-btn {
+    display: flex !important;
+  }
+
+  /* Основная область растягивается на всю ширину */
+  .tt-main {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Контент: убираем задний border-radius и тяжёлые тени */
+  .tt-main::before {
+    border-radius: 0;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+  }
+
+  /* Уменьшаем паддинг контента */
+  .tt-content {
+    padding: 12px 14px 20px;
+  }
+
+  /* Топбар — чуть компактнее */
+  .tt-topbar {
+    padding: 0 12px;
+    height: 44px;
+  }
+
+  /* Имя пользователя скрываем на очень маленьких экранах */
+  .tt-topbar-user-name {
+    display: none;
+  }
+
+  /* Заголовки страниц */
+  .tt-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .tt-page-title {
+    font-size: 18px;
+  }
+
+  .tt-page-actions {
+    width: 100%;
+  }
+
+  /* Таблицы на мобиле */
+  .tt-table {
+    margin-left: -14px;
+    margin-right: -14px;
+    width: calc(100% + 28px);
+    border-radius: 0;
+  }
+
+  .tt-table .ant-table-container {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  /* Стата — одна колонка */
+  .tt-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Команды — одна колонка */
+  .tt-team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tt-team-meta-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tt-team-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Фильтры переносятся */
+  .tt-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tt-filter-group {
+    width: 100%;
+  }
+
+  .tt-filter-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Борд — горизонтальный скролл */
+  .tt-board-columns {
+    padding-bottom: 16px;
+  }
+
+  /* Карточки задач в drawere */
+  .tt-sprint-drawer-summary-body {
+    flex-direction: column;
+  }
+
+  .tt-sprint-drawer-metrics {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Тулбар фильтра */
+  .tt-board-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .tt-board-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* --- Совсем маленькие (≤480px) --- */
+@media (max-width: 480px) {
+  .tt-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tt-team-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .tt-topbar-logout .tt-topbar-logout-label {
+    display: none;
+  }
+
+  .tt-page-title {
+    font-size: 16px;
+  }
+
+  .tt-content {
+    padding: 10px 12px 16px;
+  }
+}
+
+/* =========================================================
+   LOGIN PAGE — мобильная адаптация
+   ========================================================= */
+
+/* Убираем фиксированный min-width на мобиле */
+@media (max-width: 768px) {
+  .moex-shell {
+    min-width: 0;
+    flex-direction: column;
+  }
+
+  .moex-left {
+    width: 100%;
+    flex-shrink: 0;
+    padding: 24px 24px 32px;
+    min-height: 100dvh;
+  }
+
+  /* Правую панель (космос) скрываем на мобиле */
+  .moex-right {
+    display: none;
+  }
+
+  .moex-heading {
+    font-size: 20px;
+  }
+
+  .moex-hero-title {
+    font-size: 36px;
+    letter-spacing: -1px;
+  }
+}
+
+@media (max-width: 480px) {
+  .moex-left {
+    padding: 20px 20px 28px;
+  }
 }
 

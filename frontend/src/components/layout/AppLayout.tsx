@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Layout, Menu, Button, Typography, Switch, Tooltip } from 'antd';
 import {
   ProjectOutlined,
@@ -10,6 +11,8 @@ import {
   CalendarOutlined,
   ApartmentOutlined,
   DeploymentUnitOutlined,
+  MenuOutlined,
+  CloseOutlined,
   BulbOutlined,
   BulbFilled,
 } from '@ant-design/icons';
@@ -28,9 +31,29 @@ export default function AppLayout() {
   const { mode, toggle } = useThemeStore();
   const isLight = mode === 'light';
 
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Закрываем сайдбар при смене маршрута
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Блокируем скролл body пока мобильный сайдбар открыт
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const handleNav = (key: string) => {
+    if (key.startsWith('/')) {
+      navigate(key);
+      setMobileOpen(false);
+    }
   };
 
   const mainItems = [
@@ -39,7 +62,7 @@ export default function AppLayout() {
     {
       key: '/business-teams',
       icon: <ApartmentOutlined />,
-      label: 'Бизнес-функциональные команды',
+      label: 'Бизнес-команды',
     },
     {
       key: '/flow-teams',
@@ -59,7 +82,7 @@ export default function AppLayout() {
     {
       key: '/uat',
       icon: <CheckCircleOutlined />,
-      label: 'UAT чек-листы (MVP)',
+      label: 'UAT чек-листы',
     },
   ];
 
@@ -73,25 +96,41 @@ export default function AppLayout() {
     {
       type: 'group' as const,
       key: 'tools',
-      label: 'Инструменты MVP',
+      label: 'Инструменты',
       children: toolsItems,
     },
   ];
 
   return (
     <Layout className="tt-app-shell">
+      {/* Backdrop-оверлей — только на мобильных, когда сайдбар открыт */}
+      {mobileOpen && (
+        <div
+          className="tt-sidebar-backdrop"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       <Sider
         width={220}
         theme={isLight ? 'light' : 'dark'}
-        breakpoint="lg"
-        collapsedWidth={80}
-        className="tt-sidebar"
+        className={`tt-sidebar${mobileOpen ? ' tt-sidebar--open' : ''}`}
       >
         <div className="tt-sidebar-header">
           <div className="tt-workspace-dot" />
           <Typography.Text className="tt-sidebar-workspace-name">
             TaskTime
           </Typography.Text>
+          {/* Кнопка закрытия — видна только на мобиле внутри сайдбара */}
+          <Button
+            className="tt-sidebar-close-btn"
+            type="text"
+            size="small"
+            icon={<CloseOutlined />}
+            onClick={() => setMobileOpen(false)}
+            aria-label="Закрыть меню"
+          />
         </div>
         <Menu
           theme={isLight ? 'light' : 'dark'}
@@ -99,38 +138,49 @@ export default function AppLayout() {
           selectedKeys={[location.pathname]}
           items={menuItems}
           className="tt-sidebar-menu"
-          onClick={({ key }) => {
-            if (typeof key === 'string' && key.startsWith('/')) {
-              navigate(key);
-            }
-          }}
+          onClick={({ key }) => handleNav(key as string)}
         />
       </Sider>
+
       <Layout className="tt-main">
         <Header className="tt-topbar">
-          <Typography.Text className="tt-topbar-user">
-            {user?.name} ({user?.role})
-          </Typography.Text>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Tooltip title={isLight ? 'Переключить на тёмную тему' : 'Переключить на светлую тему'}>
+          {/* Гамбургер — виден только на мобиле */}
+          <Button
+            className="tt-mobile-hamburger"
+            type="text"
+            icon={<MenuOutlined />}
+            onClick={() => setMobileOpen(true)}
+            aria-label="Открыть меню"
+          />
+
+          <div className="tt-topbar-right">
+            <Tooltip title={isLight ? 'Тёмная тема' : 'Светлая тема'}>
               <Switch
                 size="small"
                 checked={isLight}
                 onChange={toggle}
                 checkedChildren={<BulbFilled />}
                 unCheckedChildren={<BulbOutlined />}
+                className="tt-theme-switch"
               />
             </Tooltip>
+
+            <Typography.Text className="tt-topbar-user">
+              <span className="tt-topbar-user-name">{user?.name}</span>
+              <span className="tt-topbar-role">{user?.role}</span>
+            </Typography.Text>
+
             <Button
               size="small"
               icon={<LogoutOutlined />}
               className="tt-topbar-logout"
               onClick={handleLogout}
             >
-              Logout
+              <span className="tt-topbar-logout-label">Logout</span>
             </Button>
           </div>
         </Header>
+
         <Content className="tt-content">
           <Outlet />
           <UatOnboardingOverlay />
