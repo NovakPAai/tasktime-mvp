@@ -36,7 +36,7 @@ export async function estimateIssue(dto: AiEstimateDto) {
 
     await prisma.issue.update({
       where: { id: issue.id },
-      data: { estimatedHours: hours },
+      data: { estimatedHours: hours, aiReasoning: reasoning },
     });
 
     await setAiStatus(issueId, 'DONE');
@@ -46,6 +46,85 @@ export async function estimateIssue(dto: AiEstimateDto) {
     await setAiStatus(issueId, 'FAILED').catch(() => {});
     throw err;
   }
+}
+
+export async function suggestAssignee(dto: { issueId?: string; issueKey?: string }) {
+  const issueId = await resolveIssueId(dto);
+
+  const issue = await prisma.issue.findUnique({
+    where: { id: issueId },
+    select: { id: true, projectId: true, sprintId: true },
+  });
+  if (!issue) throw new AppError(404, 'Issue not found');
+
+  // Find active sprint for the project
+  const activeSprint = await prisma.sprint.findFirst({
+    where: { projectId: issue.projectId, state: 'ACTIVE' },
+    select: { id: true },
+  });
+
+  const sprintId = issue.sprintId ?? activeSprint?.id;
+
+  // Get all users with their logged hours in the current sprint (or last 7 days)
+  const since = sprintId
+    ? undefined
+    : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const users = await prisma.user.findMany({
+    where: { isActive: true, role: { in: ['USER', 'MANAGER'] } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      timeLogs: {
+        where: {
+          ...(sprintId
+            ? { issue: { sprintId } }
+            : { createdAt: { gte: since } }),
+        },
+        select: { hours: true },
+      },
+      assignedIssues: {
+        where: {
+          status: { in: ['OPEN', 'IN_PROGRESS', 'REVIEW'] },
+          ...(sprintId ? { sprintId } : {}),
+        },
+        select: { id: true },
+      },
+    },
+  });
+
+  const ranked = users
+    .map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      loggedHours: u.timeLogs.reduce((sum, l) => sum + Number(l.hours), 0),
+      openIssues: u.assignedIssues.length,
+    }))
+    .sort((a, b) => a.loggedHours - b.loggedHours || a.openIssues - b.openIssues);
+
+  const suggested = ranked[0] ?? null;
+
+  return {
+    issueId,
+    suggested: suggested
+      ? {
+          userId: suggested.id,
+          name: suggested.name,
+          email: suggested.email,
+          loggedHours: suggested.loggedHours,
+          openIssues: suggested.openIssues,
+          reason: `Наименьшая нагрузка в спринте: ${suggested.loggedHours}ч, ${suggested.openIssues} задач`,
+        }
+      : null,
+    candidates: ranked.slice(0, 5).map((u) => ({
+      userId: u.id,
+      name: u.name,
+      loggedHours: u.loggedHours,
+      openIssues: u.openIssues,
+    })),
+  };
 }
 
 export async function decomposeIssue(dto: AiDecomposeDto, creatorId: string) {

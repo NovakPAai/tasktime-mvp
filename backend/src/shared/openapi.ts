@@ -444,6 +444,65 @@ export const swaggerSpec = {
         },
       },
     },
+    '/ai/suggest-assignee': {
+      post: {
+        tags: ['ai'],
+        summary: 'AI-предложение исполнителя по минимальной нагрузке',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  issueId: { type: 'string', format: 'uuid' },
+                  issueKey: { type: 'string', example: 'TTMP-42' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Предложенный исполнитель и список кандидатов',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    issueId: { type: 'string' },
+                    suggested: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        userId: { type: 'string' },
+                        name: { type: 'string' },
+                        email: { type: 'string' },
+                        loggedHours: { type: 'number' },
+                        openIssues: { type: 'integer' },
+                        reason: { type: 'string' },
+                      },
+                    },
+                    candidates: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          userId: { type: 'string' },
+                          name: { type: 'string' },
+                          loggedHours: { type: 'number' },
+                          openIssues: { type: 'integer' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/issues/{id}/ai-status': {
       patch: {
         tags: ['ai'],

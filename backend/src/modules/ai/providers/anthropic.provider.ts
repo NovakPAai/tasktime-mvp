@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { LlmProvider, EstimateResult, DecomposeResult } from './llm-provider.interface.js';
+import { HeuristicProvider } from './heuristic.provider.js';
 
 const estimateSchema = z.object({
   hours: z.number().min(0.5).max(40),
@@ -23,6 +24,7 @@ function extractJson(raw: string): string {
 
 export class AnthropicProvider implements LlmProvider {
   private client: Anthropic;
+  private fallback = new HeuristicProvider();
 
   constructor() {
     this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -39,16 +41,21 @@ export class AnthropicProvider implements LlmProvider {
       .filter(Boolean)
       .join('\n');
 
-    const msg = await this.client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: 'You are a senior software engineer estimating task complexity. Reply only with valid JSON.',
-      messages: [{ role: 'user', content: prompt }],
-    });
+    try {
+      const msg = await this.client.messages.create({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: 'You are a senior software engineer estimating task complexity. Reply only with valid JSON.',
+        messages: [{ role: 'user', content: prompt }],
+      });
 
-    const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
-    const json = JSON.parse(extractJson(text));
-    return estimateSchema.parse(json);
+      const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const json = JSON.parse(extractJson(text));
+      return estimateSchema.parse(json);
+    } catch (err) {
+      console.warn('[AnthropicProvider] estimateIssue failed, falling back to heuristic:', (err as Error).message);
+      return this.fallback.estimateIssue(title, description);
+    }
   }
 
   async decomposeIssue(
@@ -67,15 +74,20 @@ export class AnthropicProvider implements LlmProvider {
       .filter(Boolean)
       .join('\n');
 
-    const msg = await this.client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: 'You are a senior software engineer decomposing tasks. Reply only with valid JSON.',
-      messages: [{ role: 'user', content: prompt }],
-    });
+    try {
+      const msg = await this.client.messages.create({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: 'You are a senior software engineer decomposing tasks. Reply only with valid JSON.',
+        messages: [{ role: 'user', content: prompt }],
+      });
 
-    const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
-    const json = JSON.parse(extractJson(text));
-    return decomposeSchema.parse(json);
+      const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const json = JSON.parse(extractJson(text));
+      return decomposeSchema.parse(json);
+    } catch (err) {
+      console.warn('[AnthropicProvider] decomposeIssue failed, falling back to heuristic:', (err as Error).message);
+      return this.fallback.decomposeIssue(title, description, type);
+    }
   }
 }
