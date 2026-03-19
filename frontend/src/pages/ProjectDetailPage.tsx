@@ -29,6 +29,12 @@ function buildTree(issues: Issue[]): Issue[] {
       roots.push(issue);
     }
   }
+  // Remove empty children arrays so Ant Design doesn't show expand icon for leaf nodes
+  for (const node of map.values()) {
+    if (node.children && node.children.length === 0) {
+      delete (node as Issue & { children?: Issue[] }).children;
+    }
+  }
   return roots;
 }
 
