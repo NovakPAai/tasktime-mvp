@@ -1,5 +1,43 @@
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
 export type IssueType = 'EPIC' | 'STORY' | 'TASK' | 'SUBTASK' | 'BUG';
+
+export interface IssueTypeConfig {
+  id: string;
+  name: string;
+  description?: string | null;
+  iconName: string;
+  iconColor: string;
+  isSubtask: boolean;
+  isEnabled: boolean;
+  isSystem: boolean;
+  systemKey?: string | null;
+  orderIndex: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IssueTypeSchemeItem {
+  id: string;
+  orderIndex: number;
+  typeConfig: IssueTypeConfig;
+}
+
+export interface IssueTypeSchemeProject {
+  id: string;
+  projectId: string;
+  project: { id: string; name: string; key: string };
+}
+
+export interface IssueTypeScheme {
+  id: string;
+  name: string;
+  description?: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  items: IssueTypeSchemeItem[];
+  projects: IssueTypeSchemeProject[];
+}
 export type IssueStatus = 'OPEN' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'CANCELLED';
 export type IssuePriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type AiExecutionStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'DONE' | 'FAILED';
@@ -44,7 +82,9 @@ export interface Issue {
   title: string;
   description?: string;
   acceptanceCriteria?: string | null;
-  type: IssueType;
+  type: IssueType | null;
+  issueTypeConfigId?: string | null;
+  issueTypeConfig?: IssueTypeConfig | null;
   status: IssueStatus;
   priority: IssuePriority;
   aiEligible?: boolean;

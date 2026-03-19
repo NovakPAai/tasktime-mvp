@@ -295,7 +295,7 @@ export default function BoardPage() {
               placeholder="None (top level)"
               style={{ width: '100%' }}
               options={allBoardIssues
-                .filter((i) => ['EPIC', 'STORY', 'TASK'].includes(i.type))
+                .filter((i) => i.type != null && ['EPIC', 'STORY', 'TASK'].includes(i.type))
                 .map((i) => ({
                   value: i.id,
                   label: `${project.key}-${i.number} ${i.title}`,

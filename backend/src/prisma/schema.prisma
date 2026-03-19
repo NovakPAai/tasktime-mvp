@@ -82,8 +82,72 @@ model Project {
   issues   Issue[]
   sprints  Sprint[]
   releases Release[]
+  issueTypeScheme IssueTypeSchemeProject?
 
   @@map("projects")
+}
+
+// ===== ISSUE TYPE CONFIGS & SCHEMES =====
+
+model IssueTypeConfig {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  iconName    String   @map("icon_name")
+  iconColor   String   @map("icon_color")
+  isSubtask   Boolean  @default(false) @map("is_subtask")
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  isSystem    Boolean  @default(false) @map("is_system")
+  systemKey   String?  @unique @map("system_key")
+  orderIndex  Int      @default(0) @map("order_index")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  schemeItems IssueTypeSchemeItem[]
+  issues      Issue[]
+
+  @@map("issue_type_configs")
+}
+
+model IssueTypeScheme {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  items    IssueTypeSchemeItem[]
+  projects IssueTypeSchemeProject[]
+
+  @@map("issue_type_schemes")
+}
+
+model IssueTypeSchemeItem {
+  id           String @id @default(uuid())
+  schemeId     String @map("scheme_id")
+  typeConfigId String @map("type_config_id")
+  orderIndex   Int    @default(0) @map("order_index")
+
+  scheme     IssueTypeScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  typeConfig IssueTypeConfig @relation(fields: [typeConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeId, typeConfigId])
+  @@index([schemeId])
+  @@map("issue_type_scheme_items")
+}
+
+model IssueTypeSchemeProject {
+  id        String   @id @default(uuid())
+  schemeId  String   @map("scheme_id")
+  projectId String   @unique @map("project_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scheme  IssueTypeScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([schemeId])
+  @@map("issue_type_scheme_projects")
 }
 
 // ===== ISSUES (TASK HIERARCHY) =====
@@ -94,7 +158,8 @@ model Issue {
   number      Int
   title       String
   description String?
-  type        IssueType     @default(TASK)
+  type        IssueType?    @default(TASK)
+  issueTypeConfigId String? @map("issue_type_config_id")
   status      IssueStatus   @default(OPEN)
   priority    IssuePriority @default(MEDIUM)
   orderIndex  Int           @default(0) @map("order_index")
@@ -124,6 +189,7 @@ model Issue {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  issueTypeConfig IssueTypeConfig? @relation(fields: [issueTypeConfigId], references: [id])
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   comments Comment[]
   timeLogs TimeLog[]
@@ -138,6 +204,7 @@ model Issue {
   @@index([parentId])
   @@index([sprintId])
   @@index([releaseId])
+  @@index([issueTypeConfigId])
   @@map("issues")
 }
 

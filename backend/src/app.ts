@@ -26,6 +26,8 @@ import webhooksRouter from './modules/webhooks/webhooks.router.js';
 import linksRouter from './modules/links/links.router.js';
 import projectCategoriesRouter from './modules/project-categories/project-categories.router.js';
 import monitoringRouter from './modules/monitoring/monitoring.router.js';
+import issueTypeConfigsRouter from './modules/issue-type-configs/issue-type-configs.router.js';
+import issueTypeSchemesRouter from './modules/issue-type-schemes/issue-type-schemes.router.js';
 
 export function createApp() {
   const app = express();
@@ -86,6 +88,8 @@ export function createApp() {
   }
 
   app.use('/api', linksRouter);
+  app.use('/api', issueTypeConfigsRouter);
+  app.use('/api', issueTypeSchemesRouter);
   app.use('/api/monitoring', monitoringRouter);
 
   // Error handler (must be last)

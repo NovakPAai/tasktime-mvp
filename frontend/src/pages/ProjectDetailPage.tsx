@@ -15,9 +15,10 @@ import { useAuthStore } from '../store/auth.store';
 import * as projectsApi from '../api/projects';
 import * as issuesApi from '../api/issues';
 import * as authApi from '../api/auth';
-import type { Project, IssueType, IssuePriority, IssueStatus, User } from '../types';
+import type { Project, IssueType, IssuePriority, IssueStatus, User, IssueTypeConfig } from '../types';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { hasAnyRequiredRole } from '../lib/roles';
+import { getProjectIssueTypes } from '../api/issue-type-configs';
 
 function buildTree(issues: Issue[]): Issue[] {
   const map = new Map(issues.map((i) => [i.id, { ...i, children: [] as Issue[] }]));
@@ -52,6 +53,7 @@ export default function ProjectDetailPage() {
   const [bulkStatus, setBulkStatus] = useState<IssueStatus | undefined>(undefined);
   const [bulkAssigneeId, setBulkAssigneeId] = useState<string | undefined>(undefined);
   const [treeMode, setTreeMode] = useState(true);
+  const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -64,6 +66,7 @@ export default function ProjectDetailPage() {
         .catch(() => {
           // ignore errors, assignee filters will just be empty
         });
+      getProjectIssueTypes(id).then(setIssueTypeConfigs).catch(() => {});
     }
   }, [id, fetchIssues]);
 
@@ -468,16 +471,22 @@ export default function ProjectDetailPage() {
           form={form}
           layout="vertical"
           onFinish={handleCreate}
-          initialValues={{ type: 'TASK', priority: 'MEDIUM' }}
+          initialValues={{
+            issueTypeConfigId: issueTypeConfigs.find((c) => c.systemKey === 'TASK')?.id ?? issueTypeConfigs[0]?.id,
+            priority: 'MEDIUM',
+          }}
         >
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
           <Space style={{ width: '100%' }} size="middle">
-            <Form.Item name="type" label="Type">
+            <Form.Item name="issueTypeConfigId" label="Type">
               <Select
-                style={{ width: 140 }}
-                options={(['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG'] as IssueType[]).map((v) => ({ value: v, label: v }))}
+                style={{ width: 180 }}
+                options={issueTypeConfigs.map((c) => ({
+                  value: c.id,
+                  label: c.name,
+                }))}
               />
             </Form.Item>
             <Form.Item name="priority" label="Priority">
@@ -493,7 +502,7 @@ export default function ProjectDetailPage() {
               placeholder="None (top level)"
               style={{ width: '100%' }}
               options={issues
-                .filter((i) => ['EPIC', 'STORY', 'TASK'].includes(i.type))
+                .filter((i) => !i.issueTypeConfig?.isSubtask && (i.type == null || ['EPIC', 'STORY', 'TASK'].includes(i.type)))
                 .map((i) => ({ value: i.id, label: `${project.key}-${i.number} ${i.title}` }))}
             />
           </Form.Item>

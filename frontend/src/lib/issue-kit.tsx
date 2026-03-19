@@ -4,7 +4,7 @@
  * TTUI-4 — Компонентная библиотека
  */
 import { Tag, Tooltip } from 'antd';
-import type { IssueStatus, IssuePriority, IssueType } from '../types';
+import type { IssueStatus, IssuePriority, IssueType, IssueTypeConfig } from '../types';
 
 // ─── Статусы ─────────────────────────────────────────────────────────────────
 
@@ -122,12 +122,37 @@ export function IssuePriorityTag({ priority, size = 'default' }: PriorityTagProp
 }
 
 interface TypeBadgeProps {
-  type: IssueType;
+  type: IssueType | null;
+  typeConfig?: IssueTypeConfig | null;
   showLabel?: boolean;
 }
 
-/** Бейдж типа задачи (цветной кружок с буквой + опциональный лейбл) */
-export function IssueTypeBadge({ type, showLabel = false }: TypeBadgeProps) {
+function resolveTypeMeta(
+  type: IssueType | null,
+  typeConfig?: IssueTypeConfig | null,
+): { color: string; letter: string; label: string } {
+  if (typeConfig) {
+    return {
+      color: typeConfig.iconColor,
+      letter: typeConfig.name.charAt(0).toUpperCase(),
+      label: typeConfig.name,
+    };
+  }
+  if (type) {
+    return {
+      color: TYPE_COLOR[type],
+      letter: TYPE_LETTER[type],
+      label: TYPE_LABEL[type],
+    };
+  }
+  return { color: '#8C8C8C', letter: '?', label: 'Unknown' };
+}
+
+/** Бейдж типа задачи (цветной кружок с буквой + опциональный лейбл).
+ *  Приоритет: typeConfig > type (enum fallback) */
+export function IssueTypeBadge({ type, typeConfig, showLabel = false }: TypeBadgeProps) {
+  const meta = resolveTypeMeta(type, typeConfig);
+
   const badge = (
     <span
       style={{
@@ -137,7 +162,7 @@ export function IssueTypeBadge({ type, showLabel = false }: TypeBadgeProps) {
         width: 18,
         height: 18,
         borderRadius: 3,
-        background: TYPE_COLOR[type],
+        background: meta.color,
         color: '#fff',
         fontSize: 10,
         fontWeight: 700,
@@ -145,7 +170,7 @@ export function IssueTypeBadge({ type, showLabel = false }: TypeBadgeProps) {
         flexShrink: 0,
       }}
     >
-      {TYPE_LETTER[type]}
+      {meta.letter}
     </span>
   );
 
@@ -153,12 +178,12 @@ export function IssueTypeBadge({ type, showLabel = false }: TypeBadgeProps) {
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         {badge}
-        <span style={{ fontSize: 12, color: 'var(--t2)' }}>{TYPE_LABEL[type]}</span>
+        <span style={{ fontSize: 12, color: 'var(--t2)' }}>{meta.label}</span>
       </span>
     );
   }
 
-  return <Tooltip title={TYPE_LABEL[type]}>{badge}</Tooltip>;
+  return <Tooltip title={meta.label}>{badge}</Tooltip>;
 }
 
 interface IssueKeyProps {

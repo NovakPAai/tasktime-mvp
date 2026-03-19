@@ -51,7 +51,7 @@ function toIssueRecord(issue: Awaited<ReturnType<typeof loadIssues>>[number]): P
     number: issue.number,
     title: issue.title,
     description: issue.description,
-    type: issue.type,
+    type: issue.type ?? 'TASK',
     status: issue.status,
     priority: issue.priority,
     orderIndex: issue.orderIndex,

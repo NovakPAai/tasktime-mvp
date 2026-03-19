@@ -551,7 +551,7 @@ export default function IssueDetailPage() {
                   icon={<ApartmentOutlined />}
                   loading={aiDecomposeLoading}
                   onClick={handleAiDecompose}
-                  disabled={!['EPIC', 'STORY', 'TASK'].includes(issue.type)}
+                  disabled={!issue.type || !['EPIC', 'STORY', 'TASK'].includes(issue.type)}
                 >
                   Декомпозировать в подзадачи
                 </Button>

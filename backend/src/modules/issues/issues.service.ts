@@ -40,8 +40,9 @@ async function validateHierarchy(type: IssueType, parentId?: string | null) {
   if (allowedParents.length === 0) {
     throw new AppError(400, `${type} cannot have a parent`);
   }
-  if (!allowedParents.includes(parent.type)) {
-    throw new AppError(400, `${type} cannot be a child of ${parent.type}`);
+  const parentType = parent.type as IssueType | null;
+  if (!parentType || !allowedParents.includes(parentType)) {
+    throw new AppError(400, `${type} cannot be a child of ${parentType ?? 'custom type'}`);
   }
 }
 
@@ -273,7 +274,47 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  await validateHierarchy(dto.type, dto.parentId);
+  // Resolve issueTypeConfig and type
+  let resolvedTypeConfigId: string | undefined = dto.issueTypeConfigId;
+  let resolvedType: IssueType | undefined = dto.type;
+
+  if (resolvedTypeConfigId) {
+    const typeConfig = await prisma.issueTypeConfig.findUnique({ where: { id: resolvedTypeConfigId } });
+    if (!typeConfig) throw new AppError(404, 'Issue type not found');
+    if (!typeConfig.isEnabled) throw new AppError(400, 'Issue type is disabled');
+
+    // Validate against project scheme
+    const binding = await prisma.issueTypeSchemeProject.findUnique({
+      where: { projectId },
+      include: { scheme: { include: { items: { select: { typeConfigId: true } } } } },
+    });
+    if (binding) {
+      const allowed = binding.scheme.items.map((i) => i.typeConfigId);
+      if (!allowed.includes(resolvedTypeConfigId)) {
+        throw new AppError(400, 'Issue type is not allowed in this project scheme');
+      }
+    }
+
+    // Map to legacy enum if system type
+    if (typeConfig.systemKey) {
+      resolvedType = typeConfig.systemKey as IssueType;
+    } else {
+      resolvedType = undefined;
+    }
+  } else if (!resolvedType) {
+    resolvedType = 'TASK';
+    // Try to find default config for TASK
+    const taskConfig = await prisma.issueTypeConfig.findUnique({ where: { systemKey: 'TASK' } });
+    if (taskConfig) resolvedTypeConfigId = taskConfig.id;
+  } else {
+    // Legacy: type provided without configId, look up by systemKey
+    const typeConfig = await prisma.issueTypeConfig.findUnique({ where: { systemKey: resolvedType } });
+    if (typeConfig) resolvedTypeConfigId = typeConfig.id;
+  }
+
+  if (resolvedType) {
+    await validateHierarchy(resolvedType, dto.parentId);
+  }
 
   if (dto.parentId) {
     const parent = await prisma.issue.findUnique({ where: { id: dto.parentId } });
@@ -291,7 +332,8 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
       title: dto.title,
       description: dto.description,
       acceptanceCriteria: dto.acceptanceCriteria,
-      type: dto.type,
+      type: resolvedType ?? null,
+      issueTypeConfigId: resolvedTypeConfigId,
       priority: dto.priority,
       parentId: dto.parentId,
       assigneeId: dto.assigneeId,
@@ -301,6 +343,7 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
       assignee: { select: { id: true, name: true } },
       creator: { select: { id: true, name: true } },
       project: { select: { key: true } },
+      issueTypeConfig: true,
     },
   });
 }
@@ -309,7 +352,7 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
   const issue = await prisma.issue.findUnique({ where: { id } });
   if (!issue) throw new AppError(404, 'Issue not found');
 
-  if (dto.parentId !== undefined) {
+  if (dto.parentId !== undefined && issue.type) {
     await validateHierarchy(issue.type, dto.parentId);
   }
 

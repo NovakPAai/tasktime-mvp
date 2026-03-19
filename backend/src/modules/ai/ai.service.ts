@@ -139,15 +139,15 @@ export async function decomposeIssue(dto: AiDecomposeDto, creatorId: string) {
     if (!issue) throw new AppError(404, 'Issue not found');
 
     const allowedParents = ['EPIC', 'STORY', 'TASK'];
-    if (!allowedParents.includes(issue.type)) {
-      throw new AppError(400, `Issue type ${issue.type} cannot be decomposed into subtasks`);
+    if (!issue.type || !allowedParents.includes(issue.type)) {
+      throw new AppError(400, `Issue type ${issue.type ?? 'custom'} cannot be decomposed into subtasks`);
     }
 
     const provider = getLlmProvider();
     const { subtasks: subtaskTitles } = await provider.decomposeIssue(
       issue.title,
       issue.description,
-      issue.type,
+      issue.type as string,
     );
 
     const created: Array<{ id: string; title: string; type: string; number: number }> = [];
@@ -159,7 +159,7 @@ export async function decomposeIssue(dto: AiDecomposeDto, creatorId: string) {
         priority: 'MEDIUM',
         parentId: issue.id,
       });
-      created.push({ id: child.id, title: child.title, type: child.type, number: child.number });
+      created.push({ id: child.id, title: child.title, type: child.type ?? 'SUBTASK', number: child.number });
     }
 
     await setAiStatus(issueId, 'DONE');

@@ -2002,6 +2002,59 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   }
   }
 
+  // ===== ISSUE TYPE CONFIGS & SCHEMES =====
+  const systemTypes = [
+    { systemKey: 'EPIC',    name: 'Epic',    iconName: 'ThunderboltOutlined', iconColor: '#722ED1', isSubtask: false, orderIndex: 0 },
+    { systemKey: 'STORY',   name: 'Story',   iconName: 'BookOutlined',        iconColor: '#1677FF', isSubtask: false, orderIndex: 1 },
+    { systemKey: 'TASK',    name: 'Task',    iconName: 'CheckSquareOutlined', iconColor: '#52C41A', isSubtask: false, orderIndex: 2 },
+    { systemKey: 'BUG',     name: 'Bug',     iconName: 'BugOutlined',         iconColor: '#F5222D', isSubtask: false, orderIndex: 3 },
+    { systemKey: 'SUBTASK', name: 'Subtask', iconName: 'MinusSquareOutlined', iconColor: '#8C8C8C', isSubtask: true,  orderIndex: 4 },
+  ];
+
+  const typeConfigIds: Record<string, string> = {};
+  for (const t of systemTypes) {
+    const config = await client.issueTypeConfig.upsert({
+      where: { systemKey: t.systemKey },
+      update: {},
+      create: { ...t, isSystem: true, isEnabled: true },
+    });
+    typeConfigIds[t.systemKey] = config.id;
+  }
+
+  // Default scheme
+  const defaultScheme = await client.issueTypeScheme.upsert({
+    where: { id: 'default-issue-type-scheme' },
+    update: {},
+    create: { id: 'default-issue-type-scheme', name: 'Default Scheme', description: 'Стандартная схема типов задач', isDefault: true },
+  });
+
+  // Link all types to default scheme
+  for (const t of systemTypes) {
+    await client.issueTypeSchemeItem.upsert({
+      where: { schemeId_typeConfigId: { schemeId: defaultScheme.id, typeConfigId: typeConfigIds[t.systemKey] } },
+      update: {},
+      create: { schemeId: defaultScheme.id, typeConfigId: typeConfigIds[t.systemKey], orderIndex: t.orderIndex },
+    });
+  }
+
+  // Link all projects to default scheme
+  const allProjects = await client.project.findMany({ select: { id: true } });
+  for (const p of allProjects) {
+    await client.issueTypeSchemeProject.upsert({
+      where: { projectId: p.id },
+      update: {},
+      create: { schemeId: defaultScheme.id, projectId: p.id },
+    });
+  }
+
+  // Backfill issueTypeConfigId for existing issues (by systemKey)
+  for (const [key, configId] of Object.entries(typeConfigIds)) {
+    await client.issue.updateMany({
+      where: { type: key as any, issueTypeConfigId: null },
+      data: { issueTypeConfigId: configId },
+    });
+  }
+
   console.log('Seed complete.');
   console.log(`Users: ${admin.email}, ${manager.email}, ${dev.email}, ${viewer.email}, ${owner.email}`);
   console.log(`Password for all: ${defaultPassword}`);

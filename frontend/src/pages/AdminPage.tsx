@@ -12,6 +12,8 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import AdminProjectsTab from '../components/admin/AdminProjectsTab';
 import AdminCategoriesTab from '../components/admin/AdminCategoriesTab';
 import AdminMonitoringTab from '../components/admin/AdminMonitoringTab';
+import AdminIssueTypeConfigsTab from '../components/admin/AdminIssueTypeConfigsTab';
+import AdminIssueTypeSchemesTab from '../components/admin/AdminIssueTypeSchemesTab';
 
 interface AdminUserRow {
   id: string;
@@ -525,6 +527,8 @@ export default function AdminPage() {
           { key: 'projects', label: 'Проекты', children: <AdminProjectsTab /> },
           { key: 'categories', label: 'Категории проектов', children: <AdminCategoriesTab /> },
           { key: 'link-types', label: 'Виды связей', children: linkTypesTab },
+          { key: 'issue-type-configs', label: 'Типы задач', children: <AdminIssueTypeConfigsTab /> },
+          { key: 'issue-type-schemes', label: 'Схемы типов задач', children: <AdminIssueTypeSchemesTab /> },
         ]}
       />
     </div>
