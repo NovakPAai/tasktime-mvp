@@ -249,12 +249,17 @@ export default function AdminIssueTypeSchemesTab() {
             <Divider orientation="left">Типы задач в схеме</Divider>
             <Select
               mode="multiple"
+              showSearch
+              filterOption={(input, option) =>
+                String(option?.searchLabel ?? '').toLowerCase().includes(input.toLowerCase())
+              }
               style={{ width: '100%', marginBottom: 8 }}
-              placeholder="Выберите типы задач"
+              placeholder="Поиск по названию типа задачи..."
               value={schemeTypeIds}
               onChange={(ids: string[]) => setSchemeTypeIds(ids)}
               options={configs.map((c) => ({
                 value: c.id,
+                searchLabel: c.name,
                 label: (
                   <Space>
                     <span style={{ color: c.iconColor }}>●</span>
