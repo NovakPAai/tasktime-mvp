@@ -149,7 +149,8 @@ function generateTempPassword(): string {
 }
 
 export async function createUser(dto: CreateUserDto) {
-  const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+  const email = dto.email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new AppError(409, 'Email already registered');
 
   const tempPassword = generateTempPassword();
@@ -157,7 +158,7 @@ export async function createUser(dto: CreateUserDto) {
 
   const user = await prisma.user.create({
     data: {
-      email: dto.email,
+      email,
       name: dto.name,
       passwordHash,
       role: dto.isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
@@ -257,9 +258,12 @@ export async function updateUserAdmin(actorId: string, userId: string, dto: Upda
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError(404, 'User not found');
 
-  if (dto.email && dto.email !== user.email) {
-    const existing = await prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) throw new AppError(409, 'Email already in use');
+  if (dto.email) {
+    dto.email = dto.email.trim().toLowerCase();
+    if (dto.email !== user.email) {
+      const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+      if (existing) throw new AppError(409, 'Email already in use');
+    }
   }
 
   const updated = await prisma.user.update({

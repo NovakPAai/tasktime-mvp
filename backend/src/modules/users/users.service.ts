@@ -32,9 +32,12 @@ export async function updateUser(id: string, dto: UpdateUserDto) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
 
-  if (dto.email && dto.email !== user.email) {
-    const existing = await prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) throw new AppError(409, 'Email already in use');
+  if (dto.email) {
+    dto.email = dto.email.trim().toLowerCase();
+    if (dto.email !== user.email) {
+      const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+      if (existing) throw new AppError(409, 'Email already in use');
+    }
   }
 
   return prisma.user.update({ where: { id }, data: dto, select: userSelect });

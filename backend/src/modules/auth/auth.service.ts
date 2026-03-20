@@ -11,14 +11,15 @@ function generateRefreshExpiry(): Date {
 }
 
 export async function register(dto: RegisterDto) {
-  const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+  const email = dto.email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     throw new AppError(409, 'Email already registered');
   }
 
   const passwordHash = await hashPassword(dto.password);
   const user = await prisma.user.create({
-    data: { email: dto.email, passwordHash, name: dto.name },
+    data: { email, passwordHash, name: dto.name },
     select: { id: true, email: true, name: true, role: true },
   });
 
@@ -46,7 +47,7 @@ export async function register(dto: RegisterDto) {
 }
 
 export async function login(dto: LoginDto) {
-  const user = await prisma.user.findUnique({ where: { email: dto.email } });
+  const user = await prisma.user.findUnique({ where: { email: dto.email.trim().toLowerCase() } });
   if (!user || user.isActive === false) {
     throw new AppError(401, 'Invalid credentials');
   }
