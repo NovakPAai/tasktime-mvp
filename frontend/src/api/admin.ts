@@ -83,17 +83,9 @@ export async function getStats(): Promise<AdminStats> {
 
 export async function listAdminUsers() {
   const { data } = await api.get<
-    {
-      id: string;
-      email: string;
-      name: string;
-      role: string;
-      isActive: boolean;
-      createdAt: string;
-      _count: { createdIssues: number; assignedIssues: number; timeLogs: number };
-    }[]
+    AdminUsersResponse
   >('/admin/users');
-  return data;
+  return data.users;
 }
 
 export async function getIssuesByStatusReport(params: {
