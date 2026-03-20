@@ -79,7 +79,7 @@ export async function login(dto: LoginDto) {
   });
 
   return {
-    user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    user: { id: user.id, email: user.email, name: user.name, role: user.role, mustChangePassword: user.mustChangePassword },
     accessToken,
     refreshToken,
   };
