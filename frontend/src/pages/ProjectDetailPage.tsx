@@ -374,8 +374,8 @@ export default function ProjectDetailPage() {
           className="tt-toolbar-select"
           value={filters.issueTypeConfigId}
           maxTagCount={1}
-          onChange={(value) => setFilters({ issueTypeConfigId: value })}
-          options={issueTypeConfigs.map((c) => ({ value: c.id, label: c.name }))}
+          onChange={(value) => { setFilters({ issueTypeConfigId: value }); if (id) fetchIssues(id); }}
+          options={issueTypeConfigs.map((c) => ({ value: c.id, label: c.name.replace(/^->\s*/, '') }))}
         />
         <Select<IssueStatus[]>
           mode="multiple"
@@ -383,7 +383,7 @@ export default function ProjectDetailPage() {
           className="tt-toolbar-select"
           value={filters.status}
           maxTagCount={1}
-          onChange={(value) => setFilters({ status: value })}
+          onChange={(value) => { setFilters({ status: value }); if (id) fetchIssues(id); }}
           options={(['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'] as IssueStatus[]).map((v) => ({ value: v, label: v }))}
         />
         <Select<IssuePriority[]>
@@ -392,7 +392,7 @@ export default function ProjectDetailPage() {
           className="tt-toolbar-select"
           value={filters.priority}
           maxTagCount={1}
-          onChange={(value) => setFilters({ priority: value })}
+          onChange={(value) => { setFilters({ priority: value }); if (id) fetchIssues(id); }}
           options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map((v) => ({ value: v, label: v }))}
         />
         <Select
@@ -400,7 +400,7 @@ export default function ProjectDetailPage() {
           placeholder="Assignee"
           className="tt-toolbar-select tt-toolbar-select-wide"
           value={filters.assigneeId}
-          onChange={(value) => setFilters({ assigneeId: value })}
+          onChange={(value) => { setFilters({ assigneeId: value }); if (id) fetchIssues(id); }}
           options={[
             { value: 'UNASSIGNED', label: 'Unassigned' },
             ...allUsers.map((u) => ({ value: u.id, label: u.name })),
