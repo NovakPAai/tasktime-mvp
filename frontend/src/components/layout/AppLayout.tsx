@@ -105,7 +105,7 @@ export default function AppLayout() {
             { key: '/admin/dashboard', icon: <DashboardOutlined />, label: 'Дашборд' },
             { key: '/admin/monitoring', icon: <MonitorOutlined />, label: 'Мониторинг' },
             { key: '/admin/users', icon: <UserOutlined />, label: 'Пользователи' },
-            { key: '/admin/roles', icon: <SafetyCertificateOutlined />, label: 'Роли' },
+            { key: '/admin/roles', icon: <SafetyCertificateOutlined />, label: 'Назначение ролей' },
             { key: '/admin/projects', icon: <ProjectOutlined />, label: 'Проекты' },
             { key: '/admin/categories', icon: <TagsOutlined />, label: 'Категории' },
             { key: '/admin/link-types', icon: <LinkOutlined />, label: 'Виды связей' },
