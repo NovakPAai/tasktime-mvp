@@ -350,7 +350,7 @@ MCP_SERVICE_TOKEN=<jwt> docker compose --profile mcp up -d mcp-tasktime
 ## Battle (боевой сервер)
 
 - **URL:** http://5.129.242.171
-- **Логин:** Claude@tasktime.com / CcR2C27$%Xmx
+- **Логин:** Claude@tasktime.com / Pa88W0rd89765123
 - **Sync-скрипт:** `backend/scripts/sync-issue-with-battle.mjs`
 - **Пример pull:** `TASKTIME_BASE_URL=http://5.129.242.171 TASKTIME_ACCESS_TOKEN=<token> node scripts/sync-issue-with-battle.mjs pull TTMP-82 TTMP-83 TTMP-84 --set-in-progress`
 
