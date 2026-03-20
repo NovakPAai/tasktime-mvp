@@ -16,7 +16,7 @@ const userSelect = {
 
 export async function listUsers() {
   return prisma.user.findMany({
-    where: { isSystem: false },
+    where: { isSystem: false, isActive: true },
     select: userSelect,
     orderBy: { createdAt: 'desc' },
   });

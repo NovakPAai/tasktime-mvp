@@ -42,6 +42,9 @@ export const adminApi = {
   deleteUser: (id: string) =>
     api.delete(`/admin/users/${id}`).then(r => r.data),
 
+  deactivateUser: (id: string) =>
+    api.patch<AdminUser>(`/admin/users/${id}/deactivate`).then(r => r.data),
+
   resetPassword: (id: string) =>
     api.post<{ tempPassword: string }>(`/admin/users/${id}/reset-password`).then(r => r.data),
 

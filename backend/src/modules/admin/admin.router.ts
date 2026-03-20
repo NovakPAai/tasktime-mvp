@@ -4,6 +4,7 @@ import { requireRole, requireSuperAdmin } from '../../shared/middleware/rbac.js'
 import { validate } from '../../shared/middleware/validate.js';
 import * as adminService from './admin.service.js';
 import { createUserDto, updateUserAdminDto, assignProjectRoleDto } from './admin.dto.js';
+import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import type { UatRole } from './uat-tests.data.js';
 
@@ -62,6 +63,16 @@ router.delete('/admin/users/:id', requireSuperAdmin(), async (req: AuthRequest, 
   try {
     await adminService.deleteUser(req.user!.userId, req.params.id as string);
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/admin/users/:id/deactivate', requireRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthRequest, res, next) => {
+  try {
+    const user = await adminService.deactivateUserAdmin(req.user!.userId, req.params.id as string);
+    await logAudit(req, 'user.deactivated', 'user', req.params.id as string);
+    res.json(user);
   } catch (err) {
     next(err);
   }

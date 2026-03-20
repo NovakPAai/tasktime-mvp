@@ -98,6 +98,12 @@ export default function AdminUsersPage() {
   const [deleteCountdown, setDeleteCountdown] = useState(5);
   const [deleting, setDeleting] = useState(false);
 
+  // Deactivate (offered when delete is blocked by dependencies)
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
+  const [deactivateDeps, setDeactivateDeps] = useState<Record<string, number>>({});
+  const [deactivating, setDeactivating] = useState(false);
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -224,10 +230,35 @@ export default function AdminUsersPage() {
       void loadUsers();
       void message.success('Пользователь удалён');
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      void message.error(err?.response?.data?.error || 'Ошибка удаления');
+      const err = e as { response?: { data?: { error?: string; canDeactivate?: boolean; dependencies?: Record<string, number> } } };
+      const data = err?.response?.data;
+      if (data?.canDeactivate) {
+        setDeleteOpen(false);
+        setDeactivateTarget(deleteTarget);
+        setDeactivateDeps(data.dependencies ?? {});
+        setDeactivateOpen(true);
+      } else {
+        void message.error(data?.error || 'Ошибка удаления');
+      }
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      await adminApi.deactivateUser(deactivateTarget.id);
+      setDeactivateOpen(false);
+      setDeactivateTarget(null);
+      void loadUsers();
+      void message.success(`Пользователь отключён и переименован в "${deactivateTarget.name} (N/A)"`);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } };
+      void message.error(err?.response?.data?.error || 'Ошибка деактивации');
+    } finally {
+      setDeactivating(false);
     }
   };
 
@@ -445,6 +476,40 @@ export default function AdminUsersPage() {
           showIcon
           message={`Вы уверены, что хотите удалить пользователя "${deleteTarget?.name}"? Это действие необратимо.`}
         />
+      </Modal>
+
+      {/* Deactivate modal — shown when delete is blocked by dependencies */}
+      <Modal
+        title="Нельзя удалить пользователя"
+        open={deactivateOpen}
+        onCancel={() => { setDeactivateOpen(false); setDeactivateTarget(null); }}
+        footer={[
+          <Button key="cancel" onClick={() => { setDeactivateOpen(false); setDeactivateTarget(null); }}>Отмена</Button>,
+          <Button key="deactivate" type="primary" loading={deactivating} onClick={() => void handleDeactivate()}>
+            Отключить пользователя
+          </Button>,
+        ]}
+      >
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="У пользователя есть связанные данные — удаление невозможно"
+          description={
+            <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+              {deactivateDeps.assignedIssues > 0 && <li>Назначенных задач: {deactivateDeps.assignedIssues}</li>}
+              {deactivateDeps.createdIssues > 0 && <li>Созданных задач: {deactivateDeps.createdIssues}</li>}
+              {deactivateDeps.timeLogs > 0 && <li>Записей о времени: {deactivateDeps.timeLogs}</li>}
+              {deactivateDeps.comments > 0 && <li>Комментариев: {deactivateDeps.comments}</li>}
+              {deactivateDeps.ownedProjects > 0 && <li>Проектов во владении: {deactivateDeps.ownedProjects}</li>}
+            </ul>
+          }
+        />
+        <Text>
+          Вы можете <Text strong>отключить</Text> пользователя <Text strong>&quot;{deactivateTarget?.name}&quot;</Text>.
+          Его имя будет изменено на <Text code>{deactivateTarget?.name} (N/A)</Text>, аккаунт будет заблокирован,
+          а назначить его на задачу станет невозможно.
+        </Text>
       </Modal>
     </div>
   );

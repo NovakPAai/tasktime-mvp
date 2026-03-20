@@ -181,12 +181,33 @@ export async function createUser(dto: CreateUserDto) {
   return { user, tempPassword };
 }
 
+async function checkUserDependencies(userId: string) {
+  const [assignedIssues, createdIssues, timeLogs, comments, ownedProjects] = await Promise.all([
+    prisma.issue.count({ where: { assigneeId: userId } }),
+    prisma.issue.count({ where: { creatorId: userId } }),
+    prisma.timeLog.count({ where: { userId } }),
+    prisma.comment.count({ where: { authorId: userId } }),
+    prisma.project.count({ where: { ownerId: userId } }),
+  ]);
+  return { assignedIssues, createdIssues, timeLogs, comments, ownedProjects };
+}
+
 export async function deleteUser(actorId: string, userId: string) {
   if (actorId === userId) throw new AppError(400, 'Cannot delete yourself');
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError(404, 'User not found');
   if (user.isSystem) throw new AppError(403, 'Cannot delete system users');
+
+  const deps = await checkUserDependencies(userId);
+  const hasData = Object.values(deps).some((v) => v > 0);
+  if (hasData) {
+    throw new AppError(
+      409,
+      'Нельзя удалить пользователя — есть связанные данные. Вы можете отключить пользователя.',
+      { canDeactivate: true, dependencies: deps },
+    );
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -198,6 +219,38 @@ export async function deleteUser(actorId: string, userId: string) {
   });
 
   await prisma.user.delete({ where: { id: userId } });
+}
+
+export async function deactivateUserAdmin(actorId: string, userId: string) {
+  if (actorId === userId) throw new AppError(400, 'Cannot deactivate yourself');
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'User not found');
+  if (user.isSystem) throw new AppError(403, 'Cannot deactivate system users');
+
+  const NA_SUFFIX = ' (N/A)';
+  const newName = user.name.endsWith(NA_SUFFIX) ? user.name : user.name + NA_SUFFIX;
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive: false, name: newName },
+    select: {
+      id: true, email: true, name: true, role: true,
+      isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.deactivated',
+      entityType: 'user',
+      entityId: userId,
+      userId: actorId,
+      details: { email: user.email, previousName: user.name, newName },
+    },
+  });
+
+  return updated;
 }
 
 export async function updateUserAdmin(actorId: string, userId: string, dto: UpdateUserAdminDto) {
