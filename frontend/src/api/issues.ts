@@ -50,6 +50,7 @@ export interface CreateIssueBody {
   description?: string;
   acceptanceCriteria?: string;
   type?: IssueType;
+  issueTypeConfigId?: string;
   priority?: IssuePriority;
   parentId?: string;
   assigneeId?: string;

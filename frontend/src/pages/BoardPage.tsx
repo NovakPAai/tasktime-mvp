@@ -7,7 +7,8 @@ import * as boardApi from '../api/board';
 import * as sprintsApi from '../api/sprints';
 import * as projectsApi from '../api/projects';
 import * as issuesApi from '../api/issues';
-import type { Issue, IssueStatus, Sprint, Project, IssueType, IssuePriority } from '../types';
+import { getProjectIssueTypes } from '../api/issue-type-configs';
+import type { Issue, IssueStatus, Sprint, Project, IssuePriority, IssueTypeConfig } from '../types';
 import { useAuthStore } from '../store/auth.store';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { IssueTypeBadge } from '../lib/issue-kit';
@@ -29,6 +30,7 @@ export default function BoardPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [selectedSprint, setSelectedSprint] = useState<string | undefined>();
   const [project, setProject] = useState<Project | null>(null);
+  const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,7 +56,9 @@ export default function BoardPage() {
   }, [projectId, selectedSprint]);
 
   useEffect(() => {
-    if (projectId) sprintsApi.listSprints(projectId).then(setSprints);
+    if (!projectId) return;
+    sprintsApi.listSprints(projectId).then(setSprints);
+    getProjectIssueTypes(projectId).then(setIssueTypeConfigs).catch(() => {});
   }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
@@ -214,7 +218,7 @@ export default function BoardPage() {
                             <span className="tt-board-card-id">
                               {project.key}-{issue.number}
                             </span>
-                            <IssueTypeBadge type={issue.type} />
+                            <IssueTypeBadge type={issue.type} typeConfig={issue.issueTypeConfig} />
                           </div>
                           <Link to={`/issues/${issue.id}`} className="tt-board-card-title">
                             {issue.title}
@@ -254,7 +258,7 @@ export default function BoardPage() {
           form={form}
           layout="vertical"
           onFinish={handleCreateIssue}
-          initialValues={{ type: 'TASK', priority: 'MEDIUM' }}
+          initialValues={{ issueTypeConfigId: issueTypeConfigs.find((c) => c.systemKey === 'TASK')?.id ?? issueTypeConfigs[0]?.id, priority: 'MEDIUM' }}
         >
           <Form.Item
             name="title"
@@ -264,15 +268,15 @@ export default function BoardPage() {
             <Input />
           </Form.Item>
           <Space size="middle" style={{ width: '100%' }}>
-            <Form.Item<IssueType>
-              name="type"
+            <Form.Item
+              name="issueTypeConfigId"
               label="Type"
               style={{ flex: 1 }}
             >
-              <Select<IssueType>
-                options={(['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG'] as IssueType[]).map((v) => ({
-                  value: v,
-                  label: v,
+              <Select
+                options={issueTypeConfigs.map((c) => ({
+                  value: c.id,
+                  label: c.name,
                 }))}
               />
             </Form.Item>
@@ -295,7 +299,7 @@ export default function BoardPage() {
               placeholder="None (top level)"
               style={{ width: '100%' }}
               options={allBoardIssues
-                .filter((i) => i.type != null && ['EPIC', 'STORY', 'TASK'].includes(i.type))
+                .filter((i) => !i.issueTypeConfig?.isSubtask)
                 .map((i) => ({
                   value: i.id,
                   label: `${project.key}-${i.number} ${i.title}`,

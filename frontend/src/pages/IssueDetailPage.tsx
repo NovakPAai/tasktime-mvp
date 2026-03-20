@@ -37,9 +37,10 @@ import * as commentsApi from '../api/comments';
 import * as timeApi from '../api/time';
 import * as aiApi from '../api/ai';
 import * as authApi from '../api/auth';
+import { getProjectIssueTypes } from '../api/issue-type-configs';
 import IssueLinksSection from '../components/issues/IssueLinksSection';
 import { useAuthStore } from '../store/auth.store';
-import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, IssueType, User } from '../types';
+import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, IssueTypeConfig, User } from '../types';
 import api from '../api/client';
 import { hasAnyRequiredRole, hasRequiredRole } from '../lib/roles';
 import { IssueStatusTag, IssuePriorityTag, IssueTypeBadge } from '../lib/issue-kit';
@@ -60,6 +61,7 @@ export default function IssueDetailPage() {
   const [aiEstimateLoading, setAiEstimateLoading] = useState(false);
   const [aiDecomposeLoading, setAiDecomposeLoading] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
   const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
@@ -87,6 +89,11 @@ export default function IssueDetailPage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { timeApi.getActiveTimer().then(setActiveTimer); }, []);
   useEffect(() => { authApi.listUsers().then(setAllUsers).catch(() => {}); }, []);
+  useEffect(() => {
+    if (issue?.projectId) {
+      getProjectIssueTypes(issue.projectId).then(setIssueTypeConfigs).catch(() => {});
+    }
+  }, [issue?.projectId]);
 
   const handleStatusChange = async (status: IssueStatus) => {
     if (!id) return;
@@ -192,7 +199,7 @@ export default function IssueDetailPage() {
     if (!issue) return;
     editForm.setFieldsValue({
       title: issue.title,
-      type: issue.type,
+      issueTypeConfigId: issue.issueTypeConfigId ?? undefined,
       priority: issue.priority,
       assigneeId: issue.assigneeId ?? undefined,
       description: issue.description ?? '',
@@ -203,7 +210,7 @@ export default function IssueDetailPage() {
 
   const handleEditSave = async (vals: {
     title: string;
-    type: IssueType;
+    issueTypeConfigId?: string;
     priority: IssuePriority;
     assigneeId?: string;
     description?: string;
@@ -213,7 +220,7 @@ export default function IssueDetailPage() {
     try {
       await issuesApi.updateIssue(id, {
         title: vals.title,
-        type: vals.type,
+        issueTypeConfigId: vals.issueTypeConfigId,
         priority: vals.priority,
         assigneeId: vals.assigneeId,
         description: vals.description || undefined,
@@ -581,7 +588,7 @@ export default function IssueDetailPage() {
                   icon={<ApartmentOutlined />}
                   loading={aiDecomposeLoading}
                   onClick={handleAiDecompose}
-                  disabled={!issue.type || !['EPIC', 'STORY', 'TASK'].includes(issue.type)}
+                  disabled={!issue.type || issue.issueTypeConfig?.isSubtask === true}
                 >
                   Декомпозировать в подзадачи
                 </Button>
@@ -684,11 +691,11 @@ export default function IssueDetailPage() {
           <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Title is required' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="type" label="Type" rules={[{ required: true }]}>
+          <Form.Item name="issueTypeConfigId" label="Type">
             <Select
-              options={(['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG'] as IssueType[]).map((v) => ({
-                value: v,
-                label: v,
+              options={issueTypeConfigs.map((c) => ({
+                value: c.id,
+                label: c.name,
               }))}
             />
           </Form.Item>

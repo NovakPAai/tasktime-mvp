@@ -375,7 +375,7 @@ export default function ProjectDetailPage() {
           value={filters.type}
           maxTagCount={1}
           onChange={(value) => setFilters({ type: value })}
-          options={(['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG'] as IssueType[]).map((v) => ({ value: v, label: v }))}
+          options={issueTypeConfigs.filter((c) => c.systemKey).map((c) => ({ value: c.systemKey as IssueType, label: c.name }))}
         />
         <Select<IssueStatus[]>
           mode="multiple"
@@ -534,7 +534,7 @@ export default function ProjectDetailPage() {
               placeholder="None (top level)"
               style={{ width: '100%' }}
               options={issues
-                .filter((i) => !i.issueTypeConfig?.isSubtask && (i.type == null || ['EPIC', 'STORY', 'TASK'].includes(i.type)))
+                .filter((i) => !i.issueTypeConfig?.isSubtask)
                 .map((i) => ({ value: i.id, label: `${project.key}-${i.number} ${i.title}` }))}
             />
           </Form.Item>
