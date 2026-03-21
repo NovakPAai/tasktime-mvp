@@ -288,17 +288,20 @@ model Sprint {
   projectTeamId        String? @map("project_team_id")
   businessTeamId       String? @map("business_team_id")
   flowTeamId           String? @map("flow_team_id")
+  releaseId String? @map("release_id")
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
 
-  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues       Issue[]
-  projectTeam  Team?   @relation("SprintProjectTeam", fields: [projectTeamId], references: [id])
-  businessTeam Team?   @relation("SprintBusinessTeam", fields: [businessTeamId], references: [id])
-  flowTeam     Team?   @relation("SprintFlowTeam", fields: [flowTeamId], references: [id])
+  projectTeam  Team?    @relation("SprintProjectTeam", fields: [projectTeamId], references: [id])
+  businessTeam Team?    @relation("SprintBusinessTeam", fields: [businessTeamId], references: [id])
+  flowTeam     Team?    @relation("SprintFlowTeam", fields: [flowTeamId], references: [id])
+  release      Release? @relation(fields: [releaseId], references: [id])
 
   @@unique([projectId, name], map: "sprints_project_id_name_key")
   @@index([projectId])
+  @@index([releaseId])
   @@map("sprints")
 }
 
@@ -321,8 +324,9 @@ model Release {
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues  Issue[]
+  sprints Sprint[]
 
   @@unique([projectId, name], map: "releases_project_id_name_key")
   @@index([projectId])

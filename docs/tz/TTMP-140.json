@@ -1,0 +1,98 @@
+{
+  "key": "TTMP-140",
+  "title": "Доработка функционала релизов",
+  "generatedAt": "2026-03-21T18:50:00.000Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "apiUrl": "http://5.129.242.171/api",
+    "issueId": "58e71c2d-6b6a-436b-bfda-60a557f91b1d",
+    "fetchedAt": "2026-03-21T18:50:00.000Z"
+  },
+  "issue": {
+    "type": "EPIC",
+    "status": "OPEN",
+    "priority": "HIGH",
+    "project": "TTMP",
+    "assignee": null,
+    "creator": "Admin User",
+    "estimatedHours": 11,
+    "description": "Реализовать связь Release ↔ Sprint с бизнес-гардами: запуск релиза без спринтов с задачами запрещён; закрытие релиза с незакрытыми спринтами или невыполненными задачами запрещено.",
+    "acceptanceCriteria": "Спринты добавляются в релиз; гарды на переходах DRAFT→READY и READY→RELEASED; UI показывает прогресс готовности"
+  },
+  "dependencies": {
+    "backendModules": ["releases", "sprints", "issues", "audit"],
+    "frontendComponents": ["ReleasesPage.tsx", "api/releases.ts", "types/index.ts"],
+    "prismaModels": ["Sprint (добавить releaseId FK)", "Release (добавить sprints[])"],
+    "externalPackages": [],
+    "blockers": []
+  },
+  "risks": [
+    {
+      "id": 1,
+      "description": "Миграция ломает существующие спринты",
+      "probability": "LOW",
+      "impact": "Нет данных теряется — поле nullable",
+      "mitigation": "Поле release_id NULL by default"
+    },
+    {
+      "id": 2,
+      "description": "Один спринт в нескольких релизах",
+      "probability": "MEDIUM",
+      "impact": "Нарушение бизнес-логики",
+      "mitigation": "Проверка sprint.releaseId при добавлении"
+    },
+    {
+      "id": 3,
+      "description": "Производительность гарда на больших проектах",
+      "probability": "MEDIUM",
+      "impact": "Медленный переход статуса",
+      "mitigation": "Агрегация на уровне БД, не в памяти"
+    }
+  ],
+  "requirements": {
+    "functional": [
+      "FR-1: Спринт добавляется в релиз",
+      "FR-2: Спринт убирается из релиза",
+      "FR-3: Один спринт — один активный релиз",
+      "FR-4: DRAFT→READY только при наличии спринтов с задачами",
+      "FR-5: READY→RELEASED только если все спринты CLOSED",
+      "FR-6: READY→RELEASED только если все задачи DONE/CANCELLED",
+      "FR-7: UI показывает прогресс",
+      "FR-8: Guard tooltips на кнопках"
+    ],
+    "nonFunctional": [
+      "API response < 200ms (p95)",
+      "Гард: не более 2 SQL-запросов"
+    ],
+    "security": [
+      "SEC-1: Мутации только ADMIN/MANAGER",
+      "SEC-2: Только спринты из того же проекта",
+      "SEC-3: Audit logging"
+    ]
+  },
+  "acceptanceCriteria": [
+    "AC-1: Добавить спринт в релиз — появляется в панели",
+    "AC-2: Спринт из другого релиза — ошибка в UI",
+    "AC-3: Кнопка Готов — disabled без спринтов с задачами",
+    "AC-4: Кнопка Выпустить — disabled пока спринты не CLOSED",
+    "AC-5: Кнопка Выпустить — disabled пока задачи не DONE/CANCELLED",
+    "AC-6: Релиз выпускается когда все условия выполнены",
+    "AC-7: RELEASED релиз — нельзя менять спринты",
+    "AC-8: make test зелёный",
+    "AC-9: make lint OK"
+  ],
+  "estimation": {
+    "analysis": 1,
+    "backend": 4,
+    "frontend": 3,
+    "testing": 2,
+    "review": 1,
+    "total": 11
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [],
+    "blocks": [],
+    "dependsOn": []
+  }
+}
