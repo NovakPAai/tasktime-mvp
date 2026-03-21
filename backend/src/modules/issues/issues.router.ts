@@ -12,6 +12,7 @@ import {
   updateAiStatusDto,
 } from './issues.dto.js';
 import * as issuesService from './issues.service.js';
+import { getKanbanFieldsForIssues } from '../issue-custom-fields/issue-custom-fields.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 
@@ -37,7 +38,7 @@ router.get('/issues/search', async (req, res, next) => {
 // List issues for a project with filters
 router.get('/projects/:projectId/issues', async (req, res, next) => {
   try {
-    const { status, type, issueTypeConfigId, priority, assigneeId, sprintId, from, to, search } = req.query as {
+    const { status, type, issueTypeConfigId, priority, assigneeId, sprintId, from, to, search, includeKanbanFields } = req.query as {
       status?: string | string[];
       type?: string | string[];
       issueTypeConfigId?: string | string[];
@@ -47,6 +48,7 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
       from?: string;
       to?: string;
       search?: string;
+      includeKanbanFields?: string;
     };
 
     const toArray = (value?: string | string[]) =>
@@ -63,6 +65,19 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
       to,
       search,
     });
+
+    if (includeKanbanFields === 'true') {
+      const kanbanMap = await getKanbanFieldsForIssues(
+        issues.map((i) => ({ id: i.id, projectId: i.projectId, issueTypeConfigId: i.issueTypeConfigId ?? null })),
+      );
+      const issuesWithFields = issues.map((i) => ({
+        ...i,
+        kanbanFields: kanbanMap.get(i.id) ?? [],
+      }));
+      res.json(issuesWithFields);
+      return;
+    }
+
     res.json(issues);
   } catch (err) {
     next(err);
