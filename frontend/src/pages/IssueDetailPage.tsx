@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,6 +18,7 @@ import {
   Form,
   Modal,
   Switch,
+  Alert,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -65,6 +66,8 @@ export default function IssueDetailPage() {
   const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
+  const [missingFields, setMissingFields] = useState<{ name: string; fieldType: string }[]>([]);
+  const customFieldsRef = useRef<HTMLDivElement>(null);
   const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
   const canAssign = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
@@ -98,8 +101,17 @@ export default function IssueDetailPage() {
 
   const handleStatusChange = async (status: IssueStatus) => {
     if (!id) return;
-    await issuesApi.updateStatus(id, status);
-    load();
+    try {
+      await issuesApi.updateStatus(id, status);
+      load();
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { error?: string; fields?: { name: string; fieldType: string }[] } } };
+      if (e?.response?.status === 422 && e?.response?.data?.error === 'REQUIRED_FIELDS_MISSING') {
+        setMissingFields(e.response.data.fields ?? []);
+      } else {
+        message.error('Не удалось изменить статус');
+      }
+    }
   };
 
   const handleAddComment = async () => {
@@ -522,7 +534,9 @@ export default function IssueDetailPage() {
             </div>
           </div>
 
-          <IssueCustomFieldsSection issueId={issue.id} />
+          <div ref={customFieldsRef}>
+            <IssueCustomFieldsSection issueId={issue.id} />
+          </div>
 
           <div className="tt-panel">
             <div className="tt-panel-header">AI Execution</div>
@@ -745,6 +759,47 @@ export default function IssueDetailPage() {
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="Обязательные поля не заполнены"
+        open={missingFields.length > 0}
+        onCancel={() => setMissingFields([])}
+        footer={[
+          <Button key="cancel" onClick={() => setMissingFields([])}>
+            Закрыть
+          </Button>,
+          <Button
+            key="scroll"
+            type="primary"
+            onClick={() => {
+              setMissingFields([]);
+              customFieldsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
+            Перейти к полям
+          </Button>,
+        ]}
+      >
+        <Alert
+          type="warning"
+          showIcon
+          message="Задача не может быть переведена в статус DONE"
+          description="Заполните все обязательные поля перед закрытием задачи."
+          style={{ marginBottom: 12 }}
+        />
+        <List
+          size="small"
+          dataSource={missingFields}
+          renderItem={(f) => (
+            <List.Item>
+              <Typography.Text strong>{f.name}</Typography.Text>
+              <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 11 }}>
+                {f.fieldType}
+              </Typography.Text>
+            </List.Item>
+          )}
+        />
       </Modal>
     </div>
   );
