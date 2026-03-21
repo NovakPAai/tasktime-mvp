@@ -2,7 +2,29 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 0.2**
+**Last version: 0.3**
+
+---
+
+## [0.3] [2026-03-21] feat(field-schemas): TTADM-36+37 — backend модуль схем полей и биндингов
+
+**Задача:** [TTADM-36](http://5.129.242.171), [TTADM-37](http://5.129.242.171)
+**PR:** TBD
+**Ветка:** `claude/jack-ttadm-36-37`
+
+### Что изменилось
+
+**Backend:**
+- Новые enum: `FieldSchemaStatus` (DRAFT/ACTIVE), `FieldScopeType` (GLOBAL/PROJECT/ISSUE_TYPE/PROJECT_ISSUE_TYPE)
+- Новые модели: `FieldSchema`, `FieldSchemaItem`, `FieldSchemaBinding` + миграция `20260321140000_add_field_schemas`
+- Связи добавлены в `Project.fieldSchemaBindings`, `IssueTypeConfig.fieldSchemaBindings`, `CustomField.schemaItems`
+- Новый модуль `backend/src/modules/field-schemas/`
+- Admin CRUD: `GET/POST/PATCH/DELETE /api/admin/field-schemas`
+- Жизненный цикл: `POST .../publish`, `POST .../unpublish`, `PATCH .../set-default`
+- Копирование: `POST .../copy` (с опциональным копированием биндингов)
+- Управление полями схемы: `PUT/POST .../items`, `DELETE .../items/:itemId`, `PATCH .../items/reorder`
+- Управление биндингами: `GET/POST .../bindings`, `DELETE .../bindings/:bindingId`
+- Публичный эндпоинт: `GET /api/projects/:projectId/field-schemas` — схемы применимые к проекту
 
 ---
 

@@ -29,6 +29,7 @@ import monitoringRouter from './modules/monitoring/monitoring.router.js';
 import issueTypeConfigsRouter from './modules/issue-type-configs/issue-type-configs.router.js';
 import issueTypeSchemesRouter from './modules/issue-type-schemes/issue-type-schemes.router.js';
 import customFieldsRouter from './modules/custom-fields/custom-fields.router.js';
+import { adminRouter as fieldSchemasAdminRouter, projectFieldSchemasRouter } from './modules/field-schemas/field-schemas.router.js';
 
 export function createApp() {
   const app = express();
@@ -92,6 +93,8 @@ export function createApp() {
   app.use('/api', issueTypeConfigsRouter);
   app.use('/api', issueTypeSchemesRouter);
   app.use('/api/admin/custom-fields', customFieldsRouter);
+  app.use('/api/admin/field-schemas', fieldSchemasAdminRouter);
+  app.use('/api/projects/:projectId/field-schemas', projectFieldSchemasRouter);
   app.use('/api/monitoring', monitoringRouter);
 
   // Error handler (must be last)
