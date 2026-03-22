@@ -228,6 +228,38 @@
   color: var(--t2);
 }
 
+/* Скрываем group labels (Навигация / Инструменты) — Paper артборд их не показывает */
+.tt-sidebar .ant-menu-item-group-title {
+  display: none !important;
+}
+
+/* Menu item height 36px */
+.tt-sidebar .ant-menu-item {
+  height: 36px !important;
+  line-height: 36px !important;
+}
+
+/* Inactive items */
+.tt-sidebar .ant-menu-item .ant-menu-title-content,
+.tt-sidebar .ant-menu-item .anticon {
+  color: var(--t2);
+  font-size: 13px;
+}
+
+.tt-sidebar .ant-menu-item .anticon {
+  font-size: 16px !important;
+  margin-right: 10px !important;
+}
+
+.tt-sidebar .ant-menu-item:hover .ant-menu-title-content,
+.tt-sidebar .ant-menu-item:hover .anticon {
+  color: var(--t1) !important;
+}
+
+.tt-sidebar .ant-menu-item:hover {
+  background: var(--bg-hover) !important;
+}
+
 /* Активный пункт — фиолетовый gradient pill (Paper артборд) */
 .tt-sidebar .ant-menu-item-selected,
 .tt-sidebar .ant-menu-item-selected:hover {
@@ -2481,15 +2513,17 @@
 
 /* TTUI-101: Login page — UI Kit 2.0 tokens */
 .auth-left {
-  width: 420px;
+  width: 40%;
   flex-shrink: 0;
-  background: var(--bg-el);
+  background: #080B14;
   border-right: 1px solid var(--b);
   padding: 40px 48px;
   display: flex;
   flex-direction: column;
   position: relative;
   z-index: 1;
+  min-width: 360px;
+  max-width: 520px;
 }
 
 .auth-logo {
@@ -2512,8 +2546,8 @@
 
 .auth-logo-text {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 16px;
   color: var(--t1);
   letter-spacing: 0;
 }
@@ -2529,27 +2563,27 @@
 .auth-heading {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 24px;
+  font-size: 28px;
   color: var(--t1);
   margin: 0 0 8px;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
 }
 
 .auth-subheading {
   font-family: var(--font-sans);
   font-weight: 400;
-  font-size: 13px;
-  color: var(--t3);
+  font-size: 14px;
+  color: var(--t2);
   margin: 0 0 24px;
 }
 
 .auth-tabs {
   display: flex;
-  gap: 4px;
-  background: var(--bg-hover);
-  border-radius: 999px;
-  padding: 3px;
-  width: fit-content;
+  gap: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--b2);
+  padding: 0;
+  width: 100%;
   margin-bottom: 28px;
 }
 
@@ -2559,11 +2593,12 @@
   font-weight: 500;
   color: var(--t2);
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 5px 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 8px 16px 8px 0;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
   outline: none;
 }
 
@@ -2572,9 +2607,8 @@
 }
 
 .auth-tab--active {
-  background: var(--acc-bg);
   color: var(--acc);
-  border-color: rgba(79, 110, 247, 0.3);
+  border-bottom-color: var(--acc);
 }
 
 .auth-form {
@@ -2623,21 +2657,22 @@
 .auth-btn {
   margin-top: 6px;
   width: 100%;
-  padding: 11px 0;
-  background: var(--acc);
+  height: 44px;
+  padding: 0;
+  background: linear-gradient(135deg, #4f6ef7, #7c3aed);
   color: #ffffff;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   border: none;
   border-radius: var(--r2);
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.06s ease, opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.06s ease;
   outline: none;
 }
 
 .auth-btn:hover:not(:disabled) {
-  background: var(--acc-h);
+  opacity: 0.9;
 }
 
 .auth-btn:active:not(:disabled) {
@@ -2655,13 +2690,15 @@
   color: var(--t4);
   margin-top: auto;
   padding-top: 20px;
+  text-align: center;
 }
 
 /* ── Правая панель (космос) ── */
 
 .auth-right {
   flex: 1;
-  background: #0a0a0f;
+  min-width: 0;
+  background: #080B14;
   position: relative;
   overflow: hidden;
 }

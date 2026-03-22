@@ -177,7 +177,14 @@ export default function ProjectDetailPage() {
     {
       title: 'TITLE',
       dataIndex: 'title',
-      render: (title: string) => <span className="tt-issue-title">{title}</span>,
+      render: (title: string, r: Issue) => (
+        <span
+          className="tt-issue-title"
+          style={r.status === 'CANCELLED' ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}
+        >
+          {title}
+        </span>
+      ),
     },
     {
       title: 'STATUS',
@@ -216,14 +223,38 @@ export default function ProjectDetailPage() {
       dataIndex: ['assignee', 'name'],
       width: 120,
       render: (n: string) =>
-        n ? <span className="tt-assignee-name">{n}</span> : <span className="tt-assignee-empty">—</span>,
+        n ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: 'var(--acc-bg)',
+                color: 'var(--acc)',
+                fontSize: 9,
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              {n.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="tt-assignee-name">{n}</span>
+          </div>
+        ) : <span className="tt-assignee-empty">—</span>,
     },
     {
-      title: 'AUTHOR',
-      dataIndex: ['creator', 'name'],
-      width: 120,
-      render: (n: string) =>
-        n ? <span className="tt-assignee-name">{n}</span> : <span className="tt-assignee-empty">—</span>,
+      title: 'SPRINT',
+      width: 110,
+      render: (_: unknown, r: Issue) => {
+        const sprintName = (r as Issue & { sprint?: { name: string } }).sprint?.name;
+        return sprintName
+          ? <span style={{ fontSize: 12, color: 'var(--t2)' }}>{sprintName}</span>
+          : <span style={{ fontSize: 12, color: 'var(--t3)' }}>Backlog</span>;
+      },
     },
   ];
 

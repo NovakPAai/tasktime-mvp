@@ -106,6 +106,18 @@ export default function ProjectsPage() {
             </svg>
             <span>Search projects…</span>
           </div>
+          {canCreate && (
+            <button
+              className="tt-projects-create-btn"
+              onClick={() => setModalOpen(true)}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <line x1="6" y1="1" x2="6" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              New Project
+            </button>
+          )}
         </div>
       </div>
 
@@ -166,39 +178,6 @@ export default function ProjectsPage() {
               );
 
             })}
-
-        {canCreate && !loading && (
-          <div
-            className="tt-project-card tt-project-card--new"
-            onClick={() => setModalOpen(true)}
-          >
-            <div className="tt-project-card-new-inner">
-              <div className="tt-project-card-new-icon">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <line
-                    x1="10"
-                    y1="3"
-                    x2="10"
-                    y2="17"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                  <line
-                    x1="3"
-                    y1="10"
-                    x2="17"
-                    y2="10"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
-              <span>New Project</span>
-            </div>
-          </div>
-        )}
       </div>
 
       <Modal
