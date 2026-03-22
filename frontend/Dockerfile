@@ -3,7 +3,7 @@ FROM node:20-bookworm-slim AS build
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY frontend/tsconfig.json ./
 COPY frontend/vite.config.ts ./
