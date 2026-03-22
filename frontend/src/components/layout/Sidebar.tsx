@@ -3,6 +3,7 @@
  * TTUI-121: выделено из AppLayout.tsx монолита
  */
 import { Layout, Menu, Button, Typography } from 'antd';
+// Typography используется для workspace name
 import {
   ProjectOutlined,
   DashboardOutlined,
@@ -118,7 +119,20 @@ export default function Sidebar({
         className={`tt-sidebar${mobileOpen ? ' tt-sidebar--open' : ''}`}
       >
         <div className="tt-sidebar-header">
-          <div className="tt-workspace-dot" />
+          {/* Grid-иконка Flow Universe (Paper артборд: фиолетовая сетка) */}
+          <svg className="tt-workspace-icon" width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="22" height="22" rx="5" fill="url(#wg)" />
+            <rect x="5" y="5" width="4" height="4" rx="1" fill="rgba(255,255,255,0.85)" />
+            <rect x="13" y="5" width="4" height="4" rx="1" fill="rgba(255,255,255,0.85)" />
+            <rect x="5" y="13" width="4" height="4" rx="1" fill="rgba(255,255,255,0.85)" />
+            <rect x="13" y="13" width="4" height="4" rx="1" fill="rgba(255,255,255,0.85)" />
+            <defs>
+              <linearGradient id="wg" x1="0" y1="0" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#4f6ef7" />
+                <stop offset="1" stopColor="#7c3aed" />
+              </linearGradient>
+            </defs>
+          </svg>
           <Typography.Text className="tt-sidebar-workspace-name">
             Flow Universe
           </Typography.Text>

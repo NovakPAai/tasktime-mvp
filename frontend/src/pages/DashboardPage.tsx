@@ -7,6 +7,13 @@ import * as adminApi from '../api/admin';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { hasAnyRequiredRole } from '../lib/roles';
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Доброе утро,';
+  if (hour < 18) return 'Добрый день,';
+  return 'Добрый вечер,';
+}
+
 export default function DashboardPage() {
   const { projects, loading, fetchProjects } = useProjectsStore();
   const { user } = useAuthStore();
@@ -42,42 +49,36 @@ export default function DashboardPage() {
   const issuesByStatus = adminStats?.issuesByStatus ?? [];
   const issuesByAssignee = adminStats?.issuesByAssignee ?? [];
 
+  const displayName = user?.name ?? user?.email ?? '';
+
   return (
     <div className="tt-page">
-      <div>
-        <h1 className="tt-page-title">Dashboard</h1>
-        <p className="tt-page-subtitle">Overview of projects, issues and activity</p>
+      <div className="tt-dashboard-greeting">
+        <span className="tt-dashboard-greeting-label">{getGreeting()}</span>
+        <h1 className="tt-dashboard-greeting-name">{displayName}</h1>
       </div>
 
       {adminStats && (
         <div className="tt-stats-grid">
           <div className="tt-stats-card">
-            <div className="tt-stats-label">Projects</div>
-            <div className="tt-stats-value">
-              <ProjectOutlined className="tt-stats-icon" />
-              {projects.length}
-            </div>
+            <ProjectOutlined className="tt-stats-icon" />
+            <div className="tt-stats-value">{projects.length}</div>
+            <div className="tt-stats-label">Проектов</div>
           </div>
           <div className="tt-stats-card">
-            <div className="tt-stats-label">Total Issues</div>
-            <div className="tt-stats-value">
-              <BugOutlined className="tt-stats-icon" />
-              {totalIssues}
-            </div>
+            <BugOutlined className="tt-stats-icon" />
+            <div className="tt-stats-value">{totalIssues}</div>
+            <div className="tt-stats-label">Задач</div>
           </div>
           <div className="tt-stats-card">
-            <div className="tt-stats-label">Users</div>
-            <div className="tt-stats-value">
-              <UserOutlined className="tt-stats-icon" />
-              {adminStats.counts.users}
-            </div>
+            <UserOutlined className="tt-stats-icon" />
+            <div className="tt-stats-value">{adminStats.counts.users}</div>
+            <div className="tt-stats-label">Пользователей</div>
           </div>
           <div className="tt-stats-card">
-            <div className="tt-stats-label">Time Logs</div>
-            <div className="tt-stats-value">
-              <ClockCircleOutlined className="tt-stats-icon" />
-              {adminStats.counts.timeLogs}
-            </div>
+            <ClockCircleOutlined className="tt-stats-icon" />
+            <div className="tt-stats-value">{adminStats.counts.timeLogs}</div>
+            <div className="tt-stats-label">Записей времени</div>
           </div>
         </div>
       )}
