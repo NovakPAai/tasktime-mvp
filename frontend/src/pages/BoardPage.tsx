@@ -23,7 +23,11 @@ const COLUMN_LABELS: Record<IssueStatus, string> = {
   OPEN: 'Open', IN_PROGRESS: 'In Progress', REVIEW: 'Review', DONE: 'Done', CANCELLED: 'Cancelled',
 };
 const COLUMN_COLORS: Record<IssueStatus, string> = {
-  OPEN: '#e6f7ff', IN_PROGRESS: '#fff7e6', REVIEW: '#f6ffed', DONE: '#f9f0ff', CANCELLED: '#fff1f0',
+  OPEN: 'rgba(139, 148, 158, 0.10)',
+  IN_PROGRESS: 'rgba(240, 185, 11, 0.08)',
+  REVIEW: 'rgba(58, 115, 249, 0.08)',
+  DONE: 'rgba(79, 110, 247, 0.10)',
+  CANCELLED: 'rgba(85, 85, 102, 0.08)',
 };
 
 export default function BoardPage() {

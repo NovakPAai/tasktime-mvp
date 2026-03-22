@@ -251,10 +251,10 @@ export default function TimePage() {
       </div>
 
       {active && (
-        <Card size="small" style={{ marginBottom: 16, borderColor: '#1677ff' }}>
+        <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--acc)', background: 'rgba(79,110,247,0.06)' }}>
           <Space>
-            <ClockCircleOutlined style={{ color: '#1677ff', fontSize: 20 }} />
-            <Typography.Text strong style={{ fontSize: 24, fontFamily: 'monospace' }}>{elapsed}</Typography.Text>
+            <ClockCircleOutlined style={{ color: 'var(--acc)', fontSize: 20 }} />
+            <Typography.Text strong style={{ fontSize: 24, fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>{elapsed}</Typography.Text>
             {active.issue && <Link to={`/issues/${active.issue.id}`}>{active.issue.project?.key}-{active.issue.number} {active.issue.title}</Link>}
             <Button icon={<PauseCircleOutlined />} danger onClick={handleStop}>Stop</Button>
           </Space>
