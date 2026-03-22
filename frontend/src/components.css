@@ -2901,11 +2901,11 @@
   font-family: ui-monospace, SF Mono, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
   font-size: 12px;
-  color: var(--t3);
+  color: #6366f1;
   padding: 1px 6px 2px;
   border-radius: 999px;
-  border: 1px solid var(--b2);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .tt-board-subtitle {
@@ -3131,6 +3131,115 @@
   color: var(--t2);
 }
 
+/* Column header redesign — dots */
+.tt-board-col-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tt-board-col-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tt-board-col-dot--open       { background: #8b949e; }
+.tt-board-col-dot--in-progress { background: #4f6ef7; }
+.tt-board-col-dot--review     { background: #a78bfa; }
+.tt-board-col-dot--done       { background: #4ade80; }
+.tt-board-col-dot--cancelled  { background: #484f58; }
+.tt-board-col-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+.tt-board-col-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t3);
+}
+
+/* Board card — assignee avatar */
+.tt-board-assignee-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Board card — meta row */
+.tt-board-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* === ISSUES STATS BAR (ProjectDetailPage) === */
+
+.tt-issues-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--b);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.tt-issues-stat {
+  font-size: 12px;
+  color: var(--t2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.tt-issues-stat strong {
+  color: var(--t1);
+  font-weight: 600;
+}
+.tt-issues-stat-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tt-issues-stat-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--b2);
+  flex-shrink: 0;
+}
+.tt-issues-sprint-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--t2);
+}
+.tt-issues-sprint-bar {
+  width: 80px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--b2);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.tt-issues-sprint-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f6ef7, #7c3aed);
+  border-radius: 2px;
+}
+
 /* === TIME PAGE === */
 
 .tt-time-summary-row {
@@ -3162,5 +3271,632 @@
 .tt-time-summary-muted {
   font-size: 12px;
   color: var(--t4);
+}
+
+/* ===================================================================
+   TIMER CARD (TimePage)
+   =================================================================== */
+
+.tt-timer-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg-el);
+  border: 1px solid rgba(79, 110, 247, 0.35);
+  border-radius: var(--r3);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.tt-timer-card-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #4f6ef7;
+  border-radius: var(--r3) 0 0 var(--r3);
+}
+
+.tt-timer-card-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tt-timer-pulse-wrap {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tt-timer-pulse {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background: #4f6ef7;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(79, 110, 247, 0.6);
+  animation: tt-pulse 1.4s infinite;
+}
+
+@keyframes tt-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(79, 110, 247, 0.6); }
+  70%  { box-shadow: 0 0 0 8px rgba(79, 110, 247, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 110, 247, 0); }
+}
+
+.tt-timer-card-info {
+  min-width: 0;
+}
+
+.tt-timer-elapsed {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: 40px;
+  font-weight: 700;
+  color: #4f6ef7;
+  line-height: 1;
+}
+
+.tt-timer-issue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tt-timer-issue-key {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px;
+  color: #4f6ef7;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.tt-timer-issue-key:hover {
+  text-decoration: underline;
+}
+
+.tt-timer-issue-title {
+  font-size: 13px;
+  color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.tt-timer-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Ghost button reusable */
+.tt-btn-ghost {
+  background: transparent !important;
+  border-color: var(--b2) !important;
+  color: var(--t2) !important;
+}
+
+.tt-btn-ghost:hover,
+.tt-btn-ghost:focus {
+  border-color: var(--b3) !important;
+  color: var(--t1) !important;
+  background: var(--bg-hover) !important;
+}
+
+/* ===================================================================
+   TIME PAGE — controls row, stats, table
+   =================================================================== */
+
+.tt-time-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tt-time-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.tt-time-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tt-time-stat-value {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.tt-time-stat-label {
+  font-size: 12px;
+  color: var(--t3);
+}
+
+/* Time log table */
+.tt-time-table-wrap {
+  background: var(--bg-el);
+  border: 1px solid var(--b2);
+  border-radius: var(--r3);
+  overflow: hidden;
+}
+
+.tt-time-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tt-time-th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--t3);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--b2);
+}
+
+.tt-time-th-right {
+  text-align: right;
+}
+
+.tt-time-tr:not(:last-child) .tt-time-td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.tt-time-tr:hover .tt-time-td {
+  background: var(--bg-hover);
+}
+
+.tt-time-td {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--t1);
+  vertical-align: middle;
+}
+
+.tt-time-td-date {
+  font-size: 12px;
+  color: var(--t3);
+  white-space: nowrap;
+  width: 80px;
+}
+
+.tt-time-td-right {
+  text-align: right;
+}
+
+.tt-time-td-muted {
+  color: var(--t4);
+}
+
+.tt-time-issue-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.tt-time-issue-link:hover .tt-time-issue-title {
+  text-decoration: underline;
+}
+
+.tt-time-issue-key {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px;
+  color: #4f6ef7;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tt-time-issue-title {
+  font-size: 13px;
+  color: var(--t2);
+}
+
+.tt-time-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tt-time-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.tt-time-who-name {
+  font-size: 13px;
+  color: var(--t2);
+}
+
+.tt-time-duration {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+  white-space: nowrap;
+}
+
+.tt-time-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--t4);
+  font-size: 13px;
+}
+
+/* ===================================================================
+   SPRINT STATE TABS (SprintsPage)
+   =================================================================== */
+
+.tt-sprint-state-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--b2);
+  margin-bottom: 20px;
+}
+
+.tt-sprint-state-tab {
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  color: var(--t3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tt-sprint-state-tab:hover {
+  color: var(--t1);
+}
+
+.tt-sprint-state-tab-active {
+  color: var(--t1) !important;
+  border-bottom-color: #4f6ef7 !important;
+  font-weight: 600;
+}
+
+/* Sprint selector (when multiple sprints in same state) */
+.tt-sprint-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tt-sprint-selector-item {
+  background: var(--bg-el);
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  padding: 4px 12px;
+  font-size: 13px;
+  color: var(--t2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tt-sprint-selector-item:hover {
+  border-color: var(--b3);
+  color: var(--t1);
+}
+
+.tt-sprint-selector-item-active {
+  border-color: #4f6ef7 !important;
+  color: #4f6ef7 !important;
+  background: rgba(79, 110, 247, 0.08) !important;
+}
+
+/* ===================================================================
+   SPRINT INFO CARD (SprintsPage)
+   =================================================================== */
+
+.tt-sprint-info-card {
+  background: var(--bg-el);
+  border: 1px solid var(--b2);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tt-sprint-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tt-sprint-info-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tt-sprint-info-name {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.tt-sprint-info-dates-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tt-sprint-info-dates {
+  font-size: 12px;
+  color: var(--t3);
+}
+
+.tt-sprint-info-goal {
+  font-size: 13px;
+  color: var(--t2);
+}
+
+.tt-sprint-info-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tt-sprint-info-progress-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--t3);
+}
+
+.tt-sprint-info-progress-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tt-sprint-info-progress-bar-wrap .ant-progress {
+  flex: 1;
+  margin: 0;
+}
+
+.tt-sprint-info-progress-count {
+  font-size: 12px;
+  color: var(--t2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tt-sprint-info-status-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--t2);
+  flex-wrap: wrap;
+}
+
+.tt-sprint-info-dot {
+  font-size: 10px;
+}
+
+.tt-sprint-info-dot-done        { color: #4f6ef7; }
+.tt-sprint-info-dot-inprogress  { color: #f59e0b; }
+.tt-sprint-info-dot-review      { color: #5b9dff; }
+.tt-sprint-info-dot-open        { color: #6b7280; }
+
+/* ===================================================================
+   SPRINT ISSUES TABLE (SprintsPage)
+   =================================================================== */
+
+.tt-sprint-issues-section {
+  background: var(--bg-el);
+  border: 1px solid var(--b2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tt-sprint-issues-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--b2);
+}
+
+.tt-sprint-issues-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.tt-sprint-issues-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tt-sprint-issues-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tt-sprint-th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--t3);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--b2);
+}
+
+.tt-sprint-issue-row:not(:last-child) .tt-sprint-td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.tt-sprint-issue-row:hover .tt-sprint-td {
+  background: var(--bg-hover);
+}
+
+.tt-sprint-td {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--t1);
+  vertical-align: middle;
+}
+
+.tt-sprint-td-title {
+  max-width: 300px;
+}
+
+.tt-sprint-td-mono {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px;
+  color: var(--t2);
+  white-space: nowrap;
+}
+
+.tt-sprint-td-muted {
+  color: var(--t4);
+}
+
+.tt-sprint-issue-key {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px;
+  color: #4f6ef7;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tt-sprint-issue-key:hover {
+  text-decoration: underline;
+}
+
+.tt-sprint-issue-title {
+  font-size: 13px;
+  color: var(--t2);
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tt-sprint-issue-title:hover {
+  color: var(--t1);
+  text-decoration: underline;
+}
+
+.tt-sprint-status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.tt-sprint-status-pill-open {
+  border-color: rgba(152, 152, 176, 0.5);
+  color: #d5d5eb;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tt-sprint-status-pill-in_progress {
+  border-color: rgba(232, 184, 74, 0.7);
+  color: #ffdd8a;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tt-sprint-status-pill-review {
+  border-color: rgba(91, 157, 255, 0.7);
+  color: #c2dcff;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tt-sprint-status-pill-done {
+  border-color: rgba(79, 110, 247, 0.85);
+  color: #d3d7ff;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tt-sprint-status-pill-cancelled {
+  border-color: rgba(85, 85, 102, 0.8);
+  color: #bebed1;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tt-sprint-priority {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tt-sprint-assignee {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tt-sprint-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.tt-sprint-issues-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--t4);
+  font-size: 13px;
 }
 

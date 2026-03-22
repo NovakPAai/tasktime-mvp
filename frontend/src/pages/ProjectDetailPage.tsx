@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Progress, Popconfirm } from 'antd';
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd';
 import {
   PlusOutlined,
   AppstoreOutlined,
@@ -150,14 +150,6 @@ export default function ProjectDetailPage() {
     dashboard.activeSprint && dashboard.activeSprint.totalIssues > 0
       ? Math.round((dashboard.activeSprint.doneIssues / dashboard.activeSprint.totalIssues) * 100)
       : 0;
-
-  const statusCounts = {
-    open: issues.filter((i) => i.status === 'OPEN').length,
-    inProgress: issues.filter((i) => i.status === 'IN_PROGRESS').length,
-    review: issues.filter((i) => i.status === 'REVIEW').length,
-    done: issues.filter((i) => i.status === 'DONE').length,
-    cancelled: issues.filter((i) => i.status === 'CANCELLED').length,
-  };
 
   const columns = [
     {
@@ -334,53 +326,37 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Stats strip */}
-        <div className="tt-issues-stats-strip">
-          <div className="tt-issues-stat">
-            <span className="tt-issues-stat-label">Total</span>
-            <span className="tt-issues-stat-value">{dashboard.totals.totalIssues}</span>
-          </div>
-          <div className="tt-issues-stat-divider" />
-          <div className="tt-issues-stat">
-            <span className="tt-issues-stat-dot tt-issues-stat-dot-open" />
-            <span className="tt-issues-stat-label">Open</span>
-            <span className="tt-issues-stat-value">{statusCounts.open}</span>
-          </div>
-          <div className="tt-issues-stat">
-            <span className="tt-issues-stat-dot tt-issues-stat-dot-inprog" />
-            <span className="tt-issues-stat-label">In Progress</span>
-            <span className="tt-issues-stat-value tt-issues-stat-inprog">{statusCounts.inProgress}</span>
-          </div>
-          <div className="tt-issues-stat">
-            <span className="tt-issues-stat-dot tt-issues-stat-dot-review" />
-            <span className="tt-issues-stat-label">Review</span>
-            <span className="tt-issues-stat-value tt-issues-stat-review">{statusCounts.review}</span>
-          </div>
-          <div className="tt-issues-stat">
-            <span className="tt-issues-stat-dot tt-issues-stat-dot-done" />
-            <span className="tt-issues-stat-label">Done</span>
-            <span className="tt-issues-stat-value tt-issues-stat-done">{statusCounts.done}</span>
-          </div>
-          <div className="tt-issues-stat">
-            <span className="tt-issues-stat-dot tt-issues-stat-dot-cancelled" />
-            <span className="tt-issues-stat-label">Cancelled</span>
-            <span className="tt-issues-stat-value">{statusCounts.cancelled}</span>
-          </div>
+        {/* Stats bar */}
+        <div className="tt-issues-stats-bar">
+          <span className="tt-issues-stat">Total <strong>{dashboard.totals.totalIssues}</strong></span>
+          {[
+            { status: 'OPEN', color: '#8b949e', label: 'Open' },
+            { status: 'IN_PROGRESS', color: '#4f6ef7', label: 'In Progress' },
+            { status: 'REVIEW', color: '#a78bfa', label: 'Review' },
+            { status: 'DONE', color: '#4ade80', label: 'Done' },
+            { status: 'CANCELLED', color: '#484f58', label: 'Cancelled' },
+          ].map(({ status, color, label }) => {
+            const count = issues.filter(i => i.status === status).length;
+            return (
+              <span key={status} className="tt-issues-stat">
+                <span className="tt-issues-stat-dot" style={{ background: color }} />
+                {label} <strong>{count}</strong>
+              </span>
+            );
+          })}
           {dashboard.activeSprint && (
             <>
-              <div className="tt-issues-stat-divider" />
-              <div className="tt-issues-stat tt-issues-stat-sprint">
-                <span className="tt-issues-stat-label">{dashboard.activeSprint.name}</span>
+              <span className="tt-issues-stat-divider" />
+              <span className="tt-issues-sprint-stat">
+                {dashboard.activeSprint.name}
                 <div className="tt-issues-sprint-bar">
-                  <Progress
-                    percent={sprintPercent}
-                    showInfo={false}
-                    strokeWidth={4}
-                    className="tt-issues-sprint-progress"
+                  <div
+                    className="tt-issues-sprint-bar-fill"
+                    style={{ width: `${sprintPercent}%` }}
                   />
                 </div>
-                <span className="tt-issues-stat-value tt-issues-stat-sprint-pct">{sprintPercent}%</span>
-              </div>
+                <strong style={{ color: '#4f6ef7' }}>{sprintPercent}%</strong>
+              </span>
             </>
           )}
         </div>
