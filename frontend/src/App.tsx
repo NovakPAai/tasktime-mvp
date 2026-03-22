@@ -53,40 +53,39 @@ export default function App() {
     loadUser();
   }, [loadUser]);
 
-  const primary = isLight ? '#5e6ad2' : '#7b86ff';
+  // Flow Universe UI Kit 2.0 — Design Tokens (TTUI-92)
+  // Единый акцент #4F6EF7 для обеих тем. Ant Design токены обязательно
+  // задавать hex-значениями — CSS vars в JS-контексте не работают.
   const antTheme = {
     algorithm: isLight ? antdTheme.defaultAlgorithm : antdTheme.darkAlgorithm,
     token: {
-      // Передаём конкретные hex-значения — Ant Design разрешает токены в JS,
-      // CSS vars там не работают. colorBgElevated фиксирует тёмный фон
-      // для Select/Dropdown/Modal/Popover попапов
-      colorPrimary: isLight ? '#5e6ad2' : '#7b86ff',
-      colorPrimaryHover: isLight ? '#7b86ff' : '#9aa4ff',
-      colorInfo: primary,
-      colorBgBase: isLight ? '#f5f5f7' : '#111117',
-      colorBgContainer: isLight ? '#ffffff' : '#181821',
-      colorBgElevated: isLight ? '#ffffff' : '#1e1e2a',   // попапы, модалки, дропдауны
-      colorBgSpotlight: isLight ? '#f0f0f4' : '#252535',  // тултипы
-      colorBgLayout: isLight ? '#eaeaed' : '#08080b',
-      colorText: isLight ? '#1a1a2e' : '#e2e2e8',
-      colorTextBase: isLight ? '#1a1a2e' : '#e2e2e8',
-      colorTextSecondary: isLight ? '#5a5a72' : '#8c8c9e',
-      colorTextTertiary: isLight ? '#9a9aaa' : '#555566',
-      colorTextDisabled: isLight ? '#c0c0cc' : '#3a3a4a',
-      colorTextPlaceholder: isLight ? '#c0c0cc' : '#3a3a4a',
+      colorPrimary: '#4f6ef7',
+      colorPrimaryHover: '#6b85ff',
+      colorInfo: '#4f6ef7',
+      colorBgBase: isLight ? '#f5f3ff' : '#03050f',
+      colorBgContainer: isLight ? '#fdfcff' : '#0f1320',
+      colorBgElevated: isLight ? '#fdfcff' : '#161e30',   // попапы, модалки, дропдауны
+      colorBgSpotlight: isLight ? '#ede9fe' : '#1e2640',  // тултипы
+      colorBgLayout: isLight ? '#ede9fe' : '#0b1535',
+      colorText: isLight ? '#2e1065' : '#e2e8f8',
+      colorTextBase: isLight ? '#2e1065' : '#e2e8f8',
+      colorTextSecondary: isLight ? '#6d28d9' : '#8b949e',
+      colorTextTertiary: isLight ? '#8b5cf6' : '#3d4d6b',
+      colorTextDisabled: isLight ? '#a78bfa' : '#1e2d47',
+      colorTextPlaceholder: isLight ? '#a78bfa' : '#1e2d47',
       colorFill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
       colorFillSecondary: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
       colorFillTertiary: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-      colorSplit: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)',
-      colorBorder: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.10)',
-      colorBorderSecondary: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.07)',
-      colorSuccess: '#4caf7d',
+      colorSplit: isLight ? 'rgba(139,92,246,0.12)' : '#1e2640',
+      colorBorder: isLight ? 'rgba(139,92,246,0.2)' : '#21262d',
+      colorBorderSecondary: isLight ? 'rgba(139,92,246,0.12)' : '#1e2640',
+      colorSuccess: '#22c55e',
       colorWarning: '#e8b84a',
       colorError: '#e5534b',
-      borderRadius: 6,
-      borderRadiusSM: 4,
-      borderRadiusLG: 10,
-      fontFamily: 'Inter, -apple-system, system-ui, sans-serif',
+      borderRadius: 12,
+      borderRadiusSM: 8,
+      borderRadiusLG: 20,
+      fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
       fontSize: 13,
       fontSizeSM: 12,
       lineHeight: 1.5,
@@ -101,21 +100,22 @@ export default function App() {
       Button: {
         fontWeight: 500,
         paddingInline: 14,
+        borderRadius: 8,
       },
       Tag: {
-        borderRadiusSM: 3,
+        borderRadiusSM: 4,
         fontSizeSM: 11,
       },
       Table: {
-        headerBg: isLight ? '#f0f0f4' : '#14141c',
-        headerColor: isLight ? '#5a5a72' : '#8c8c9e',
+        headerBg: isLight ? '#ede9fe' : '#080d1a',
+        headerColor: isLight ? '#6d28d9' : '#8b949e',
         headerSplitColor: 'transparent',
         rowHoverBg: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
         cellPaddingBlock: 8,
         cellPaddingInline: 12,
       },
       Modal: {
-        borderRadiusLG: 8,
+        borderRadiusLG: 16,
         paddingContentHorizontalLG: 24,
       },
       Drawer: {
@@ -126,8 +126,8 @@ export default function App() {
       },
       Menu: {
         itemHeight: 34,
-        itemBorderRadius: 4,
-        subMenuItemBorderRadius: 4,
+        itemBorderRadius: 6,
+        subMenuItemBorderRadius: 6,
       },
     },
   };

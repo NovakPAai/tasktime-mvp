@@ -1,35 +1,81 @@
+/* ============================================================
+   Flow Universe UI Kit 2.0 — Self-hosted fonts (TTUI-93)
+   Space Grotesk: заголовки, числа, метрики
+   Inter: body text, UI labels
+   font-display:swap — текст виден сразу, шрифт заменяется после загрузки
+   ============================================================ */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.woff2') format('woff2');
+}
+
+/* ============================================================
+   Flow Universe UI Kit 2.0 — Design Tokens (TTUI-91)
+   Dark theme (default / :root)
+   ============================================================ */
 :root {
   /* === BACKGROUNDS === */
-  --bg: #111117;
-  --bg-sb: #08080b;
-  --bg-el: #181821;
+  --bg: #03050f;
+  --bg-sb: #0b1535;
+  --bg-el: #0f1320;
   --bg-hover: rgba(255, 255, 255, 0.04);
   --bg-active: rgba(255, 255, 255, 0.06);
-  --bg-sel: rgba(94, 106, 210, 0.15);
-  --bg-input: #1e1e28;
-  --bg-modal: #1c1c24;
+  --bg-sel: rgba(79, 110, 247, 0.12);
+  --bg-input: #161e30;
+  --bg-modal: #0f1320;
 
   /* === BORDERS === */
-  --b: rgba(255, 255, 255, 0.07);
-  --b2: rgba(255, 255, 255, 0.1);
-  --b3: rgba(255, 255, 255, 0.14);
-  --b-focus: #5e6ad2;
+  --b: #1e2640;
+  --b2: #21262d;
+  --b3: #2d3a52;
+  --b-focus: #4f6ef7;
 
   /* === TEXT === */
-  --t1: #e2e2e8;
-  --t2: #8c8c9e;
-  --t3: #6e6e82;
-  --t4: #52526a;
+  --t1: #e2e8f8;
+  --t2: #8b949e;
+  --t3: #3d4d6b;
+  --t4: #1e2d47;
 
   /* === ACCENT === */
-  --acc: #7b86ff;
-  --acc-h: #9aa4ff;
-  --acc-bg: rgba(123, 134, 255, 0.22);
+  --acc: #4f6ef7;
+  --acc-h: #6b85ff;
+  --acc-bg: rgba(79, 110, 247, 0.12);
 
   /* === STATUS COLORS === */
   --s-todo: #9898b0;
   --s-inprog: #e8b84a;
-  --s-done: #5e6ad2;
+  --s-done: #4f6ef7;
   --s-cancelled: #555566;
   --s-urgent: #e5534b;
   --s-high: #e8804a;
@@ -37,9 +83,9 @@
 
   /* === LABEL COLORS === */
   --lbl-bug: #e5534b;
-  --lbl-feat: #5e6ad2;
+  --lbl-feat: #4f6ef7;
   --lbl-imp: #8b5cf6;
-  --lbl-perf: #4caf7d;
+  --lbl-perf: #22c55e;
 
   /* === LAYOUT === */
   --sidebar-w: 220px;
@@ -48,23 +94,27 @@
   --sprint-drawer-w: 900px;
 
   /* === RADII === */
-  --r: 10px;
-  --r2: 6px;
-  --r3: 4px;
+  --r: 12px;
+  --r2: 8px;
+  --r3: 6px;
 
   /* === SHADOWS === */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.5);
   --shadow-err: 0 0 0 2px rgba(229, 83, 75, 0.3);
+  --shadow-acc: 0 0 0 2px rgba(79, 110, 247, 0.3);
 
-  /* === TYPOGRAPHY & SPACING SCALE (Linear-like) === */
+  /* === TYPOGRAPHY & SPACING SCALE === */
+  --font-display: 'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-md: 14px;
   --fs-lg: 15px;
+  --fs-xl: 18px;
+  --fs-2xl: 24px;
   --lh-tight: 1.3;
   --lh-normal: 1.5;
   --lh-relaxed: 1.6;
@@ -74,43 +124,45 @@
   --space-4: 8px;
   --space-5: 12px;
   --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
 }
 
 /* ============================================================
-   TTMP-83 — Светлая тема: белый фон, тёмные шрифты
+   Flow Universe UI Kit 2.0 — Light theme tokens (TTUI-91)
    ============================================================ */
 [data-theme='light'] {
   /* === BACKGROUNDS === */
-  --bg: #f5f5f7;
-  --bg-sb: #eaeaed;
-  --bg-el: #ffffff;
+  --bg: #f5f3ff;
+  --bg-sb: #ede9fe;
+  --bg-el: #fdfcff;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: rgba(0, 0, 0, 0.06);
-  --bg-sel: rgba(94, 106, 210, 0.1);
-  --bg-input: #ffffff;
-  --bg-modal: #ffffff;
+  --bg-sel: rgba(79, 110, 247, 0.1);
+  --bg-input: #fdfcff;
+  --bg-modal: #fdfcff;
 
   /* === BORDERS === */
-  --b: rgba(0, 0, 0, 0.08);
-  --b2: rgba(0, 0, 0, 0.12);
-  --b3: rgba(0, 0, 0, 0.16);
-  --b-focus: #5e6ad2;
+  --b: rgba(139, 92, 246, 0.12);
+  --b2: rgba(139, 92, 246, 0.2);
+  --b3: rgba(139, 92, 246, 0.28);
+  --b-focus: #4f6ef7;
 
   /* === TEXT === */
-  --t1: #1a1a2e;
-  --t2: #5a5a72;
-  --t3: #9a9aaa;
-  --t4: #c0c0cc;
+  --t1: #2e1065;
+  --t2: #6d28d9;
+  --t3: #8b5cf6;
+  --t4: #a78bfa;
 
   /* === ACCENT === */
-  --acc: #5e6ad2;
-  --acc-h: #4a56c4;
-  --acc-bg: rgba(94, 106, 210, 0.12);
+  --acc: #4f6ef7;
+  --acc-h: #3b5fff;
+  --acc-bg: rgba(79, 110, 247, 0.1);
 
   /* === STATUS COLORS === */
   --s-todo: #8888a0;
   --s-inprog: #d4a017;
-  --s-done: #5e6ad2;
+  --s-done: #4f6ef7;
   --s-cancelled: #aaaabc;
   --s-urgent: #d94040;
   --s-high: #d46a20;
@@ -118,15 +170,16 @@
 
   /* === LABEL COLORS === */
   --lbl-bug: #d94040;
-  --lbl-feat: #5e6ad2;
+  --lbl-feat: #4f6ef7;
   --lbl-imp: #7c3aed;
-  --lbl-perf: #2e8a5a;
+  --lbl-perf: #16a34a;
 
   /* === SHADOWS === */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
   --shadow-err: 0 0 0 2px rgba(217, 64, 64, 0.25);
+  --shadow-acc: 0 0 0 2px rgba(79, 110, 247, 0.25);
 }
 
 * {
