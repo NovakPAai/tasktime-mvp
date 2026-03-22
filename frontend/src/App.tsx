@@ -54,9 +54,23 @@ export default function App() {
     loadUser();
   }, [loadUser]);
 
-  // Flow Universe UI Kit 2.0 — Design Tokens (TTUI-92)
-  // Единый акцент #4F6EF7 для обеих тем. Ant Design токены обязательно
-  // задавать hex-значениями — CSS vars в JS-контексте не работают.
+  /**
+   * TTUI-118: Два источника правды — архитектурное решение
+   *
+   * 1. CSS custom properties (src/styles.css → :root / [data-theme='light'])
+   *    Используются в TSX через inline style={{ color: 'var(--t1)' }}
+   *    и в CSS-классах (.tt-panel, .tt-stats-card, .auth-btn …).
+   *    Изменяются через data-theme атрибут на <html>.
+   *
+   * 2. Ant Design ConfigProvider (ниже)
+   *    Используется компонентами Ant Design (Button, Select, Modal, Table …).
+   *    Принимает только hex / rgba — CSS vars здесь не работают.
+   *
+   * Оба источника используют одну палитру:
+   *   accent: #4f6ef7  bg-dark: #03050f  bg-card: #0f1320
+   *
+   * Tech debt: консолидация в единый источник — TTUI-118 (backlog).
+   */
   const antTheme = {
     algorithm: isLight ? antdTheme.defaultAlgorithm : antdTheme.darkAlgorithm,
     token: {

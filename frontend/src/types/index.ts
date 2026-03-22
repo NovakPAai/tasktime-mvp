@@ -1,274 +1,48 @@
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
-export type IssueType = 'EPIC' | 'STORY' | 'TASK' | 'SUBTASK' | 'BUG';
+/**
+ * Flow Universe — Types barrel
+ * TTUI-125: типы разбиты по доменным модулям.
+ * Этот файл реэкспортирует всё для обратной совместимости.
+ *
+ * Прямые импорты по доменам (рекомендуется для новых файлов):
+ *   import type { User } from '../types/auth.types';
+ *   import type { Issue } from '../types/issue.types';
+ *   import type { Sprint } from '../types/sprint.types';
+ *   …и т.д.
+ */
 
-export interface IssueTypeConfig {
-  id: string;
-  name: string;
-  description?: string | null;
-  iconName: string;
-  iconColor: string;
-  isSubtask: boolean;
-  isEnabled: boolean;
-  isSystem: boolean;
-  systemKey?: string | null;
-  orderIndex: number;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { UserRole, User, AuthResponse } from './auth.types';
 
-export interface IssueTypeSchemeItem {
-  id: string;
-  orderIndex: number;
-  typeConfig: IssueTypeConfig;
-}
+export type {
+  IssueType,
+  IssueStatus,
+  IssuePriority,
+  AiExecutionStatus,
+  AiAssigneeType,
+  IssueTypeConfig,
+  IssueTypeSchemeItem,
+  IssueTypeSchemeProject,
+  IssueTypeScheme,
+  KanbanField,
+  Issue,
+  IssueLinkType,
+  IssueLink,
+  Comment,
+  AuditEntry,
+  BoardData,
+} from './issue.types';
 
-export interface IssueTypeSchemeProject {
-  id: string;
-  projectId: string;
-  project: { id: string; name: string; key: string };
-}
+export type { ProjectCategory, Project } from './project.types';
 
-export interface IssueTypeScheme {
-  id: string;
-  name: string;
-  description?: string | null;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
-  items: IssueTypeSchemeItem[];
-  projects: IssueTypeSchemeProject[];
-}
-export type IssueStatus = 'OPEN' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'CANCELLED';
-export type IssuePriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-export type AiExecutionStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'DONE' | 'FAILED';
-export type AiAssigneeType = 'HUMAN' | 'AGENT' | 'MIXED';
+export type { SprintState, Sprint, SprintDetailsResponse } from './sprint.types';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  isActive: boolean;
-  mustChangePassword?: boolean;
-  createdAt: string;
-}
+export type { TeamMember, Team } from './team.types';
 
-export interface ProjectCategory {
-  id: string;
-  name: string;
-  description?: string | null;
-  projects?: { id: string; name: string; key: string }[];
-  createdAt: string;
-  updatedAt: string;
-}
+export type {
+  ReleaseLevel,
+  ReleaseState,
+  SprintInRelease,
+  ReleaseReadiness,
+  Release,
+} from './release.types';
 
-export interface Project {
-  id: string;
-  name: string;
-  key: string;
-  description?: string;
-  ownerId?: string | null;
-  categoryId?: string | null;
-  owner?: { id: string; name: string; email: string } | null;
-  category?: { id: string; name: string } | null;
-  createdAt: string;
-  updatedAt: string;
-  _count?: { issues: number };
-}
-
-export interface KanbanField {
-  customFieldId: string;
-  name: string;
-  fieldType: string;
-  value: unknown;
-  showOnKanban: boolean;
-}
-
-export interface Issue {
-  id: string;
-  projectId: string;
-  number: number;
-  title: string;
-  description?: string;
-  acceptanceCriteria?: string | null;
-  type: IssueType | null;
-  issueTypeConfigId?: string | null;
-  issueTypeConfig?: IssueTypeConfig | null;
-  status: IssueStatus;
-  priority: IssuePriority;
-  aiEligible?: boolean;
-  aiExecutionStatus?: AiExecutionStatus;
-  aiAssigneeType?: AiAssigneeType;
-  parentId?: string;
-  assigneeId?: string;
-  creatorId: string;
-  assignee?: { id: string; name: string; email?: string };
-  creator?: { id: string; name: string };
-  parent?: { id: string; title: string; type: IssueType; number: number };
-  children?: Issue[];
-  project?: { id: string; name: string; key: string };
-  releaseId?: string | null;
-  estimatedHours?: number | null;
-  kanbanFields?: KanbanField[];
-  _count?: { children: number };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface IssueLinkType {
-  id: string;
-  name: string;
-  outboundName: string;
-  inboundName: string;
-  isActive: boolean;
-  isSystem: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface IssueLink {
-  id: string;
-  createdAt: string;
-  linkType: Pick<IssueLinkType, 'id' | 'name' | 'outboundName' | 'inboundName'>;
-  sourceIssue: { id: string; number: number; title: string; type: IssueType; status: IssueStatus; issueTypeConfig?: IssueTypeConfig | null; project: { key: string } };
-  targetIssue: { id: string; number: number; title: string; type: IssueType; status: IssueStatus; issueTypeConfig?: IssueTypeConfig | null; project: { key: string } };
-  createdBy: { id: string; name: string };
-}
-
-export type SprintState = 'PLANNED' | 'ACTIVE' | 'CLOSED';
-
-export interface Sprint {
-  id: string;
-  projectId: string;
-  name: string;
-  goal?: string;
-  startDate?: string;
-  endDate?: string;
-  state: SprintState;
-  createdAt: string;
-  _count?: { issues: number };
-  project?: { id: string; name: string; key: string };
-  projectTeam?: Team;
-  businessTeam?: Team;
-  flowTeam?: Team;
-  stats?: { totalIssues: number; estimatedIssues: number; planningReadiness: number };
-}
-
-export interface SprintDetailsResponse {
-  sprint: Sprint;
-  issues: Issue[];
-}
-
-export type ReleaseLevel = 'MINOR' | 'MAJOR';
-export type ReleaseState = 'DRAFT' | 'READY' | 'RELEASED';
-
-export interface SprintInRelease {
-  id: string;
-  name: string;
-  state: SprintState;
-  startDate?: string | null;
-  endDate?: string | null;
-  _count?: { issues: number };
-  issues?: { id: string; status: string }[];
-}
-
-export interface ReleaseReadiness {
-  totalSprints: number;
-  closedSprints: number;
-  totalIssues: number;
-  doneIssues: number;
-  canMarkReady: boolean;
-  canRelease: boolean;
-}
-
-export interface Release {
-  id: string;
-  projectId: string;
-  name: string;
-  description?: string | null;
-  level: ReleaseLevel;
-  state: ReleaseState;
-  releaseDate?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  _count?: { issues: number; sprints?: number };
-  project?: { id: string; name: string; key: string };
-  sprints?: SprintInRelease[];
-}
-
-export interface Comment {
-  id: string;
-  issueId: string;
-  authorId: string;
-  body: string;
-  author?: { id: string; name: string; email?: string };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface TimeLog {
-  id: string;
-  issueId: string;
-  userId?: string | null;
-  hours: number;
-  note?: string;
-  startedAt?: string;
-  stoppedAt?: string;
-  logDate: string;
-  createdAt: string;
-  user?: { id: string; name: string };
-  issue?: { id: string; title: string; number: number; project?: { key: string } };
-  source?: 'HUMAN' | 'AGENT';
-  agentSessionId?: string | null;
-  costMoney?: number | null;
-  agentSession?: { model: string; provider: string };
-}
-
-export interface UserTimeSummary {
-  userId: string;
-  humanHours: number;
-  agentHours: number;
-  totalHours: number;
-  agentCost: number;
-}
-
-export interface AuditEntry {
-  id: string;
-  action: string;
-  entityType: string;
-  entityId: string;
-  details?: Record<string, unknown>;
-  user?: { id: string; name: string };
-  createdAt: string;
-}
-
-export interface BoardData {
-  projectId: string;
-  sprintId: string | null;
-  columns: Record<IssueStatus, Issue[]>;
-}
-
-export interface TeamMember {
-  id: string;
-  userId: string;
-  teamId: string;
-  role?: string | null;
-  createdAt: string;
-  user: User;
-}
-
-export interface Team {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-  members?: TeamMember[];
-  _count?: { members: number };
-}
-
-export interface AuthResponse {
-  user: User;
-  accessToken: string;
-  refreshToken: string;
-}
+export type { TimeLog, UserTimeSummary } from './time.types';
