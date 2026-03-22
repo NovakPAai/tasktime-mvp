@@ -2,8 +2,7 @@
  * Sidebar — навигационная панель Flow Universe
  * TTUI-121: выделено из AppLayout.tsx монолита
  */
-import { Layout, Menu, Button, Typography } from 'antd';
-// Typography используется для workspace name
+import { Layout, Menu, Button, Typography, Tooltip } from 'antd';
 import {
   ProjectOutlined,
   DashboardOutlined,
@@ -29,7 +28,18 @@ import {
 } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import { hasRequiredRole } from '../../lib/roles';
-import type { UserRole } from '../../types';
+import type { UserRole, User } from '../../types';
+
+function getInitials(name: string): string {
+  return name.split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+}
+
+const AVATAR_COLORS = ['#4f6ef7','#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4'];
+function avatarColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+}
 
 const { Sider } = Layout;
 
@@ -38,6 +48,7 @@ interface SidebarProps {
   mobileOpen: boolean;
   openKeys: string[];
   userRole?: UserRole;
+  user?: User | null;
   onClose: () => void;
   onOpenKeysChange: (keys: string[]) => void;
   onNavigate: (key: string) => void;
@@ -48,6 +59,7 @@ export default function Sidebar({
   mobileOpen,
   openKeys,
   userRole,
+  user,
   onClose,
   onOpenKeysChange,
   onNavigate,
@@ -156,6 +168,23 @@ export default function Sidebar({
           className="tt-sidebar-menu"
           onClick={({ key }) => onNavigate(key as string)}
         />
+
+        {user && (
+          <div className="tt-sidebar-user">
+            <Tooltip title={user.email} placement="right">
+              <div
+                className="tt-sidebar-user-avatar"
+                style={{ background: avatarColor(user.name) }}
+              >
+                {getInitials(user.name)}
+              </div>
+            </Tooltip>
+            <div className="tt-sidebar-user-info">
+              <span className="tt-sidebar-user-name">{user.name}</span>
+              <span className="tt-sidebar-user-role">{user.role}</span>
+            </div>
+          </div>
+        )}
       </Sider>
     </>
   );

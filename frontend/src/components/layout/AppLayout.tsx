@@ -76,6 +76,7 @@ export default function AppLayout() {
         mobileOpen={mobileOpen}
         openKeys={openKeys}
         userRole={user?.role}
+        user={user}
         onClose={() => setMobileOpen(false)}
         onOpenKeysChange={setOpenKeys}
         onNavigate={handleNav}
