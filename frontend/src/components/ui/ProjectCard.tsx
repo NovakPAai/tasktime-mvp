@@ -2,13 +2,38 @@
  * ProjectCard — Ф2.6 UI Kit 2.0 (TTUI-99)
  * 3 варианта: Active (violet glow) / OnHold (amber glow) / Archived (no glow, dim)
  * Radial glow: position:absolute, right:-30px top:-30px, 100×100px
+ * Avatar: gradient 36×36px square с 2-буквенными инициалами (детерминировано из key)
  */
 
-import { ProjectOutlined } from '@ant-design/icons';
 import type { AvatarUser } from './AvatarGroup';
 import { AvatarGroup } from './AvatarGroup';
 import { ProgressBar } from './ProgressBar';
 import { ProjectStatusBadge, type ProjectStatus } from './ProjectStatusBadge';
+
+const GRADIENTS = [
+  'linear-gradient(135deg, #4f6ef7, #7c3aed)', // синий-фиолетовый
+  'linear-gradient(135deg, #10b981, #06b6d4)', // зелёный-голубой
+  'linear-gradient(135deg, #f59e0b, #ef4444)', // оранжевый-красный
+  'linear-gradient(135deg, #8b5cf6, #ec4899)', // фиолетовый-розовый
+  'linear-gradient(135deg, #06b6d4, #3b82f6)', // голубой-синий
+  'linear-gradient(135deg, #84cc16, #10b981)', // лайм-зелёный
+];
+
+function projectGradient(key: string): string {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) & 0xffff;
+  return GRADIENTS[h % GRADIENTS.length]!;
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+  if (diff < 60) return 'только что';
+  if (diff < 3600) return `${Math.floor(diff / 60)} мин назад`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ч назад`;
+  if (diff < 7 * 86400) return `${Math.floor(diff / 86400)} д назад`;
+  if (diff < 30 * 86400) return `${Math.floor(diff / (7 * 86400))} нед. назад`;
+  return `${Math.floor(diff / (30 * 86400))} мес. назад`;
+}
 
 export interface ProjectCardData {
   id: string;
@@ -47,9 +72,8 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
   const isArchived = project.status === 'archived';
   const completion = project.completionPct ?? 0;
 
-  const updatedLabel = project.updatedAt
-    ? new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(project.updatedAt))
-    : null;
+  const updatedLabel = project.updatedAt ? timeAgo(project.updatedAt) : null;
+  const gradient = projectGradient(project.key);
 
   return (
     <div
@@ -102,16 +126,19 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               borderRadius: 8,
-              background: 'var(--acc-bg)',
-              color: 'var(--acc)',
-              fontSize: 16,
+              background: gradient,
+              color: '#ffffff',
+              fontSize: 13,
+              fontWeight: 700,
+              fontFamily: 'var(--font-display)',
               flexShrink: 0,
+              letterSpacing: '0.02em',
             }}
           >
-            <ProjectOutlined />
+            {project.key.slice(0, 2)}
           </span>
           <div>
             <div
@@ -184,12 +211,14 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
         {project.members && project.members.length > 0 ? (
           <AvatarGroup users={project.members} max={4} size={22} />
         ) : (
-          <span />
+          updatedLabel ? (
+            <span style={{ fontSize: 11, color: 'var(--t3)' }}>{updatedLabel}</span>
+          ) : (
+            <span />
+          )
         )}
-        {updatedLabel && (
-          <span style={{ fontSize: 11, color: 'var(--t3)' }}>
-            Обновлено {updatedLabel}
-          </span>
+        {project.members && project.members.length > 0 && updatedLabel && (
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>{updatedLabel}</span>
         )}
       </div>
     </div>

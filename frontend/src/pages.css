@@ -156,7 +156,7 @@
 }
 
 .tt-projects-title {
-  font-family: 'Syne', var(--font-sans);
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 800;
   color: var(--t1);
@@ -261,7 +261,7 @@
 .tt-projects-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 24px;
 }
 
 /* Card */

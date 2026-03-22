@@ -1,19 +1,58 @@
+/**
+ * TimePage — Учёт времени
+ * Дизайн: Paper артборд "Time — Dark" (2RY-0)
+ */
 import { useEffect, useMemo, useState } from 'react';
-import { Typography, Table, Card, Space, Button, message, Select } from 'antd';
-import { ClockCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
+import { Button, Modal, Form, Input, InputNumber, DatePicker, Select, message } from 'antd';
+import { PlusOutlined, PauseCircleOutlined, StopOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import * as timeApi from '../api/time';
 import { useAuthStore } from '../store/auth.store';
-import type { TimeLog, UserTimeSummary } from '../types';
+import type { TimeLog } from '../types';
 
-function emptySummary(userId?: string): UserTimeSummary {
-  return {
-    userId: userId ?? '',
-    humanHours: 0,
-    agentHours: 0,
-    totalHours: 0,
-    agentCost: 0,
-  };
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function fmtHours(h: number): string {
+  const hours = Math.floor(h);
+  const minutes = Math.round((h - hours) * 60);
+  return `${hours}ч ${String(minutes).padStart(2, '0')}м`;
+}
+
+function smartDate(logDate: string): string {
+  const d = new Date(`${logDate.slice(0, 10)}T00:00:00`);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const todayStr = today.toISOString().slice(0, 10);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+  const logStr = logDate.slice(0, 10);
+
+  if (logStr === todayStr) return 'Сегодня';
+  if (logStr === yesterdayStr) return 'Вчера';
+
+  const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  return `${d.getDate()} ${months[d.getMonth()] ?? ''}`;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  '#4f6ef7', '#7c3aed', '#10b981', '#f59e0b',
+  '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899',
+];
+
+function avatarColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
 }
 
 function getBusinessDateText(logDate: string): string {
@@ -24,13 +63,16 @@ function getBusinessDate(logDate: string): Date {
   return new Date(`${getBusinessDateText(logDate)}T00:00:00`);
 }
 
+// ── component ─────────────────────────────────────────────────────────────────
+
 export default function TimePage() {
   const { user } = useAuthStore();
   const [logs, setLogs] = useState<TimeLog[]>([]);
-  const [summary, setSummary] = useState<UserTimeSummary>(emptySummary());
   const [active, setActive] = useState<TimeLog | null>(null);
   const [elapsed, setElapsed] = useState('00:00:00');
   const [period, setPeriod] = useState<'all' | 'today' | 'week' | 'month'>('week');
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm] = Form.useForm();
   const [projectKey, setProjectKey] = useState<string | 'all'>('all');
 
   const loadUserLogs = async (userId: string) => {
@@ -38,25 +80,13 @@ export default function TimePage() {
       const nextLogs = await timeApi.getUserLogs(userId);
       setLogs(nextLogs);
     } catch {
-      message.error('Failed to load time logs');
-    }
-  };
-
-  const loadUserSummary = async (userId: string) => {
-    try {
-      const nextSummary = await timeApi.getUserTimeSummary(userId);
-      setSummary(nextSummary);
-    } catch {
-      setSummary(emptySummary(userId));
-      message.error('Failed to load time summary');
+      void message.error('Не удалось загрузить записи времени');
     }
   };
 
   useEffect(() => {
     if (user) {
-      setSummary(emptySummary(user.id));
       void loadUserLogs(user.id);
-      void loadUserSummary(user.id);
       void timeApi.getActiveTimer().then(setActive);
     }
   }, [user]);
@@ -79,14 +109,28 @@ export default function TimePage() {
     try {
       await timeApi.stopTimer(active.issueId);
       setActive(null);
-      if (user) {
-        await Promise.all([
-          loadUserLogs(user.id),
-          loadUserSummary(user.id),
-        ]);
-      }
-      message.success('Timer stopped');
-    } catch { message.error('Error'); }
+      if (user) await loadUserLogs(user.id);
+      void message.success('Таймер остановлен');
+    } catch {
+      void message.error('Ошибка');
+    }
+  };
+
+  const handleManualSubmit = async (vals: { issueId: string; hours: number; note?: string; logDate?: { toISOString?: () => string } }) => {
+    try {
+      const logDate = vals.logDate
+        ? (typeof vals.logDate === 'string'
+            ? vals.logDate
+            : (vals.logDate as { format?: (fmt: string) => string }).format?.('YYYY-MM-DD') ?? new Date().toISOString().slice(0, 10))
+        : new Date().toISOString().slice(0, 10);
+      await timeApi.logManual(vals.issueId, { hours: vals.hours, note: vals.note, logDate });
+      void message.success('Запись добавлена');
+      setManualOpen(false);
+      manualForm.resetFields();
+      if (user) await loadUserLogs(user.id);
+    } catch {
+      void message.error('Ошибка при сохранении');
+    }
   };
 
   const filteredLogs = useMemo(() => {
@@ -125,204 +169,213 @@ export default function TimePage() {
     return keys.map((key) => ({ label: key, value: key }));
   }, [logs]);
 
-  const columns = [
-    {
-      title: 'Issue',
-      key: 'issue',
-      render: (_: unknown, r: TimeLog) =>
-        r.issue ? (
-          <Link to={`/issues/${r.issue.id}`}>
-            <span className="tt-mono">
-              {r.issue.project?.key}-{r.issue.number}
-            </span>{' '}
-            {r.issue.title}
-          </Link>
-        ) : (
-          '-'
-        ),
-    },
-    {
-      title: 'Hours',
-      dataIndex: 'hours',
-      width: 90,
-      render: (h: number) => <span className="tt-mono">{Number(h).toFixed(2)}</span>,
-    },
-    {
-      title: 'Source',
-      dataIndex: 'source',
-      width: 90,
-      render: (src: TimeLog['source']) =>
-        src === 'AGENT' ? (
-          <span className="tt-badge tt-badge-purple">AI</span>
-        ) : (
-          <span className="tt-badge tt-badge-blue">Human</span>
-        ),
-    },
-    {
-      title: 'Model',
-      key: 'model',
-      width: 140,
-      render: (_: unknown, r: TimeLog) =>
-        r.source === 'AGENT' && r.agentSession
-          ? `${r.agentSession.model}`
-          : '-',
-    },
-    {
-      title: 'AI Cost',
-      dataIndex: 'costMoney',
-      width: 90,
-      render: (c: number | null | undefined, r: TimeLog) =>
-        r.source === 'AGENT' && c != null ? (
-          <span className="tt-mono">{Number(c).toFixed(4)}</span>
-        ) : (
-          '-'
-        ),
-    },
-    { title: 'Note', dataIndex: 'note', width: 200, render: (n: string) => n || '-' },
-    {
-      title: 'Date',
-      dataIndex: 'logDate',
-      width: 120,
-      render: (d: string) => {
-        return <span className="tt-mono">{getBusinessDateText(d)}</span>;
-      },
-    },
+  // Stats
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const weekFrom = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const todayHours = useMemo(() =>
+    logs
+      .filter((l) => l.logDate.slice(0, 10) === todayStr)
+      .reduce((sum, l) => sum + (l.hours ?? 0), 0),
+    [logs, todayStr],
+  );
+
+  const weekHours = useMemo(() =>
+    logs
+      .filter((l) => getBusinessDate(l.logDate) >= weekFrom)
+      .reduce((sum, l) => sum + (l.hours ?? 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [logs],
+  );
+
+  const PERIOD_TABS: { label: string; value: 'today' | 'week' | 'month' | 'all' }[] = [
+    { label: 'Сегодня', value: 'today' },
+    { label: 'Неделя', value: 'week' },
+    { label: 'Месяц', value: 'month' },
+    { label: 'Всё время', value: 'all' },
   ];
 
   return (
     <div className="tt-page">
+      {/* Header */}
       <div className="tt-page-header">
         <div>
-          <h1 className="tt-page-title">My Time</h1>
-          <p className="tt-page-subtitle">Review and filter your logged work</p>
+          <h1 className="tt-page-title">Учёт времени</h1>
+          <p className="tt-page-subtitle">Ваши трудозатраты за период</p>
+        </div>
+        <div className="tt-page-actions">
+          <Button
+            className="tt-dashboard-new-btn"
+            icon={<PlusOutlined />}
+            onClick={() => setManualOpen(true)}
+          >
+            Ручной ввод
+          </Button>
         </div>
       </div>
 
-      <div className="tt-filters-row">
-        <div className="tt-filter-group">
-          <span className="tt-filter-label">Period</span>
-          <div className="tt-filter-pills">
-            <button
-              type="button"
-              className={`tt-filter-pill ${period === 'today' ? 'tt-filter-pill-active' : ''}`}
-              onClick={() => setPeriod('today')}
+      {/* Active timer card */}
+      {active && (
+        <div className="tt-timer-card">
+          <div className="tt-timer-card-accent" />
+          <div className="tt-timer-card-left">
+            <div className="tt-timer-pulse-wrap">
+              <span className="tt-timer-pulse" />
+            </div>
+            <div className="tt-timer-card-info">
+              <div className="tt-timer-elapsed">{elapsed}</div>
+              {active.issue && (
+                <div className="tt-timer-issue">
+                  <Link to={`/issues/${active.issue.id}`} className="tt-timer-issue-key">
+                    {active.issue.project?.key}-{active.issue.number}
+                  </Link>
+                  <span className="tt-timer-issue-title">{active.issue.title}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="tt-timer-card-actions">
+            <Button
+              icon={<PauseCircleOutlined />}
+              className="tt-btn-ghost"
+              onClick={() => void 0}
             >
-              Today
-            </button>
-            <button
-              type="button"
-              className={`tt-filter-pill ${period === 'week' ? 'tt-filter-pill-active' : ''}`}
-              onClick={() => setPeriod('week')}
+              Пауза
+            </Button>
+            <Button
+              icon={<StopOutlined />}
+              danger
+              onClick={() => void handleStop()}
             >
-              Last 7 days
-            </button>
-            <button
-              type="button"
-              className={`tt-filter-pill ${period === 'month' ? 'tt-filter-pill-active' : ''}`}
-              onClick={() => setPeriod('month')}
-            >
-              Last 30 days
-            </button>
-            <button
-              type="button"
-              className={`tt-filter-pill ${period === 'all' ? 'tt-filter-pill-active' : ''}`}
-              onClick={() => setPeriod('all')}
-            >
-              All time
-            </button>
+              Стоп
+            </Button>
           </div>
         </div>
-
-        <div className="tt-filter-group">
-          <span className="tt-filter-label">Project</span>
-          <Select
-            size="small"
-            className="tt-filter-select"
-            placeholder="All projects"
-            value={projectKey}
-            style={{ minWidth: 140 }}
-            onChange={(value) => setProjectKey(value)}
-            options={[
-              { label: 'All projects', value: 'all' },
-              ...projectOptions,
-            ]}
-          />
-        </div>
-      </div>
-
-      {active && (
-        <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--acc)', background: 'rgba(79,110,247,0.06)' }}>
-          <Space>
-            <ClockCircleOutlined style={{ color: 'var(--acc)', fontSize: 20 }} />
-            <Typography.Text strong style={{ fontSize: 24, fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>{elapsed}</Typography.Text>
-            {active.issue && <Link to={`/issues/${active.issue.id}`}>{active.issue.project?.key}-{active.issue.number} {active.issue.title}</Link>}
-            <Button icon={<PauseCircleOutlined />} danger onClick={handleStop}>Stop</Button>
-          </Space>
-        </Card>
       )}
 
-      <div style={{ marginBottom: 12 }}>
-        <Typography.Title level={5} style={{ marginBottom: 4 }}>
-          All-time summary
-        </Typography.Title>
-        <Typography.Text type="secondary">
-          Filters below affect the log table only.
-        </Typography.Text>
+      {/* Period tabs + stats row */}
+      <div className="tt-time-controls-row">
+        <div className="tt-filter-pills">
+          {PERIOD_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              className={`tt-filter-pill${period === tab.value ? ' tt-filter-pill-active' : ''}`}
+              onClick={() => setPeriod(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+          {projectOptions.length > 0 && (
+            <Select
+              size="small"
+              className="tt-filter-select"
+              value={projectKey}
+              style={{ minWidth: 120, marginLeft: 8 }}
+              onChange={(v) => setProjectKey(v)}
+              options={[
+                { label: 'Все проекты', value: 'all' },
+                ...projectOptions,
+              ]}
+            />
+          )}
+        </div>
+        <div className="tt-time-stats-row">
+          <div className="tt-time-stat">
+            <span className="tt-time-stat-value">{fmtHours(todayHours)}</span>
+            <span className="tt-time-stat-label">Сегодня</span>
+          </div>
+          <div className="tt-time-stat">
+            <span className="tt-time-stat-value">{fmtHours(weekHours)}</span>
+            <span className="tt-time-stat-label">Эта неделя</span>
+          </div>
+        </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: 12,
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          marginBottom: 16,
-        }}
+      {/* Time log table */}
+      <div className="tt-time-table-wrap">
+        <table className="tt-time-table">
+          <thead>
+            <tr>
+              <th className="tt-time-th">ДАТА</th>
+              <th className="tt-time-th">ЗАДАЧА</th>
+              <th className="tt-time-th">КТО</th>
+              <th className="tt-time-th tt-time-th-right">ВРЕМЯ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLogs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="tt-time-empty">
+                  Нет записей за выбранный период
+                </td>
+              </tr>
+            ) : (
+              filteredLogs.map((log) => {
+                const userName = log.user?.name ?? 'Система';
+                return (
+                  <tr key={log.id} className="tt-time-tr">
+                    <td className="tt-time-td tt-time-td-date">
+                      {smartDate(log.logDate)}
+                    </td>
+                    <td className="tt-time-td">
+                      {log.issue ? (
+                        <Link to={`/issues/${log.issue.id}`} className="tt-time-issue-link">
+                          <span className="tt-time-issue-key">
+                            {log.issue.project?.key}-{log.issue.number}
+                          </span>
+                          <span className="tt-time-issue-title">{log.issue.title}</span>
+                        </Link>
+                      ) : (
+                        <span className="tt-time-td-muted">—</span>
+                      )}
+                    </td>
+                    <td className="tt-time-td">
+                      <div className="tt-time-who">
+                        <span
+                          className="tt-time-avatar"
+                          style={{ background: avatarColor(userName) }}
+                        >
+                          {getInitials(userName)}
+                        </span>
+                        <span className="tt-time-who-name">{userName}</span>
+                      </div>
+                    </td>
+                    <td className="tt-time-td tt-time-td-right">
+                      <span className="tt-time-duration">{fmtHours(log.hours)}</span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Manual entry modal */}
+      <Modal
+        title="Ручной ввод времени"
+        open={manualOpen}
+        onCancel={() => { setManualOpen(false); manualForm.resetFields(); }}
+        onOk={() => manualForm.submit()}
+        okText="Сохранить"
+        cancelText="Отмена"
       >
-        <Card size="small" data-testid="time-summary-human">
-          <Typography.Text type="secondary">Human</Typography.Text>
-          <div className="tt-mono" style={{ fontSize: 24, marginTop: 8 }}>
-            {summary.humanHours.toFixed(2)}h
-          </div>
-        </Card>
-        <Card size="small" data-testid="time-summary-ai">
-          <Typography.Text type="secondary">AI</Typography.Text>
-          <div className="tt-mono" style={{ fontSize: 24, marginTop: 8 }}>
-            {summary.agentHours.toFixed(2)}h
-          </div>
-        </Card>
-        <Card size="small" data-testid="time-summary-ai-cost">
-          <Typography.Text type="secondary">AI cost</Typography.Text>
-          <div className="tt-mono" style={{ fontSize: 24, marginTop: 8 }}>
-            {summary.agentCost.toFixed(4)}
-          </div>
-        </Card>
-        <Card size="small" data-testid="time-summary-total">
-          <Typography.Text type="secondary">Total</Typography.Text>
-          <div className="tt-mono" style={{ fontSize: 24, marginTop: 8 }}>
-            {summary.totalHours.toFixed(2)}h
-          </div>
-        </Card>
-      </div>
-
-      <div className="tt-time-summary-row">
-        <span className="tt-time-summary-label">Visible log entries</span>
-        <span className="tt-time-summary-value tt-mono">{filteredLogs.length}</span>
-        {filteredLogs.length !== logs.length && (
-          <span className="tt-time-summary-muted">
-            ({filteredLogs.length} of {logs.length} entries)
-          </span>
-        )}
-      </div>
-
-      <div className="tt-table tt-time-table">
-        <Table
-          dataSource={filteredLogs}
-          columns={columns}
-          rowKey="id"
-          size="small"
-          pagination={{ pageSize: 20 }}
-        />
-      </div>
+        <Form form={manualForm} layout="vertical" onFinish={(v) => void handleManualSubmit(v)}>
+          <Form.Item name="issueId" label="ID задачи" rules={[{ required: true, message: 'Укажите ID задачи' }]}>
+            <Input placeholder="UUID задачи" />
+          </Form.Item>
+          <Form.Item name="hours" label="Часы" rules={[{ required: true, message: 'Укажите количество часов' }]}>
+            <InputNumber min={0.1} step={0.5} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="logDate" label="Дата">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="note" label="Комментарий">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

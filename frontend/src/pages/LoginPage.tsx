@@ -139,8 +139,8 @@ export default function LoginPage() {
 
         {/* Форма */}
         <div className="auth-form-wrap">
-          <h1 className="auth-heading">Войти в систему</h1>
-          <p className="auth-subheading">Добро пожаловать в Flow Universe</p>
+          <h1 className="auth-heading">Добро пожаловать</h1>
+          <p className="auth-subheading">Войдите в систему управления проектами</p>
 
           {/* Табы */}
           <div className="auth-tabs">

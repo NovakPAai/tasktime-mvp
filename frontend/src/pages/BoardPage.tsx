@@ -30,6 +30,26 @@ const COLUMN_COLORS: Record<IssueStatus, string> = {
   CANCELLED: 'rgba(85, 85, 102, 0.08)',
 };
 
+const AVATAR_COLORS = [
+  '#4f6ef7', '#7c3aed', '#10b981', '#f59e0b',
+  '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899',
+];
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function avatarColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+}
+
 export default function BoardPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -258,12 +278,11 @@ export default function BoardPage() {
                   style={{ backgroundColor: COLUMN_COLORS[status] }}
                 >
                   <div className="tt-board-column-header">
-                    <span className={`tt-board-column-chip tt-board-column-chip--${status.toLowerCase()}`}>
-                      {COLUMN_LABELS[status]}
-                    </span>
-                    <span className="tt-board-column-count">
-                      {columns[status]?.length || 0}
-                    </span>
+                    <div className="tt-board-col-title">
+                      <span className={`tt-board-col-dot tt-board-col-dot--${status.toLowerCase().replace('_', '-')}`} />
+                      <span className="tt-board-col-name">{COLUMN_LABELS[status]}</span>
+                    </div>
+                    <span className="tt-board-col-count">{columns[status]?.length || 0}</span>
                   </div>
                   {(columns[status] || []).map((issue, idx) => (
                     <Draggable key={issue.id} draggableId={issue.id} index={idx}>
@@ -277,10 +296,10 @@ export default function BoardPage() {
                           onClick={() => setSelectedIssueId(issue.id)}
                         >
                           <div className="tt-board-card-top-row">
-                            <span className="tt-board-card-id">
+                            <IssueTypeBadge type={issue.type} typeConfig={issue.issueTypeConfig} />
+                            <span className="tt-board-key">
                               {project.key}-{issue.number}
                             </span>
-                            <IssueTypeBadge type={issue.type} typeConfig={issue.issueTypeConfig} />
                           </div>
                           <Link to={`/issues/${issue.id}`} className="tt-board-card-title">
                             {issue.title}
@@ -289,13 +308,16 @@ export default function BoardPage() {
                             <KanbanCardCustomFields kanbanFields={kanbanFieldsMap.get(issue.id)!} />
                           )}
                           <div className="tt-board-card-meta">
-                            <span className={`tt-board-status-pill tt-board-status-pill--${issue.status.toLowerCase()}`}>
-                              {COLUMN_LABELS[issue.status]}
+                            <span className={`tt-priority-text tt-priority-text--${issue.priority.toLowerCase()}`}>
+                              {issue.priority}
                             </span>
                             {issue.assignee && (
-                              <span className="tt-board-card-assignee">
-                                {issue.assignee.name}
-                              </span>
+                              <div
+                                className="tt-board-assignee-avatar"
+                                style={{ background: avatarColor(issue.assignee.name) }}
+                              >
+                                {getInitials(issue.assignee.name)}
+                              </div>
                             )}
                           </div>
                         </div>
