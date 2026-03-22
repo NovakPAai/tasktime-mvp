@@ -19,7 +19,9 @@ import {
   Modal,
   Switch,
   Alert,
+  DatePicker,
 } from 'antd';
+import dayjs from 'dayjs';
 import {
   ArrowLeftOutlined,
   CommentOutlined,
@@ -217,6 +219,7 @@ export default function IssueDetailPage() {
       assigneeId: issue.assigneeId ?? undefined,
       description: issue.description ?? '',
       acceptanceCriteria: issue.acceptanceCriteria ?? '',
+      dueDate: issue.dueDate ? dayjs(issue.dueDate) : null,
     });
     setEditModalOpen(true);
   };
@@ -228,6 +231,7 @@ export default function IssueDetailPage() {
     assigneeId?: string;
     description?: string;
     acceptanceCriteria?: string;
+    dueDate?: dayjs.Dayjs | null;
   }) => {
     if (!id) return;
     try {
@@ -238,6 +242,7 @@ export default function IssueDetailPage() {
         assigneeId: vals.assigneeId,
         description: vals.description || undefined,
         acceptanceCriteria: vals.acceptanceCriteria || undefined,
+        dueDate: vals.dueDate ? vals.dueDate.format('YYYY-MM-DD') : null,
       });
       setEditModalOpen(false);
       await load();
@@ -294,7 +299,7 @@ export default function IssueDetailPage() {
             <div className="tt-issue-id-badge">
               <span>{issueKey}</span>
             </div>
-            <IssueTypeBadge type={issue.type} typeConfig={issue.issueTypeConfig} showLabel />
+            <IssueTypeBadge typeConfig={issue.issueTypeConfig} showLabel />
           </div>
           <div className="tt-issue-header-meta">
             <span>
@@ -305,7 +310,7 @@ export default function IssueDetailPage() {
               <span>
                 Parent:{' '}
                 <Link to={`/issues/${issue.parent.id}`}>
-                  {issue.parent.type}-{issue.parent.number}: {issue.parent.title}
+                  {issue.parent.issueTypeConfig?.systemKey ?? 'ISSUE'}-{issue.parent.number}: {issue.parent.title}
                 </Link>
               </span>
             )}
@@ -369,7 +374,7 @@ export default function IssueDetailPage() {
                 renderItem={(child) => (
                   <List.Item>
                     <Link to={`/issues/${child.id}`}>
-                      <IssueTypeBadge type={child.type} typeConfig={child.issueTypeConfig} />{' '}
+                      <IssueTypeBadge typeConfig={child.issueTypeConfig} />{' '}
                       <IssueStatusTag status={child.status} size="small" />{' '}
                       {child.title}
                     </Link>
@@ -528,6 +533,19 @@ export default function IssueDetailPage() {
                 </div>
               )}
               <div className="tt-panel-row">
+                <span>Срок исполнения</span>
+                {issue.dueDate ? (
+                  <span>
+                    {dayjs(issue.dueDate).format('DD.MM.YYYY')}
+                    {issue.status !== 'DONE' && issue.status !== 'CANCELLED' && dayjs(issue.dueDate).isBefore(dayjs(), 'day') && (
+                      <Tag color="red" style={{ marginLeft: 4, fontSize: 10 }}>просрочено</Tag>
+                    )}
+                  </span>
+                ) : (
+                  <span style={{ color: '#bbb' }}>—</span>
+                )}
+              </div>
+              <div className="tt-panel-row">
                 <span>Created</span>
                 <span>{new Date(issue.createdAt).toLocaleDateString()}</span>
               </div>
@@ -605,7 +623,7 @@ export default function IssueDetailPage() {
                   icon={<ApartmentOutlined />}
                   loading={aiDecomposeLoading}
                   onClick={handleAiDecompose}
-                  disabled={!issue.type || issue.issueTypeConfig?.isSubtask === true}
+                  disabled={!issue.issueTypeConfig || issue.issueTypeConfig?.isSubtask === true}
                 >
                   Декомпозировать в подзадачи
                 </Button>
@@ -736,6 +754,9 @@ export default function IssueDetailPage() {
           </Form.Item>
           <Form.Item name="acceptanceCriteria" label="Acceptance Criteria">
             <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="dueDate" label="Срок исполнения">
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
         </Form>
       </Modal>

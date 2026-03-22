@@ -9,6 +9,7 @@ export const createIssueDto = z.object({
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
   parentId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().optional(),
+  dueDate: z.string().date().optional(),
 });
 
 export const updateIssueDto = z.object({
@@ -18,6 +19,7 @@ export const updateIssueDto = z.object({
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   parentId: z.string().uuid().nullable().optional(),
+  dueDate: z.string().date().nullable().optional(),
 });
 
 export const updateStatusDto = z.object({

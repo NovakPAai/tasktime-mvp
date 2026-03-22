@@ -2,7 +2,28 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 1.0**
+**Last version: 1.1**
+
+---
+
+## [1.1] [2026-03-22] feat(issues): добавлено поле «Срок исполнения» (dueDate)
+
+**PR:** TBD
+**Ветка:** `claude/jack-duedate`
+
+### Что изменилось
+
+**Backend:**
+- `schema.prisma` — добавлено поле `dueDate DateTime? @db.Date` в модель `Issue` + индекс `@@index([dueDate])`
+- `migrations/20260322000000_add_issue_due_date` — SQL-миграция: `ALTER TABLE "issues" ADD COLUMN "due_date" DATE` + индекс
+- `issues.dto.ts` — `dueDate: z.string().date().optional()` в `createIssueDto`; `dueDate: z.string().date().nullable().optional()` в `updateIssueDto`
+- `issues.service.ts` — передача `dueDate` при создании задачи
+
+**Frontend:**
+- `issue.types.ts` — добавлено `dueDate?: string | null` в интерфейс `Issue`
+- `api/issues.ts` — добавлено `dueDate?: string | null` в `CreateIssueBody`
+- `IssueDetailPage` — поле «Срок исполнения» в панели Details с индикатором «просрочено» (красный Tag + жирный шрифт) для задач не в DONE/CANCELLED; поле DatePicker в форме Edit Issue
+- `ProjectDetailPage` — колонка «СРОК» в таблице задач с overdue-индикацией; поле DatePicker в форме создания New Issue
 
 ---
 

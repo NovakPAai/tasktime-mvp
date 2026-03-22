@@ -145,24 +145,25 @@ export async function decomposeIssue(dto: AiDecomposeDto) {
   try {
     const issue = await prisma.issue.findUnique({
       where: { id: issueId },
-      select: { id: true, projectId: true, title: true, description: true, type: true },
+      select: { id: true, projectId: true, title: true, description: true, issueTypeConfig: { select: { systemKey: true } } },
     });
     if (!issue) throw new AppError(404, 'Issue not found');
 
+    const systemKey = issue.issueTypeConfig?.systemKey ?? null;
     const allowedParents = ['EPIC', 'STORY', 'TASK'];
-    if (!issue.type || !allowedParents.includes(issue.type)) {
-      throw new AppError(400, `Issue type ${issue.type ?? 'custom'} cannot be decomposed into subtasks`);
+    if (!systemKey || !allowedParents.includes(systemKey)) {
+      throw new AppError(400, `Issue type ${systemKey ?? 'custom'} cannot be decomposed into subtasks`);
     }
 
     const provider = getLlmProvider();
     const { subtasks: subtaskTitles } = await provider.decomposeIssue(
       issue.title,
       issue.description,
-      issue.type as string,
+      systemKey,
     );
 
     const aiDeveloperId = await getAiDeveloperId();
-    const created: Array<{ id: string; title: string; type: string; number: number }> = [];
+    const created: Array<{ id: string; title: string; systemKey: string; number: number }> = [];
     for (const title of subtaskTitles) {
       const child = await issuesService.createIssue(issue.projectId, aiDeveloperId, {
         title: title.slice(0, 500),
@@ -172,7 +173,7 @@ export async function decomposeIssue(dto: AiDecomposeDto) {
         parentId: issue.id,
         assigneeId: aiDeveloperId,
       });
-      created.push({ id: child.id, title: child.title, type: child.type ?? 'SUBTASK', number: child.number });
+      created.push({ id: child.id, title: child.title, systemKey: child.issueTypeConfig?.systemKey ?? 'SUBTASK', number: child.number });
     }
 
     await setAiStatus(issueId, 'DONE');

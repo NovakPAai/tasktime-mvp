@@ -114,7 +114,7 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                 <div className="tt-issue-id-badge">
                   <span>{issueKey}</span>
                 </div>
-                <IssueTypeBadge type={issue.type} typeConfig={issue.issueTypeConfig} showLabel />
+                <IssueTypeBadge typeConfig={issue.issueTypeConfig} showLabel />
               </div>
               <div className="tt-issue-header-meta">
                 <span>Создана: {formatDate(issue.createdAt)}</span>
@@ -154,7 +154,7 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                     <div className="tt-panel-row">
                       <span>Родитель</span>
                       <span className="tt-aside-value">
-                        {issue.parent ? `${issue.parent.type}-${issue.parent.number}: ${issue.parent.title}` : 'Нет'}
+                        {issue.parent ? `${issue.parent.issueTypeConfig?.systemKey ?? 'ISSUE'}-${issue.parent.number}: ${issue.parent.title}` : 'Нет'}
                       </span>
                     </div>
                     <div className="tt-panel-row">
@@ -176,7 +176,7 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                       <List.Item>
                         <div className="tt-issue-preview-subissue">
                           <div className="tt-issue-preview-subissue-top">
-                            <IssueTypeBadge type={child.type} typeConfig={child.issueTypeConfig} />
+                            <IssueTypeBadge typeConfig={child.issueTypeConfig} />
                             <IssueStatusTag status={child.status} size="small" />
                           </div>
                           <span>{child.title}</span>
@@ -202,7 +202,7 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                   </div>
                   <div className="tt-panel-row">
                     <span>Тип</span>
-                    <IssueTypeBadge type={issue.type} typeConfig={issue.issueTypeConfig} showLabel />
+                    <IssueTypeBadge typeConfig={issue.issueTypeConfig} showLabel />
                   </div>
                   <div className="tt-panel-row">
                     <span>Исполнитель</span>

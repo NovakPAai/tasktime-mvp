@@ -1,7 +1,6 @@
 import type {
   IssuePriority,
   IssueStatus,
-  IssueType,
   Prisma,
   AiAssigneeType,
 } from '@prisma/client';
@@ -17,33 +16,44 @@ import type {
   UpdateAiStatusDto,
 } from './issues.dto.js';
 
-// Which types can be children (and their allowed parent types)
-const ALLOWED_PARENTS: Record<IssueType, IssueType[]> = {
-  EPIC: [], // top-level only
+// Hierarchy rules keyed by systemKey (null key = custom type, skip validation)
+const ALLOWED_PARENT_KEYS: Record<string, string[]> = {
+  EPIC: [],
   STORY: ['EPIC'],
   TASK: ['EPIC', 'STORY'],
   SUBTASK: ['STORY', 'TASK'],
   BUG: ['EPIC', 'STORY'],
 };
 
-async function validateHierarchy(type: IssueType, parentId?: string | null) {
+async function validateHierarchy(issueTypeConfigId: string | undefined | null, parentId?: string | null) {
+  if (!issueTypeConfigId) return; // custom or unset type — skip hierarchy validation
+
+  const typeConfig = await prisma.issueTypeConfig.findUnique({ where: { id: issueTypeConfigId } });
+  if (!typeConfig?.systemKey) return; // custom type — skip
+
+  const systemKey = typeConfig.systemKey;
+  const allowedParentKeys = ALLOWED_PARENT_KEYS[systemKey] ?? null;
+
   if (!parentId) {
-    if (ALLOWED_PARENTS[type].length > 0 && type === 'SUBTASK') {
+    if (systemKey === 'SUBTASK') {
       throw new AppError(400, 'SUBTASK must have a parent');
     }
     return;
   }
 
-  const parent = await prisma.issue.findUnique({ where: { id: parentId } });
+  if (allowedParentKeys !== null && allowedParentKeys.length === 0) {
+    throw new AppError(400, `${systemKey} cannot have a parent`);
+  }
+
+  const parent = await prisma.issue.findUnique({
+    where: { id: parentId },
+    include: { issueTypeConfig: { select: { systemKey: true } } },
+  });
   if (!parent) throw new AppError(404, 'Parent issue not found');
 
-  const allowedParents = ALLOWED_PARENTS[type];
-  if (allowedParents.length === 0) {
-    throw new AppError(400, `${type} cannot have a parent`);
-  }
-  const parentType = parent.type as IssueType | null;
-  if (!parentType || !allowedParents.includes(parentType)) {
-    throw new AppError(400, `${type} cannot be a child of ${parentType ?? 'custom type'}`);
+  const parentKey = parent.issueTypeConfig?.systemKey ?? null;
+  if (!parentKey || (allowedParentKeys !== null && !allowedParentKeys.includes(parentKey))) {
+    throw new AppError(400, `${systemKey} cannot be a child of ${parentKey ?? 'custom type'}`);
   }
 }
 
@@ -58,7 +68,6 @@ async function getNextNumber(projectId: string): Promise<number> {
 
 type ListIssuesFilters = {
   status?: IssueStatus[];
-  type?: IssueType[];
   issueTypeConfigId?: string[];
   priority?: IssuePriority[];
   assigneeId?: string;
@@ -73,9 +82,6 @@ export async function listIssues(projectId: string, filters?: ListIssuesFilters)
 
   if (filters?.status && filters.status.length > 0) {
     where.status = { in: filters.status };
-  }
-  if (filters?.type && filters.type.length > 0) {
-    where.type = { in: filters.type };
   }
   if (filters?.issueTypeConfigId && filters.issueTypeConfigId.length > 0) {
     where.issueTypeConfigId = { in: filters.issueTypeConfigId };
@@ -144,8 +150,8 @@ export async function searchIssuesGlobal(q: string, excludeId?: string) {
       id: true,
       number: true,
       title: true,
-      type: true,
       status: true,
+      issueTypeConfig: { select: { systemKey: true, name: true, iconName: true, iconColor: true } },
       project: { select: { key: true } },
     },
     take: 20,
@@ -246,9 +252,9 @@ export async function getIssueByKey(issueKey: string) {
     include: {
       assignee: { select: { id: true, name: true, email: true } },
       creator: { select: { id: true, name: true } },
-      parent: { select: { id: true, title: true, type: true, number: true, projectId: true } },
+      parent: { select: { id: true, title: true, number: true, projectId: true, issueTypeConfig: { select: { systemKey: true, name: true } } } },
       children: {
-        select: { id: true, title: true, type: true, status: true, number: true, assignee: { select: { id: true, name: true } } },
+        select: { id: true, title: true, status: true, number: true, issueTypeConfig: { select: { systemKey: true, name: true } }, assignee: { select: { id: true, name: true } } },
         orderBy: { orderIndex: 'asc' },
       },
       project: { select: { id: true, name: true, key: true } },
@@ -265,10 +271,10 @@ export async function getIssue(id: string) {
       assignee: { select: { id: true, name: true, email: true } },
       creator: { select: { id: true, name: true } },
       issueTypeConfig: true,
-      parent: { select: { id: true, title: true, type: true, number: true, projectId: true } },
+      parent: { select: { id: true, title: true, number: true, projectId: true, issueTypeConfig: { select: { systemKey: true, name: true } } } },
       children: {
         select: {
-          id: true, title: true, type: true, status: true, number: true,
+          id: true, title: true, status: true, number: true,
           issueTypeConfig: true,
           assignee: { select: { id: true, name: true } },
         },
@@ -285,9 +291,8 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  // Resolve issueTypeConfig and type
+  // Resolve issueTypeConfigId — default to TASK system type if not provided
   let resolvedTypeConfigId: string | undefined = dto.issueTypeConfigId;
-  let resolvedType: IssueType | undefined = dto.type;
 
   if (resolvedTypeConfigId) {
     const typeConfig = await prisma.issueTypeConfig.findUnique({ where: { id: resolvedTypeConfigId } });
@@ -305,27 +310,13 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
         throw new AppError(400, 'Issue type is not allowed in this project scheme');
       }
     }
-
-    // Map to legacy enum if system type
-    if (typeConfig.systemKey) {
-      resolvedType = typeConfig.systemKey as IssueType;
-    } else {
-      resolvedType = undefined;
-    }
-  } else if (!resolvedType) {
-    resolvedType = 'TASK';
-    // Try to find default config for TASK
+  } else {
+    // Default to TASK
     const taskConfig = await prisma.issueTypeConfig.findUnique({ where: { systemKey: 'TASK' } });
     if (taskConfig) resolvedTypeConfigId = taskConfig.id;
-  } else {
-    // Legacy: type provided without configId, look up by systemKey
-    const typeConfig = await prisma.issueTypeConfig.findUnique({ where: { systemKey: resolvedType } });
-    if (typeConfig) resolvedTypeConfigId = typeConfig.id;
   }
 
-  if (resolvedType) {
-    await validateHierarchy(resolvedType, dto.parentId);
-  }
+  await validateHierarchy(resolvedTypeConfigId, dto.parentId);
 
   if (dto.parentId) {
     const parent = await prisma.issue.findUnique({ where: { id: dto.parentId } });
@@ -343,11 +334,11 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
       title: dto.title,
       description: dto.description,
       acceptanceCriteria: dto.acceptanceCriteria,
-      type: resolvedType ?? null,
       issueTypeConfigId: resolvedTypeConfigId,
       priority: dto.priority,
       parentId: dto.parentId,
       assigneeId: dto.assigneeId,
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
       creatorId,
     },
     include: {
@@ -363,13 +354,17 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
   const issue = await prisma.issue.findUnique({ where: { id } });
   if (!issue) throw new AppError(404, 'Issue not found');
 
-  if (dto.parentId !== undefined && issue.type) {
-    await validateHierarchy(issue.type, dto.parentId);
+  if (dto.parentId !== undefined) {
+    await validateHierarchy(issue.issueTypeConfigId, dto.parentId);
   }
 
+  const { dueDate, ...rest } = dto;
   return prisma.issue.update({
     where: { id },
-    data: dto,
+    data: {
+      ...rest,
+      ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
+    },
     include: {
       assignee: { select: { id: true, name: true } },
       creator: { select: { id: true, name: true } },

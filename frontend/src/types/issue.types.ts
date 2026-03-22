@@ -59,7 +59,6 @@ export interface Issue {
   title: string;
   description?: string;
   acceptanceCriteria?: string | null;
-  type: IssueType | null;
   issueTypeConfigId?: string | null;
   issueTypeConfig?: IssueTypeConfig | null;
   status: IssueStatus;
@@ -72,10 +71,11 @@ export interface Issue {
   creatorId: string;
   assignee?: { id: string; name: string; email?: string };
   creator?: { id: string; name: string };
-  parent?: { id: string; title: string; type: IssueType; number: number };
+  parent?: { id: string; title: string; number: number; issueTypeConfig?: Pick<IssueTypeConfig, 'systemKey' | 'iconName' | 'iconColor' | 'name'> | null };
   children?: Issue[];
   project?: { id: string; name: string; key: string };
   releaseId?: string | null;
+  dueDate?: string | null;
   estimatedHours?: number | null;
   kanbanFields?: KanbanField[];
   _count?: { children: number };
@@ -98,8 +98,8 @@ export interface IssueLink {
   id: string;
   createdAt: string;
   linkType: Pick<IssueLinkType, 'id' | 'name' | 'outboundName' | 'inboundName'>;
-  sourceIssue: { id: string; number: number; title: string; type: IssueType; status: IssueStatus; issueTypeConfig?: IssueTypeConfig | null; project: { key: string } };
-  targetIssue: { id: string; number: number; title: string; type: IssueType; status: IssueStatus; issueTypeConfig?: IssueTypeConfig | null; project: { key: string } };
+  sourceIssue: { id: string; number: number; title: string; status: IssueStatus; issueTypeConfig?: IssueTypeConfig | null; project: { key: string } };
+  targetIssue: { id: string; number: number; title: string; status: IssueStatus; issueTypeConfig?: IssueTypeConfig | null; project: { key: string } };
   createdBy: { id: string; name: string };
 }
 

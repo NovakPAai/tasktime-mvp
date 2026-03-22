@@ -51,7 +51,7 @@ function toIssueRecord(issue: Awaited<ReturnType<typeof loadIssues>>[number]): P
     number: issue.number,
     title: issue.title,
     description: issue.description,
-    type: issue.type ?? 'TASK',
+    type: issue.issueTypeConfig?.systemKey ?? 'TASK',
     status: issue.status,
     priority: issue.priority,
     orderIndex: issue.orderIndex,
@@ -158,7 +158,7 @@ async function loadIssues(prisma: SyncPrismaClient, projectId: string) {
       number: true,
       title: true,
       description: true,
-      type: true,
+      issueTypeConfig: { select: { systemKey: true } },
       status: true,
       priority: true,
       orderIndex: true,
@@ -428,6 +428,10 @@ async function syncIssues(
 ) {
   const context = await buildTargetContext(targetPrisma, projectId);
 
+  // Build issueTypeConfig lookup by systemKey for this target DB
+  const typeConfigs = await targetPrisma.issueTypeConfig.findMany({ select: { id: true, systemKey: true } });
+  const typeConfigIdByKey = new Map(typeConfigs.filter((c) => c.systemKey).map((c) => [c.systemKey!, c.id]));
+
   for (const issue of sourceIssues) {
     const creatorId = context.userIdByEmail.get(issue.creatorEmail);
     if (!creatorId) {
@@ -436,13 +440,14 @@ async function syncIssues(
 
     const assigneeId = issue.assigneeEmail ? context.userIdByEmail.get(issue.assigneeEmail) ?? null : null;
     const sprintId = issue.sprintName ? context.sprintIdByName.get(issue.sprintName) ?? null : null;
+    const issueTypeConfigId = typeConfigIdByKey.get(issue.type) ?? null;
 
     await targetPrisma.issue.upsert({
       where: { projectId_number: { projectId, number: issue.number } },
       update: {
         title: issue.title,
         description: issue.description,
-        type: issue.type as never,
+        issueTypeConfigId,
         status: issue.status as never,
         priority: issue.priority as never,
         orderIndex: issue.orderIndex,
@@ -460,7 +465,7 @@ async function syncIssues(
         number: issue.number,
         title: issue.title,
         description: issue.description,
-        type: issue.type as never,
+        issueTypeConfigId,
         status: issue.status as never,
         priority: issue.priority as never,
         orderIndex: issue.orderIndex,

@@ -59,7 +59,7 @@ export async function getSprintIssues(id: string) {
           number: true,
           title: true,
           estimatedHours: true,
-          type: true,
+          issueTypeConfig: true,
           status: true,
           priority: true,
           updatedAt: true,

@@ -123,7 +123,7 @@ export async function getIssueCustomFields(issueId: string) {
   return {
     fields: fields.map((f) => ({
       ...f,
-      currentValue: valueMap.get(f.customFieldId)?.value ?? null,
+      currentValue: (valueMap.get(f.customFieldId)?.value as { v: unknown } | null | undefined)?.v ?? null,
       updatedAt: valueMap.get(f.customFieldId)?.updatedAt ?? null,
     })),
   };
@@ -158,11 +158,11 @@ export async function upsertIssueCustomFields(
         create: {
           issueId,
           customFieldId: v.customFieldId,
-          value: v.value as Prisma.InputJsonValue,
+          value: { v: v.value } as Prisma.InputJsonValue,
           updatedById: actorId,
         },
         update: {
-          value: v.value as Prisma.InputJsonValue,
+          value: { v: v.value } as Prisma.InputJsonValue,
           updatedById: actorId,
         },
       }),
@@ -308,7 +308,7 @@ export async function getKanbanFieldsForIssues(
         customFieldId: fId,
         name: meta?.[0] ?? '',
         fieldType: meta?.[1] ?? '',
-        value: valueMap.get(`${issue.id}:${fId}`) ?? null,
+        value: (valueMap.get(`${issue.id}:${fId}`) as { v: unknown } | null | undefined)?.v ?? null,
         showOnKanban: true,
       };
     });

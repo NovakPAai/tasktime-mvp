@@ -130,7 +130,7 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
           <Typography.Text type="secondary" style={{ fontSize: 12, minWidth: 90, display: 'inline-block' }}>
             {relationLabel}
           </Typography.Text>
-          <IssueTypeBadge type={relatedIssue.type} typeConfig={relatedIssue.issueTypeConfig} showLabel />
+          <IssueTypeBadge typeConfig={relatedIssue.issueTypeConfig} showLabel />
           <IssueStatusTag status={relatedIssue.status} size="small" />
           <Link to={`/issues/${relatedIssue.id}`} style={{ fontSize: 13 }}>
             {relatedIssue.project.key}-{relatedIssue.number}: {relatedIssue.title}

@@ -24,7 +24,7 @@ export async function getReleaseWithIssues(id: string) {
           projectId: true,
           number: true,
           title: true,
-          type: true,
+          issueTypeConfig: true,
           status: true,
           priority: true,
           updatedAt: true,
