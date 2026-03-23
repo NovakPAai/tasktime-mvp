@@ -87,9 +87,9 @@ export default function App() {
       colorSuccess: tokens.semantic.success,
       colorWarning: tokens.semantic.warning,
       colorError: tokens.semantic.error,
-      borderRadius: tokens.layout.r,
-      borderRadiusSM: tokens.layout.r2,
-      borderRadiusLG: tokens.layout.rActive,
+      borderRadius: tokens.layout.radiusCard,
+      borderRadiusSM: tokens.layout.radiusButton,
+      borderRadiusLG: tokens.layout.radiusNavActive,
       fontFamily: tokens.typography.fontSans,
       fontSize: tokens.typography.fsLabel,
       fontSizeSM: tokens.typography.fsBody,
@@ -105,10 +105,10 @@ export default function App() {
       Button: {
         fontWeight: 500,
         paddingInline: 14,
-        borderRadius: tokens.layout.r2,
+        borderRadius: tokens.layout.radiusButton,
       },
       Tag: {
-        borderRadiusSM: tokens.layout.rBadge,
+        borderRadiusSM: tokens.layout.radiusBadge,
         fontSizeSM: 11,
       },
       Table: {
@@ -120,7 +120,7 @@ export default function App() {
         cellPaddingInline: 12,
       },
       Modal: {
-        borderRadiusLG: tokens.layout.r,
+        borderRadiusLG: tokens.layout.radiusCard,
         paddingContentHorizontalLG: 24,
       },
       Drawer: {
@@ -131,8 +131,8 @@ export default function App() {
       },
       Menu: {
         itemHeight: 34,
-        itemBorderRadius: tokens.layout.r3,
-        subMenuItemBorderRadius: tokens.layout.r3,
+        itemBorderRadius: tokens.layout.radiusPill,
+        subMenuItemBorderRadius: tokens.layout.radiusPill,
       },
     },
   };

@@ -2,26 +2,25 @@
  * Flow Universe — Design Tokens
  *
  * ЕДИНСТВЕННЫЙ ИСТОЧНИК ПРАВДЫ.
- * Имена ключей должны СТРОГО совпадать с именами переменных в CSS (после kebab-case).
- * Например: bgSb -> --bg-sb
+ * Имена ключей должны совпадать с тем, что ожидает CSS.
  */
 
 // ─── Dark theme ───────────────────────────────────────────────────────────────
 export const dark = {
-  bg:             '#080B14', // --bg
-  bgSb:           '#0F1320', // --bg-sb
-  bgEl:           '#161B22', // --bg-el
+  bg:             '#080B14',
+  bgSb:           '#0F1320',
+  bgEl:           '#161B22',
   bgHover:        'rgba(255, 255, 255, 0.04)',
   bgActive:       'rgba(255, 255, 255, 0.06)',
-  b:              '#21262D', // --b
-  b2:             '#30363D', // --b2
-  b3:             '#30363D', // --b3
-  t1:             '#E2E8F8', // --t1
-  t2:             '#C9D1D9', // --t2
-  t3:             '#8B949E', // --t3
-  t4:             '#484F58', // --t4
-  acc:            '#4F6EF7', // --acc
-  accH:           '#6B85FF', // --acc-h
+  b:              '#21262D',
+  b2:             '#30363D',
+  b3:             '#30363D',
+  t1:             '#E2E8F8',
+  t2:             '#C9D1D9',
+  t3:             '#8B949E',
+  t4:             '#484F58',
+  acc:            '#4F6EF7',
+  accH:           '#6B85FF',
   accBg:          'rgba(79, 110, 247, 0.12)',
 } as const;
 
@@ -62,26 +61,18 @@ export const issueType = {
   bug:     '#EF4444',
 } as const;
 
-// ─── Semantic ─────────────────────────────────────────────────────────────────
-export const semantic = {
-  success: '#4ADE80',
-  warning: '#F59E0B',
-  error:   '#EF4444',
-  info:    '#4F6EF7',
-} as const;
-
-// ─── Layout & Spacing ────────────────────────────────────────────────────────
+// ─── Layout & Spacing (ВОЗВРАЩАЮ ПОЛНЫЕ ИМЕНА) ───────────────────────────────
 export const layout = {
-  sidebarW:      210,  // --sidebar-w
-  pageP:         24,   // --page-p
+  sidebarWidth:  210,  // --sidebar-width
+  pagePadding:   24,   // --page-padding
   cardGap:       16,
   elementGap:    8,
-  topbarH:       38,
-  r:             12,   // --r
-  r2:            8,    // --r2
-  r3:            6,    // --r3
-  rBadge:        3,
-  rActive:       20,
+  topbarHeight:  38,
+  radiusCard:    12,   // --radius-card
+  radiusButton:  8,    // --radius-button
+  radiusPill:    6,
+  radiusBadge:   3,
+  radiusNavActive: 20,
 } as const;
 
 // ─── Typography ─────────────────────────────────────────────────────────────

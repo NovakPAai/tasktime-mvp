@@ -29,16 +29,16 @@
   --type-task: #10B981;
   --type-subtask: #6B7280;
   --type-bug: #EF4444;
-  --sidebar-w: 210px;
-  --page-p: 24px;
+  --sidebar-width: 210px;
+  --page-padding: 24px;
   --card-gap: 16px;
   --element-gap: 8px;
-  --topbar-h: 38px;
-  --r: 12px;
-  --r2: 8px;
-  --r3: 6px;
-  --r-badge: 3px;
-  --r-active: 20px;
+  --topbar-height: 38px;
+  --radius-card: 12px;
+  --radius-button: 8px;
+  --radius-pill: 6px;
+  --radius-badge: 3px;
+  --radius-nav-active: 20px;
 }
 
 [data-theme='light'] {
