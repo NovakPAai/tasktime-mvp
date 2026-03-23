@@ -171,8 +171,7 @@ export default function ProjectDetailPage() {
       dataIndex: 'title',
       render: (title: string, r: Issue) => (
         <span
-          className="tt-issue-title"
-          style={r.status === 'CANCELLED' ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}
+          className={`tt-issue-title${r.status === 'CANCELLED' ? ' tt-issue-title--cancelled' : ''}`}
         >
           {title}
         </span>
@@ -216,22 +215,8 @@ export default function ProjectDetailPage() {
       width: 120,
       render: (n: string) =>
         n ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                background: 'var(--acc-bg)',
-                color: 'var(--acc)',
-                fontSize: 9,
-                fontWeight: 700,
-                flexShrink: 0,
-              }}
-            >
+          <div className="tt-assignee-cell">
+            <span className="tt-assignee-avatar">
               {n.slice(0, 1).toUpperCase()}
             </span>
             <span className="tt-assignee-name">{n}</span>
@@ -244,8 +229,8 @@ export default function ProjectDetailPage() {
       render: (_: unknown, r: Issue) => {
         const sprintName = (r as Issue & { sprint?: { name: string } }).sprint?.name;
         return sprintName
-          ? <span style={{ fontSize: 12, color: 'var(--t2)' }}>{sprintName}</span>
-          : <span style={{ fontSize: 12, color: 'var(--t3)' }}>Backlog</span>;
+          ? <span className="tt-sprint-label">{sprintName}</span>
+          : <span className="tt-sprint-label tt-sprint-label--backlog">Backlog</span>;
       },
     },
   ];
@@ -330,11 +315,11 @@ export default function ProjectDetailPage() {
         <div className="tt-issues-stats-bar">
           <span className="tt-issues-stat">Total <strong>{dashboard.totals.totalIssues}</strong></span>
           {[
-            { status: 'OPEN', color: '#8b949e', label: 'Open' },
-            { status: 'IN_PROGRESS', color: '#4f6ef7', label: 'In Progress' },
-            { status: 'REVIEW', color: '#a78bfa', label: 'Review' },
-            { status: 'DONE', color: '#4ade80', label: 'Done' },
-            { status: 'CANCELLED', color: '#484f58', label: 'Cancelled' },
+            { status: 'OPEN', color: 'var(--s-open)', label: 'Open' },
+            { status: 'IN_PROGRESS', color: 'var(--acc)', label: 'In Progress' },
+            { status: 'REVIEW', color: 'var(--s-review)', label: 'Review' },
+            { status: 'DONE', color: 'var(--s-done)', label: 'Done' },
+            { status: 'CANCELLED', color: 'var(--s-cancelled)', label: 'Cancelled' },
           ].map(({ status, color, label }) => {
             const count = issues.filter(i => i.status === status).length;
             return (
@@ -355,7 +340,7 @@ export default function ProjectDetailPage() {
                     style={{ width: `${sprintPercent}%` }}
                   />
                 </div>
-                <strong style={{ color: '#4f6ef7' }}>{sprintPercent}%</strong>
+                <strong style={{ color: 'var(--acc)' }}>{sprintPercent}%</strong>
               </span>
             </>
           )}
@@ -491,7 +476,7 @@ export default function ProjectDetailPage() {
             if (target.closest('.ant-table-row-expand-icon') || target.closest('.ant-table-row-indent')) return;
             navigate(`/issues/${record.id}`);
           },
-          style: { cursor: 'pointer' },
+          className: 'tt-clickable-row',
         })}
         indentSize={24}
         expandable={treeMode ? { defaultExpandAllRows: false } : undefined}
@@ -518,10 +503,10 @@ export default function ProjectDetailPage() {
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Space style={{ width: '100%' }} size="middle">
+          <Space className="tt-full-width" size="middle">
             <Form.Item name="issueTypeConfigId" label="Type">
               <Select
-                style={{ width: 180 }}
+                className="tt-select-type"
                 options={issueTypeConfigs.map((c) => ({
                   value: c.id,
                   label: c.name,
@@ -530,7 +515,7 @@ export default function ProjectDetailPage() {
             </Form.Item>
             <Form.Item name="priority" label="Priority">
               <Select
-                style={{ width: 140 }}
+                className="tt-select-priority"
                 options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map((v) => ({ value: v, label: v }))}
               />
             </Form.Item>
@@ -539,7 +524,7 @@ export default function ProjectDetailPage() {
             <Select
               allowClear
               placeholder="None (top level)"
-              style={{ width: '100%' }}
+              className="tt-full-width"
               options={issues
                 .filter((i) => !i.issueTypeConfig?.isSubtask)
                 .map((i) => ({ value: i.id, label: `${project.key}-${i.number} ${i.title}` }))}
@@ -549,7 +534,7 @@ export default function ProjectDetailPage() {
             <Select
               allowClear
               placeholder="Unassigned"
-              style={{ width: '100%' }}
+              className="tt-full-width"
               options={allUsers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))}
             />
           </Form.Item>

@@ -16,12 +16,12 @@ export default function SettingsPage() {
   const isLight = mode === 'light';
 
   return (
-    <div style={{ maxWidth: 600, padding: '32px 24px' }}>
+    <div style={{ maxWidth: 600, padding: '32px var(--space-8)' }}>
       <Title
         level={3}
         style={{
           fontFamily: 'var(--font-display)',
-          marginBottom: 24,
+          marginBottom: 'var(--space-8)',
           color: 'var(--t1)',
         }}
       >
@@ -35,14 +35,14 @@ export default function SettingsPage() {
             background: 'var(--bg-el)',
             border: '1px solid var(--b)',
             borderRadius: 'var(--r)',
-            padding: '20px 24px',
-            marginBottom: 16,
+            padding: '20px var(--space-8)',
+            marginBottom: 'var(--space-6)',
           }}
         >
-          <Title level={5} style={{ marginBottom: 16, fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>
+          <Title level={5} style={{ marginBottom: 'var(--space-6)', fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>
             Профиль
           </Title>
-          <Divider style={{ margin: '0 0 16px', borderColor: 'var(--b)' }} />
+          <Divider style={{ margin: '0 0 var(--space-6)', borderColor: 'var(--b)' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <Text style={{ color: 'var(--t3)', fontSize: 12 }}>Имя</Text>
@@ -66,14 +66,14 @@ export default function SettingsPage() {
           background: 'var(--bg-el)',
           border: '1px solid var(--b)',
           borderRadius: 'var(--r)',
-          padding: '20px 24px',
-          marginBottom: 16,
+          padding: '20px var(--space-8)',
+          marginBottom: 'var(--space-6)',
         }}
       >
-        <Title level={5} style={{ marginBottom: 16, fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>
+        <Title level={5} style={{ marginBottom: 'var(--space-6)', fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>
           Интерфейс
         </Title>
-        <Divider style={{ margin: '0 0 16px', borderColor: 'var(--b)' }} />
+        <Divider style={{ margin: '0 0 var(--space-6)', borderColor: 'var(--b)' }} />
 
         <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
           <Space>
@@ -105,19 +105,19 @@ export default function SettingsPage() {
           background: 'var(--bg-el)',
           border: '1px solid var(--b)',
           borderRadius: 'var(--r)',
-          padding: '20px 24px',
+          padding: '20px var(--space-8)',
         }}
       >
-        <Title level={5} style={{ marginBottom: 16, fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>
+        <Title level={5} style={{ marginBottom: 'var(--space-6)', fontFamily: 'var(--font-display)', color: 'var(--t1)' }}>
           Шрифты системы
         </Title>
-        <Divider style={{ margin: '0 0 16px', borderColor: 'var(--b)' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Divider style={{ margin: '0 0 var(--space-6)', borderColor: 'var(--b)' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           <div>
             <Text style={{ color: 'var(--t3)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Space Grotesk — заголовки и числа
             </Text>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, color: 'var(--t1)', marginTop: 4 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, color: 'var(--t1)', marginTop: 'var(--space-2)' }}>
               Flow Universe 2026
             </div>
           </div>
@@ -125,7 +125,7 @@ export default function SettingsPage() {
             <Text style={{ color: 'var(--t3)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Inter — основной текст
             </Text>
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--t2)', marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--t2)', marginTop: 'var(--space-2)', lineHeight: 1.5 }}>
               Управление проектами нового поколения — импортозамещение Jira для российского финансового сектора.
             </div>
           </div>

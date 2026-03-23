@@ -381,7 +381,7 @@ export default function ReleasesPage() {
                     }}
                   >
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
                         <span style={{ fontWeight: 500, color: 'var(--t1)' }}>{r.name}</span>
                         <Tag color={r.level === 'MAJOR' ? 'blue' : 'default'}>
                           {r.level === 'MAJOR' ? 'Мажорный' : 'Минорный'}

@@ -78,7 +78,7 @@ export default function GlobalSprintsPage() {
         key={sprint.id}
         size="small"
         className="tt-panel tt-sprint-card"
-        style={{ marginBottom: 8 }}
+        style={{ marginBottom: 'var(--space-4)' }}
       >
         <div className="tt-sprint-card-body">
           <div className="tt-sprint-card-main">
@@ -145,7 +145,7 @@ export default function GlobalSprintsPage() {
         </div>
       </div>
 
-      <div className="tt-filters-row" style={{ marginBottom: 16 }}>
+      <div className="tt-filters-row" style={{ marginBottom: 'var(--space-6)' }}>
         <Select
           placeholder="Все состояния"
           value={stateFilter}
@@ -200,7 +200,7 @@ export default function GlobalSprintsPage() {
         </div>
       </div>
 
-      <div className="tt-panel" style={{ marginTop: 24 }}>
+      <div className="tt-panel" style={{ marginTop: 'var(--space-8)' }}>
         <div className="tt-panel-header">
           <span>Active sprints</span>
           <span style={{ fontSize: 11, color: 'var(--t3)' }}>
@@ -218,7 +218,7 @@ export default function GlobalSprintsPage() {
         </div>
       </div>
 
-      <div className="tt-panel" style={{ marginTop: 24 }}>
+      <div className="tt-panel" style={{ marginTop: 'var(--space-8)' }}>
         <div className="tt-panel-header">
           <span>Closed sprints</span>
           <span style={{ fontSize: 11, color: 'var(--t3)' }}>

@@ -269,19 +269,19 @@ export default function IssueDetailPage() {
     }
   };
 
-  if (!issue) return <div style={{ padding: 24 }}>Loading...</div>;
+  if (!issue) return <div style={{ padding: 'var(--space-8)' }}>Loading...</div>;
 
   const issueKey = issue.project ? `${issue.project.key}-${issue.number}` : `#${issue.number}`;
   const timerRunning = activeTimer?.issueId === id;
 
   return (
     <div className="tt-page tt-issue-page">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
         <Button
           type="text"
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate(-1)}
-          style={{ padding: '4px 8px', color: 'var(--t2)' }}
+          style={{ padding: 'var(--space-2) var(--space-4)', color: 'var(--t2)' }}
         >
           Back
         </Button>
@@ -432,7 +432,7 @@ export default function IssueDetailPage() {
               />
 
               <Space.Compact
-                style={{ width: '100%', marginTop: 4 }}
+                style={{ width: '100%', marginTop: 'var(--space-2)' }}
                 className="tt-comment-input"
               >
                 <Input.TextArea
@@ -538,7 +538,7 @@ export default function IssueDetailPage() {
                   <span>
                     {dayjs(issue.dueDate).format('DD.MM.YYYY')}
                     {issue.status !== 'DONE' && issue.status !== 'CANCELLED' && dayjs(issue.dueDate).isBefore(dayjs(), 'day') && (
-                      <Tag color="red" style={{ marginLeft: 4, fontSize: 10 }}>просрочено</Tag>
+                      <Tag color="red" style={{ marginLeft: 'var(--space-2)', fontSize: 10 }}>просрочено</Tag>
                     )}
                   </span>
                 ) : (
@@ -607,7 +607,7 @@ export default function IssueDetailPage() {
                   <span>{issue.aiExecutionStatus ?? 'NOT_STARTED'}</span>
                 )}
               </div>
-              <div className="tt-panel-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+              <div className="tt-panel-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-4)' }}>
                 <Button
                   type="default"
                   size="small"
@@ -639,7 +639,7 @@ export default function IssueDetailPage() {
               </span>
             </div>
             <div className="tt-panel-body" style={{ padding: 10 }}>
-              <Space style={{ marginBottom: 8 }}>
+              <Space style={{ marginBottom: 'var(--space-4)' }}>
                 {timerRunning ? (
                   <Button
                     icon={<PauseCircleOutlined />}
@@ -807,7 +807,7 @@ export default function IssueDetailPage() {
           showIcon
           message="Задача не может быть переведена в статус DONE"
           description="Заполните все обязательные поля перед закрытием задачи."
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: 'var(--space-5)' }}
         />
         <List
           size="small"
@@ -815,7 +815,7 @@ export default function IssueDetailPage() {
           renderItem={(f) => (
             <List.Item>
               <Typography.Text strong>{f.name}</Typography.Text>
-              <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 11 }}>
+              <Typography.Text type="secondary" style={{ marginLeft: 'var(--space-4)', fontSize: 11 }}>
                 {f.fieldType}
               </Typography.Text>
             </List.Item>

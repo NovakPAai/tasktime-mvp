@@ -31,7 +31,7 @@ const COLUMN_COLORS: Record<IssueStatus, string> = {
 };
 
 const AVATAR_COLORS = [
-  '#4f6ef7', '#7c3aed', '#10b981', '#f59e0b',
+  'var(--acc)', '#7c3aed', '#10b981', '#f59e0b',
   '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899',
 ];
 
@@ -200,12 +200,12 @@ export default function BoardPage() {
 
   return (
     <div className="tt-page tt-board-page">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
         <Button
           type="text"
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate(`/projects/${projectId}`)}
-          style={{ padding: '4px 8px', color: 'var(--t2)' }}
+          style={{ padding: 'var(--space-2) var(--space-4)', color: 'var(--t2)' }}
         >
           Back to project
         </Button>
@@ -398,7 +398,7 @@ export default function BoardPage() {
           </Form.Item>
           {createCustomFields.length > 0 && (
             <>
-              <Divider orientation="left" orientationMargin={0} style={{ margin: '12px 0 8px' }}>
+              <Divider orientation="left" orientationMargin={0} style={{ margin: 'var(--space-5) 0 var(--space-4)' }}>
                 <Typography.Text style={{ fontSize: 12, color: 'inherit' }}>Дополнительные поля</Typography.Text>
               </Divider>
               {createCustomFields.map(field => (
@@ -410,7 +410,7 @@ export default function BoardPage() {
                       {field.name}
                     </span>
                   }
-                  style={{ marginBottom: 8 }}
+                  style={{ marginBottom: 'var(--space-4)' }}
                 >
                   <CustomFieldInput
                     field={{ ...field, currentValue: createCustomFieldValues[field.customFieldId] ?? null }}

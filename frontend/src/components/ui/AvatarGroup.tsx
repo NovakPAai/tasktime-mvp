@@ -28,8 +28,8 @@ function getInitials(name: string): string {
 
 function getAvatarColor(name: string): string {
   const colors = [
-    '#4f6ef7', '#8b5cf6', '#e8804a', '#22c55e',
-    '#e5534b', '#e8b84a', '#06b6d4', '#f472b6',
+    'var(--acc)', 'var(--s-review)', 'var(--s-in-progress)', 'var(--s-done)',
+    'var(--type-bug)', 'var(--type-epic)', 'var(--type-story)', 'var(--type-task)',
   ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -51,10 +51,10 @@ function Avatar({ user, size }: { user: AvatarUser; size: number }) {
           height: size,
           borderRadius: '50%',
           background: user.avatarUrl ? 'transparent' : color,
-          border: '2px solid var(--bg-el)',
+          border: 'var(--space-1) solid var(--bg-el)',
           fontSize: Math.max(9, size * 0.38),
           fontWeight: 600,
-          color: '#fff',
+          color: 'var(--bg)',
           flexShrink: 0,
           overflow: 'hidden',
           cursor: 'default',
@@ -93,7 +93,7 @@ export function AvatarGroup({ users, max = 4, size = 24 }: AvatarGroupProps) {
               height: size,
               borderRadius: '50%',
               background: 'var(--bg-hover)',
-              border: '2px solid var(--bg-el)',
+              border: 'var(--space-1) solid var(--bg-el)',
               fontSize: Math.max(9, size * 0.35),
               fontWeight: 600,
               color: 'var(--t2)',

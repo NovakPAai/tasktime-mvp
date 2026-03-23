@@ -35,8 +35,8 @@ function getInitials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  'var(--acc)', 'var(--lbl-imp)', 'var(--lbl-perf)', 'var(--s-inprog)',
-  'var(--s-urgent)', 'var(--lbl-feat)'
+  'var(--acc)', 'var(--s-done)', 'var(--s-in-progress)', 'var(--s-review)',
+  'var(--type-epic)', 'var(--type-story)', 'var(--acc-h)', 'var(--type-bug)',
 ];
 function avatarColor(name: string): string {
   let h = 0;
@@ -129,7 +129,7 @@ export default function Sidebar({
       )}
 
       <Sider
-        width={210}
+        width="var(--sidebar-width)"
         theme={isLight ? 'light' : 'dark'}
         className={`tt-sidebar${mobileOpen ? ' tt-sidebar--open' : ''}`}
       >
@@ -143,8 +143,8 @@ export default function Sidebar({
             <rect x="13" y="13" width="4" height="4" rx="1" fill="rgba(255,255,255,0.85)" />
             <defs>
               <linearGradient id="wg" x1="0" y1="0" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#4f6ef7" />
-                <stop offset="1" stopColor="#7c3aed" />
+                <stop stopColor="var(--acc)" />
+                <stop offset="1" stopColor="var(--type-epic)" />
               </linearGradient>
             </defs>
           </svg>

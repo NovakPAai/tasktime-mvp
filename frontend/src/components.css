@@ -176,7 +176,7 @@
 }
 
 .tt-sidebar {
-  width: var(--sidebar-w);
+  width: var(--sidebar-width);
   flex-shrink: 0;
   background-color: var(--bg-sb);
 }

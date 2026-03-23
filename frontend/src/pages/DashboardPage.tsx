@@ -51,8 +51,8 @@ function getInitials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  'var(--acc)', 'var(--lbl-imp)', 'var(--lbl-perf)', 'var(--s-inprog)',
-  'var(--s-urgent)', 'var(--lbl-feat)', 'var(--acc-h)', '#ec4899',
+  'var(--acc)', 'var(--s-done)', 'var(--s-in-progress)', 'var(--s-review)',
+  'var(--type-epic)', 'var(--type-story)', 'var(--acc-h)', 'var(--type-bug)',
 ];
 function avatarColor(name: string): string {
   let h = 0;

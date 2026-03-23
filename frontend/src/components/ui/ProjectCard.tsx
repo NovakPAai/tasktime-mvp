@@ -11,12 +11,12 @@ import { ProgressBar } from './ProgressBar';
 import { ProjectStatusBadge, type ProjectStatus } from './ProjectStatusBadge';
 
 const GRADIENTS = [
-  'linear-gradient(135deg, #4f6ef7, #7c3aed)', // синий-фиолетовый
-  'linear-gradient(135deg, #10b981, #06b6d4)', // зелёный-голубой
-  'linear-gradient(135deg, #f59e0b, #ef4444)', // оранжевый-красный
-  'linear-gradient(135deg, #8b5cf6, #ec4899)', // фиолетовый-розовый
-  'linear-gradient(135deg, #06b6d4, #3b82f6)', // голубой-синий
-  'linear-gradient(135deg, #84cc16, #10b981)', // лайм-зелёный
+  'linear-gradient(135deg, var(--acc), var(--type-epic))', // синий-фиолетовый
+  'linear-gradient(135deg, var(--type-task), var(--type-story))', // зелёный-голубой
+  'linear-gradient(135deg, var(--s-in-progress), var(--type-bug))', // оранжевый-красный
+  'linear-gradient(135deg, var(--s-review), var(--type-epic))', // фиолетовый-розовый
+  'linear-gradient(135deg, var(--type-story), var(--acc))', // голубой-синий
+  'linear-gradient(135deg, var(--s-done), var(--type-task))', // лайм-зелёный
 ];
 
 function projectGradient(key: string): string {
@@ -63,7 +63,7 @@ const GLOW_CONFIG: Record<ProjectStatus, string | null> = {
 const CARD_BG: Record<ProjectStatus, string> = {
   active:   'var(--bg-el)',
   onhold:   'var(--bg-el)',
-  archived: '#0c1019',
+  archived: 'var(--bg-sb)',
   empty:    'var(--bg-el)',
 };
 
@@ -84,7 +84,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
         background: CARD_BG[project.status],
         border: '1px solid var(--b)',
         borderRadius: 'var(--r)',
-        padding: 24,
+        padding: 'var(--space-8)',
         width: 340,
         cursor: onClick ? 'pointer' : 'default',
         opacity: isArchived ? 0.7 : 1,
@@ -119,7 +119,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       )}
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span
             style={{
@@ -128,9 +128,9 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
               justifyContent: 'center',
               width: 36,
               height: 36,
-              borderRadius: 8,
+              borderRadius: 'var(--r2)',
               background: gradient,
-              color: '#ffffff',
+              color: 'var(--t1)',
               fontSize: 13,
               fontWeight: 700,
               fontFamily: 'var(--font-display)',
@@ -152,7 +152,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
             >
               {project.name}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 'var(--space-1)' }}>
               {project.key}
             </div>
           </div>
@@ -167,7 +167,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
             fontSize: 12,
             color: 'var(--t3)',
             lineHeight: 1.5,
-            marginBottom: 16,
+            marginBottom: 'var(--space-6)',
             overflow: 'hidden',
             display: '-webkit-box',
             WebkitLineClamp: 2,
@@ -177,32 +177,32 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           {project.description}
         </div>
       )}
-      {!project.description && <div style={{ marginBottom: 16 }} />}
+      {!project.description && <div style={{ marginBottom: 'var(--space-6)' }} />}
 
       {/* Stats row */}
-      <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 'var(--space-7)', marginBottom: 14 }}>
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--t1)', lineHeight: 1 }}>
             {project.openIssues ?? 0}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>открытых задач</div>
+          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 'var(--space-1)' }}>открытых задач</div>
         </div>
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--t1)', lineHeight: 1 }}>
             {project.currentSprint ?? '—'}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>текущий спринт</div>
+          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 'var(--space-1)' }}>текущий спринт</div>
         </div>
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--acc)', lineHeight: 1 }}>
             {completion}%
           </div>
-          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>выполнено</div>
+          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 'var(--space-1)' }}>выполнено</div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <ProgressBar value={completion} height={3} />
       </div>
 

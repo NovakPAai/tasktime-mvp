@@ -7,10 +7,10 @@
 export type ProjectStatus = 'active' | 'onhold' | 'archived' | 'empty';
 
 const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; dot: string }> = {
-  active:   { label: 'Active',    color: 'rgba(34,197,94,0.15)',  dot: '#22c55e' },
-  onhold:   { label: 'On Hold',   color: 'rgba(245,158,11,0.15)', dot: '#f59e0b' },
-  archived: { label: 'Archived',  color: 'rgba(107,114,128,0.15)', dot: '#6b7280' },
-  empty:    { label: 'Empty',     color: 'rgba(107,114,128,0.12)', dot: '#6b7280' },
+  active:   { label: 'Active',    color: 'color-mix(in srgb, var(--s-done), transparent 85%)',  dot: 'var(--s-done)' },
+  onhold:   { label: 'On Hold',   color: 'color-mix(in srgb, var(--s-in-progress), transparent 85%)', dot: 'var(--s-in-progress)' },
+  archived: { label: 'Archived',  color: 'color-mix(in srgb, var(--t3), transparent 85%)', dot: 'var(--t3)' },
+  empty:    { label: 'Empty',     color: 'color-mix(in srgb, var(--t3), transparent 88%)', dot: 'var(--t3)' },
 };
 
 interface ProjectStatusBadgeProps {
@@ -21,7 +21,7 @@ interface ProjectStatusBadgeProps {
 export function ProjectStatusBadge({ status, size = 'md' }: ProjectStatusBadgeProps) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.empty;
   const fs = size === 'sm' ? 11 : 12;
-  const px = size === 'sm' ? '5px 8px' : '4px 10px';
+  const px = size === 'sm' ? 'var(--space-2) var(--space-4)' : 'var(--space-2) var(--space-5)';
   const dotSz = size === 'sm' ? 5 : 6;
 
   return (
@@ -29,7 +29,7 @@ export function ProjectStatusBadge({ status, size = 'md' }: ProjectStatusBadgePr
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 5,
+        gap: 'var(--space-2)',
         padding: px,
         borderRadius: 99,
         background: cfg.color,
