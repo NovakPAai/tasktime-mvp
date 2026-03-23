@@ -2,7 +2,18 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 1.4**
+**Last version: 1.5**
+
+---
+
+## [1.5] [2026-03-23] fix(sprints): единый стиль статусов задач через IssueStatusTag
+
+**PR:** [#123](https://github.com/jackrescuer-gif/tasktime-mvp/pull/123)
+**Ветка:** `claude/jack-ttmp-145-sprint-status-tag`
+
+### Что изменилось
+- `SprintsPage.tsx` — кастомные CSS-пилюли статусов (`tt-sprint-status-pill`) заменены на компонент `IssueStatusTag` — единый стиль с остальными страницами приложения
+- Удалены неиспользуемые константы `STATUS_LABEL_RU` и `STATUS_CLASS`
 
 ---
 
