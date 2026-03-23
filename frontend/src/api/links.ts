@@ -23,6 +23,12 @@ export async function deleteIssueLink(issueId: string, linkId: string): Promise<
   await api.delete(`/issues/${issueId}/links/${linkId}`);
 }
 
+// Активные типы связей для всех авторизованных пользователей
+export async function listActiveLinkTypes(): Promise<IssueLinkType[]> {
+  const { data } = await api.get<IssueLinkType[]>('/link-types');
+  return data;
+}
+
 // Admin
 export async function listLinkTypes(includeInactive = false): Promise<IssueLinkType[]> {
   const { data } = await api.get<IssueLinkType[]>('/admin/link-types', {

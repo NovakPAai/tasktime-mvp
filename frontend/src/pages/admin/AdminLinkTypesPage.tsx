@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Table, Tag, Button, Input, Form, Modal, Switch, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, Input, Form, Modal, Switch, Space, message } from 'antd';
+import { PlusOutlined, EditOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import * as linksApi from '../../api/links';
 import type { IssueLinkType } from '../../types';
@@ -12,6 +12,9 @@ export default function AdminLinkTypesPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createForm] = Form.useForm();
   const [creating, setCreating] = useState(false);
+  const [editingType, setEditingType] = useState<IssueLinkType | null>(null);
+  const [editForm] = Form.useForm();
+  const [saving, setSaving] = useState(false);
 
   const loadLinkTypes = async () => {
     setLoading(true);
@@ -40,6 +43,26 @@ export default function AdminLinkTypesPage() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleEditLinkType = async (values: { name: string; outboundName: string; inboundName: string }) => {
+    if (!editingType) return;
+    setSaving(true);
+    try {
+      const updated = await linksApi.updateLinkType(editingType.id, values);
+      setLinkTypes((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setEditingType(null);
+      void message.success('Вид связи обновлён');
+    } catch (err) {
+      void message.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditModal = (record: IssueLinkType) => {
+    setEditingType(record);
+    editForm.setFieldsValue({ name: record.name, outboundName: record.outboundName, inboundName: record.inboundName });
   };
 
   const handleToggleLinkType = async (id: string, isActive: boolean) => {
@@ -76,13 +99,22 @@ export default function AdminLinkTypesPage() {
       title: 'Действия',
       key: 'actions',
       render: (_, record) => (
-        <Switch
-          size="small"
-          checked={record.isActive}
-          onChange={(checked) => void handleToggleLinkType(record.id, checked)}
-          checkedChildren="Вкл"
-          unCheckedChildren="Выкл"
-        />
+        <Space>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => openEditModal(record)}
+          >
+            Изменить
+          </Button>
+          <Switch
+            size="small"
+            checked={record.isActive}
+            onChange={(checked) => void handleToggleLinkType(record.id, checked)}
+            checkedChildren="Вкл"
+            unCheckedChildren="Выкл"
+          />
+        </Space>
       ),
     },
   ];
@@ -121,6 +153,34 @@ export default function AdminLinkTypesPage() {
         loading={loading}
         pagination={{ pageSize: 20 }}
       />
+
+      <Modal
+        title="Редактировать вид связи"
+        open={!!editingType}
+        onCancel={() => setEditingType(null)}
+        onOk={() => editForm.submit()}
+        confirmLoading={saving}
+        okText="Сохранить"
+        cancelText="Отмена"
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={(values: { name: string; outboundName: string; inboundName: string }) =>
+            void handleEditLinkType(values)
+          }
+        >
+          <Form.Item name="name" label="Наименование вида связи" rules={[{ required: true, message: 'Обязательное поле' }]}>
+            <Input disabled={editingType?.isSystem} />
+          </Form.Item>
+          <Form.Item name="outboundName" label="Исходящая связь" rules={[{ required: true, message: 'Обязательное поле' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="inboundName" label="Входящая связь" rules={[{ required: true, message: 'Обязательное поле' }]}>
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="Создать вид связи"

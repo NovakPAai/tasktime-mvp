@@ -59,7 +59,7 @@ export async function getSprintIssues(id: string) {
           number: true,
           title: true,
           estimatedHours: true,
-          issueTypeConfig: true,
+          issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconName: true, iconColor: true } },
           status: true,
           priority: true,
           updatedAt: true,
@@ -81,7 +81,10 @@ export async function getSprintIssues(id: string) {
 
   return {
     sprint: mappedSprint,
-    issues: sprint.issues,
+    issues: sprint.issues.map((issue) => ({
+      ...issue,
+      type: issue.issueTypeConfig?.systemKey ?? null,
+    })),
   };
 }
 

@@ -291,9 +291,12 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  // Resolve issueTypeConfigId — default to TASK system type if not provided
+  // Resolve issueTypeConfigId — accept UUID or legacy systemKey string (e.g. 'TASK', 'EPIC')
   let resolvedTypeConfigId: string | undefined = dto.issueTypeConfigId;
-
+  if (!resolvedTypeConfigId && dto.type) {
+    const byKey = await prisma.issueTypeConfig.findUnique({ where: { systemKey: dto.type.toUpperCase() } });
+    if (byKey) resolvedTypeConfigId = byKey.id;
+  }
   if (resolvedTypeConfigId) {
     const typeConfig = await prisma.issueTypeConfig.findUnique({ where: { id: resolvedTypeConfigId } });
     if (!typeConfig) throw new AppError(404, 'Issue type not found');
