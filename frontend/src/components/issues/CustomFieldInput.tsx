@@ -125,11 +125,13 @@ function EditInput({
   allUsers = [],
   onSave,
   onCancel,
+  autoFocus = false,
 }: {
   field: IssueCustomFieldValue;
   allUsers?: User[];
   onSave: (val: unknown) => void;
   onCancel?: () => void;
+  autoFocus?: boolean;
 }) {
   const [localVal, setLocalVal] = useState<unknown>(field.currentValue);
 
@@ -150,8 +152,8 @@ function EditInput({
     case 'SELECT':
       return (
         <Select
-          autoFocus
-          defaultOpen
+          autoFocus={autoFocus}
+          defaultOpen={autoFocus}
           size="small"
           style={{ minWidth: 140 }}
           defaultValue={field.currentValue as string ?? undefined}
@@ -165,7 +167,7 @@ function EditInput({
     case 'MULTI_SELECT':
       return (
         <Select
-          autoFocus
+          autoFocus={autoFocus}
           mode="multiple"
           size="small"
           style={{ minWidth: 180 }}
@@ -179,7 +181,7 @@ function EditInput({
     case 'LABEL':
       return (
         <Select
-          autoFocus
+          autoFocus={autoFocus}
           mode="tags"
           size="small"
           style={{ minWidth: 180 }}
@@ -192,8 +194,8 @@ function EditInput({
     case 'USER':
       return (
         <Select
-          autoFocus
-          defaultOpen
+          autoFocus={autoFocus}
+          defaultOpen={autoFocus}
           size="small"
           style={{ minWidth: 140 }}
           defaultValue={field.currentValue as string ?? undefined}
@@ -209,7 +211,7 @@ function EditInput({
     case 'NUMBER':
       return (
         <InputNumber
-          autoFocus
+          autoFocus={autoFocus}
           size="small"
           precision={0}
           defaultValue={field.currentValue as number ?? undefined}
@@ -223,7 +225,7 @@ function EditInput({
     case 'DECIMAL':
       return (
         <InputNumber
-          autoFocus
+          autoFocus={autoFocus}
           size="small"
           defaultValue={field.currentValue as number ?? undefined}
           onChange={v => setLocalVal(v)}
@@ -236,7 +238,7 @@ function EditInput({
     case 'DATE':
       return (
         <DatePicker
-          autoFocus
+          autoFocus={autoFocus}
           size="small"
           defaultValue={field.currentValue ? dayjs(field.currentValue as string) : undefined}
           onChange={d => onSave(d ? d.format('YYYY-MM-DD') : null)}
@@ -248,7 +250,7 @@ function EditInput({
     case 'DATETIME':
       return (
         <DatePicker
-          autoFocus
+          autoFocus={autoFocus}
           size="small"
           showTime
           defaultValue={field.currentValue ? dayjs(field.currentValue as string) : undefined}
@@ -260,7 +262,7 @@ function EditInput({
     case 'TEXTAREA':
       return (
         <Input.TextArea
-          autoFocus
+          autoFocus={autoFocus}
           size="small"
           autoSize={{ minRows: 2, maxRows: 6 }}
           defaultValue={field.currentValue as string ?? ''}
@@ -273,7 +275,7 @@ function EditInput({
     default: // TEXT, URL
       return (
         <Input
-          autoFocus
+          autoFocus={autoFocus}
           size="small"
           defaultValue={field.currentValue as string ?? ''}
           onChange={e => setLocalVal(e.target.value)}
@@ -318,6 +320,7 @@ export default function CustomFieldInput({ field, onSave, allUsers = [], inlineE
         allUsers={allUsers}
         onSave={handleSave}
         onCancel={() => inlineEdit && setEditing(false)}
+        autoFocus={inlineEdit}
       />
     );
   }
