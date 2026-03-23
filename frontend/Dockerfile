@@ -9,6 +9,7 @@ COPY frontend/tsconfig.json ./
 COPY frontend/vite.config.ts ./
 COPY frontend/index.html ./
 COPY frontend/src ./src
+COPY frontend/scripts ./scripts
 
 RUN npm run build
 
