@@ -51,8 +51,8 @@ function getInitials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  '#4f6ef7', '#7c3aed', '#10b981', '#f59e0b',
-  '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899',
+  'var(--acc)', 'var(--lbl-imp)', 'var(--lbl-perf)', 'var(--s-inprog)',
+  'var(--s-urgent)', 'var(--lbl-feat)', 'var(--acc-h)', '#ec4899',
 ];
 function avatarColor(name: string): string {
   let h = 0;

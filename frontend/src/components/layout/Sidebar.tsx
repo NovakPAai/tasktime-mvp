@@ -34,7 +34,10 @@ function getInitials(name: string): string {
   return name.split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
 }
 
-const AVATAR_COLORS = ['#4f6ef7','#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4'];
+const AVATAR_COLORS = [
+  'var(--acc)', 'var(--lbl-imp)', 'var(--lbl-perf)', 'var(--s-inprog)',
+  'var(--s-urgent)', 'var(--lbl-feat)'
+];
 function avatarColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
@@ -126,7 +129,7 @@ export default function Sidebar({
       )}
 
       <Sider
-        width={220}
+        width={210}
         theme={isLight ? 'light' : 'dark'}
         className={`tt-sidebar${mobileOpen ? ' tt-sidebar--open' : ''}`}
       >
