@@ -2,53 +2,49 @@
  * Flow Universe — Design Tokens
  *
  * ЕДИНСТВЕННЫЙ ИСТОЧНИК ПРАВДЫ.
- * Все значения синхронизированы с Paper (артборд "Design Tokens").
- *
- * Эти токены используются в ConfigProvider (App.tsx) для настройки Ant Design
- * и в tokens.css для глобальных переменных.
+ * Имена ключей должны СТРОГО совпадать с именами переменных в CSS (после kebab-case).
+ * Например: bgSb -> --bg-sb
  */
 
-// ─── Dark theme (Synchronized with Paper) ───────────────────────────────────
+// ─── Dark theme ───────────────────────────────────────────────────────────────
 export const dark = {
-  bgMain:         '#080B14',
-  bgCard:         '#0F1320',
-  bgElevated:     '#161B22',
-  border:         '#21262D',
-  borderSoft:     '#30363D',
-  textPrimary:    '#E2E8F8',
-  textSecondary:  '#C9D1D9',
-  textMuted:      '#8B949E',
-  textDisabled:   '#484F58',
-  textPlaceholder:'#3D4D6B',
-  accent:         '#4F6EF7',
-  accentHover:    '#6B85FF',
-  accentLinks:    '#4F6EF7',
-  accentBg:       'rgba(79, 110, 247, 0.12)',
+  bg:             '#080B14', // --bg
+  bgSb:           '#0F1320', // --bg-sb
+  bgEl:           '#161B22', // --bg-el
   bgHover:        'rgba(255, 255, 255, 0.04)',
   bgActive:       'rgba(255, 255, 255, 0.06)',
+  b:              '#21262D', // --b
+  b2:             '#30363D', // --b2
+  b3:             '#30363D', // --b3
+  t1:             '#E2E8F8', // --t1
+  t2:             '#C9D1D9', // --t2
+  t3:             '#8B949E', // --t3
+  t4:             '#484F58', // --t4
+  acc:            '#4F6EF7', // --acc
+  accH:           '#6B85FF', // --acc-h
+  accBg:          'rgba(79, 110, 247, 0.12)',
 } as const;
 
-// ─── Light theme (Synchronized with Paper) ──────────────────────────────────
+// ─── Light theme ─────────────────────────────────────────────────────────────
 export const light = {
-  bgMain:         '#FFFFFF',
-  bgCard:         '#F6F8FA',
-  bgElevated:     '#FFFFFF',
-  border:         '#D0D7DE',
-  borderSoft:     '#E8ECEF',
-  textPrimary:    '#1F2328',
-  textSecondary:  '#656D76',
-  textMuted:      '#8B949E',
-  textDisabled:   '#AFB8C1',
-  textPlaceholder:'#9198A1',
-  accent:         '#4F6EF7',
-  accentHover:    '#3B5FFF',
-  accentLinks:    '#4F6EF7',
-  accentBg:       'rgba(79, 110, 247, 0.10)',
+  bg:             '#FFFFFF',
+  bgSb:           '#F6F8FA',
+  bgEl:           '#FFFFFF',
   bgHover:        'rgba(0, 0, 0, 0.04)',
   bgActive:       'rgba(0, 0, 0, 0.06)',
+  b:              '#D0D7DE',
+  b2:             '#D0D7DE',
+  b3:             '#D0D7DE',
+  t1:             '#1F2328',
+  t2:             '#656D76',
+  t3:             '#8B949E',
+  t4:             '#AFB8C1',
+  acc:            '#4F6EF7',
+  accH:           '#3B5FFF',
+  accBg:          'rgba(79, 110, 247, 0.10)',
 } as const;
 
-// ─── Status colors (Neutralized according to Paper) ──────────────────────────
+// ─── Status colors ────────────────────────────────────────────────────────────
 export const status = {
   done:       '#4ADE80',
   inProgress: '#F59E0B',
@@ -57,7 +53,7 @@ export const status = {
   cancelled:  '#484F58',
 } as const;
 
-// ─── Issue type / priority colors ──────────────────────────────────────────
+// ─── Issue type colors ────────────────────────────────────────────────────────
 export const issueType = {
   epic:    '#A855F7',
   story:   '#3B82F6',
@@ -66,7 +62,7 @@ export const issueType = {
   bug:     '#EF4444',
 } as const;
 
-// ─── Semantic ────────────────────────────────────────────────────────────────
+// ─── Semantic ─────────────────────────────────────────────────────────────────
 export const semantic = {
   success: '#4ADE80',
   warning: '#F59E0B',
@@ -74,18 +70,18 @@ export const semantic = {
   info:    '#4F6EF7',
 } as const;
 
-// ─── Layout & Spacing (Synchronized with Paper) ─────────────────────────────
+// ─── Layout & Spacing ────────────────────────────────────────────────────────
 export const layout = {
-  sidebarWidth:  210,  // БЫЛО 220
-  pagePadding:   24,
+  sidebarW:      210,  // --sidebar-w
+  pageP:         24,   // --page-p
   cardGap:       16,
   elementGap:    8,
-  topbarHeight:  38,
-  radiusCard:    12,
-  radiusButton:  8,
-  radiusPill:    6,
-  radiusBadge:   3,
-  radiusNavActive: 20,
+  topbarH:       38,
+  r:             12,   // --r
+  r2:            8,    // --r2
+  r3:            6,    // --r3
+  rBadge:        3,
+  rActive:       20,
 } as const;
 
 // ─── Typography ─────────────────────────────────────────────────────────────
@@ -93,8 +89,6 @@ export const typography = {
   fontDisplay: "'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif",
   fontSans:    "'Inter', -apple-system, system-ui, sans-serif",
   fsLabel:     13,
-  fsTableTitle:12,
   fsBody:      12,
   fsMeta:      11,
-  fsTableHeader: 10,
 } as const;
