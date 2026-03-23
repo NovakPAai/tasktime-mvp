@@ -13,6 +13,7 @@ import * as teamsApi from '../api/teams';
 import { useAuthStore } from '../store/auth.store';
 import type { Sprint, Issue, SprintState, Team, Project } from '../types';
 import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
+import SprintPlanningDrawer from '../components/sprints/SprintPlanningDrawer';
 import { hasAnyRequiredRole } from '../lib/roles';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -92,12 +93,11 @@ export default function SprintsPage() {
   const { user } = useAuthStore();
   const [project, setProject] = useState<Project | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [backlog, setBacklog] = useState<Issue[]>([]);
   const [sprintIssues, setSprintIssues] = useState<Issue[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedBacklog, setSelectedBacklog] = useState<string[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [planningOpen, setPlanningOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState<StateFilter>('ACTIVE');
   const [teams, setTeams] = useState<Team[]>([]);
   const [form] = Form.useForm();
@@ -105,9 +105,8 @@ export default function SprintsPage() {
 
   const load = useCallback(async () => {
     if (!projectId) return;
-    const [sp, bl, ts, proj] = await Promise.all([
+    const [sp, ts, proj] = await Promise.all([
       sprintsApi.listSprints(projectId),
-      sprintsApi.getBacklog(projectId),
       teamsApi.listTeams(),
       projectsApi.getProject(projectId),
     ]);
@@ -121,7 +120,6 @@ export default function SprintsPage() {
       const active = sp.find((s) => s.state === 'ACTIVE');
       return (active ?? sp[0]).id;
     });
-    setBacklog(bl);
   }, [projectId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -172,13 +170,6 @@ export default function SprintsPage() {
       const error = e as AxiosError<{ error?: string }>;
       void message.error(error.response?.data?.error ?? 'Ошибка');
     }
-  };
-
-  const handleMoveToSprint = async (sprintId: string) => {
-    if (!selectedBacklog.length) return;
-    await sprintsApi.moveIssuesToSprint(sprintId, selectedBacklog);
-    setSelectedBacklog([]);
-    void load();
   };
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId) ?? null;
@@ -364,12 +355,12 @@ export default function SprintsPage() {
               <Button size="small" icon={<FilterOutlined />} className="tt-btn-ghost">
                 Фильтр
               </Button>
-              {canManage && backlog.length > 0 && (
+              {canManage && (
                 <Button
                   size="small"
                   icon={<PlusOutlined />}
                   type="primary"
-                  onClick={() => setDetailsOpen(true)}
+                  onClick={() => setPlanningOpen(true)}
                 >
                   Добавить из бэклога
                 </Button>
@@ -456,19 +447,6 @@ export default function SprintsPage() {
         </div>
       )}
 
-      {/* Backlog (collapsed section for moving issues) */}
-      {canManage && selectedSprint && selectedSprint.state === 'ACTIVE' && backlog.length > 0 && selectedBacklog.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => void handleMoveToSprint(selectedSprint.id)}
-          >
-            + Добавить выбранные в спринт ({selectedBacklog.length})
-          </Button>
-        </div>
-      )}
-
       {/* Create Sprint Modal */}
       <Modal
         title="Новый спринт"
@@ -501,6 +479,14 @@ export default function SprintsPage() {
         open={detailsOpen}
         sprintId={selectedSprintId}
         onClose={() => setDetailsOpen(false)}
+      />
+
+      <SprintPlanningDrawer
+        open={planningOpen}
+        sprintId={selectedSprintId}
+        projectId={projectId ?? null}
+        onClose={() => setPlanningOpen(false)}
+        onAdded={() => { void load(); }}
       />
     </div>
   );
