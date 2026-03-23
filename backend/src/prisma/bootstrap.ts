@@ -32,7 +32,30 @@ export const BOOTSTRAP_USERS: ReadonlyArray<{
   { email: AI_DEVELOPER_EMAIL, name: 'AI Developer', role: 'USER', isSystem: true },
 ];
 
-type BootstrapPrismaClient = Pick<PrismaClient, 'user'>;
+type BootstrapPrismaClient = Pick<PrismaClient, 'user' | 'issueLinkType'>;
+
+const SYSTEM_LINK_TYPES: ReadonlyArray<{
+  name: string;
+  outboundName: string;
+  inboundName: string;
+}> = [
+  { name: 'Блокирует',  outboundName: 'Блокирует',  inboundName: 'Заблокировано' },
+  { name: 'Связана с',  outboundName: 'Связана с',  inboundName: 'Связана с' },
+  { name: 'Дублирует',  outboundName: 'Дублирует',  inboundName: 'Является дубликатом' },
+  { name: 'Зависит от', outboundName: 'Зависит от', inboundName: 'Требуется для' },
+];
+
+export async function bootstrapSystemLinkTypes(
+  prisma: BootstrapPrismaClient,
+): Promise<void> {
+  for (const type of SYSTEM_LINK_TYPES) {
+    await prisma.issueLinkType.upsert({
+      where: { name: type.name },
+      update: {},
+      create: { ...type, isActive: true, isSystem: true },
+    });
+  }
+}
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -113,6 +136,8 @@ async function main() {
   try {
     await bootstrapDefaultUsers(prisma, password, users);
     console.log(`Bootstrapped ${users.length} default users.`);
+    await bootstrapSystemLinkTypes(prisma);
+    console.log('Bootstrapped system link types.');
   } finally {
     await prisma.$disconnect();
   }
