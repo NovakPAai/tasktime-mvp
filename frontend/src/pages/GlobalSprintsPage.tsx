@@ -163,7 +163,7 @@ export default function GlobalSprintsPage() {
           placeholder="Все проекты"
           value={projectFilter}
           onChange={v => setProjectFilter(v)}
-          style={{ width: 220 }}
+          style={{ width: 'var(--sidebar-width)' }}
           options={projects.map(p => ({
             value: p.id,
             label: `${p.key} — ${p.name}`,
@@ -174,7 +174,7 @@ export default function GlobalSprintsPage() {
           placeholder="Все команды"
           value={teamFilter}
           onChange={v => setTeamFilter(v)}
-          style={{ width: 220 }}
+          style={{ width: 'var(--sidebar-width)' }}
           options={teams.map(t => ({
             value: t.id,
             label: t.name,

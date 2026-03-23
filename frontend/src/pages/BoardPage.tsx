@@ -257,7 +257,7 @@ export default function BoardPage() {
             placeholder="All sprints"
             value={selectedSprint}
             onChange={setSelectedSprint}
-            style={{ minWidth: 220 }}
+            style={{ minWidth: 'var(--sidebar-width)' }}
             options={sprints.map((s) => ({
               value: s.id,
               label: s.name,
