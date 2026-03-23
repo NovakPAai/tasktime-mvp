@@ -33,8 +33,11 @@
   --type-subtask: #6B7280;
   --type-bug: #EF4444;
   --sidebar-width: 210px;
+  --sidebar-w: 210px;
   --topbar-height: 38px;
+  --topbar-h: 38px;
   --page-padding: 24px;
+  --page-p: 24px;
   --card-gap: 16px;
   --element-gap: 8px;
   --r: 12px;
@@ -50,8 +53,8 @@
   --space-6: 16px;
   --space-7: 20px;
   --space-8: 24px;
-  --font-display: Space Grotesk, Inter, system-ui, sans-serif;
-  --font-sans: Inter, system-ui, sans-serif;
+  --font-display: ;
+  --font-sans: ;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --fs-xs: 12px;
   --fs-sm: 13px;
