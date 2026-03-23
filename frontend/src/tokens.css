@@ -7,7 +7,7 @@
   --bg: #080B14;
   --bg-sb: #0F1320;
   --bg-el: #161B22;
-  --bg-input: #0D1117, // --bg-input;
+  --bg-input: #0D1117;
   --bg-hover: rgba(255, 255, 255, 0.04);
   --bg-active: rgba(255, 255, 255, 0.06);
   --bg-sel: rgba(79, 110, 247, 0.12);

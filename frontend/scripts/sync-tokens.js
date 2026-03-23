@@ -21,12 +21,16 @@ function parseTokens() {
     if (!sectionMatch) return;
     const lines = sectionMatch[1].split('\n');
     lines.forEach(line => {
-      // Ищем ключи и значения (строки или числа)
-      const m = line.match(/^\s*(\w+):\s*(.*?),?$/);
+      // 1. Убираем комментарии // и /* */
+      const cleanLine = line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '').trim();
+      if (!cleanLine) return;
+
+      // 2. Ищем ключ: значение
+      const m = cleanLine.match(/^(\w+):\s*(.*?),?$/);
       if (m) {
         let val = m[2].trim().replace(/['"]/g, ''); // Убираем кавычки
         if (val.endsWith(',')) val = val.slice(0, -1);
-        tokens[section][m[1]] = val;
+        tokens[section][m[1]] = val.trim();
       }
     });
   };
@@ -66,7 +70,7 @@ function generateCSS() {
   css += `}\n`;
 
   fs.writeFileSync(OUTPUT_FILE, css);
-  console.log('✅ tokens.css полностью синхронизирован (Brute Force Build)');
+  console.log('✅ tokens.css успешно синхронизирован (Syntax Error Fix Build)');
 }
 
 generateCSS();
