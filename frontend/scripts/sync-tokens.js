@@ -1,34 +1,36 @@
 import fs from 'fs';
 import path from 'path';
 
-/**
- * ЧИСТЫЙ JS СКРИПТ ДЛЯ CI/CD. 
- * Не требует лоадеров TypeScript. Парсит design-tokens.ts как текст.
- */
-
 const INPUT_FILE = path.resolve('src/design-tokens.ts');
 const OUTPUT_FILE = path.resolve('src/tokens.css');
 
-const toKebab = (str) => str.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
+const toKebab = (str) => {
+  if (/^[a-z][0-9]$/.test(str)) return str; 
+  return str
+    .replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2')
+    .replace(/([a-z])([0-9])/g, '$1-$2') 
+    .toLowerCase();
+};
 
 function parseTokens() {
   const content = fs.readFileSync(INPUT_FILE, 'utf8');
-  const tokens = { dark: {}, light: {}, status: {}, issueType: {}, layout: {} };
+  const tokens = { dark: {}, light: {}, status: {}, issueType: {}, layout: {}, typography: {} };
 
-  // Упрощенный парсинг через RegExp для извлечения ключ: 'значение'
   const extract = (section) => {
     const sectionMatch = content.match(new RegExp(`export const ${section} = \\{([\\s\\S]*?)\\} as const;`));
     if (!sectionMatch) return;
     const lines = sectionMatch[1].split('\n');
     lines.forEach(line => {
+      // Поддержка одинарных кавычек для шрифтов
       const m = line.match(/^\s*(\w+):\s*['"](.*?)['"]/);
-      if (m) tokens[section][m[1]] = m[2];
-      const numM = line.match(/^\s*(\w+):\s*(\d+)/);
+      if (m) { tokens[section][m[1]] = m[2]; return; }
+      
+      const numM = line.match(/^\s*(\w+):\s*(\d+(\.\d+)?)/);
       if (numM) tokens[section][numM[1]] = numM[2];
     });
   };
 
-  ['dark', 'light', 'status', 'issueType', 'layout'].forEach(extract);
+  ['dark', 'light', 'status', 'issueType', 'layout', 'typography'].forEach(extract);
   return tokens;
 }
 
@@ -49,13 +51,17 @@ function generateCSS() {
     const unit = isNaN(v) ? '' : 'px';
     css += `  --${toKebab(k)}: ${v}${unit};\n`;
   });
+  Object.entries(tokens.typography).forEach(([k, v]) => {
+    const unit = (isNaN(v) || k.startsWith('lh') || k.startsWith('font')) ? '' : 'px';
+    css += `  --${toKebab(k)}: ${v}${unit};\n`;
+  });
 
   css += `}\n\n[data-theme='light'] {\n`;
   Object.entries(tokens.light).forEach(([k, v]) => css += `  --${toKebab(k)}: ${v};\n`);
   css += `}\n`;
 
   fs.writeFileSync(OUTPUT_FILE, css);
-  console.log('✅ tokens.css успешно синхронизирован (Pure Node.js Mode)');
+  console.log('✅ tokens.css синхронизирован (Final Patch)');
 }
 
 generateCSS();
