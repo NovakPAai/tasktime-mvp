@@ -9,55 +9,55 @@
    ========================================================= */
 
 .ant-select-dropdown {
-  background-color: #1e1e2a !important;
-  border: 1px solid rgba(255, 255, 255, 0.10) !important;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75), 0 2px 8px rgba(0, 0, 0, 0.5) !important;
-  border-radius: 8px !important;
+  background-color: var(--bg-el) !important;
+  border: 1px solid var(--b2) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border-radius: var(--r2) !important;
 }
 
 .ant-select-item {
-  color: #8c8c9e !important;
-  border-radius: 5px !important;
+  color: var(--t3) !important;
+  border-radius: var(--r3) !important;
 }
 
 .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: #d5d5eb !important;
+  background: var(--bg-hover) !important;
+  color: var(--t2) !important;
 }
 
 .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
-  background: rgba(123, 134, 255, 0.15) !important;
-  color: #ffffff !important;
+  background: var(--acc-bg) !important;
+  color: var(--t1) !important;
 }
 
 .ant-select-item-empty {
-  color: #555566 !important;
+  color: var(--t4) !important;
 }
 
 /* Dropdown menus (e.g. action menus) */
 .ant-dropdown-menu {
-  background-color: #1e1e2a !important;
-  border: 1px solid rgba(255, 255, 255, 0.10) !important;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75) !important;
-  border-radius: 8px !important;
+  background-color: var(--bg-el) !important;
+  border: 1px solid var(--b2) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border-radius: var(--r2) !important;
 }
 
 .ant-dropdown-menu-item {
-  color: #8c8c9e !important;
-  border-radius: 5px !important;
+  color: var(--t3) !important;
+  border-radius: var(--r3) !important;
 }
 
 .ant-dropdown-menu-item:hover,
 .ant-dropdown-menu-item-active {
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: #d5d5eb !important;
+  background: var(--bg-hover) !important;
+  color: var(--t2) !important;
 }
 
 /* Popover */
 .ant-popover-inner {
-  background-color: #1e1e2a !important;
-  border: 1px solid rgba(255, 255, 255, 0.10) !important;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75) !important;
+  background-color: var(--bg-el) !important;
+  border: 1px solid var(--b2) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 .ant-popover-inner-content,
@@ -67,15 +67,15 @@
 
 /* Tooltip */
 .ant-tooltip-inner {
-  background-color: #252535 !important;
+  background-color: var(--bg-el) !important;
   color: var(--t1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 6px !important;
+  border: 1px solid var(--b3) !important;
+  border-radius: var(--r3) !important;
 }
 
 .ant-tooltip-arrow::before,
 .ant-tooltip-arrow-content {
-  background-color: #252535 !important;
+  background-color: var(--bg-el) !important;
 }
 
 /* =========================================================
@@ -94,35 +94,35 @@
 .tt-theme-toggle {
   width: 32px !important;
   height: 32px !important;
-  border-radius: 6px !important;
+  border-radius: var(--r3) !important;
   border: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
-  font-size: 16px !important;
+  font-size: var(--fs-6) !important;
   padding: 0 !important;
 }
 
 /* Light mode styles */
 .tt-theme-toggle {
-  background-color: #f0f2f5 !important;
+  background-color: var(--bg-sb) !important;
   color: #faad14 !important;
 }
 
 .tt-theme-toggle:hover {
-  background-color: #e6e8eb !important;
+  background-color: var(--bg-hover) !important;
 }
 
 /* Dark mode styles */
 [data-theme='dark'] .tt-theme-toggle {
-  background-color: #262c35 !important;
+  background-color: var(--bg-el) !important;
   color: #faad14 !important;
 }
 
 [data-theme='dark'] .tt-theme-toggle:hover {
-  background-color: #3c434c !important;
+  background-color: var(--bg-active) !important;
 }
 
 /* Animation on click */
@@ -151,13 +151,13 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 24px;
-  gap: 16px;
+  margin-bottom: var(--space-8);
+  gap: var(--space-6);
 }
 
 .tt-projects-title {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   font-weight: 800;
   color: var(--t1);
   letter-spacing: -0.03em;
@@ -175,17 +175,17 @@
 .tt-projects-header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-5);
 }
 
 .tt-projects-search {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-3);
   background: var(--bg-el);
   border: 1px solid var(--b2);
   border-radius: var(--r2);
-  padding: 7px 12px;
+  padding: var(--space-3) var(--space-5);
   color: var(--t3);
   font-size: 12px;
   width: 210px;
@@ -195,9 +195,9 @@
 .tt-projects-create-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #4f6ef7, #7c3aed);
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  background: var(--acc);
   border: none;
   border-radius: var(--r2);
   color: white;
@@ -218,17 +218,17 @@
 .tt-projects-filters {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 20px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-7);
 }
 
 .tt-projects-filter-tab {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
   border: 1px solid transparent;
-  border-radius: 20px;
+  border-radius: var(--r-active);
   background: transparent;
   font-family: var(--font-sans);
   font-size: 12px;
@@ -242,8 +242,8 @@
 }
 
 .tt-projects-filter-tab.active {
-  background: rgba(123, 134, 255, 0.1);
-  border-color: rgba(123, 134, 255, 0.25);
+  background: var(--acc-bg);
+  border-color: rgba(79, 110, 247, 0.25);
   color: var(--acc);
   font-weight: 500;
 }
@@ -261,7 +261,7 @@
 .tt-projects-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: var(--space-8);
 }
 
 /* Card */
@@ -270,10 +270,10 @@
   background: var(--bg-el);
   border: 1px solid var(--b2);
   border-radius: var(--r);
-  padding: 20px;
+  padding: var(--space-7);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-5);
   cursor: pointer;
   position: relative;
   overflow: hidden;
@@ -291,7 +291,7 @@
   background: linear-gradient(
     90deg,
     var(--bg-el) 25%,
-    rgba(255, 255, 255, 0.03) 50%,
+    var(--bg-hover) 50%,
     var(--bg-el) 75%
   );
   background-size: 200% 100%;
@@ -329,7 +329,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-5);
   color: var(--t3);
   font-size: 12px;
   font-weight: 500;
@@ -366,7 +366,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-4);
   position: relative;
   z-index: 1;
 }
@@ -374,17 +374,17 @@
 .tt-project-card-id {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-5);
 }
 
 .tt-project-avatar {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--r2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Syne', var(--font-sans);
+  font-family: var(--font-display);
   font-weight: 700;
   font-size: 11px;
   color: white;
@@ -400,7 +400,7 @@
 }
 
 .tt-project-card-name {
-  font-family: 'Syne', var(--font-sans);
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 14px;
   color: var(--t1);
@@ -421,9 +421,9 @@
 .tt-project-status-badge {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 20px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--r-active);
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
@@ -443,8 +443,8 @@
 }
 
 .tt-project-status-badge--empty {
-  background: rgba(85, 85, 102, 0.2);
-  border: 1px solid rgba(85, 85, 102, 0.3);
+  background: var(--bg-active);
+  border: 1px solid var(--b2);
   color: var(--t3);
 }
 
@@ -476,7 +476,7 @@
 .tt-project-metrics {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-5);
   position: relative;
   z-index: 1;
 }
@@ -489,9 +489,9 @@
 }
 
 .tt-project-metric-value {
-  font-family: 'Syne', var(--font-sans);
+  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 18px;
+  font-size: var(--fs-xl);
   color: var(--t1);
   letter-spacing: -0.02em;
   line-height: 1;
@@ -499,7 +499,7 @@
 }
 
 .tt-project-metric-value--muted {
-  font-size: 15px;
+  font-size: var(--fs-lg);
   color: var(--t1);
 }
 
@@ -562,7 +562,7 @@
 }
 
 .tt-issues-header {
-  padding: 14px 24px 0;
+  padding: var(--space-6) var(--space-8) 0;
   border-bottom: 1px solid var(--b);
   background: var(--bg);
   flex-shrink: 0;
@@ -571,10 +571,10 @@
 .tt-issues-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-2);
   font-size: 11px;
   color: var(--t3);
-  margin-bottom: 10px;
+  margin-bottom: var(--space-5);
 }
 .tt-issues-breadcrumb-link { color: var(--acc); cursor: pointer; }
 .tt-issues-breadcrumb-link:hover { text-decoration: underline; }
@@ -586,25 +586,25 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-6);
 }
 
 .tt-issues-title-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-5);
 }
 
 .tt-issues-title-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
 .tt-issues-title {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--t1);
   margin: 0;
@@ -612,29 +612,29 @@
 }
 
 .tt-issues-key-badge {
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--acc-bg);
   color: var(--acc);
   font-size: 10px;
   font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  padding: 2px var(--space-3);
+  border-radius: var(--r3);
+  font-family: var(--font-mono);
   letter-spacing: 0.4px;
 }
 
 .tt-issues-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   font-size: 10px;
   font-weight: 500;
-  padding: 2px 8px;
+  padding: 2px var(--space-4);
   border-radius: 10px;
 }
 .tt-issues-status-active { background: rgba(34, 197, 94, 0.1); color: #4ade80; }
 .tt-issues-status-dot { width: 5px; height: 5px; background: currentColor; border-radius: 50%; display: inline-block; }
 
-.tt-issues-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.tt-issues-actions { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
 
 .tt-issues-action-btn.ant-btn {
   background: var(--bg-el);
@@ -642,7 +642,7 @@
   color: var(--t2);
   font-size: 12px;
   height: 28px;
-  padding: 0 12px;
+  padding: 0 var(--space-5);
 }
 .tt-issues-action-btn.ant-btn:hover { color: var(--t1) !important; border-color: var(--b3) !important; }
 
@@ -650,22 +650,22 @@
   height: 28px;
   font-size: 12px;
   font-weight: 600;
-  padding: 0 14px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  padding: 0 var(--space-6);
+  background: var(--acc);
   border: none;
 }
 
 .tt-issues-stats-strip {
   display: flex;
   align-items: center;
-  margin-top: 10px;
-  padding-top: 8px;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--b);
-  padding-bottom: 10px;
+  padding-bottom: var(--space-5);
   flex-wrap: wrap;
 }
 
-.tt-issues-stat { display: flex; align-items: center; gap: 5px; padding: 0 14px; }
+.tt-issues-stat { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-6); }
 .tt-issues-stat:first-child { padding-left: 0; }
 .tt-issues-stat-label { font-size: 11px; color: var(--t3); white-space: nowrap; }
 .tt-issues-stat-value { font-size: 12px; font-weight: 600; color: var(--t1); font-family: var(--font-display); }
@@ -682,16 +682,16 @@
 .tt-issues-stat-dot-cancelled { background: var(--t4); }
 
 .tt-issues-stat-divider { width: 1px; height: 14px; background: var(--b); flex-shrink: 0; }
-.tt-issues-stat-sprint { gap: 8px; }
+.tt-issues-stat-sprint { gap: var(--space-4); }
 .tt-issues-sprint-bar { width: 72px; }
 .tt-issues-sprint-bar .ant-progress-inner { background: var(--b2); }
-.tt-issues-sprint-bar .ant-progress-bg { background: linear-gradient(90deg, #6366f1, #8b5cf6) !important; }
+.tt-issues-sprint-bar .ant-progress-bg { background: var(--acc) !important; }
 
 .tt-issues-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 24px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-8);
   border-bottom: 1px solid var(--b);
   background: var(--bg);
   flex-shrink: 0;
@@ -701,11 +701,11 @@
 .tt-issues-search {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   background: var(--bg-el);
   border: 1px solid var(--b2);
   border-radius: var(--r2);
-  padding: 0 10px;
+  padding: 0 var(--space-5);
   width: 220px;
   height: 28px;
   flex-shrink: 0;
@@ -732,7 +732,7 @@
 
 .tt-toolbar-apply-btn.ant-btn,
 .tt-toolbar-reset-btn.ant-btn {
-  height: 28px; font-size: 11px; padding: 0 10px;
+  height: 28px; font-size: 11px; padding: 0 var(--space-5);
   background: var(--bg-el); border-color: var(--b2); color: var(--t2);
 }
 .tt-toolbar-apply-btn.ant-btn:hover,
@@ -752,39 +752,39 @@
   font-size: 10px !important;
   font-weight: 600 !important;
   letter-spacing: 0.5px !important;
-  padding: 6px 8px !important;
+  padding: var(--space-3) var(--space-4) !important;
   text-transform: uppercase;
 }
 
 .tt-issues-table-v2 .ant-table-tbody > tr > td {
   border-bottom: 1px solid var(--b) !important;
-  padding: 6px 8px !important;
+  padding: var(--space-3) var(--space-4) !important;
   background: var(--bg) !important;
 }
 .tt-issues-table-v2 .ant-table-tbody > tr:hover > td { background: var(--bg-hover) !important; }
 .tt-issues-table-v2 .ant-table-tbody > tr:nth-child(even) > td { background: rgba(255,255,255,0.012) !important; }
 .tt-issues-table-v2 .ant-table-tbody > tr:nth-child(even):hover > td { background: var(--bg-hover) !important; }
 .tt-issues-table-v2 .ant-table-row-selected > td { background: var(--bg-sel) !important; }
-.tt-issues-table-v2 .ant-table-pagination { padding: 8px 24px !important; margin: 0 !important; border-top: 1px solid var(--b); }
+.tt-issues-table-v2 .ant-table-pagination { padding: var(--space-4) var(--space-8) !important; margin: 0 !important; border-top: 1px solid var(--b); }
 
 .tt-issue-key { font-family: var(--font-display); font-size: 11px; font-weight: 600; color: var(--acc); }
 .tt-issue-title { font-size: 12px; color: var(--t1); }
 .tt-assignee-name { font-size: 11px; color: var(--t2); }
 .tt-assignee-empty { font-size: 11px; color: var(--t4); }
-.tt-issues-table-v2 .tt-issue-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+.tt-issues-table-v2 .tt-issue-tag { font-size: 10px; padding: 1px var(--space-3); border-radius: var(--r-badge); }
 
 /* Markdown help drawer */
-.tt-markdown-help { font-size: 13px; color: var(--t1); line-height: 1.6; }
-.tt-markdown-help h1 { font-size: 18px; font-weight: 700; margin: 0 0 12px; color: var(--t1); }
-.tt-markdown-help h2 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; color: var(--t1); border-bottom: 1px solid var(--b); padding-bottom: 4px; }
-.tt-markdown-help h3 { font-size: 13px; font-weight: 600; margin: 16px 0 6px; color: var(--t1); }
-.tt-markdown-help p { margin: 6px 0; }
-.tt-markdown-help ul, .tt-markdown-help ol { padding-left: 20px; margin: 6px 0; }
+.tt-markdown-help { font-size: var(--fs-sm); color: var(--t1); line-height: 1.6; }
+.tt-markdown-help h1 { font-size: var(--fs-xl); font-weight: 700; margin: 0 0 var(--space-5); color: var(--t1); }
+.tt-markdown-help h2 { font-size: var(--fs-lg); font-weight: 700; margin: var(--space-7) 0 var(--space-4); color: var(--t1); border-bottom: 1px solid var(--b); padding-bottom: var(--space-2); }
+.tt-markdown-help h3 { font-size: var(--fs-sm); font-weight: 600; margin: var(--space-6) 0 var(--space-3); color: var(--t1); }
+.tt-markdown-help p { margin: var(--space-3) 0; }
+.tt-markdown-help ul, .tt-markdown-help ol { padding-left: var(--space-7); margin: var(--space-3) 0; }
 .tt-markdown-help li { margin: 2px 0; }
-.tt-markdown-help code { font-family: var(--font-mono, monospace); font-size: 12px; background: var(--bg3); padding: 1px 5px; border-radius: 3px; color: var(--acc); }
-.tt-markdown-help blockquote { border-left: 3px solid var(--acc); padding: 6px 12px; margin: 8px 0; background: var(--bg2); border-radius: 0 4px 4px 0; color: var(--t2); }
-.tt-markdown-help hr { border: none; border-top: 1px solid var(--b); margin: 16px 0; }
-.tt-markdown-help table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
-.tt-markdown-help th { background: var(--bg3); padding: 6px 10px; text-align: left; font-weight: 600; border: 1px solid var(--b); white-space: nowrap; }
-.tt-markdown-help td { padding: 5px 10px; border: 1px solid var(--b); vertical-align: middle; }
-.tt-markdown-help tr:nth-child(even) td { background: var(--bg2); }
+.tt-markdown-help code { font-family: var(--font-mono); font-size: 12px; background: var(--bg-active); padding: 1px var(--space-3); border-radius: var(--r-badge); color: var(--acc); }
+.tt-markdown-help blockquote { border-left: 3px solid var(--acc); padding: var(--space-3) var(--space-5); margin: var(--space-4) 0; background: var(--acc-bg); border-radius: 0 var(--r3) var(--r3) 0; color: var(--t2); }
+.tt-markdown-help hr { border: none; border-top: 1px solid var(--b); margin: var(--space-6) 0; }
+.tt-markdown-help table { width: 100%; border-collapse: collapse; font-size: 12px; margin: var(--space-4) 0; }
+.tt-markdown-help th { background: var(--bg-sb); padding: var(--space-3) var(--space-5); text-align: left; font-weight: 600; border: 1px solid var(--b); white-space: nowrap; }
+.tt-markdown-help td { padding: var(--space-2) var(--space-5); border: 1px solid var(--b); vertical-align: middle; }
+.tt-markdown-help tr:nth-child(even) td { background: var(--bg-active); }

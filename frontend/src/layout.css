@@ -11,7 +11,7 @@
 .tt-topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-5);
   margin-left: auto;
   min-width: 0;
   overflow: hidden;
@@ -20,12 +20,12 @@
 .tt-topbar-user {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .tt-topbar-user-name {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   color: var(--t1);
   white-space: nowrap;
@@ -35,13 +35,13 @@
 }
 
 .tt-topbar-role {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--t3);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  padding: 1px 5px;
+  background: var(--bg-active);
+  border: 1px solid var(--b2);
+  border-radius: var(--r3);
+  padding: 2px var(--space-3);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -77,14 +77,14 @@
 
   .tt-topbar {
     justify-content: flex-start;
-    padding: 0 10px;
-    gap: 6px;
+    padding: 0 var(--space-5);
+    gap: var(--space-3);
   }
 
   .tt-topbar-right {
     flex: 1;
     justify-content: flex-end;
-    gap: 6px;
+    gap: var(--space-3);
   }
 
   .tt-topbar-user-name {
@@ -149,7 +149,7 @@
   }
 
   .tt-content {
-    padding: 14px 14px 20px;
+    padding: var(--space-5) var(--space-5) var(--space-7);
   }
 
   .tt-main::before {
@@ -177,7 +177,7 @@
 @media (max-width: 480px) {
 
   .tt-content {
-    padding: 10px 10px 16px;
+    padding: var(--space-5) var(--space-5) var(--space-6);
   }
 
   .moex-shell {
