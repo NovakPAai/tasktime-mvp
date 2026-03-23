@@ -12,9 +12,13 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/issues/:id/custom-fields — applicable fields + current values
+// Optional query param: ?issueTypeConfigId=<uuid> to override the issue type (used by edit modal on type change)
 router.get('/issues/:id/custom-fields', async (req, res, next) => {
   try {
-    const result = await service.getIssueCustomFields(req.params.id as string);
+    const overrideTypeId = typeof req.query.issueTypeConfigId === 'string'
+      ? req.query.issueTypeConfigId
+      : undefined;
+    const result = await service.getIssueCustomFields(req.params.id as string, overrideTypeId);
     res.json(result);
   } catch (err) {
     next(err);

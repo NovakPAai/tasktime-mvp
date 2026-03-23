@@ -14,14 +14,17 @@ const SCOPE_PRIORITY: Record<string, number> = {
 
 // ===== Core: resolve applicable fields for an issue =====
 
-export async function getApplicableFields(issueId: string) {
+export async function getApplicableFields(issueId: string, overrideIssueTypeConfigId?: string | null) {
   const issue = await prisma.issue.findUnique({
     where: { id: issueId },
     select: { id: true, projectId: true, issueTypeConfigId: true },
   });
   if (!issue) throw new AppError(404, 'Issue not found');
 
-  const { projectId, issueTypeConfigId } = issue;
+  const { projectId } = issue;
+  const issueTypeConfigId = overrideIssueTypeConfigId !== undefined
+    ? overrideIssueTypeConfigId
+    : issue.issueTypeConfigId;
 
   // Find all ACTIVE schemas whose bindings match this issue
   const activeSchemas = await prisma.fieldSchema.findMany({
@@ -107,8 +110,8 @@ export async function getApplicableFields(issueId: string) {
 
 // ===== GET /api/issues/:id/custom-fields =====
 
-export async function getIssueCustomFields(issueId: string) {
-  const fields = await getApplicableFields(issueId);
+export async function getIssueCustomFields(issueId: string, overrideIssueTypeConfigId?: string | null) {
+  const fields = await getApplicableFields(issueId, overrideIssueTypeConfigId);
 
   if (fields.length === 0) return { fields: [], values: [] };
 
