@@ -61,15 +61,23 @@ export const issueType = {
   bug:     '#EF4444',
 } as const;
 
-// ─── Layout & Spacing (ВОЗВРАЩАЮ ПОЛНЫЕ ИМЕНА) ───────────────────────────────
+// ─── Semantic ─────────────────────────────────────────────────────────────────
+export const semantic = {
+  success: '#4ADE80',
+  warning: '#F59E0B',
+  error:   '#EF4444',
+  info:    '#4F6EF7',
+} as const;
+
+// ─── Layout & Spacing ────────────────────────────────────────────────────────
 export const layout = {
-  sidebarWidth:  210,  // --sidebar-width
-  pagePadding:   24,   // --page-padding
+  sidebarWidth:  210,
+  pagePadding:   24,
   cardGap:       16,
   elementGap:    8,
   topbarHeight:  38,
-  radiusCard:    12,   // --radius-card
-  radiusButton:  8,    // --radius-button
+  radiusCard:    12,
+  radiusButton:  8,
   radiusPill:    6,
   radiusBadge:   3,
   radiusNavActive: 20,
