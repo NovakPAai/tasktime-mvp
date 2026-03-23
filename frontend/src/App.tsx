@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import { useAuthStore } from './store/auth.store';
 import { useThemeStore } from './store/theme.store';
+import * as tokens from './design-tokens';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -55,54 +56,43 @@ export default function App() {
   }, [loadUser]);
 
   /**
-   * TTUI-118: Два источника правды — архитектурное решение
-   *
-   * 1. CSS custom properties (src/styles.css → :root / [data-theme='light'])
-   *    Используются в TSX через inline style={{ color: 'var(--t1)' }}
-   *    и в CSS-классах (.tt-panel, .tt-stats-card, .auth-btn …).
-   *    Изменяются через data-theme атрибут на <html>.
-   *
-   * 2. Ant Design ConfigProvider (ниже)
-   *    Используется компонентами Ant Design (Button, Select, Modal, Table …).
-   *    Принимает только hex / rgba — CSS vars здесь не работают.
-   *
-   * Оба источника используют одну палитру:
-   *   accent: #4f6ef7  bg-dark: #03050f  bg-card: #0f1320
-   *
-   * Tech debt: консолидация в единый источник — TTUI-118 (backlog).
+   * TTUI-118: Дизайн-система синхронизирована с Paper.
+   * Ant Design ConfigProvider использует значения из design-tokens.ts
    */
+  const t = isLight ? tokens.light : tokens.dark;
+
   const antTheme = {
     algorithm: isLight ? antdTheme.defaultAlgorithm : antdTheme.darkAlgorithm,
     token: {
-      colorPrimary: '#4f6ef7',
-      colorPrimaryHover: '#6b85ff',
-      colorInfo: '#4f6ef7',
-      colorBgBase: isLight ? '#f5f3ff' : '#03050f',
-      colorBgContainer: isLight ? '#fdfcff' : '#0f1320',
-      colorBgElevated: isLight ? '#fdfcff' : '#161e30',   // попапы, модалки, дропдауны
-      colorBgSpotlight: isLight ? '#ede9fe' : '#1e2640',  // тултипы
-      colorBgLayout: isLight ? '#ede9fe' : '#0b1535',
-      colorText: isLight ? '#2e1065' : '#e2e8f8',
-      colorTextBase: isLight ? '#2e1065' : '#e2e8f8',
-      colorTextSecondary: isLight ? '#6d28d9' : '#8b949e',
-      colorTextTertiary: isLight ? '#8b5cf6' : '#3d4d6b',
-      colorTextDisabled: isLight ? '#a78bfa' : '#1e2d47',
-      colorTextPlaceholder: isLight ? '#a78bfa' : '#1e2d47',
-      colorFill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
-      colorFillSecondary: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-      colorFillTertiary: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-      colorSplit: isLight ? 'rgba(139,92,246,0.12)' : '#1e2640',
-      colorBorder: isLight ? 'rgba(139,92,246,0.2)' : '#21262d',
-      colorBorderSecondary: isLight ? 'rgba(139,92,246,0.12)' : '#1e2640',
-      colorSuccess: '#22c55e',
-      colorWarning: '#e8b84a',
-      colorError: '#e5534b',
-      borderRadius: 12,
-      borderRadiusSM: 8,
-      borderRadiusLG: 20,
-      fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
-      fontSize: 13,
-      fontSizeSM: 12,
+      colorPrimary: t.accent,
+      colorPrimaryHover: t.accentHover,
+      colorInfo: t.accent,
+      colorBgBase: t.bgMain,
+      colorBgContainer: t.bgCard,
+      colorBgElevated: t.bgElevated,
+      colorBgSpotlight: isLight ? '#ede9fe' : '#1e2640',
+      colorBgLayout: t.bgMain,
+      colorText: t.textPrimary,
+      colorTextBase: t.textPrimary,
+      colorTextSecondary: t.textSecondary,
+      colorTextTertiary: t.textMuted,
+      colorTextDisabled: t.textDisabled,
+      colorTextPlaceholder: t.textPlaceholder,
+      colorFill: t.bgHover,
+      colorFillSecondary: t.bgActive,
+      colorFillTertiary: 'rgba(255,255,255,0.03)',
+      colorSplit: t.border,
+      colorBorder: t.border,
+      colorBorderSecondary: t.borderSoft,
+      colorSuccess: tokens.semantic.success,
+      colorWarning: tokens.semantic.warning,
+      colorError: tokens.semantic.error,
+      borderRadius: tokens.layout.radiusCard,
+      borderRadiusSM: tokens.layout.radiusButton,
+      borderRadiusLG: tokens.layout.radiusNavActive,
+      fontFamily: tokens.typography.fontSans,
+      fontSize: tokens.typography.fsLabel,
+      fontSizeSM: tokens.typography.fsBody,
       lineHeight: 1.5,
       controlHeight: 32,
       controlHeightSM: 26,
@@ -115,22 +105,22 @@ export default function App() {
       Button: {
         fontWeight: 500,
         paddingInline: 14,
-        borderRadius: 8,
+        borderRadius: tokens.layout.radiusButton,
       },
       Tag: {
-        borderRadiusSM: 4,
+        borderRadiusSM: tokens.layout.radiusBadge,
         fontSizeSM: 11,
       },
       Table: {
-        headerBg: isLight ? '#ede9fe' : '#080d1a',
-        headerColor: isLight ? '#6d28d9' : '#8b949e',
+        headerBg: isLight ? t.bgCard : '#080d1a',
+        headerColor: t.textSecondary,
         headerSplitColor: 'transparent',
-        rowHoverBg: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+        rowHoverBg: t.bgHover,
         cellPaddingBlock: 8,
         cellPaddingInline: 12,
       },
       Modal: {
-        borderRadiusLG: 16,
+        borderRadiusLG: tokens.layout.radiusCard,
         paddingContentHorizontalLG: 24,
       },
       Drawer: {
@@ -141,8 +131,8 @@ export default function App() {
       },
       Menu: {
         itemHeight: 34,
-        itemBorderRadius: 6,
-        subMenuItemBorderRadius: 6,
+        itemBorderRadius: tokens.layout.radiusPill,
+        subMenuItemBorderRadius: tokens.layout.radiusPill,
       },
     },
   };
