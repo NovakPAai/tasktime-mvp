@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { List, Button, Select, Space, Popconfirm, Typography, message, Spin } from 'antd';
+import { List, Button, Select, Space, Popconfirm, Typography, message, Spin, Alert } from 'antd';
 import { PlusOutlined, DeleteOutlined, LinkOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import * as linksApi from '../../api/links';
@@ -40,6 +40,7 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
   const [links, setLinks] = useState<linksApi.IssueLinksResponse>({ outbound: [], inbound: [] });
   const [directionOptions, setDirectionOptions] = useState<DirectionOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -59,6 +60,8 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
         ]);
         setLinks(linksData);
         setDirectionOptions(buildDirectionOptions(typesData));
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить данные связей');
       } finally {
         setLoading(false);
       }
@@ -137,6 +140,7 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
   const totalCount = links.outbound.length + links.inbound.length;
 
   if (loading) return <Spin size="small" />;
+  if (loadError) return <Alert type="error" message="Ошибка загрузки связей" description={loadError} showIcon style={{ marginBottom: 8 }} />;
 
   // Группировка по лейблу направления
   const groupedLinks = (() => {
