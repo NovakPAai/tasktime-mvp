@@ -7,9 +7,9 @@
 import type { IssuePriority } from '../../types';
 
 const PRIORITY_CONFIG: Record<IssuePriority, { label: string; color: string; bg: string }> = {
-  CRITICAL: { label: 'Критический', color: '#e5534b', bg: 'rgba(229,83,75,0.12)' },
-  HIGH:     { label: 'Высокий',     color: '#e8804a', bg: 'rgba(232,128,74,0.12)' },
-  MEDIUM:   { label: 'Средний',     color: '#e8b84a', bg: 'rgba(232,184,74,0.12)' },
+  CRITICAL: { label: 'Критический', color: 'var(--semantic-error)', bg: 'rgba(229, 83, 75, 0.12)' },
+  HIGH:     { label: 'Высокий',     color: 'var(--s-in-progress)', bg: 'rgba(232, 128, 74, 0.12)' },
+  MEDIUM:   { label: 'Средний',     color: 'var(--s-in-progress)', bg: 'rgba(232, 184, 74, 0.12)' },
   LOW:      { label: 'Низкий',      color: 'var(--t3)', bg: 'var(--bg-hover)' },
 };
 

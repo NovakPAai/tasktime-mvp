@@ -31,8 +31,8 @@ const COLUMN_COLORS: Record<IssueStatus, string> = {
 };
 
 const AVATAR_COLORS = [
-  'var(--acc)', '#7c3aed', '#10b981', '#f59e0b',
-  '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899',
+  'var(--acc)', 'var(--s-review)', 'var(--s-done)', 'var(--s-in-progress)',
+  'var(--semantic-error)', 'var(--s-info)', 'var(--s-active)', 'var(--s-accent)',
 ];
 
 function getInitials(name: string): string {
@@ -406,7 +406,7 @@ export default function BoardPage() {
                   key={field.customFieldId}
                   label={
                     <span>
-                      {field.isRequired && <span style={{ color: '#e5534b' }}>* </span>}
+                      {field.isRequired && <span style={{ color: 'var(--semantic-error)' }}>* </span>}
                       {field.name}
                     </span>
                   }

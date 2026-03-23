@@ -55,7 +55,7 @@
 .ant-btn-primary {
   background-color: var(--acc);
   border-color: transparent;
-  color: #ffffff !important;
+  color: var(--t1) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
@@ -688,19 +688,19 @@
 .tt-status-badge--in-progress {
   background: var(--acc-bg);
   border-color: rgba(79, 110, 247, 0.3);
-  color: #93a8fa;
+  color: var(--acc);
 }
 
 .tt-status-badge--review {
   background: rgba(167, 139, 250, 0.14);
   border-color: rgba(167, 139, 250, 0.3);
-  color: #c4b5fd;
+  color: var(--s-review);
 }
 
 .tt-status-badge--done {
   background: rgba(74, 222, 128, 0.12);
   border-color: rgba(74, 222, 128, 0.25);
-  color: #4ade80;
+  color: var(--s-done);
 }
 
 .tt-status-badge--cancelled {
@@ -717,8 +717,8 @@
   white-space: nowrap;
 }
 
-.tt-priority-text--critical { color: #ef4444; }
-.tt-priority-text--high     { color: #f59e0b; }
+.tt-priority-text--critical { color: var(--semantic-error); }
+.tt-priority-text--high     { color: var(--s-in-progress); }
 .tt-priority-text--medium   { color: var(--t3); }
 .tt-priority-text--low      { color: var(--t4); }
 
@@ -779,8 +779,8 @@
 }
 
 /* Stat icon variants */
-.tt-stats-icon--orange { color: #f59e0b !important; }
-.tt-stats-icon--red    { color: #ef4444 !important; }
+.tt-stats-icon--orange { color: var(--s-in-progress) !important; }
+.tt-stats-icon--red    { color: var(--semantic-error) !important; }
 
 /* ── Sidebar user block ─────────────────────────────────────────────────────── */
 
@@ -1147,7 +1147,7 @@
   border-radius: 999px;
   border: 1px solid rgba(123, 134, 255, 0.24);
   background: rgba(123, 134, 255, 0.1);
-  color: #d9ddff;
+  color: var(--t2);
   font-size: var(--fs-xs);
   font-weight: 500;
   white-space: nowrap;
@@ -1477,19 +1477,19 @@
 .tt-sprint-state-pill-planned {
   background: rgba(152, 152, 176, 0.14);
   border-color: rgba(152, 152, 176, 0.32);
-  color: #d5d5eb;
+  color: var(--t2);
 }
 
 .tt-sprint-state-pill-active {
   background: rgba(232, 184, 74, 0.12);
   border-color: rgba(232, 184, 74, 0.38);
-  color: #ffdd8a;
+  color: var(--s-in-progress);
 }
 
 .tt-sprint-state-pill-closed {
   background: rgba(79, 110, 247, 0.16);
   border-color: rgba(79, 110, 247, 0.4);
-  color: #ccd5ff;
+  color: var(--t2);
 }
 
 .tt-sprint-drawer-metrics {
@@ -1603,31 +1603,31 @@
 .tt-sprint-drawer-status-pill-open {
   background: rgba(152, 152, 176, 0.14);
   border-color: rgba(152, 152, 176, 0.3);
-  color: #d5d5eb;
+  color: var(--t2);
 }
 
 .tt-sprint-drawer-status-pill-in_progress {
   background: rgba(232, 184, 74, 0.12);
   border-color: rgba(232, 184, 74, 0.34);
-  color: #ffdd8a;
+  color: var(--s-in-progress);
 }
 
 .tt-sprint-drawer-status-pill-review {
   background: rgba(139, 92, 246, 0.14);
   border-color: rgba(139, 92, 246, 0.3);
-  color: #d9c2ff;
+  color: var(--s-review);
 }
 
 .tt-sprint-drawer-status-pill-done {
   background: rgba(79, 110, 247, 0.16);
   border-color: rgba(79, 110, 247, 0.36);
-  color: #d3d7ff;
+  color: var(--t2);
 }
 
 .tt-sprint-drawer-status-pill-cancelled {
   background: rgba(85, 85, 102, 0.2);
   border-color: rgba(85, 85, 102, 0.32);
-  color: #c4c4d4;
+  color: var(--t2);
 }
 
 .tt-sprint-drawer-type-pill {
@@ -1635,32 +1635,32 @@
 }
 
 .tt-sprint-drawer-type-epic {
-  background: #8b5cf6;
-  border-color: #8b5cf6;
+  background: var(--type-epic);
+  border-color: var(--type-epic);
   color: var(--t1);
 }
 
 .tt-sprint-drawer-type-story {
-  background: #22c55e;
-  border-color: #22c55e;
+  background: var(--s-done);
+  border-color: var(--s-done);
   color: var(--t1);
 }
 
 .tt-sprint-drawer-type-task {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--type-story);
+  border-color: var(--type-story);
   color: var(--t1);
 }
 
 .tt-sprint-drawer-type-subtask {
-  background: #6b7280;
-  border-color: #6b7280;
+  background: var(--type-subtask);
+  border-color: var(--type-subtask);
   color: var(--t1);
 }
 
 .tt-sprint-drawer-type-bug {
-  background: #ef4444;
-  border-color: #ef4444;
+  background: var(--semantic-error);
+  border-color: var(--semantic-error);
   color: var(--t1);
 }
 
@@ -2314,27 +2314,27 @@
 }
 
 .tt-issue-tag-epic {
-  background-color: #8b5cf6;
+  background-color: var(--type-epic);
   color: var(--t1);
 }
 
 .tt-issue-tag-story {
-  background-color: #22c55e;
+  background-color: var(--s-done);
   color: var(--t1);
 }
 
 .tt-issue-tag-task {
-  background-color: #3b82f6;
+  background-color: var(--type-story);
   color: var(--t1);
 }
 
 .tt-issue-tag-subtask {
-  background-color: #6b7280;
+  background-color: var(--type-subtask);
   color: var(--t1);
 }
 
 .tt-issue-tag-bug {
-  background-color: #ef4444;
+  background-color: var(--semantic-error);
   color: var(--t1);
 }
 
@@ -2704,7 +2704,7 @@
 .auth-nebula--1 {
   width: 400px;
   height: 400px;
-  background: #4f35b8;
+  background: var(--type-epic);
   top: -80px;
   left: -80px;
   animation-delay: 0s;
@@ -2713,7 +2713,7 @@
 .auth-nebula--2 {
   width: 350px;
   height: 350px;
-  background: #1a3a6e;
+  background: var(--acc);
   top: 30%;
   right: -60px;
   animation-delay: -4s;
@@ -2722,7 +2722,7 @@
 .auth-nebula--3 {
   width: 300px;
   height: 300px;
-  background: #6b2f7a;
+  background: var(--type-epic);
   bottom: -60px;
   left: 30%;
   animation-delay: -8s;
@@ -2878,7 +2878,7 @@
   font-family: ui-monospace, SF Mono, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
   font-size: var(--fs-xs);
-  color: #6366f1;
+  color: var(--acc);
   padding: 1px 6px 2px;
   border-radius: 999px;
   border: 1px solid rgba(99, 102, 241, 0.25);
@@ -2951,36 +2951,36 @@
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.05);
   background: rgba(0, 0, 0, 0.12);
-  color: #111119;
+  color: var(--bg);
 }
 
 .tt-board-column-chip--open {
   background: rgba(152, 152, 176, 0.15);
-  color: #d5d5eb;
+  color: var(--t2);
   border-color: rgba(152, 152, 176, 0.35);
 }
 
 .tt-board-column-chip--in_progress {
   background: rgba(232, 184, 74, 0.1);
-  color: #ffdd8a;
+  color: var(--s-in-progress);
   border-color: rgba(232, 184, 74, 0.4);
 }
 
 .tt-board-column-chip--review {
   background: rgba(91, 157, 255, 0.12);
-  color: #c2dcff;
+  color: var(--t2);
   border-color: rgba(91, 157, 255, 0.45);
 }
 
 .tt-board-column-chip--done {
   background: rgba(79, 110, 247, 0.18);
-  color: #ccd5ff;
+  color: var(--t2);
   border-color: rgba(79, 110, 247, 0.55);
 }
 
 .tt-board-column-chip--cancelled {
   background: rgba(85, 85, 102, 0.16);
-  color: #bebed1;
+  color: var(--t2);
   border-color: rgba(85, 85, 102, 0.5);
 }
 
@@ -3076,27 +3076,27 @@
 
 .tt-board-status-pill--open {
   border-color: rgba(152, 152, 176, 0.5);
-  color: #d5d5eb;
+  color: var(--t2);
 }
 
 .tt-board-status-pill--in_progress {
   border-color: rgba(232, 184, 74, 0.7);
-  color: #ffdd8a;
+  color: var(--s-in-progress);
 }
 
 .tt-board-status-pill--review {
   border-color: rgba(91, 157, 255, 0.7);
-  color: #c2dcff;
+  color: var(--t2);
 }
 
 .tt-board-status-pill--done {
   border-color: rgba(79, 110, 247, 0.85);
-  color: #d3d7ff;
+  color: var(--t2);
 }
 
 .tt-board-status-pill--cancelled {
   border-color: rgba(85, 85, 102, 0.8);
-  color: #bebed1;
+  color: var(--t2);
 }
 
 .tt-board-card-assignee {
@@ -3116,11 +3116,11 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-.tt-board-col-dot--open       { background: #8b949e; }
+.tt-board-col-dot--open       { background: var(--s-open); }
 .tt-board-col-dot--in-progress { background: var(--acc); }
-.tt-board-col-dot--review     { background: #a78bfa; }
-.tt-board-col-dot--done       { background: #4ade80; }
-.tt-board-col-dot--cancelled  { background: #484f58; }
+.tt-board-col-dot--review     { background: var(--s-review); }
+.tt-board-col-dot--done       { background: var(--s-done); }
+.tt-board-col-dot--cancelled  { background: var(--s-cancelled); }
 .tt-board-col-name {
   font-size: 11px;
   font-weight: 700;
@@ -3692,9 +3692,9 @@
 }
 
 .tt-sprint-info-dot-done        { color: var(--acc); }
-.tt-sprint-info-dot-inprogress  { color: #f59e0b; }
-.tt-sprint-info-dot-review      { color: #5b9dff; }
-.tt-sprint-info-dot-open        { color: #6b7280; }
+.tt-sprint-info-dot-inprogress  { color: var(--s-in-progress); }
+.tt-sprint-info-dot-review      { color: var(--acc); }
+.tt-sprint-info-dot-open        { color: var(--type-subtask); }
 
 /* ===================================================================
    SPRINT ISSUES TABLE (SprintsPage)
@@ -3814,31 +3814,31 @@
 
 .tt-sprint-status-pill-open {
   border-color: rgba(152, 152, 176, 0.5);
-  color: #d5d5eb;
+  color: var(--t2);
   background: rgba(0, 0, 0, 0.2);
 }
 
 .tt-sprint-status-pill-in_progress {
   border-color: rgba(232, 184, 74, 0.7);
-  color: #ffdd8a;
+  color: var(--s-in-progress);
   background: rgba(0, 0, 0, 0.2);
 }
 
 .tt-sprint-status-pill-review {
   border-color: rgba(91, 157, 255, 0.7);
-  color: #c2dcff;
+  color: var(--t2);
   background: rgba(0, 0, 0, 0.2);
 }
 
 .tt-sprint-status-pill-done {
   border-color: rgba(79, 110, 247, 0.85);
-  color: #d3d7ff;
+  color: var(--t2);
   background: rgba(0, 0, 0, 0.2);
 }
 
 .tt-sprint-status-pill-cancelled {
   border-color: rgba(85, 85, 102, 0.8);
-  color: #bebed1;
+  color: var(--t2);
   background: rgba(0, 0, 0, 0.2);
 }
 

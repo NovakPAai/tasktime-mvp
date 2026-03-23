@@ -24,6 +24,7 @@ export const dark = {
   acc:            '#4F6EF7',
   accH:           '#6B85FF',
   accBg:          'rgba(79, 110, 247, 0.12)',
+  semanticError:  '#EF4444',
 } as const;
 
 // ─── Light theme ─────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export const light = {
   acc:            '#4F6EF7',
   accH:           '#3B5FFF',
   accBg:          'rgba(79, 110, 247, 0.10)',
+  semanticError:  '#EF4444',
 } as const;
 
 // ─── Shared scales (Space, Layout, Typography) ───────────────────────────────

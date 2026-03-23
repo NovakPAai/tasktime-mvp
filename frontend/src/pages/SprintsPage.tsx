@@ -40,10 +40,10 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
-  CRITICAL: '#ef4444',
-  HIGH: '#f59e0b',
-  MEDIUM: '#4f6ef7',
-  LOW: '#6b7280',
+  CRITICAL: 'var(--semantic-error)',
+  HIGH: 'var(--s-in-progress)',
+  MEDIUM: 'var(--acc)',
+  LOW: 'var(--t3)',
 };
 
 function getInitials(name: string): string {
@@ -56,8 +56,8 @@ function getInitials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  '#4f6ef7', '#7c3aed', '#10b981', '#f59e0b',
-  '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899',
+  'var(--acc)', 'var(--s-review)', 'var(--s-done)', 'var(--s-in-progress)',
+  'var(--semantic-error)', 'var(--s-info)', 'var(--s-active)', 'var(--s-accent)',
 ];
 
 function avatarColor(name: string): string {
@@ -331,7 +331,7 @@ export default function SprintsPage() {
               <Progress
                 percent={progressPercent}
                 showInfo={false}
-                strokeColor="linear-gradient(90deg, #4f6ef7 0%, #7c3aed 100%)"
+                strokeColor="var(--acc)"
                 trailColor="rgba(255,255,255,0.08)"
                 size="small"
               />

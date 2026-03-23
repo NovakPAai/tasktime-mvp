@@ -151,7 +151,7 @@ function resolveTypeMeta(
       label: typeConfig.name,
     };
   }
-  return { color: '#8C8C8C', icon: <CheckSquareOutlined />, label: 'Unknown' };
+  return { color: 'var(--t3)', icon: <CheckSquareOutlined />, label: 'Unknown' };
 }
 
 /** Бейдж типа задачи (цветной квадрат с иконкой + опциональный лейбл).
@@ -169,7 +169,7 @@ export function IssueTypeBadge({ typeConfig, showLabel = false }: TypeBadgeProps
         height: 18,
         borderRadius: 3,
         background: meta.color,
-        color: '#fff',
+        color: 'var(--t1)',
         fontSize: 11,
         lineHeight: 1,
         flexShrink: 0,
