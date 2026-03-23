@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { request } from './helpers.js';
+import { request, getIssueTypeConfigId } from './helpers.js';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 let adminToken: string;
 let projectId: string;
+let typeConfigIds: Record<string, string>;
 
 beforeEach(async () => {
   await prisma.auditLog.deleteMany();
@@ -25,53 +26,61 @@ beforeEach(async () => {
     .set('Authorization', `Bearer ${adminToken}`)
     .send({ name: 'Test', key: 'TST' });
   projectId = proj.body.id;
+
+  typeConfigIds = {
+    TASK: await getIssueTypeConfigId('TASK'),
+    EPIC: await getIssueTypeConfigId('EPIC'),
+    STORY: await getIssueTypeConfigId('STORY'),
+    SUBTASK: await getIssueTypeConfigId('SUBTASK'),
+    BUG: await getIssueTypeConfigId('BUG'),
+  };
 });
 
 describe('Issues API', () => {
   it('POST /api/projects/:projectId/issues - creates issue', async () => {
     const res = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'First issue', type: 'TASK' });
+      .send({ title: 'First issue', issueTypeConfigId: typeConfigIds.TASK });
     expect(res.status).toBe(201);
     expect(res.body.number).toBe(1);
-    expect(res.body.type).toBe('TASK');
+    expect(res.body.issueTypeConfig.systemKey).toBe('TASK');
   });
 
   it('creates EPIC and STORY hierarchy', async () => {
     const epic = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Epic', type: 'EPIC' });
+      .send({ title: 'Epic', issueTypeConfigId: typeConfigIds.EPIC });
     expect(epic.status).toBe(201);
 
     const story = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Story', type: 'STORY', parentId: epic.body.id });
+      .send({ title: 'Story', issueTypeConfigId: typeConfigIds.STORY, parentId: epic.body.id });
     expect(story.status).toBe(201);
   });
 
   it('rejects invalid hierarchy (EPIC under STORY)', async () => {
     const story = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Story', type: 'STORY' });
+      .send({ title: 'Story', issueTypeConfigId: typeConfigIds.STORY });
 
     const res = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Bad Epic', type: 'EPIC', parentId: story.body.id });
+      .send({ title: 'Bad Epic', issueTypeConfigId: typeConfigIds.EPIC, parentId: story.body.id });
     expect(res.status).toBe(400);
   });
 
   it('rejects SUBTASK under SUBTASK', async () => {
     const task = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Task', type: 'TASK' });
+      .send({ title: 'Task', issueTypeConfigId: typeConfigIds.TASK });
 
     const sub = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Sub', type: 'SUBTASK', parentId: task.body.id });
+      .send({ title: 'Sub', issueTypeConfigId: typeConfigIds.SUBTASK, parentId: task.body.id });
 
     const res = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'SubSub', type: 'SUBTASK', parentId: sub.body.id });
+      .send({ title: 'SubSub', issueTypeConfigId: typeConfigIds.SUBTASK, parentId: sub.body.id });
     expect(res.status).toBe(400);
   });
 
@@ -95,7 +104,7 @@ describe('Issues API', () => {
       .send({ title: 'Open task', status: 'OPEN' });
     const doneIssue = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Done bug', type: 'BUG' });
+      .send({ title: 'Done bug', issueTypeConfigId: typeConfigIds.BUG });
 
     // Move second issue to DONE status via dedicated status endpoint
     await request
@@ -133,7 +142,7 @@ describe('Issues API', () => {
   it('GET /api/issues/:id - returns issue detail', async () => {
     const create = await request.post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: 'Detail Test', type: 'EPIC' });
+      .send({ title: 'Detail Test', issueTypeConfigId: typeConfigIds.EPIC });
 
     const res = await request.get(`/api/issues/${create.body.id}`)
       .set('Authorization', `Bearer ${adminToken}`);

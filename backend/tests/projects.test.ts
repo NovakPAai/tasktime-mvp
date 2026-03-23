@@ -110,7 +110,6 @@ describe('Projects API', () => {
         projectId,
         number: 1,
         title: 'Issue 1',
-        type: 'TASK',
         status: 'OPEN',
         priority: 'MEDIUM',
         creatorId: (await prisma.user.findFirstOrThrow({ where: { email: 'admin@test.com' } })).id,

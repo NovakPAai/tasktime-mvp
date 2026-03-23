@@ -188,7 +188,6 @@ model Issue {
   number      Int
   title       String
   description String?
-  type        IssueType?    @default(TASK)
   issueTypeConfigId String? @map("issue_type_config_id")
   status      IssueStatus   @default(OPEN)
   priority    IssuePriority @default(MEDIUM)
@@ -213,6 +212,7 @@ model Issue {
   release   Release? @relation(fields: [releaseId], references: [id])
 
   estimatedHours      Decimal? @map("estimated_hours") @db.Decimal(6, 2)
+  dueDate             DateTime? @map("due_date") @db.Date
   acceptanceCriteria  String?  @map("acceptance_criteria")
   aiReasoning         String?  @map("ai_reasoning")
 
@@ -236,16 +236,11 @@ model Issue {
   @@index([sprintId])
   @@index([releaseId])
   @@index([issueTypeConfigId])
+  @@index([dueDate])
   @@map("issues")
 }
 
-enum IssueType {
-  EPIC
-  STORY
-  TASK
-  SUBTASK
-  BUG
-}
+
 
 enum IssueStatus {
   OPEN

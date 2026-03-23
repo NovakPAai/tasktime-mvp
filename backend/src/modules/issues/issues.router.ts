@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { IssuePriority, IssueStatus, IssueType } from '@prisma/client';
+import type { IssuePriority, IssueStatus } from '@prisma/client';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
@@ -38,9 +38,8 @@ router.get('/issues/search', async (req, res, next) => {
 // List issues for a project with filters
 router.get('/projects/:projectId/issues', async (req, res, next) => {
   try {
-    const { status, type, issueTypeConfigId, priority, assigneeId, sprintId, from, to, search, includeKanbanFields } = req.query as {
+    const { status, issueTypeConfigId, priority, assigneeId, sprintId, from, to, search, includeKanbanFields } = req.query as {
       status?: string | string[];
-      type?: string | string[];
       issueTypeConfigId?: string | string[];
       priority?: string | string[];
       assigneeId?: string;
@@ -56,7 +55,6 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
 
     const issues = await issuesService.listIssues(req.params.projectId as string, {
       status: toArray(status) as IssueStatus[] | undefined,
-      type: toArray(type) as IssueType[] | undefined,
       issueTypeConfigId: toArray(issueTypeConfigId),
       priority: toArray(priority) as IssuePriority[] | undefined,
       assigneeId,

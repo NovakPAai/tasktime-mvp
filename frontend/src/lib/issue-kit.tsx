@@ -12,7 +12,7 @@ import {
   DatabaseOutlined, CloudOutlined, CodeOutlined, SafetyOutlined,
   ExperimentOutlined, CompassOutlined, AimOutlined,
 } from '@ant-design/icons';
-import type { IssueStatus, IssuePriority, IssueType, IssueTypeConfig } from '../types';
+import type { IssueStatus, IssuePriority, IssueTypeConfig } from '../types';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   ThunderboltOutlined:  <ThunderboltOutlined />,
@@ -95,39 +95,10 @@ export const PRIORITY_DOT: Record<IssuePriority, string> = {
 
 // ─── Типы задач ───────────────────────────────────────────────────────────────
 
-export const TYPE_LABEL: Record<IssueType, string> = {
-  EPIC:    'Эпик',
-  STORY:   'История',
-  TASK:    'Задача',
-  SUBTASK: 'Подзадача',
-  BUG:     'Баг',
-};
 
-export const TYPE_COLOR: Record<IssueType, string> = {
-  EPIC:    '#8b5cf6',
-  STORY:   '#3b82f6',
-  TASK:    '#5e6ad2',
-  SUBTASK: '#6b7280',
-  BUG:     '#e5534b',
-};
 
 /** Буква-иконка типа задачи (fallback для системных типов без iconName) */
-export const TYPE_LETTER: Record<IssueType, string> = {
-  EPIC:    'E',
-  STORY:   'S',
-  TASK:    'T',
-  SUBTASK: '↳',
-  BUG:     'B',
-};
 
-/** Иконка Ant Design для системных типов */
-const TYPE_ICON: Record<IssueType, React.ReactNode> = {
-  EPIC:    <ThunderboltOutlined />,
-  STORY:   <BookOutlined />,
-  TASK:    <CheckSquareOutlined />,
-  SUBTASK: <MinusSquareOutlined />,
-  BUG:     <BugOutlined />,
-};
 
 // ─── Компоненты ───────────────────────────────────────────────────────────────
 
@@ -166,13 +137,11 @@ export function IssuePriorityTag({ priority, size = 'default' }: PriorityTagProp
 }
 
 interface TypeBadgeProps {
-  type: IssueType | null;
   typeConfig?: IssueTypeConfig | null;
   showLabel?: boolean;
 }
 
 function resolveTypeMeta(
-  type: IssueType | null,
   typeConfig?: IssueTypeConfig | null,
 ): { color: string; icon: React.ReactNode; label: string } {
   if (typeConfig) {
@@ -182,20 +151,13 @@ function resolveTypeMeta(
       label: typeConfig.name,
     };
   }
-  if (type) {
-    return {
-      color: TYPE_COLOR[type],
-      icon: TYPE_ICON[type],
-      label: TYPE_LABEL[type],
-    };
-  }
   return { color: '#8C8C8C', icon: <CheckSquareOutlined />, label: 'Unknown' };
 }
 
 /** Бейдж типа задачи (цветной квадрат с иконкой + опциональный лейбл).
  *  Приоритет: typeConfig > type (enum fallback) */
-export function IssueTypeBadge({ type, typeConfig, showLabel = false }: TypeBadgeProps) {
-  const meta = resolveTypeMeta(type, typeConfig);
+export function IssueTypeBadge({ typeConfig, showLabel = false }: TypeBadgeProps) {
+  const meta = resolveTypeMeta(typeConfig);
 
   const badge = (
     <span

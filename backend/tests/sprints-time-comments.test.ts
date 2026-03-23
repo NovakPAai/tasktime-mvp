@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { request } from './helpers.js';
+import { request, getIssueTypeConfigId } from './helpers.js';
 
 const prisma = new PrismaClient();
 
@@ -57,9 +57,10 @@ beforeEach(async () => {
     .send({ name: 'Sprint Project', key: 'SPR' });
   projectId = proj.body.id;
 
+  const taskConfigId = await getIssueTypeConfigId('TASK');
   const issue = await request.post(`/api/projects/${projectId}/issues`)
     .set('Authorization', `Bearer ${adminToken}`)
-    .send({ title: 'Issue for sprint', type: 'TASK' });
+    .send({ title: 'Issue for sprint', issueTypeConfigId: taskConfigId });
   issueId = issue.body.id;
 });
 
@@ -113,7 +114,6 @@ describe('Sprint 2 APIs: sprints, time, comments, history', () => {
       id: issueId,
       projectId,
       title: 'Issue for sprint',
-      type: 'TASK',
       status: 'OPEN',
       priority: 'MEDIUM',
       project: {

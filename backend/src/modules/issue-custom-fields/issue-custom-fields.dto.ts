@@ -1,15 +1,9 @@
 import { z } from 'zod';
 
-// A single field value — value is stored as { v: ... }
+// A single field value — plain value on the API surface; { v: ... } wrapper is a storage detail
 const fieldValueSchema = z.object({
   customFieldId: z.string().uuid(),
-  value: z.union([
-    z.object({ v: z.string() }),
-    z.object({ v: z.number() }),
-    z.object({ v: z.boolean() }),
-    z.object({ v: z.array(z.string()) }),
-    z.object({ v: z.null() }),
-  ]),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]),
 });
 
 export const upsertCustomFieldValuesDto = z.object({

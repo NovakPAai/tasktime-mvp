@@ -12,15 +12,39 @@ interface Props {
   readonly?: boolean;
 }
 
+interface DirectionOption {
+  value: string; // `${typeId}:outbound` | `${typeId}:inbound`
+  label: string;
+}
+
+function buildDirectionOptions(linkTypes: IssueLinkType[]): DirectionOption[] {
+  const options: DirectionOption[] = [];
+  for (const t of linkTypes) {
+    options.push({ value: `${t.id}:outbound`, label: t.outboundName });
+    if (t.inboundName !== t.outboundName) {
+      options.push({ value: `${t.id}:inbound`, label: t.inboundName });
+    }
+  }
+  return options;
+}
+
+function parseDirection(value: string): { linkTypeId: string; direction: 'outbound' | 'inbound' } {
+  const idx = value.lastIndexOf(':');
+  return {
+    linkTypeId: value.slice(0, idx),
+    direction: value.slice(idx + 1) as 'outbound' | 'inbound',
+  };
+}
+
 export default function IssueLinksSection({ issueId, readonly = false }: Props) {
   const [links, setLinks] = useState<linksApi.IssueLinksResponse>({ outbound: [], inbound: [] });
-  const [linkTypes, setLinkTypes] = useState<IssueLinkType[]>([]);
+  const [directionOptions, setDirectionOptions] = useState<DirectionOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Form state
-  const [selectedLinkTypeId, setSelectedLinkTypeId] = useState<string | undefined>();
+  const [selectedDirection, setSelectedDirection] = useState<string | undefined>();
   const [targetSearch, setTargetSearch] = useState('');
   const [searchResults, setSearchResults] = useState<{ value: string; label: string }[]>([]);
   const [selectedTargetId, setSelectedTargetId] = useState<string | undefined>();
@@ -31,10 +55,10 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
       try {
         const [linksData, typesData] = await Promise.all([
           linksApi.getIssueLinks(issueId),
-          linksApi.listLinkTypes(),
+          linksApi.listActiveLinkTypes(),
         ]);
         setLinks(linksData);
-        setLinkTypes(typesData);
+        setDirectionOptions(buildDirectionOptions(typesData));
       } finally {
         setLoading(false);
       }
@@ -62,20 +86,30 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
     }
   };
 
+  const reloadLinks = async () => {
+    const linksData = await linksApi.getIssueLinks(issueId);
+    setLinks(linksData);
+  };
+
   const handleAdd = async () => {
-    if (!selectedLinkTypeId || !selectedTargetId) {
-      void message.warning('Выберите тип связи и задачу');
+    if (!selectedDirection || !selectedTargetId) {
+      void message.warning('Выберите направление связи и задачу');
       return;
     }
     setSaving(true);
     try {
-      const link = await linksApi.createIssueLink(issueId, {
-        targetIssueId: selectedTargetId,
-        linkTypeId: selectedLinkTypeId,
-      });
-      setLinks((prev) => ({ ...prev, outbound: [...prev.outbound, link] }));
+      const { linkTypeId, direction } = parseDirection(selectedDirection);
+
+      if (direction === 'outbound') {
+        await linksApi.createIssueLink(issueId, { targetIssueId: selectedTargetId, linkTypeId });
+      } else {
+        // inbound: текущая задача — цель, выбранная задача — источник
+        await linksApi.createIssueLink(selectedTargetId, { targetIssueId: issueId, linkTypeId });
+      }
+
+      await reloadLinks();
       setAdding(false);
-      setSelectedLinkTypeId(undefined);
+      setSelectedDirection(undefined);
       setSelectedTargetId(undefined);
       setTargetSearch('');
       setSearchResults([]);
@@ -104,14 +138,29 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
 
   if (loading) return <Spin size="small" />;
 
+  // Группировка по лейблу направления
+  const groupedLinks = (() => {
+    const map = new Map<string, { link: IssueLink; direction: 'outbound' | 'inbound' }[]>();
+    for (const link of links.outbound) {
+      const label = link.linkType.outboundName;
+      if (!map.has(label)) map.set(label, []);
+      map.get(label)!.push({ link, direction: 'outbound' });
+    }
+    for (const link of links.inbound) {
+      const label = link.linkType.inboundName;
+      if (!map.has(label)) map.set(label, []);
+      map.get(label)!.push({ link, direction: 'inbound' });
+    }
+    return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
+  })();
+
   const renderLinkItem = (link: IssueLink, direction: 'outbound' | 'inbound') => {
     const relatedIssue = direction === 'outbound' ? link.targetIssue : link.sourceIssue;
-    const relationLabel = direction === 'outbound' ? link.linkType.outboundName : link.linkType.inboundName;
 
     return (
       <List.Item
         key={link.id}
-        style={{ paddingInline: 0, paddingBlock: 6 }}
+        style={{ paddingInline: 0, paddingBlock: 4 }}
         actions={
           readonly
             ? []
@@ -127,10 +176,7 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
         }
       >
         <Space size={6} wrap>
-          <Typography.Text type="secondary" style={{ fontSize: 12, minWidth: 90, display: 'inline-block' }}>
-            {relationLabel}
-          </Typography.Text>
-          <IssueTypeBadge type={relatedIssue.type} typeConfig={relatedIssue.issueTypeConfig} showLabel />
+          <IssueTypeBadge typeConfig={relatedIssue.issueTypeConfig} showLabel />
           <IssueStatusTag status={relatedIssue.status} size="small" />
           <Link to={`/issues/${relatedIssue.id}`} style={{ fontSize: 13 }}>
             {relatedIssue.project.key}-{relatedIssue.number}: {relatedIssue.title}
@@ -168,12 +214,12 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
           }}
         >
           <Select
-            placeholder="Тип связи"
-            style={{ minWidth: 150 }}
+            placeholder="Направление связи"
+            style={{ minWidth: 170 }}
             size="small"
-            value={selectedLinkTypeId}
-            onChange={setSelectedLinkTypeId}
-            options={linkTypes.map((t) => ({ value: t.id, label: t.outboundName }))}
+            value={selectedDirection}
+            onChange={setSelectedDirection}
+            options={directionOptions}
           />
           <Select
             showSearch
@@ -202,14 +248,18 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
           Связей нет
         </Typography.Text>
       ) : (
-        <List
-          size="small"
-          dataSource={[
-            ...links.outbound.map((l) => ({ link: l, direction: 'outbound' as const })),
-            ...links.inbound.map((l) => ({ link: l, direction: 'inbound' as const })),
-          ]}
-          renderItem={({ link, direction }) => renderLinkItem(link, direction)}
-        />
+        groupedLinks.map(({ label, items }) => (
+          <div key={label} style={{ marginBottom: 8 }}>
+            <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {label}
+            </Typography.Text>
+            <List
+              size="small"
+              dataSource={items}
+              renderItem={({ link, direction }) => renderLinkItem(link, direction)}
+            />
+          </div>
+        ))
       )}
     </section>
   );

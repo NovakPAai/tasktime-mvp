@@ -1,7 +1,6 @@
 import api from './client';
 import type {
   Issue,
-  IssueType,
   IssuePriority,
   IssueStatus,
   AiAssigneeType,
@@ -10,7 +9,6 @@ import type {
 
 export interface IssueFilters {
   status?: IssueStatus[];
-  type?: IssueType[];
   issueTypeConfigId?: string[];
   priority?: IssuePriority[];
   assigneeId?: string;
@@ -24,7 +22,6 @@ export async function listIssues(projectId: string, filters?: IssueFilters): Pro
   const { data } = await api.get<Issue[]>(`/projects/${projectId}/issues`, {
     params: {
       ...(filters?.status && { status: filters.status.join(',') }),
-      ...(filters?.type && { type: filters.type.join(',') }),
       ...(filters?.issueTypeConfigId && filters.issueTypeConfigId.length > 0 && { issueTypeConfigId: filters.issueTypeConfigId.join(',') }),
       ...(filters?.priority && { priority: filters.priority.join(',') }),
       ...(filters?.assigneeId && { assigneeId: filters.assigneeId }),
@@ -61,11 +58,11 @@ export interface CreateIssueBody {
   title: string;
   description?: string;
   acceptanceCriteria?: string;
-  type?: IssueType;
   issueTypeConfigId?: string;
   priority?: IssuePriority;
   parentId?: string;
   assigneeId?: string;
+  dueDate?: string | null;
 }
 
 export async function createIssue(projectId: string, body: CreateIssueBody): Promise<Issue> {
@@ -130,7 +127,6 @@ export interface IssueSearchResult {
   id: string;
   number: number;
   title: string;
-  type: IssueType;
   status: IssueStatus;
   project: { key: string };
 }

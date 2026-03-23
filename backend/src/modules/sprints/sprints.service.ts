@@ -59,7 +59,7 @@ export async function getSprintIssues(id: string) {
           number: true,
           title: true,
           estimatedHours: true,
-          type: true,
+          issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconName: true, iconColor: true } },
           status: true,
           priority: true,
           updatedAt: true,
@@ -81,7 +81,10 @@ export async function getSprintIssues(id: string) {
 
   return {
     sprint: mappedSprint,
-    issues: sprint.issues,
+    issues: sprint.issues.map((issue) => ({
+      ...issue,
+      type: issue.issueTypeConfig?.systemKey ?? null,
+    })),
   };
 }
 
@@ -163,6 +166,7 @@ export async function getBacklog(projectId: string) {
     where: { projectId, sprintId: null },
     include: {
       assignee: { select: { id: true, name: true } },
+      issueTypeConfig: true,
       _count: { select: { children: true } },
     },
     orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],

@@ -130,7 +130,7 @@ export default function SprintIssuesDrawer({ open, sprintId, onClose }: SprintIs
       title: 'Тип',
       dataIndex: 'type',
       width: 110,
-      render: (_value: Issue['type'], record: Issue) => <IssueTypeBadge type={record.type} typeConfig={record.issueTypeConfig} showLabel />,
+      render: (_: unknown, record: Issue) => <IssueTypeBadge typeConfig={record.issueTypeConfig} showLabel />,
     },
     {
       title: 'Статус',

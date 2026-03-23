@@ -78,7 +78,7 @@ export async function getProjectDashboard(projectId: string) {
         where: { projectId },
       }),
       prisma.issue.groupBy({
-        by: ['type'],
+        by: ['issueTypeConfigId'],
         _count: { _all: true },
         where: { projectId },
       }),

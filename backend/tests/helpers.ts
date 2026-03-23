@@ -72,3 +72,18 @@ export function signSuperAdminToken(user: { id: string; email: string }) {
     role: 'SUPER_ADMIN',
   });
 }
+
+/**
+ * Returns the IssueTypeConfig ID for a given systemKey (e.g. 'TASK', 'EPIC').
+ * These configs are seeded by migration and persist across test runs.
+ */
+export async function getIssueTypeConfigId(systemKey: string): Promise<string> {
+  const { PrismaClient } = await import('@prisma/client');
+  const prisma = new PrismaClient();
+  try {
+    const config = await prisma.issueTypeConfig.findUniqueOrThrow({ where: { systemKey } });
+    return config.id;
+  } finally {
+    await prisma.$disconnect();
+  }
+}

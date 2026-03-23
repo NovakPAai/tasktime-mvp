@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { request, createAdminUser, createManagerUser } from './helpers.js';
+import { request, createAdminUser, createManagerUser, getIssueTypeConfigId } from './helpers.js';
 
 const prisma = new PrismaClient();
 
 let adminToken: string;
 let managerToken: string;
+let typeConfigIds: Record<string, string>;
 
 beforeEach(async () => {
   await prisma.auditLog.deleteMany();
@@ -24,6 +25,11 @@ beforeEach(async () => {
 
   const manager = await createManagerUser();
   managerToken = manager.accessToken;
+
+  typeConfigIds = {
+    EPIC: await getIssueTypeConfigId('EPIC'),
+    TASK: await getIssueTypeConfigId('TASK'),
+  };
 });
 
 describe('E2E main flows', () => {
@@ -56,13 +62,13 @@ describe('E2E main flows', () => {
     const epicRes = await request
       .post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${managerToken}`)
-      .send({ title: 'E2E Epic', type: 'EPIC' });
+      .send({ title: 'E2E Epic', issueTypeConfigId: typeConfigIds.EPIC });
     expect(epicRes.status).toBe(201);
 
     const taskRes = await request
       .post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${managerToken}`)
-      .send({ title: 'E2E Task', type: 'TASK', parentId: epicRes.body.id });
+      .send({ title: 'E2E Task', issueTypeConfigId: typeConfigIds.TASK, parentId: epicRes.body.id });
     expect(taskRes.status).toBe(201);
     const issueId = taskRes.body.id as string;
 

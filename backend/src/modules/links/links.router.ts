@@ -43,6 +43,18 @@ router.delete('/issues/:id/links/:linkId', async (req: AuthRequest, res, next) =
   }
 });
 
+// ===== Link Types =====
+
+// GET /link-types — список активных типов связей (для всех авторизованных)
+router.get('/link-types', async (req, res, next) => {
+  try {
+    const types = await linksService.listLinkTypes(false);
+    res.json(types);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ===== Link Types (Admin) =====
 
 // GET /admin/link-types — список всех типов связей
