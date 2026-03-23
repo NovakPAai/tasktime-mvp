@@ -8,10 +8,10 @@ const LINK_SELECT = {
     select: { id: true, name: true, outboundName: true, inboundName: true },
   },
   sourceIssue: {
-    select: { id: true, number: true, title: true, type: true, status: true, issueTypeConfig: true, project: { select: { key: true } } },
+    select: { id: true, number: true, title: true, status: true, issueTypeConfig: true, project: { select: { key: true } } },
   },
   targetIssue: {
-    select: { id: true, number: true, title: true, type: true, status: true, issueTypeConfig: true, project: { select: { key: true } } },
+    select: { id: true, number: true, title: true, status: true, issueTypeConfig: true, project: { select: { key: true } } },
   },
   createdBy: { select: { id: true, name: true } },
 };
