@@ -2,7 +2,19 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 1.3**
+**Last version: 1.4**
+
+---
+
+## [1.4] [2026-03-23] fix(sprints): добавление задач в активный спринт + колонка ТИП
+
+**Задача:** [TTMP-145](http://5.129.242.171/projects/bb450f20-798e-4e23-a69f-7d57f545ed98/sprints)
+**PR:** [#122](https://github.com/jackrescuer-gif/tasktime-mvp/pull/122)
+**Ветка:** `claude/jack-ttmp-145-sprint-add-from-backlog`
+
+### Что изменилось
+- `SprintsPage.tsx` — кнопка «Добавить из бэклога» теперь открывает `SprintPlanningDrawer` (выбор задач из бэклога) вместо `SprintIssuesDrawer` (просмотр задач спринта); компонент `SprintPlanningDrawer` уже существовал, но не был подключён
+- `SprintsPage.tsx` — добавлена колонка «ТИП» с `IssueTypeBadge` в таблицу задач спринта; `colSpan` empty-state обновлён с 6 до 7
 
 ---
 

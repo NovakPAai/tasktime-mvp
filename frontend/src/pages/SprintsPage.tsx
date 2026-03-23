@@ -13,6 +13,8 @@ import * as teamsApi from '../api/teams';
 import { useAuthStore } from '../store/auth.store';
 import type { Sprint, Issue, SprintState, Team, Project } from '../types';
 import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
+import SprintPlanningDrawer from '../components/sprints/SprintPlanningDrawer';
+import { IssueTypeBadge } from '../lib/issue-kit';
 import { hasAnyRequiredRole } from '../lib/roles';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -98,6 +100,7 @@ export default function SprintsPage() {
   const [selectedBacklog, setSelectedBacklog] = useState<string[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [planningOpen, setPlanningOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState<StateFilter>('ACTIVE');
   const [teams, setTeams] = useState<Team[]>([]);
   const [form] = Form.useForm();
@@ -369,7 +372,7 @@ export default function SprintsPage() {
                   size="small"
                   icon={<PlusOutlined />}
                   type="primary"
-                  onClick={() => setDetailsOpen(true)}
+                  onClick={() => setPlanningOpen(true)}
                 >
                   Добавить из бэклога
                 </Button>
@@ -381,6 +384,7 @@ export default function SprintsPage() {
             <thead>
               <tr>
                 <th className="tt-sprint-th">КЛЮЧ</th>
+                <th className="tt-sprint-th">ТИП</th>
                 <th className="tt-sprint-th">ЗАДАЧА</th>
                 <th className="tt-sprint-th">СТАТУС</th>
                 <th className="tt-sprint-th">ПРИОРИТЕТ</th>
@@ -391,7 +395,7 @@ export default function SprintsPage() {
             <tbody>
               {sprintIssues.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="tt-sprint-issues-empty">
+                  <td colSpan={7} className="tt-sprint-issues-empty">
                     В спринте нет задач
                   </td>
                 </tr>
@@ -407,6 +411,9 @@ export default function SprintsPage() {
                         >
                           {issue.project?.key ?? ''}-{issue.number}
                         </Link>
+                      </td>
+                      <td className="tt-sprint-td">
+                        <IssueTypeBadge typeConfig={issue.issueTypeConfig} />
                       </td>
                       <td className="tt-sprint-td tt-sprint-td-title">
                         <Link to={`/issues/${issue.id}`} className="tt-sprint-issue-title">
@@ -501,6 +508,19 @@ export default function SprintsPage() {
         open={detailsOpen}
         sprintId={selectedSprintId}
         onClose={() => setDetailsOpen(false)}
+      />
+
+      <SprintPlanningDrawer
+        open={planningOpen}
+        sprintId={selectedSprintId}
+        projectId={projectId ?? null}
+        onClose={() => setPlanningOpen(false)}
+        onAdded={() => {
+          void load();
+          if (selectedSprintId) {
+            void sprintsApi.getSprintIssues(selectedSprintId).then((res) => setSprintIssues(res.issues));
+          }
+        }}
       />
     </div>
   );
