@@ -14,7 +14,7 @@ import { useAuthStore } from '../store/auth.store';
 import type { Sprint, Issue, SprintState, Team, Project } from '../types';
 import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
 import SprintPlanningDrawer from '../components/sprints/SprintPlanningDrawer';
-import { IssueTypeBadge } from '../lib/issue-kit';
+import { IssueTypeBadge, IssueStatusTag } from '../lib/issue-kit';
 import { hasAnyRequiredRole } from '../lib/roles';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -25,21 +25,6 @@ const STATE_TONE_CLASS: Record<SprintState, string> = {
   CLOSED: 'closed',
 };
 
-const STATUS_LABEL_RU: Record<string, string> = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'Ревью',
-  DONE: 'Готово',
-  CANCELLED: 'Отменена',
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  OPEN: 'open',
-  IN_PROGRESS: 'in_progress',
-  REVIEW: 'review',
-  DONE: 'done',
-  CANCELLED: 'cancelled',
-};
 
 const PRIORITY_COLOR: Record<string, string> = {
   CRITICAL: 'var(--semantic-error)',
@@ -421,9 +406,7 @@ export default function SprintsPage() {
                         </Link>
                       </td>
                       <td className="tt-sprint-td">
-                        <span className={`tt-sprint-status-pill tt-sprint-status-pill-${STATUS_CLASS[issue.status] ?? 'open'}`}>
-                          {STATUS_LABEL_RU[issue.status] ?? issue.status}
-                        </span>
+                        <IssueStatusTag status={issue.status} size="small" />
                       </td>
                       <td className="tt-sprint-td">
                         <span
