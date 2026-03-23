@@ -163,7 +163,7 @@ export default function ProjectDetailPage() {
       title: 'TYPE',
       width: 160,
       render: (_: unknown, r: Issue) => (
-        <IssueTypeBadge typeConfig={r.issueTypeConfig} showLabel />
+        <IssueTypeBadge type={r.type} typeConfig={r.issueTypeConfig} showLabel />
       ),
     },
     {
