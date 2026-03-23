@@ -3,14 +3,14 @@
  * 
  * ВАЖНО: Имена ключей в объектах (dark, light, layout, typography) 
  * должны СТРОГО соответствовать именам в CSS (после kebab-case).
- * Например: bgSb -> --bg-sb, space5 -> --space-5
  */
 
-// ─── Dark theme (Synchronized with Paper) ───────────────────────────────────
+// ─── Dark theme ───────────────────────────────────────────────────────────────
 export const dark = {
   bg:             '#080B14',
   bgSb:           '#0F1320',
   bgEl:           '#161B22',
+  bgInput:        '#0D1117', // --bg-input
   bgHover:        'rgba(255, 255, 255, 0.04)',
   bgActive:       'rgba(255, 255, 255, 0.06)',
   bgSel:          'rgba(79, 110, 247, 0.12)',
@@ -26,11 +26,12 @@ export const dark = {
   accBg:          'rgba(79, 110, 247, 0.12)',
 } as const;
 
-// ─── Light theme (Synchronized with Paper) ──────────────────────────────────
+// ─── Light theme ─────────────────────────────────────────────────────────────
 export const light = {
   bg:             '#FFFFFF',
   bgSb:           '#F6F8FA',
   bgEl:           '#FFFFFF',
+  bgInput:        '#FFFFFF',
   bgHover:        'rgba(0, 0, 0, 0.04)',
   bgActive:       'rgba(0, 0, 0, 0.06)',
   bgSel:          'rgba(79, 110, 247, 0.10)',
@@ -46,7 +47,7 @@ export const light = {
   accBg:          'rgba(79, 110, 247, 0.10)',
 } as const;
 
-// ─── Status colors (Neutralized according to Paper) ──────────────────────────
+// ─── Shared scales (Space, Layout, Typography) ───────────────────────────────
 export const status = {
   done:       '#4ADE80',
   inProgress: '#F59E0B',
@@ -55,7 +56,6 @@ export const status = {
   cancelled:  '#484F58',
 } as const;
 
-// ─── Issue type colors ───────────────────────────────────────────────────────
 export const issueType = {
   epic:    '#A855F7',
   story:   '#3B82F6',
@@ -64,7 +64,6 @@ export const issueType = {
   bug:     '#EF4444',
 } as const;
 
-// ─── Semantic ────────────────────────────────────────────────────────────────
 export const semantic = {
   success: '#4ADE80',
   warning: '#F59E0B',
@@ -72,42 +71,38 @@ export const semantic = {
   info:    '#4F6EF7',
 } as const;
 
-// ─── Layout & Spacing (Mapping to CSS variables) ─────────────────────────────
 export const layout = {
-  sidebarWidth:  210,  // --sidebar-width
-  topbarHeight:  38,   // --topbar-height
-  pagePadding:   24,   // --page-padding
+  sidebarWidth:  210,
+  topbarHeight:  38,
+  pagePadding:   24,
   cardGap:       16,
   elementGap:    8,
-  r:             12,   // --r
-  r2:            8,    // --r2
-  r3:            6,    // --r3
+  r:             12,
+  r2:            8,
+  r3:            6,
   rBadge:        3,
   rActive:       20,
-  // Шкала отступов (обязательно!)
-  space1:        2,    // --space-1
-  space2:        4,    // --space-2
-  space3:        6,    // --space-3
-  space4:        8,    // --space-4
-  space5:        12,   // --space-5
-  space6:        16,   // --space-6
-  space7:        20,   // --space-7
-  space8:        24,   // --space-8
+  space1:        2,
+  space2:        4,
+  space3:        6,
+  space4:        8,
+  space5:        12,
+  space6:        16,
+  space7:        20,
+  space8:        24,
 } as const;
 
-// ─── Typography (Mapping to CSS variables) ───────────────────────────────────
 export const typography = {
-  fontDisplay: "'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif",
-  fontSans:    "'Inter', -apple-system, system-ui, sans-serif",
+  fontDisplay: "'Space Grotesk', 'Inter', system-ui, sans-serif",
+  fontSans:    "'Inter', system-ui, sans-serif",
   fontMono:    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  // Шкала размеров шрифтов
-  fsXs:        12,   // --fs-xs
-  fsSm:        13,   // --fs-sm
-  fsMd:        14,   // --fs-md
-  fsLg:        15,   // --fs-lg
-  fsXl:        18,   // --fs-xl
-  fs2xl:       24,   // --fs-2xl
-  lhTight:     1.3,  // --lh-tight
-  lhNormal:    1.5,  // --lh-normal
-  lhRelaxed:   1.6,  // --lh-relaxed
+  fsXs:        12,
+  fsSm:        13,
+  fsMd:        14,
+  fsLg:        15,
+  fsXl:        18,
+  fs2xl:       24,
+  lhTight:     1.3,
+  lhNormal:    1.5,
+  lhRelaxed:   1.6,
 } as const;

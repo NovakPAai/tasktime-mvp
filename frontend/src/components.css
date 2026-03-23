@@ -34,7 +34,7 @@
 .ant-input-textarea,
 .ant-select-selector {
   background-color: var(--bg-input) !important;
-  border-color: var(--b2) !important;
+  border: 1px solid var(--b2) !important;
   color: var(--t1) !important;
 }
 
@@ -55,10 +55,8 @@
 .ant-btn-primary {
   background-color: var(--acc);
   border-color: transparent;
-  color: var(--bg);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 6px 18px rgba(0, 0, 0, 0.6);
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .ant-btn-primary:hover,

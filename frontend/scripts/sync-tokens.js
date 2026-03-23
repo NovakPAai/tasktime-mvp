@@ -21,12 +21,13 @@ function parseTokens() {
     if (!sectionMatch) return;
     const lines = sectionMatch[1].split('\n');
     lines.forEach(line => {
-      // Поддержка одинарных кавычек для шрифтов
-      const m = line.match(/^\s*(\w+):\s*['"](.*?)['"]/);
-      if (m) { tokens[section][m[1]] = m[2]; return; }
-      
-      const numM = line.match(/^\s*(\w+):\s*(\d+(\.\d+)?)/);
-      if (numM) tokens[section][numM[1]] = numM[2];
+      // Ищем ключи и значения (строки или числа)
+      const m = line.match(/^\s*(\w+):\s*(.*?),?$/);
+      if (m) {
+        let val = m[2].trim().replace(/['"]/g, ''); // Убираем кавычки
+        if (val.endsWith(',')) val = val.slice(0, -1);
+        tokens[section][m[1]] = val;
+      }
     });
   };
 
@@ -47,12 +48,16 @@ function generateCSS() {
   Object.entries(tokens.dark).forEach(([k, v]) => css += `  --${toKebab(k)}: ${v};\n`);
   Object.entries(tokens.status).forEach(([k, v]) => css += `  --s-${toKebab(k)}: ${v};\n`);
   Object.entries(tokens.issueType).forEach(([k, v]) => css += `  --type-${toKebab(k)}: ${v};\n`);
+  
   Object.entries(tokens.layout).forEach(([k, v]) => {
     const unit = isNaN(v) ? '' : 'px';
     css += `  --${toKebab(k)}: ${v}${unit};\n`;
   });
+
   Object.entries(tokens.typography).forEach(([k, v]) => {
-    const unit = (isNaN(v) || k.startsWith('lh') || k.startsWith('font')) ? '' : 'px';
+    const isLh = k.toLowerCase().includes('lh');
+    const isFont = k.toLowerCase().includes('font');
+    const unit = (isNaN(v) || isLh || isFont) ? '' : 'px';
     css += `  --${toKebab(k)}: ${v}${unit};\n`;
   });
 
@@ -61,7 +66,7 @@ function generateCSS() {
   css += `}\n`;
 
   fs.writeFileSync(OUTPUT_FILE, css);
-  console.log('✅ tokens.css синхронизирован (Final Patch)');
+  console.log('✅ tokens.css полностью синхронизирован (Brute Force Build)');
 }
 
 generateCSS();
