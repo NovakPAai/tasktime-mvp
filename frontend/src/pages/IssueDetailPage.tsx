@@ -73,6 +73,7 @@ export default function IssueDetailPage() {
   const [editForm] = Form.useForm();
   const [editCustomFields, setEditCustomFields] = useState<IssueCustomFieldValue[]>([]);
   const [editCustomValues, setEditCustomValues] = useState<Record<string, unknown>>({});
+  const [customFieldsVersion, setCustomFieldsVersion] = useState(0);
   const [missingFields, setMissingFields] = useState<{ name: string; fieldType: string }[]>([]);
   const customFieldsRef = useRef<HTMLDivElement>(null);
   const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
@@ -279,6 +280,7 @@ export default function IssueDetailPage() {
       setEditCustomFields([]);
       setEditCustomValues({});
       await load();
+      setCustomFieldsVersion(v => v + 1);
       message.success('Issue updated');
     } catch {
       message.error('Could not save changes');
@@ -586,7 +588,7 @@ export default function IssueDetailPage() {
           </div>
 
           <div ref={customFieldsRef}>
-            <IssueCustomFieldsSection issueId={issue.id} />
+            <IssueCustomFieldsSection issueId={issue.id} refreshKey={customFieldsVersion} />
           </div>
 
           <div className="tt-panel">

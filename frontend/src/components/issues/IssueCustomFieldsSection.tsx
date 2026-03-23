@@ -8,9 +8,10 @@ interface User { id: string; name: string }
 
 interface Props {
   issueId: string;
+  refreshKey?: number;
 }
 
-export default function IssueCustomFieldsSection({ issueId }: Props) {
+export default function IssueCustomFieldsSection({ issueId, refreshKey }: Props) {
   const [fields, setFields] = useState<IssueCustomFieldValue[]>([]);
   const [loading, setLoading] = useState(true);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -22,7 +23,7 @@ export default function IssueCustomFieldsSection({ issueId }: Props) {
       .catch(() => {})
       .finally(() => setLoading(false));
     api.get<User[]>('/users').then(r => setAllUsers(r.data)).catch(() => {});
-  }, [issueId]);
+  }, [issueId, refreshKey]);
 
   if (loading) return (
     <div className="tt-panel" style={{ padding: '12px 16px' }}>
