@@ -1,177 +1,63 @@
 /**
- * Flow Universe UI Kit 2.0 — Design Tokens
- * Синхронизировано с Paper (Source of Truth)
- * Содержит: @font-face, CSS custom properties (:root dark + [data-theme='light'] light), базовые стили body/html
+ * АВТОГЕНЕРИРУЕМЫЙ ФАЙЛ. НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ.
+ * Источник: src/design-tokens.ts
+ * Синхронизация: npm run tokens:sync
  */
 
-/* ============================================================
-   Flow Universe UI Kit 2.0 — Self-hosted fonts
-   ============================================================ */
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/space-grotesk-600.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/space-grotesk-700.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/inter-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/inter-500.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/inter-600.woff2') format('woff2');
-}
-
-/* ============================================================
-   Flow Universe UI Kit 2.0 — Design Tokens
-   Dark theme (default / :root) — Synchronized with Paper
-   ============================================================ */
 :root {
-  /* === BACKGROUNDS === */
-  --bg: #080B14;
-  --bg-sb: #0F1320;
-  --bg-el: #161B22;
+  --bg-main: #080B14;
+  --bg-card: #0F1320;
+  --bg-elevated: #161B22;
+  --border: #21262D;
+  --border-soft: #30363D;
+  --text-primary: #E2E8F8;
+  --text-secondary: #C9D1D9;
+  --text-muted: #8B949E;
+  --text-disabled: #484F58;
+  --text-placeholder: #3D4D6B;
+  --accent: #4F6EF7;
+  --accent-hover: #6B85FF;
+  --accent-links: #4F6EF7;
+  --accent-bg: rgba(79, 110, 247, 0.12);
   --bg-hover: rgba(255, 255, 255, 0.04);
   --bg-active: rgba(255, 255, 255, 0.06);
-  --bg-sel: rgba(79, 110, 247, 0.12);
-  --bg-input: #161B22;
-  --bg-modal: #0F1320;
-
-  /* === BORDERS === */
-  --b: #21262D;
-  --b2: #30363D;
-  --b3: #30363D;
-  --b-focus: #4F6EF7;
-
-  /* === TEXT === */
-  --t1: #E2E8F8;
-  --t2: #C9D1D9;
-  --t3: #8B949E;
-  --t4: #484F58;
-
-  /* === ACCENT === */
-  --acc: #4F6EF7;
-  --acc-h: #6B85FF;
-  --acc-bg: rgba(79, 110, 247, 0.12);
-
-  /* === LAYOUT === */
-  --sidebar-w: 210px;
-  --topbar-h: 38px;
-  --drawer-gap: 24px;
-  --sprint-drawer-w: 900px;
-
-  /* === RADII === */
-  --r: 12px;
-  --r2: 8px;
-  --r3: 6px;
-  --r-badge: 3px;
-  --r-active: 20px;
-
-  /* === SHADOWS === */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.5);
-
-  /* === TYPOGRAPHY & SPACING SCALE === */
-  --font-display: 'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
-  --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  --fs-xs: 12px;
-  --fs-sm: 13px;
-  --fs-md: 14px;
-  --fs-lg: 15px;
-  --fs-xl: 18px;
-  --fs-2xl: 24px;
-  --lh-tight: 1.3;
-  --lh-normal: 1.5;
-  --lh-relaxed: 1.6;
-  --space-1: 2px;
-  --space-2: 4px;
-  --space-3: 6px;
-  --space-4: 8px;
-  --space-5: 12px;
-  --space-6: 16px;
-  --space-7: 20px;
-  --space-8: 24px;
+  --s-done: #4ADE80;
+  --s-in-progress: #F59E0B;
+  --s-review: #A78BFA;
+  --s-open: #8B949E;
+  --s-cancelled: #484F58;
+  --type-epic: #A855F7;
+  --type-story: #3B82F6;
+  --type-task: #10B981;
+  --type-subtask: #6B7280;
+  --type-bug: #EF4444;
+  --sidebar-width: 210px;
+  --page-padding: 24px;
+  --card-gap: 16px;
+  --element-gap: 8px;
+  --topbar-height: 38px;
+  --radius-card: 12px;
+  --radius-button: 8px;
+  --radius-pill: 6px;
+  --radius-badge: 3px;
+  --radius-nav-active: 20px;
 }
 
-/* ============================================================
-   Flow Universe UI Kit 2.0 — Light theme tokens
-   Synchronized with Paper
-   ============================================================ */
 [data-theme='light'] {
-  /* === BACKGROUNDS === */
-  --bg: #FFFFFF;
-  --bg-sb: #F6F8FA;
-  --bg-el: #FFFFFF;
+  --bg-main: #FFFFFF;
+  --bg-card: #F6F8FA;
+  --bg-elevated: #FFFFFF;
+  --border: #D0D7DE;
+  --border-soft: #E8ECEF;
+  --text-primary: #1F2328;
+  --text-secondary: #656D76;
+  --text-muted: #8B949E;
+  --text-disabled: #AFB8C1;
+  --text-placeholder: #9198A1;
+  --accent: #4F6EF7;
+  --accent-hover: #3B5FFF;
+  --accent-links: #4F6EF7;
+  --accent-bg: rgba(79, 110, 247, 0.10);
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: rgba(0, 0, 0, 0.06);
-  --bg-sel: rgba(79, 110, 247, 0.1);
-  --bg-input: #FFFFFF;
-  --bg-modal: #FFFFFF;
-
-  /* === BORDERS === */
-  --b: #D0D7DE;
-  --b2: #D0D7DE;
-  --b3: #D0D7DE;
-  --b-focus: #4F6EF7;
-
-  /* === TEXT === */
-  --t1: #1F2328;
-  --t2: #656D76;
-  --t3: #8B949E;
-  --t4: #484F58;
-
-  /* === ACCENT === */
-  --acc: #4F6EF7;
-  --acc-h: #3B5FFF;
-  --acc-bg: rgba(79, 110, 247, 0.1);
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--fs-md);
-  line-height: var(--lh-normal);
-  background-color: var(--bg);
-  color: var(--t1);
-  display: flex;
-  min-height: 100vh;
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  font-variant-numeric: tabular-nums;
-  color-scheme: dark;
-}
-
-[data-theme='light'] body,
-[data-theme='light'] {
-  color-scheme: light;
 }
