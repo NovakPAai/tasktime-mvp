@@ -163,7 +163,7 @@ export default function LoginPage() {
           </div>
 
           {!registrationEnabled && activeTab === 'register' && (
-            <p className="auth-subheading" style={{ color: '#f5a623', marginTop: 12 }}>
+            <p className="auth-subheading" style={{ color: 'var(--s-medium)', marginTop: 'var(--space-5)' }}>
               Регистрация временно недоступна. Обратитесь к администратору.
             </p>
           )}

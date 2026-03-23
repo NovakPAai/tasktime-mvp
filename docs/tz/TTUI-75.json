@@ -1,0 +1,125 @@
+{
+  "key": "TTUI-75",
+  "title": "Прогресс дочерних задач и отображение трудозатрат в списке задач",
+  "generatedAt": "2026-03-21T12:00:00.000Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "apiUrl": "http://5.129.242.171/api",
+    "issueId": "13ca680f-5c6a-4602-ab10-77541ae4aab9",
+    "fetchedAt": "2026-03-21T12:00:00.000Z"
+  },
+  "issue": {
+    "type": "STORY",
+    "status": "OPEN",
+    "priority": "HIGH",
+    "project": "TTUI",
+    "assignee": "Novak Pavel",
+    "creator": "Admin User",
+    "estimatedHours": null,
+    "description": "Улучшить информативность списка задач проекта за счёт трёх доработок: прогресс-бар дочерних задач, оценка трудозатрат, совокупная оценка для родительских задач.",
+    "acceptanceCriteria": null
+  },
+  "dependencies": {
+    "backendModules": ["issues"],
+    "frontendComponents": [
+      "ProjectDetailPage.tsx",
+      "IssueDetailPage.tsx",
+      "IssuePreviewDrawer.tsx",
+      "IssueProgressBar (новый)",
+      "types/index.ts"
+    ],
+    "prismaModels": ["Issue (без изменений схемы)"],
+    "externalPackages": [],
+    "blockers": []
+  },
+  "risks": [
+    {
+      "id": 1,
+      "description": "N+1 запросы при рекурсивном подсчёте дочерних задач",
+      "probability": "HIGH",
+      "impact": "Деградация скорости списка задач при 200+ задачах",
+      "mitigation": "Рекурсивный CTE или единый Prisma include с фиксированной вложенностью. Кэширование Redis при необходимости."
+    },
+    {
+      "id": 2,
+      "description": "Глубокая иерархия (EPIC→STORY→TASK→SUBTASK) — рекурсия до 4 уровней",
+      "probability": "MEDIUM",
+      "impact": "Сложность запроса, потенциально медленный ответ",
+      "mitigation": "Ограничить глубину рекурсии до 4 уровней (максимум по доменной модели)."
+    },
+    {
+      "id": 3,
+      "description": "Prisma Decimal → JavaScript number — потеря точности",
+      "probability": "LOW",
+      "impact": "Неправильное отображение часов",
+      "mitigation": "Явное приведение через Number() или .toNumber(). Для агрегации — сумма на уровне SQL."
+    },
+    {
+      "id": 4,
+      "description": "Увеличение размера ответа API",
+      "probability": "LOW",
+      "impact": "Незначительно больший payload",
+      "mitigation": "childrenStats добавляются только для задач с _count.children > 0"
+    }
+  ],
+  "requirements": {
+    "functional": [
+      "FR-1: Прогресс-бар появляется только у задач с _count.children > 0",
+      "FR-2: Логика переключения процент/дробь (allEstimated → %, иначе → дробь)",
+      "FR-3: estimatedHours отображается в списке задач в формате N.Nh",
+      "FR-4: Совокупная оценка на родительских задачах отдельно от индивидуальной",
+      "FR-5: Прогресс и совокупная оценка в IssueDetailPage",
+      "FR-6: Прогресс и совокупная оценка в IssuePreviewDrawer",
+      "FR-7: childrenStats рекурсивно по всей иерархии",
+      "FR-8: DONE и CANCELLED = выполнено"
+    ],
+    "nonFunctional": [
+      "NFR-1: API < 200ms (p95) при 200 задачах",
+      "NFR-2: Нет N+1 запросов",
+      "NFR-3: Chrome 139+, Yandex Browser 25+, Edge 139+, Safari 18+"
+    ],
+    "security": [
+      "SEC-1: Только аутентифицированные пользователи",
+      "SEC-2: Данные фильтруются по проекту"
+    ]
+  },
+  "acceptanceCriteria": [
+    "Прогресс-бар появляется только у задач с _count.children > 0",
+    "Логика переключения процент/дробь работает корректно",
+    "estimatedHours отображается в списке задач (дерево и плоский режим)",
+    "Совокупная оценка показывается на родительских задачах",
+    "В IssueDetailPage отображаются прогресс и совокупная оценка",
+    "Нет деградации производительности (данные с backend, не N+1)",
+    "Все тесты зелёные",
+    "Lint проходит"
+  ],
+  "estimation": {
+    "analysis": 1,
+    "backend": 4,
+    "frontend": 6,
+    "testing": 3,
+    "review": 1,
+    "total": 15
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [
+      "TTUI-76: Backend: добавить childrenStats в ответ API",
+      "TTUI-77: Backend: вычислять aggregatedEstimatedHours",
+      "TTUI-78: Frontend: компонент IssueProgressBar",
+      "TTUI-79: Frontend: отображение estimatedHours в списке",
+      "TTUI-80: Frontend: совокупная оценка на родительских задачах",
+      "TTUI-81: Frontend: интеграция в DetailPage и Drawer"
+    ],
+    "blocks": [],
+    "dependsOn": []
+  },
+  "implementationOrder": [
+    "TTUI-76",
+    "TTUI-77",
+    "TTUI-78",
+    "TTUI-79",
+    "TTUI-80",
+    "TTUI-81"
+  ]
+}

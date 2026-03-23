@@ -5,16 +5,14 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import type { AxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
-import { Button, Modal, Form, Input, DatePicker, Progress, Popconfirm, Select, message } from 'antd';
-import { PlusOutlined, PlayCircleOutlined, StopOutlined, FilterOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import { Button, Modal, Form, Input, Progress, Popconfirm, Select, message } from 'antd';
+import { PlusOutlined, PlayCircleOutlined, StopOutlined, FilterOutlined } from '@ant-design/icons';
 import * as sprintsApi from '../api/sprints';
 import * as projectsApi from '../api/projects';
 import * as teamsApi from '../api/teams';
 import { useAuthStore } from '../store/auth.store';
 import type { Sprint, Issue, SprintState, Team, Project } from '../types';
 import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
-import SprintPlanningDrawer from '../components/sprints/SprintPlanningDrawer';
 import { hasAnyRequiredRole } from '../lib/roles';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -94,22 +92,22 @@ export default function SprintsPage() {
   const { user } = useAuthStore();
   const [project, setProject] = useState<Project | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [backlog, setBacklog] = useState<Issue[]>([]);
   const [sprintIssues, setSprintIssues] = useState<Issue[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedBacklog, setSelectedBacklog] = useState<string[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [planningOpen, setPlanningOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState<StateFilter>('ACTIVE');
   const [teams, setTeams] = useState<Team[]>([]);
   const [form] = Form.useForm();
-  const [editForm] = Form.useForm();
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const load = useCallback(async () => {
     if (!projectId) return;
-    const [sp, ts, proj] = await Promise.all([
+    const [sp, bl, ts, proj] = await Promise.all([
       sprintsApi.listSprints(projectId),
+      sprintsApi.getBacklog(projectId),
       teamsApi.listTeams(),
       projectsApi.getProject(projectId),
     ]);
@@ -123,6 +121,7 @@ export default function SprintsPage() {
       const active = sp.find((s) => s.state === 'ACTIVE');
       return (active ?? sp[0]).id;
     });
+    setBacklog(bl);
   }, [projectId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -175,46 +174,11 @@ export default function SprintsPage() {
     }
   };
 
-  const handleRemoveFromSprint = async (issueId: string) => {
-    if (!projectId) return;
-    try {
-      await sprintsApi.moveIssuesToBacklog(projectId, [issueId]);
-      if (selectedSprintId) {
-        void sprintsApi.getSprintIssues(selectedSprintId).then((res) => setSprintIssues(res.issues));
-      }
-    } catch (e) {
-      const error = e as AxiosError<{ error?: string }>;
-      void message.error(error.response?.data?.error ?? 'Ошибка');
-    }
-  };
-
-  const handleUpdate = async (vals: {
-    name: string;
-    goal?: string;
-    startDate?: dayjs.Dayjs;
-    endDate?: dayjs.Dayjs;
-    projectTeamId?: string;
-    businessTeamId?: string;
-    flowTeamId?: string;
-  }) => {
-    if (!selectedSprintId) return;
-    try {
-      await sprintsApi.updateSprint(selectedSprintId, {
-        name: vals.name,
-        goal: vals.goal ?? null,
-        startDate: vals.startDate ? vals.startDate.toISOString() : null,
-        endDate: vals.endDate ? vals.endDate.toISOString() : null,
-        projectTeamId: vals.projectTeamId ?? null,
-        businessTeamId: vals.businessTeamId ?? null,
-        flowTeamId: vals.flowTeamId ?? null,
-      });
-      setEditModalOpen(false);
-      void load();
-      void message.success('Спринт обновлён');
-    } catch (e) {
-      const error = e as AxiosError<{ error?: string }>;
-      void message.error(error.response?.data?.error ?? 'Ошибка');
-    }
+  const handleMoveToSprint = async (sprintId: string) => {
+    if (!selectedBacklog.length) return;
+    await sprintsApi.moveIssuesToSprint(sprintId, selectedBacklog);
+    setSelectedBacklog([]);
+    void load();
   };
 
   const selectedSprint = sprints.find((s) => s.id === selectedSprintId) ?? null;
@@ -325,28 +289,6 @@ export default function SprintsPage() {
                   {selectedSprint.endDate ? `Дата окончания ${fmtDate(selectedSprint.endDate)}` : ''}
                 </span>
               ) : null}
-              {canManage && selectedSprint.state !== 'CLOSED' && (
-                <Button
-                  size="small"
-                  icon={<EditOutlined />}
-                  className="tt-btn-ghost"
-                  style={{ marginLeft: 8 }}
-                  onClick={() => {
-                    editForm.setFieldsValue({
-                      name: selectedSprint.name,
-                      goal: selectedSprint.goal ?? '',
-                      startDate: selectedSprint.startDate ? dayjs(selectedSprint.startDate) : null,
-                      endDate: selectedSprint.endDate ? dayjs(selectedSprint.endDate) : null,
-                      projectTeamId: selectedSprint.projectTeam?.id,
-                      businessTeamId: selectedSprint.businessTeam?.id,
-                      flowTeamId: selectedSprint.flowTeam?.id,
-                    });
-                    setEditModalOpen(true);
-                  }}
-                >
-                  Редактировать
-                </Button>
-              )}
               {canManage && selectedSprint.state === 'PLANNED' && (
                 <Button
                   size="small"
@@ -422,12 +364,12 @@ export default function SprintsPage() {
               <Button size="small" icon={<FilterOutlined />} className="tt-btn-ghost">
                 Фильтр
               </Button>
-              {canManage && (
+              {canManage && backlog.length > 0 && (
                 <Button
                   size="small"
                   icon={<PlusOutlined />}
                   type="primary"
-                  onClick={() => setPlanningOpen(true)}
+                  onClick={() => setDetailsOpen(true)}
                 >
                   Добавить из бэклога
                 </Button>
@@ -444,7 +386,6 @@ export default function SprintsPage() {
                 <th className="tt-sprint-th">ПРИОРИТЕТ</th>
                 <th className="tt-sprint-th">ВРЕМЯ</th>
                 <th className="tt-sprint-th">КОМУ</th>
-                {canManage && <th className="tt-sprint-th" />}
               </tr>
             </thead>
             <tbody>
@@ -506,29 +447,25 @@ export default function SprintsPage() {
                           <span className="tt-sprint-td-muted">—</span>
                         )}
                       </td>
-                      {canManage && (
-                        <td className="tt-sprint-td" style={{ textAlign: 'right' }}>
-                          <Popconfirm
-                            title="Убрать задачу из спринта?"
-                            onConfirm={() => void handleRemoveFromSprint(issue.id)}
-                            okText="Убрать"
-                            cancelText="Отмена"
-                          >
-                            <Button
-                              size="small"
-                              type="text"
-                              icon={<DeleteOutlined />}
-                              danger
-                            />
-                          </Popconfirm>
-                        </td>
-                      )}
                     </tr>
                   );
                 })
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Backlog (collapsed section for moving issues) */}
+      {canManage && selectedSprint && selectedSprint.state === 'ACTIVE' && backlog.length > 0 && selectedBacklog.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => void handleMoveToSprint(selectedSprint.id)}
+          >
+            + Добавить выбранные в спринт ({selectedBacklog.length})
+          </Button>
         </div>
       )}
 
@@ -560,57 +497,10 @@ export default function SprintsPage() {
         </Form>
       </Modal>
 
-      {/* Edit Sprint Modal */}
-      <Modal
-        title="Редактировать спринт"
-        open={editModalOpen}
-        onCancel={() => setEditModalOpen(false)}
-        onOk={() => editForm.submit()}
-        okText="Сохранить"
-        cancelText="Отмена"
-      >
-        <Form form={editForm} layout="vertical" onFinish={(v) => void handleUpdate(v)}>
-          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="goal" label="Цель">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item name="startDate" label="Дата начала">
-            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
-          </Form.Item>
-          <Form.Item name="endDate" label="Дата окончания">
-            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
-          </Form.Item>
-          <Form.Item name="projectTeamId" label="Проектная команда">
-            <Select allowClear options={teams.map((t) => ({ value: t.id, label: t.name }))} />
-          </Form.Item>
-          <Form.Item name="businessTeamId" label="Бизнес-функциональная команда">
-            <Select allowClear options={teams.map((t) => ({ value: t.id, label: t.name }))} />
-          </Form.Item>
-          <Form.Item name="flowTeamId" label="Flow-команда">
-            <Select allowClear options={teams.map((t) => ({ value: t.id, label: t.name }))} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
       <SprintIssuesDrawer
         open={detailsOpen}
         sprintId={selectedSprintId}
         onClose={() => setDetailsOpen(false)}
-      />
-
-      <SprintPlanningDrawer
-        open={planningOpen}
-        sprintId={selectedSprintId}
-        projectId={projectId ?? null}
-        onClose={() => setPlanningOpen(false)}
-        onAdded={() => {
-          void load();
-          if (selectedSprintId) {
-            void sprintsApi.getSprintIssues(selectedSprintId).then((res) => setSprintIssues(res.issues));
-          }
-        }}
       />
     </div>
   );

@@ -1,14 +1,11 @@
 /**
  * Flow Universe UI Kit 2.0 — Design Tokens
- * TTUI-167: вынесен из styles.css
+ * Синхронизировано с Paper (Source of Truth)
  * Содержит: @font-face, CSS custom properties (:root dark + [data-theme='light'] light), базовые стили body/html
- * Импортируется ПЕРВЫМ в styles.css
  */
+
 /* ============================================================
-   Flow Universe UI Kit 2.0 — Self-hosted fonts (TTUI-93)
-   Space Grotesk: заголовки, числа, метрики
-   Inter: body text, UI labels
-   font-display:swap — текст виден сразу, шрифт заменяется после загрузки
+   Flow Universe UI Kit 2.0 — Self-hosted fonts
    ============================================================ */
 @font-face {
   font-family: 'Space Grotesk';
@@ -47,54 +44,39 @@
 }
 
 /* ============================================================
-   Flow Universe UI Kit 2.0 — Design Tokens (TTUI-91)
-   Dark theme (default / :root)
+   Flow Universe UI Kit 2.0 — Design Tokens
+   Dark theme (default / :root) — Synchronized with Paper
    ============================================================ */
 :root {
   /* === BACKGROUNDS === */
-  --bg: #03050f;
-  --bg-sb: #0b1535;
-  --bg-el: #0f1320;
+  --bg: #080B14;
+  --bg-sb: #0F1320;
+  --bg-el: #161B22;
   --bg-hover: rgba(255, 255, 255, 0.04);
   --bg-active: rgba(255, 255, 255, 0.06);
   --bg-sel: rgba(79, 110, 247, 0.12);
-  --bg-input: #161e30;
-  --bg-modal: #0f1320;
+  --bg-input: #161B22;
+  --bg-modal: #0F1320;
 
   /* === BORDERS === */
-  --b: #1e2640;
-  --b2: #21262d;
-  --b3: #2d3a52;
-  --b-focus: #4f6ef7;
+  --b: #21262D;
+  --b2: #30363D;
+  --b3: #30363D;
+  --b-focus: #4F6EF7;
 
   /* === TEXT === */
-  --t1: #e2e8f8;
-  --t2: #8b949e;
-  --t3: #3d4d6b;
-  --t4: #1e2d47;
+  --t1: #E2E8F8;
+  --t2: #C9D1D9;
+  --t3: #8B949E;
+  --t4: #484F58;
 
   /* === ACCENT === */
-  --acc: #4f6ef7;
-  --acc-h: #6b85ff;
+  --acc: #4F6EF7;
+  --acc-h: #6B85FF;
   --acc-bg: rgba(79, 110, 247, 0.12);
 
-  /* === STATUS COLORS === */
-  --s-todo: #9898b0;
-  --s-inprog: #e8b84a;
-  --s-done: #4f6ef7;
-  --s-cancelled: #555566;
-  --s-urgent: #e5534b;
-  --s-high: #e8804a;
-  --s-medium: #e8b84a;
-
-  /* === LABEL COLORS === */
-  --lbl-bug: #e5534b;
-  --lbl-feat: #4f6ef7;
-  --lbl-imp: #8b5cf6;
-  --lbl-perf: #22c55e;
-
   /* === LAYOUT === */
-  --sidebar-w: 220px;
+  --sidebar-w: 210px;
   --topbar-h: 38px;
   --drawer-gap: 24px;
   --sprint-drawer-w: 900px;
@@ -103,13 +85,13 @@
   --r: 12px;
   --r2: 8px;
   --r3: 6px;
+  --r-badge: 3px;
+  --r-active: 20px;
 
   /* === SHADOWS === */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-err: 0 0 0 2px rgba(229, 83, 75, 0.3);
-  --shadow-acc: 0 0 0 2px rgba(79, 110, 247, 0.3);
 
   /* === TYPOGRAPHY & SPACING SCALE === */
   --font-display: 'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
@@ -135,57 +117,36 @@
 }
 
 /* ============================================================
-   Flow Universe UI Kit 2.0 — Light theme tokens (TTUI-91)
+   Flow Universe UI Kit 2.0 — Light theme tokens
+   Synchronized with Paper
    ============================================================ */
 [data-theme='light'] {
   /* === BACKGROUNDS === */
-  --bg: #f5f3ff;
-  --bg-sb: #ede9fe;
-  --bg-el: #fdfcff;
+  --bg: #FFFFFF;
+  --bg-sb: #F6F8FA;
+  --bg-el: #FFFFFF;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: rgba(0, 0, 0, 0.06);
   --bg-sel: rgba(79, 110, 247, 0.1);
-  --bg-input: #fdfcff;
-  --bg-modal: #fdfcff;
+  --bg-input: #FFFFFF;
+  --bg-modal: #FFFFFF;
 
   /* === BORDERS === */
-  --b: rgba(139, 92, 246, 0.12);
-  --b2: rgba(139, 92, 246, 0.2);
-  --b3: rgba(139, 92, 246, 0.28);
-  --b-focus: #4f6ef7;
+  --b: #D0D7DE;
+  --b2: #D0D7DE;
+  --b3: #D0D7DE;
+  --b-focus: #4F6EF7;
 
   /* === TEXT === */
-  --t1: #2e1065;
-  --t2: #6d28d9;
-  --t3: #8b5cf6;
-  --t4: #a78bfa;
+  --t1: #1F2328;
+  --t2: #656D76;
+  --t3: #8B949E;
+  --t4: #484F58;
 
   /* === ACCENT === */
-  --acc: #4f6ef7;
-  --acc-h: #3b5fff;
+  --acc: #4F6EF7;
+  --acc-h: #3B5FFF;
   --acc-bg: rgba(79, 110, 247, 0.1);
-
-  /* === STATUS COLORS === */
-  --s-todo: #8888a0;
-  --s-inprog: #d4a017;
-  --s-done: #4f6ef7;
-  --s-cancelled: #aaaabc;
-  --s-urgent: #d94040;
-  --s-high: #d46a20;
-  --s-medium: #d4a017;
-
-  /* === LABEL COLORS === */
-  --lbl-bug: #d94040;
-  --lbl-feat: #4f6ef7;
-  --lbl-imp: #7c3aed;
-  --lbl-perf: #16a34a;
-
-  /* === SHADOWS === */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
-  --shadow-err: 0 0 0 2px rgba(217, 64, 64, 0.25);
-  --shadow-acc: 0 0 0 2px rgba(79, 110, 247, 0.25);
 }
 
 * {
@@ -214,4 +175,3 @@ body {
 [data-theme='light'] {
   color-scheme: light;
 }
-

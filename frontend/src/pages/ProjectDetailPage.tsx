@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, DatePicker, Tag } from 'antd';
-import dayjs from 'dayjs';
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd';
 import {
   PlusOutlined,
   AppstoreOutlined,
@@ -76,11 +75,10 @@ export default function ProjectDetailPage() {
   const canCreate = user?.role !== 'VIEWER';
   const canBulkEdit = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
-  const handleCreate = async (values: issuesApi.CreateIssueBody & { dueDate?: dayjs.Dayjs | null }) => {
+  const handleCreate = async (values: issuesApi.CreateIssueBody) => {
     if (!id) return;
-    const { dueDate, ...rest } = values;
     try {
-      await issuesApi.createIssue(id, { ...rest, dueDate: dueDate ? dueDate.format('YYYY-MM-DD') : undefined });
+      await issuesApi.createIssue(id, values);
       message.success('Issue created');
       setModalOpen(false);
       form.resetFields();
@@ -165,7 +163,7 @@ export default function ProjectDetailPage() {
       title: 'TYPE',
       width: 160,
       render: (_: unknown, r: Issue) => (
-        <IssueTypeBadge typeConfig={r.issueTypeConfig} showLabel />
+        <IssueTypeBadge type={r.type} typeConfig={r.issueTypeConfig} showLabel />
       ),
     },
     {
@@ -248,18 +246,6 @@ export default function ProjectDetailPage() {
         return sprintName
           ? <span style={{ fontSize: 12, color: 'var(--t2)' }}>{sprintName}</span>
           : <span style={{ fontSize: 12, color: 'var(--t3)' }}>Backlog</span>;
-      },
-    },
-    {
-      title: 'СРОК',
-      dataIndex: 'dueDate',
-      width: 110,
-      render: (dueDate: string | null | undefined, r: Issue) => {
-        if (!dueDate) return <span style={{ fontSize: 12, color: 'var(--t3)' }}>—</span>;
-        const overdue = r.status !== 'DONE' && r.status !== 'CANCELLED' && dayjs(dueDate).isBefore(dayjs(), 'day');
-        return overdue
-          ? <Tag color="error" style={{ margin: 0 }}>{dayjs(dueDate).format('DD.MM.YY')}</Tag>
-          : <span style={{ fontSize: 12 }}>{dayjs(dueDate).format('DD.MM.YY')}</span>;
       },
     },
   ];
@@ -575,9 +561,6 @@ export default function ProjectDetailPage() {
               rows={3}
               placeholder="What conditions must be met for this issue to be considered done?"
             />
-          </Form.Item>
-          <Form.Item name="dueDate" label="Срок исполнения">
-            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
         </Form>
       </Modal>

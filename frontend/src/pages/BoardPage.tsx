@@ -296,7 +296,7 @@ export default function BoardPage() {
                           onClick={() => setSelectedIssueId(issue.id)}
                         >
                           <div className="tt-board-card-top-row">
-                            <IssueTypeBadge typeConfig={issue.issueTypeConfig} />
+                            <IssueTypeBadge type={issue.type} typeConfig={issue.issueTypeConfig} />
                             <span className="tt-board-key">
                               {project.key}-{issue.number}
                             </span>
