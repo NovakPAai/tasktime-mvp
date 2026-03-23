@@ -87,12 +87,12 @@ export default function App() {
       colorSuccess: tokens.semantic.success,
       colorWarning: tokens.semantic.warning,
       colorError: tokens.semantic.error,
-      borderRadius: tokens.layout.radiusCard,
-      borderRadiusSM: tokens.layout.radiusButton,
-      borderRadiusLG: tokens.layout.radiusNavActive,
+      borderRadius: tokens.layout.r,
+      borderRadiusSM: tokens.layout.r2,
+      borderRadiusLG: tokens.layout.rActive,
       fontFamily: tokens.typography.fontSans,
-      fontSize: tokens.typography.fsLabel,
-      fontSizeSM: tokens.typography.fsBody,
+      fontSize: tokens.typography.fsSm,
+      fontSizeSM: tokens.typography.fsXs,
       lineHeight: 1.5,
       controlHeight: 32,
       controlHeightSM: 26,
@@ -105,10 +105,10 @@ export default function App() {
       Button: {
         fontWeight: 500,
         paddingInline: 14,
-        borderRadius: tokens.layout.radiusButton,
+        borderRadius: tokens.layout.r2,
       },
       Tag: {
-        borderRadiusSM: tokens.layout.radiusBadge,
+        borderRadiusSM: tokens.layout.rBadge,
         fontSizeSM: 11,
       },
       Table: {
@@ -120,7 +120,7 @@ export default function App() {
         cellPaddingInline: 12,
       },
       Modal: {
-        borderRadiusLG: tokens.layout.radiusCard,
+        borderRadiusLG: tokens.layout.r,
         paddingContentHorizontalLG: 24,
       },
       Drawer: {
@@ -131,8 +131,8 @@ export default function App() {
       },
       Menu: {
         itemHeight: 34,
-        itemBorderRadius: tokens.layout.radiusPill,
-        subMenuItemBorderRadius: tokens.layout.radiusPill,
+        itemBorderRadius: tokens.layout.r3,
+        subMenuItemBorderRadius: tokens.layout.r3,
       },
     },
   };
