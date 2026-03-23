@@ -19,8 +19,10 @@ export interface IssueCustomFieldsResponse {
 }
 
 export const issueCustomFieldsApi = {
-  getFields: (issueId: string) =>
-    api.get<IssueCustomFieldsResponse>(`/issues/${issueId}/custom-fields`).then(r => r.data),
+  getFields: (issueId: string, params?: { issueTypeConfigId?: string }) => {
+    const q = params?.issueTypeConfigId ? `?issueTypeConfigId=${encodeURIComponent(params.issueTypeConfigId)}` : '';
+    return api.get<IssueCustomFieldsResponse>(`/issues/${issueId}/custom-fields${q}`).then(r => r.data);
+  },
 
   updateFields: (issueId: string, values: { customFieldId: string; value: unknown }[]) =>
     api.put<IssueCustomFieldsResponse>(`/issues/${issueId}/custom-fields`, { values }).then(r => r.data),

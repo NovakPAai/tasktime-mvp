@@ -20,6 +20,7 @@ import {
   Switch,
   Alert,
   DatePicker,
+  Divider,
 } from 'antd';
 import dayjs from 'dayjs';
 import {
@@ -43,6 +44,8 @@ import * as authApi from '../api/auth';
 import { getProjectIssueTypes } from '../api/issue-type-configs';
 import IssueLinksSection from '../components/issues/IssueLinksSection';
 import IssueCustomFieldsSection from '../components/issues/IssueCustomFieldsSection';
+import CustomFieldInput from '../components/issues/CustomFieldInput';
+import { issueCustomFieldsApi, type IssueCustomFieldValue } from '../api/issue-custom-fields';
 import { useAuthStore } from '../store/auth.store';
 import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, IssueTypeConfig, User, AiExecutionStatus } from '../types';
 import api from '../api/client';
@@ -68,6 +71,8 @@ export default function IssueDetailPage() {
   const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
+  const [editCustomFields, setEditCustomFields] = useState<IssueCustomFieldValue[]>([]);
+  const [editCustomValues, setEditCustomValues] = useState<Record<string, unknown>>({});
   const [missingFields, setMissingFields] = useState<{ name: string; fieldType: string }[]>([]);
   const customFieldsRef = useRef<HTMLDivElement>(null);
   const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
@@ -210,7 +215,7 @@ export default function IssueDetailPage() {
     }
   };
 
-  const handleEditOpen = () => {
+  const handleEditOpen = async () => {
     if (!issue) return;
     editForm.setFieldsValue({
       title: issue.title,
@@ -221,7 +226,27 @@ export default function IssueDetailPage() {
       acceptanceCriteria: issue.acceptanceCriteria ?? '',
       dueDate: issue.dueDate ? dayjs(issue.dueDate) : null,
     });
+    try {
+      const res = await issueCustomFieldsApi.getFields(issue.id);
+      setEditCustomFields(res.fields);
+      setEditCustomValues(Object.fromEntries(res.fields.map(f => [f.customFieldId, f.currentValue])));
+    } catch {
+      setEditCustomFields([]);
+      setEditCustomValues({});
+    }
     setEditModalOpen(true);
+  };
+
+  const handleEditTypeChange = async (newTypeId: string) => {
+    if (!issue) return;
+    try {
+      const res = await issueCustomFieldsApi.getFields(issue.id, { issueTypeConfigId: newTypeId });
+      setEditCustomFields(res.fields);
+      setEditCustomValues(Object.fromEntries(res.fields.map(f => [f.customFieldId, f.currentValue])));
+    } catch {
+      setEditCustomFields([]);
+      setEditCustomValues({});
+    }
   };
 
   const handleEditSave = async (vals: {
@@ -244,7 +269,15 @@ export default function IssueDetailPage() {
         acceptanceCriteria: vals.acceptanceCriteria || undefined,
         dueDate: vals.dueDate ? vals.dueDate.format('YYYY-MM-DD') : null,
       });
+      if (editCustomFields.length > 0) {
+        await issueCustomFieldsApi.updateFields(id, editCustomFields.map(f => ({
+          customFieldId: f.customFieldId,
+          value: editCustomValues[f.customFieldId] ?? null,
+        })));
+      }
       setEditModalOpen(false);
+      setEditCustomFields([]);
+      setEditCustomValues({});
       await load();
       message.success('Issue updated');
     } catch {
@@ -715,7 +748,11 @@ export default function IssueDetailPage() {
       <Modal
         title="Edit Issue"
         open={editModalOpen}
-        onCancel={() => setEditModalOpen(false)}
+        onCancel={() => {
+          setEditModalOpen(false);
+          setEditCustomFields([]);
+          setEditCustomValues({});
+        }}
         onOk={() => editForm.submit()}
         okText="Save"
         cancelText="Cancel"
@@ -732,6 +769,7 @@ export default function IssueDetailPage() {
                 value: c.id,
                 label: c.name,
               }))}
+              onChange={handleEditTypeChange}
             />
           </Form.Item>
           <Form.Item name="priority" label="Priority" rules={[{ required: true }]}>
@@ -758,6 +796,34 @@ export default function IssueDetailPage() {
           <Form.Item name="dueDate" label="Срок исполнения">
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
+          {editCustomFields.length > 0 && (
+            <>
+              <Divider orientation="left" orientationMargin={0} style={{ fontSize: 13, color: '#8c8c8c' }}>
+                Дополнительные поля
+              </Divider>
+              {editCustomFields.map(field => (
+                <Form.Item
+                  key={field.customFieldId}
+                  label={
+                    <span>
+                      {field.isRequired && <Typography.Text type="danger">* </Typography.Text>}
+                      {field.name}
+                    </span>
+                  }
+                  style={{ marginBottom: 12 }}
+                >
+                  <CustomFieldInput
+                    field={{ ...field, currentValue: editCustomValues[field.customFieldId] ?? field.currentValue }}
+                    allUsers={allUsers}
+                    inlineEdit={false}
+                    onSave={async (v) => {
+                      setEditCustomValues(prev => ({ ...prev, [field.customFieldId]: v }));
+                    }}
+                  />
+                </Form.Item>
+              ))}
+            </>
+          )}
         </Form>
       </Modal>
 
