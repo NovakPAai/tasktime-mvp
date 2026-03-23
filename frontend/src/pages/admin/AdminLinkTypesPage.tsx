@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Table, Tag, Button, Input, Form, Modal, Switch, Space, message } from 'antd';
-import { PlusOutlined, EditOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, Input, Form, Modal, Switch, Space, message, Tooltip } from 'antd';
+import { PlusOutlined, EditOutlined, LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import * as linksApi from '../../api/links';
 import type { IssueLinkType } from '../../types';
@@ -84,6 +84,16 @@ export default function AdminLinkTypesPage() {
         record.name.toLowerCase().includes(String(value).toLowerCase()) ||
         record.outboundName.toLowerCase().includes(String(value).toLowerCase()) ||
         record.inboundName.toLowerCase().includes(String(value).toLowerCase()),
+      render: (name: string, record: IssueLinkType) => (
+        <Space size={6}>
+          {name}
+          {record.isSystem && (
+            <Tooltip title="Системный тип — нельзя переименовать">
+              <Tag icon={<LockOutlined />} color="blue" style={{ marginInlineEnd: 0 }}>Системный</Tag>
+            </Tooltip>
+          )}
+        </Space>
+      ),
     },
     { title: 'Исходящая связь', dataIndex: 'outboundName', key: 'outboundName' },
     { title: 'Входящая связь', dataIndex: 'inboundName', key: 'inboundName' },
@@ -174,10 +184,10 @@ export default function AdminLinkTypesPage() {
             <Input disabled={editingType?.isSystem} />
           </Form.Item>
           <Form.Item name="outboundName" label="Исходящая связь" rules={[{ required: true, message: 'Обязательное поле' }]}>
-            <Input />
+            <Input disabled={editingType?.isSystem} />
           </Form.Item>
           <Form.Item name="inboundName" label="Входящая связь" rules={[{ required: true, message: 'Обязательное поле' }]}>
-            <Input />
+            <Input disabled={editingType?.isSystem} />
           </Form.Item>
         </Form>
       </Modal>

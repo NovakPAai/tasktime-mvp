@@ -1,4 +1,5 @@
 import { prisma } from '../../prisma/client.js';
+import { AppError } from '../../shared/middleware/error-handler.js';
 
 const LINK_SELECT = {
   id: true,
@@ -48,13 +49,13 @@ export async function createLink(
     prisma.issue.findUnique({ where: { id: sourceIssueId }, select: { id: true } }),
     prisma.issue.findUnique({ where: { id: targetIssueId }, select: { id: true } }),
   ]);
-  if (!source) throw Object.assign(new Error('Исходная задача не найдена'), { status: 404 });
-  if (!target) throw Object.assign(new Error('Целевая задача не найдена'), { status: 404 });
+  if (!source) throw new AppError(404, 'Исходная задача не найдена');
+  if (!target) throw new AppError(404, 'Целевая задача не найдена');
 
   // Проверяем что тип связи активен
   const linkType = await prisma.issueLinkType.findUnique({ where: { id: linkTypeId } });
-  if (!linkType) throw Object.assign(new Error('Тип связи не найден'), { status: 404 });
-  if (!linkType.isActive) throw Object.assign(new Error('Тип связи неактивен'), { status: 400 });
+  if (!linkType) throw new AppError(404, 'Тип связи не найден');
+  if (!linkType.isActive) throw new AppError(400, 'Тип связи неактивен');
 
   try {
     const link = await prisma.issueLink.create({
@@ -106,11 +107,11 @@ export async function updateLinkType(
   data: { name?: string; outboundName?: string; inboundName?: string; isActive?: boolean },
 ) {
   const type = await prisma.issueLinkType.findUnique({ where: { id } });
-  if (!type) throw Object.assign(new Error('Тип связи не найден'), { status: 404 });
+  if (!type) throw new AppError(404, 'Тип связи не найден');
 
   // Системные типы нельзя переименовывать, только активировать/деактивировать
   if (type.isSystem && (data.name || data.outboundName || data.inboundName)) {
-    throw Object.assign(new Error('Системный тип связи нельзя переименовывать'), { status: 400 });
+    throw new AppError(400, 'Системный тип связи нельзя переименовывать');
   }
 
   return prisma.issueLinkType.update({ where: { id }, data });
