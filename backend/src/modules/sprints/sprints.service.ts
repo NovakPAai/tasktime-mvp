@@ -166,6 +166,7 @@ export async function getBacklog(projectId: string) {
     where: { projectId, sprintId: null },
     include: {
       assignee: { select: { id: true, name: true } },
+      issueTypeConfig: true,
       _count: { select: { children: true } },
     },
     orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
