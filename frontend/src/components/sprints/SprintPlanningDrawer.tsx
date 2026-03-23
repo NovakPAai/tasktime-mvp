@@ -48,7 +48,7 @@ export default function SprintPlanningDrawer({
         setLoading(true);
         setError(null);
         const issues = await sprintsApi.getBacklog(projectId);
-        if (active) setBacklog(issues);
+        if (active) setBacklog(issues.filter((i) => i.status !== 'DONE' && i.status !== 'CANCELLED'));
       } catch (err) {
         if (active) {
           const axiosErr = err as AxiosError<{ error?: string }>;

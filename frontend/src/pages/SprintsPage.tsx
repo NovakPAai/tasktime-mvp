@@ -486,7 +486,12 @@ export default function SprintsPage() {
         sprintId={selectedSprintId}
         projectId={projectId ?? null}
         onClose={() => setPlanningOpen(false)}
-        onAdded={() => { void load(); }}
+        onAdded={() => {
+          void load();
+          if (selectedSprintId) {
+            void sprintsApi.getSprintIssues(selectedSprintId).then((res) => setSprintIssues(res.issues));
+          }
+        }}
       />
     </div>
   );
