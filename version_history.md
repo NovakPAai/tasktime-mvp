@@ -2,7 +2,36 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 1.5**
+**Last version: 1.7**
+
+---
+
+## [1.7] [2026-03-24] feat(custom-fields): тип поля Справочник (REFERENCE) [TTADM-52]
+
+**Задача:** TTADM-52
+**PR:** [#125](https://github.com/jackrescuer-gif/tasktime-mvp/pull/125)
+**Ветка:** `sprint/ttadm`
+
+### Что изменилось
+- `schema.prisma` — добавлен `REFERENCE` в enum `CustomFieldType`; миграция `20260324000000_add_reference_field_type` (`ALTER TYPE ... ADD VALUE IF NOT EXISTS`)
+- `custom-fields.dto.ts` — `referenceOptionsSchema` (`maxValues: int ≥ 0`, `items[]: {value, label, isEnabled}`)
+- `custom-fields.service.ts` — валидация REFERENCE при `createCustomField` / `updateCustomField`
+- `custom-fields.ts` (frontend API) — типы `ReferenceItem`, `ReferenceOptions`; union в `CustomField.options`
+- `issue-custom-fields.ts` — union `ReferenceOptions` в `IssueCustomFieldValue.options`
+- `AdminCustomFieldsPage.tsx` — тип «Справочник» (`BookOutlined`) в FIELD_TYPE_META; форма управления значениями справочника (добавить/включить/отключить/удалить) и настройка `maxValues` с дисклеймером
+- `CustomFieldInput.tsx` — `ReadValue` (Tags по `items`) и `EditInput` (single/multiple Select по `maxValues`, только enabled items)
+- `KanbanCardCustomFields.tsx` — отображение значений REFERENCE: первые 2 Tags + счётчик остальных
+
+---
+
+## [1.6] [2026-03-24] fix(admin): удалять постфикс " (N/A)" при реактивации пользователя [TTADM-33]
+
+**Задача:** TTADM-33
+**PR:** [#125](https://github.com/jackrescuer-gif/tasktime-mvp/pull/125)
+**Ветка:** `sprint/ttadm`
+
+### Что изменилось
+- `admin.service.ts` — `NA_SUFFIX` вынесен на уровень модуля; в `updateUserAdmin()` добавлена очистка постфикса при реактивации (`isActive: false → true`)
 
 ---
 
