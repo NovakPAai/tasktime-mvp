@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const fieldTypeEnum = z.enum([
   'TEXT', 'TEXTAREA', 'NUMBER', 'DECIMAL', 'DATE', 'DATETIME',
-  'URL', 'CHECKBOX', 'SELECT', 'MULTI_SELECT', 'USER', 'LABEL',
+  'URL', 'CHECKBOX', 'SELECT', 'MULTI_SELECT', 'USER', 'LABEL', 'REFERENCE',
 ]);
 
 const selectOptionSchema = z.object({
@@ -11,17 +11,28 @@ const selectOptionSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 
+const referenceItemSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+  isEnabled: z.boolean().default(true),
+});
+
+export const referenceOptionsSchema = z.object({
+  maxValues: z.number().int().nonnegative(),
+  items: z.array(referenceItemSchema),
+});
+
 export const createCustomFieldDto = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional(),
   fieldType: fieldTypeEnum,
-  options: z.array(selectOptionSchema).optional(),
+  options: z.union([z.array(selectOptionSchema), referenceOptionsSchema]).optional(),
 });
 
 export const updateCustomFieldDto = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().optional(),
-  options: z.array(selectOptionSchema).optional(),
+  options: z.union([z.array(selectOptionSchema), referenceOptionsSchema]).optional(),
 });
 
 export const reorderCustomFieldsDto = z.object({
@@ -34,3 +45,4 @@ export const reorderCustomFieldsDto = z.object({
 export type CreateCustomFieldDto = z.infer<typeof createCustomFieldDto>;
 export type UpdateCustomFieldDto = z.infer<typeof updateCustomFieldDto>;
 export type ReorderCustomFieldsDto = z.infer<typeof reorderCustomFieldsDto>;
+export type ReferenceOptions = z.infer<typeof referenceOptionsSchema>;

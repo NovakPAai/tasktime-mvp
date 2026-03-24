@@ -222,6 +222,8 @@ export async function deleteUser(actorId: string, userId: string) {
   await prisma.user.delete({ where: { id: userId } });
 }
 
+const NA_SUFFIX = ' (N/A)';
+
 export async function deactivateUserAdmin(actorId: string, userId: string) {
   if (actorId === userId) throw new AppError(400, 'Cannot deactivate yourself');
 
@@ -229,7 +231,6 @@ export async function deactivateUserAdmin(actorId: string, userId: string) {
   if (!user) throw new AppError(404, 'User not found');
   if (user.isSystem) throw new AppError(403, 'Cannot deactivate system users');
 
-  const NA_SUFFIX = ' (N/A)';
   const newName = user.name.endsWith(NA_SUFFIX) ? user.name : user.name + NA_SUFFIX;
 
   const updated = await prisma.user.update({
@@ -264,6 +265,10 @@ export async function updateUserAdmin(actorId: string, userId: string, dto: Upda
       const existing = await prisma.user.findUnique({ where: { email: dto.email } });
       if (existing) throw new AppError(409, 'Email already in use');
     }
+  }
+
+  if (dto.isActive === true && !user.isActive && user.name.endsWith(NA_SUFFIX)) {
+    dto.name = user.name.slice(0, -NA_SUFFIX.length);
   }
 
   const updated = await prisma.user.update({

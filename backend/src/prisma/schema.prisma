@@ -491,6 +491,7 @@ enum CustomFieldType {
   MULTI_SELECT
   USER
   LABEL
+  REFERENCE
 }
 
 model CustomField {

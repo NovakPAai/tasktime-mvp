@@ -1,12 +1,12 @@
 import api from './client';
-import type { CustomFieldType, CustomFieldOption } from './custom-fields';
+import type { CustomFieldType, CustomFieldOption, ReferenceOptions } from './custom-fields';
 
 export interface IssueCustomFieldValue {
   customFieldId: string;
   name: string;
   description: string | null;
   fieldType: CustomFieldType;
-  options: CustomFieldOption[] | null;
+  options: CustomFieldOption[] | ReferenceOptions | null;
   isRequired: boolean;
   showOnKanban: boolean;
   orderIndex: number;

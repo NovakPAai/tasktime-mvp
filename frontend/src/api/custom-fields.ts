@@ -12,7 +12,8 @@ export type CustomFieldType =
   | 'SELECT'
   | 'MULTI_SELECT'
   | 'USER'
-  | 'LABEL';
+  | 'LABEL'
+  | 'REFERENCE';
 
 export interface CustomFieldOption {
   value: string;
@@ -20,12 +21,23 @@ export interface CustomFieldOption {
   color?: string;
 }
 
+export interface ReferenceItem {
+  value: string;
+  label: string;
+  isEnabled: boolean;
+}
+
+export interface ReferenceOptions {
+  maxValues: number;
+  items: ReferenceItem[];
+}
+
 export interface CustomField {
   id: string;
   name: string;
   description: string | null;
   fieldType: CustomFieldType;
-  options: CustomFieldOption[] | null;
+  options: CustomFieldOption[] | ReferenceOptions | null;
   isSystem: boolean;
   isEnabled: boolean;
   orderIndex: number;
@@ -42,13 +54,13 @@ export const customFieldsApi = {
     name: string;
     description?: string;
     fieldType: CustomFieldType;
-    options?: CustomFieldOption[];
+    options?: CustomFieldOption[] | ReferenceOptions;
   }) => api.post<CustomField>('/admin/custom-fields', data).then(r => r.data),
 
   get: (id: string) =>
     api.get<CustomField>(`/admin/custom-fields/${id}`).then(r => r.data),
 
-  update: (id: string, data: { name?: string; description?: string; options?: CustomFieldOption[] }) =>
+  update: (id: string, data: { name?: string; description?: string; options?: CustomFieldOption[] | ReferenceOptions }) =>
     api.patch<CustomField>(`/admin/custom-fields/${id}`, data).then(r => r.data),
 
   delete: (id: string) =>

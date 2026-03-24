@@ -32,6 +32,16 @@ function FieldValue({ field }: { field: KanbanField }) {
       );
     }
 
+    case 'REFERENCE': {
+      const arr = Array.isArray(val) ? val as string[] : [];
+      return (
+        <Space size={2}>
+          {arr.slice(0, 2).map(v => <Tag key={v} style={{ fontSize: 11, margin: 0 }}>{v}</Tag>)}
+          {arr.length > 2 && <Typography.Text type="secondary" style={{ fontSize: 11 }}>+{arr.length - 2}</Typography.Text>}
+        </Space>
+      );
+    }
+
     case 'DATE': {
       const d = new Date(val as string);
       return (

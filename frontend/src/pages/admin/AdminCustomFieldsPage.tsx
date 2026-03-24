@@ -5,6 +5,7 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
   Select,
   Space,
   Badge,
@@ -13,6 +14,7 @@ import {
   Tag,
   message,
   Popconfirm,
+  Switch,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -33,8 +35,9 @@ import {
   UserOutlined,
   TagOutlined,
   PoweroffOutlined,
+  BookOutlined,
 } from '@ant-design/icons';
-import { customFieldsApi, type CustomField, type CustomFieldType, type CustomFieldOption } from '../../api/custom-fields';
+import { customFieldsApi, type CustomField, type CustomFieldType, type CustomFieldOption, type ReferenceItem, type ReferenceOptions } from '../../api/custom-fields';
 
 const SELECT_TYPES: CustomFieldType[] = ['SELECT', 'MULTI_SELECT'];
 
@@ -51,6 +54,7 @@ const FIELD_TYPE_META: Record<CustomFieldType, { label: string; icon: React.Reac
   MULTI_SELECT: { label: 'Мультивыбор', icon: <BarsOutlined /> },
   USER: { label: 'Пользователь', icon: <UserOutlined /> },
   LABEL: { label: 'Метка', icon: <TagOutlined /> },
+  REFERENCE: { label: 'Справочник', icon: <BookOutlined /> },
 };
 
 const OPTION_COLORS = [
@@ -72,6 +76,10 @@ interface OptionRow {
   color?: string;
 }
 
+interface RefItemRow extends ReferenceItem {
+  key: string;
+}
+
 export default function AdminCustomFieldsPage() {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(false);
@@ -81,6 +89,8 @@ export default function AdminCustomFieldsPage() {
   const [form] = Form.useForm();
   const [watchType, setWatchType] = useState<CustomFieldType | null>(null);
   const [options, setOptions] = useState<OptionRow[]>([]);
+  const [refItems, setRefItems] = useState<RefItemRow[]>([]);
+  const [refMaxValues, setRefMaxValues] = useState<number>(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +109,8 @@ export default function AdminCustomFieldsPage() {
     setEditField(null);
     setWatchType(null);
     setOptions([]);
+    setRefItems([]);
+    setRefMaxValues(0);
     form.resetFields();
     setModalOpen(true);
   };
@@ -106,13 +118,24 @@ export default function AdminCustomFieldsPage() {
   const openEdit = (field: CustomField) => {
     setEditField(field);
     setWatchType(field.fieldType);
-    const opts: OptionRow[] = (field.options ?? []).map((o, i) => ({
-      key: String(i),
-      value: o.value,
-      label: o.label,
-      color: o.color,
-    }));
-    setOptions(opts);
+
+    if (field.fieldType === 'REFERENCE') {
+      const refOpts = field.options as ReferenceOptions | null;
+      setRefMaxValues(refOpts?.maxValues ?? 0);
+      setRefItems((refOpts?.items ?? []).map((item, i) => ({ ...item, key: String(i) })));
+      setOptions([]);
+    } else {
+      const opts: OptionRow[] = ((field.options as CustomFieldOption[] | null) ?? []).map((o, i) => ({
+        key: String(i),
+        value: o.value,
+        label: o.label,
+        color: o.color,
+      }));
+      setOptions(opts);
+      setRefItems([]);
+      setRefMaxValues(0);
+    }
+
     form.setFieldsValue({ name: field.name, description: field.description, fieldType: field.fieldType });
     setModalOpen(true);
   };
@@ -126,6 +149,8 @@ export default function AdminCustomFieldsPage() {
     }
 
     const isSelectType = SELECT_TYPES.includes(values.fieldType);
+    const isRefType = values.fieldType === 'REFERENCE';
+
     if (isSelectType && options.length === 0) {
       message.error('Добавьте хотя бы один вариант ответа');
       return;
@@ -136,12 +161,27 @@ export default function AdminCustomFieldsPage() {
         return;
       }
     }
+    for (const item of refItems) {
+      if (!item.label.trim()) {
+        message.error('Заполните названия всех значений справочника');
+        return;
+      }
+    }
 
     const cleanOptions: CustomFieldOption[] = options.map(o => ({
       value: o.value.trim(),
       label: o.label.trim(),
       ...(o.color ? { color: o.color } : {}),
     }));
+
+    const cleanRefOptions: ReferenceOptions = {
+      maxValues: refMaxValues,
+      items: refItems.map((item, idx) => ({
+        value: item.value || `item_${idx}_${Date.now()}`,
+        label: item.label.trim(),
+        isEnabled: item.isEnabled,
+      })),
+    };
 
     setSaving(true);
     try {
@@ -150,6 +190,7 @@ export default function AdminCustomFieldsPage() {
           name: values.name,
           description: values.description,
           ...(isSelectType ? { options: cleanOptions } : {}),
+          ...(isRefType ? { options: cleanRefOptions } : {}),
         });
         message.success('Поле обновлено');
       } else {
@@ -158,6 +199,7 @@ export default function AdminCustomFieldsPage() {
           description: values.description,
           fieldType: values.fieldType,
           ...(isSelectType ? { options: cleanOptions } : {}),
+          ...(isRefType ? { options: cleanRefOptions } : {}),
         });
         message.success('Поле создано');
       }
@@ -204,7 +246,24 @@ export default function AdminCustomFieldsPage() {
     setOptions(prev => prev.map(o => o.key === key ? { ...o, [field]: val } : o));
   };
 
+  const addRefItem = () => {
+    setRefItems(prev => [...prev, { key: Date.now().toString(), value: '', label: '', isEnabled: true }]);
+  };
+
+  const removeRefItem = (key: string) => {
+    setRefItems(prev => prev.filter(i => i.key !== key));
+  };
+
+  const updateRefItemLabel = (key: string, label: string) => {
+    setRefItems(prev => prev.map(i => i.key === key ? { ...i, label } : i));
+  };
+
+  const toggleRefItem = (key: string) => {
+    setRefItems(prev => prev.map(i => i.key === key ? { ...i, isEnabled: !i.isEnabled } : i));
+  };
+
   const isSelectType = watchType && SELECT_TYPES.includes(watchType);
+  const isRefType = watchType === 'REFERENCE';
 
   const columns: ColumnsType<CustomField> = [
     {
@@ -401,6 +460,59 @@ export default function AdminCustomFieldsPage() {
                 </Button>
               </div>
             </Form.Item>
+          )}
+
+          {isRefType && (
+            <>
+              <Form.Item
+                label="Макс. кол-во значений"
+                extra={
+                  refMaxValues === 0
+                    ? 'Значение 0 означает, что количество выбранных значений не ограничено'
+                    : refMaxValues === 1
+                    ? 'Пользователь сможет выбрать только одно значение'
+                    : `Пользователь сможет выбрать не более ${refMaxValues} значений`
+                }
+              >
+                <InputNumber
+                  min={0}
+                  value={refMaxValues}
+                  onChange={v => setRefMaxValues(v ?? 0)}
+                  style={{ width: 120 }}
+                />
+              </Form.Item>
+
+              <Form.Item label="Значения справочника">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {refItems.map(item => (
+                    <div key={item.key} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <Tooltip title={item.isEnabled ? 'Включено' : 'Отключено'}>
+                        <Switch
+                          size="small"
+                          checked={item.isEnabled}
+                          onChange={() => toggleRefItem(item.key)}
+                        />
+                      </Tooltip>
+                      <Input
+                        placeholder="Название значения"
+                        value={item.label}
+                        onChange={e => updateRefItemLabel(item.key, e.target.value)}
+                        style={{ flex: 1, opacity: item.isEnabled ? 1 : 0.45 }}
+                      />
+                      <Button
+                        type="text"
+                        icon={<MinusCircleOutlined />}
+                        danger
+                        onClick={() => removeRefItem(item.key)}
+                      />
+                    </div>
+                  ))}
+                  <Button type="dashed" onClick={addRefItem} icon={<PlusOutlined />}>
+                    Добавить значение
+                  </Button>
+                </div>
+              </Form.Item>
+            </>
           )}
         </Form>
       </Modal>
