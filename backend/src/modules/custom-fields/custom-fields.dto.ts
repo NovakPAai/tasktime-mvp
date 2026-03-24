@@ -31,7 +31,7 @@ export const createCustomFieldDto = z.object({
 
 export const updateCustomFieldDto = z.object({
   name: z.string().min(1).max(100).optional(),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   options: z.union([z.array(selectOptionSchema), referenceOptionsSchema]).optional(),
 });
 

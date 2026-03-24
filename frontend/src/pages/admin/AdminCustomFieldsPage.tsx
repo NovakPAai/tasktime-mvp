@@ -188,7 +188,7 @@ export default function AdminCustomFieldsPage() {
       if (editField) {
         await customFieldsApi.update(editField.id, {
           name: values.name,
-          description: values.description,
+          description: values.description ?? undefined,
           ...(isSelectType ? { options: cleanOptions } : {}),
           ...(isRefType ? { options: cleanRefOptions } : {}),
         });
