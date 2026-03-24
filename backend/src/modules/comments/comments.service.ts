@@ -23,7 +23,7 @@ export async function createComment(issueId: string, authorId: string, dto: Crea
 export async function updateComment(id: string, userId: string, userRole: string, dto: UpdateCommentDto) {
   const comment = await prisma.comment.findUnique({ where: { id } });
   if (!comment) throw new AppError(404, 'Comment not found');
-  if (comment.authorId !== userId && userRole !== 'ADMIN') {
+  if (comment.authorId !== userId && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
     throw new AppError(403, 'Not allowed');
   }
 
@@ -37,7 +37,7 @@ export async function updateComment(id: string, userId: string, userRole: string
 export async function deleteComment(id: string, userId: string, userRole: string) {
   const comment = await prisma.comment.findUnique({ where: { id } });
   if (!comment) throw new AppError(404, 'Comment not found');
-  if (comment.authorId !== userId && userRole !== 'ADMIN') {
+  if (comment.authorId !== userId && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
     throw new AppError(403, 'Not allowed');
   }
 
