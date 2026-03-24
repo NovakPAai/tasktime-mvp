@@ -171,7 +171,7 @@ export default function AdminCustomFieldsPage() {
     const cleanOptions: CustomFieldOption[] = options.map(o => ({
       value: o.value.trim(),
       label: o.label.trim(),
-      ...(o.color ? { color: o.color } : {}),
+      ...(o.color && o.color !== 'default' ? { color: o.color } : {}),
     }));
 
     const cleanRefOptions: ReferenceOptions = {

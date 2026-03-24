@@ -8,7 +8,7 @@ const fieldTypeEnum = z.enum([
 const selectOptionSchema = z.object({
   value: z.string().min(1),
   label: z.string().min(1),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  color: z.string().optional(),
 });
 
 const referenceItemSchema = z.object({
