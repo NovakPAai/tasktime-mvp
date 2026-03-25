@@ -4,6 +4,16 @@
 
 ### Novak Pavel
 
+- `2c792db5` fix(ci): исправить SHA mismatch в deploy-staging (#127) (2026-03-25)
+
+### github-actions[bot]
+
+- `057f0578` chore: update changelog [skip ci] (2026-03-25)
+
+## 2026-03-25
+
+### Novak Pavel
+
 - `3aa040c0` docs: живая документационная система — архитектура, API, user manual, автоматизация (#126) (2026-03-25)
 - `98cf0555` Claude/jack paper tokens (#114) (2026-03-23)
 - `e86c2699` feat: UI Kit 2.0 delta fix — sidebar icon, dashboard greeting, accent colours (#109) (2026-03-22)
