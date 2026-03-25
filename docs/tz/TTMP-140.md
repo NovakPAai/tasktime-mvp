@@ -2,7 +2,7 @@
 
 **Дата:** 2026-03-21
 **Тип:** EPIC | **Приоритет:** HIGH | **Статус:** OPEN
-**Проект:** TaskTime MVP (vibe-code) (TTMP)
+**Проект:** Flow Universe MVP (vibe-code) (TTMP)
 **Автор ТЗ:** Claude Code (auto-generated)
 
 ---

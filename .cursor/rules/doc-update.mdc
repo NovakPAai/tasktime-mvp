@@ -1,0 +1,36 @@
+---
+description: Напоминание обновить документацию при изменении кода
+globs:
+  - "backend/src/modules/**/*.router.ts"
+  - "backend/src/prisma/schema.prisma"
+  - "backend/src/app.ts"
+  - "frontend/src/App.tsx"
+  - "frontend/src/pages/**/*.tsx"
+alwaysApply: false
+---
+
+# Правило: Обновление документации
+
+При изменении следующих файлов — **обязательно** обнови документацию:
+
+## Если изменён `*.router.ts` или `app.ts`
+→ Обнови **`docs/api/reference.md`** — добавь/измени описание роутов
+
+## Если изменён `schema.prisma`
+→ Обнови **`docs/architecture/data-model.md`** — добавь/измени описание моделей
+
+## Если изменён `frontend/src/App.tsx`
+→ Обнови **`docs/architecture/frontend-architecture.md`** — Route Map
+
+## Если изменена страница в `frontend/src/pages/`
+→ Обнови **`docs/user-manual/features/`** — если изменилось UX-поведение
+
+## Инструмент для проверки
+```bash
+make docs        # проверит устаревшие файлы и обновит CHANGELOG
+```
+
+## Правило PR
+Перед созданием PR убедись, что чеклист документации в `.github/PULL_REQUEST_TEMPLATE.md` заполнен.
+
+Подробнее: `docs/guides/doc-workflow.md`

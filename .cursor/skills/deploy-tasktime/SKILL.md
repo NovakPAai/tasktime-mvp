@@ -1,6 +1,6 @@
 # Skill: deploy-tasktime
 
-Цель: описать базовый lifecycle развёртывания и диагностики TaskTime (dev/staging/prod) с учётом сети и доступности.
+Цель: описать базовый lifecycle развёртывания и диагностики Flow Universe (dev/staging/prod) с учётом сети и доступности.
 
 ## 1. Dev-окружение (локально)
 

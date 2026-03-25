@@ -1,0 +1,116 @@
+name: Update Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ── Job 1: Update CHANGELOG from commits ───────────────────────────────────
+  update-changelog:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate changelog
+        run: node scripts/generate-docs.js --changelog
+
+      - name: Commit changelog update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet docs/CHANGELOG.md; then
+            echo "No changelog changes"
+          else
+            git add docs/CHANGELOG.md .doc-sync-state
+            git commit -m "chore: update changelog [skip ci]"
+            git push
+          fi
+
+  # ── Job 2: Check API docs staleness ────────────────────────────────────────
+  check-api-docs:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check API docs
+        run: node scripts/generate-docs.js --api
+
+  # ── Job 3: PR staleness check and comment ──────────────────────────────────
+  check-staleness:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check for stale docs
+        id: stale
+        run: |
+          OUTPUT=$(node scripts/generate-docs.js --stale 2>&1)
+          echo "$OUTPUT"
+          # Extract warnings (lines with ⚠️)
+          WARNINGS=$(echo "$OUTPUT" | grep "⚠️" || true)
+          if [ -n "$WARNINGS" ]; then
+            echo "has_warnings=true" >> "$GITHUB_OUTPUT"
+            # Escape for multiline output
+            ESCAPED=$(echo "$WARNINGS" | sed 's/%/%25/g; s/\n/%0A/g')
+            echo "warnings=$ESCAPED" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_warnings=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR
+        if: steps.stale.outputs.has_warnings == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## 📋 Documentation Check
+
+            The following source files changed and their documentation may need updating:
+
+            \`\`\`
+            ${{ steps.stale.outputs.warnings }}
+            \`\`\`
+
+            Please review [docs/guides/doc-workflow.md](../docs/guides/doc-workflow.md) for the doc-update process.
+
+            > This is an automated reminder — dismiss if no doc changes are needed.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend infra stop clean seed test lint setup sync pr ship merge branches
+.PHONY: dev backend frontend infra stop clean seed test lint setup docs sync pr ship merge branches
 
 # --- First time setup ---
 setup:
@@ -36,6 +36,10 @@ db-reset:
 
 db-studio:
 	cd backend && npx prisma studio
+
+# --- Documentation ---
+docs:
+	node scripts/generate-docs.js
 
 # --- Quality ---
 test:

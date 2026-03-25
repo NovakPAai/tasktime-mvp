@@ -1,26 +1,26 @@
 name: tasktime-issues-gateway
-description: MCP/skill facade for TaskTime issue control (TTMP/LIVE), used by agents in Cursor to fetch and update tasks by key.
+description: MCP/skill facade for Flow Universe issue control (TTMP/LIVE), used by agents in Cursor to fetch and update tasks by key.
 
 ---
 
-# TaskTime Issues Gateway (TTMP/LIVE)
+# Flow Universe Issues Gateway (TTMP/LIVE)
 
 ## Назначение
 
-Дать агенту в Cursor **единый флоу «TaskTime → план → код → тесты → коммит → TaskTime»** для задач по ключу (`TTMP-83`, `LIVE-3`), с учётом:
+Дать агенту в Cursor **единый флоу «Flow Universe → план → код → тесты → коммит → Flow Universe»** для задач по ключу (`TTMP-83`, `LIVE-3`), с учётом:
 
 - статусов агента (`aiExecutionStatus`);
 - флага **Agent can do this** (`aiEligible`, `aiAssigneeType`);
 - комментариев и описаний в самой задаче;
 - **учёта времени и стоимости ИИ** через модуль `ai-sessions` (`/api/ai-sessions` + time logs).
 
-**Источник истины всегда REST‑API TaskTime.** MCP‑сервер `user-user-tasktime-issues` (если доступен) — **тонкая опциональная обёртка** над теми же REST‑эндпоинтами.
+**Источник истины всегда REST‑API Flow Universe.** MCP‑сервер `user-user-tasktime-issues` (если доступен) — **тонкая опциональная обёртка** над теми же REST‑эндпоинтами.
 
 ---
 
 ## Базовые REST‑эндпоинты (основной путь)
 
-Агент всегда должен исходить из того, что доступны обычные HTTP‑эндпоинты TaskTime:
+Агент всегда должен исходить из того, что доступны обычные HTTP‑эндпоинты Flow Universe:
 
 - **Задачи**
   - `GET /api/issues/key/:key` — получить задачу по ключу (`TTMP-83`).
@@ -94,7 +94,7 @@ description: MCP/skill facade for TaskTime issue control (TTMP/LIVE), used by ag
 ### 1. Получить задачу и выставить IN_PROGRESS
 
 1. Разобрать ключ `key` (например, `TTMP-83`).
-2. Сходить в TaskTime:
+2. Сходить в Flow Universe:
 
    - `GET /api/issues/key/:key` → объект задачи (включая `id`, `aiEligible`, `aiAssigneeType`, `aiExecutionStatus`, `type`, `project.key`).
 
@@ -159,7 +159,7 @@ description: MCP/skill facade for TaskTime issue control (TTMP/LIVE), used by ag
      - `costMoney` (распределённый по ratio);
      - `agentSessionId = id сессии`.
 
-3. В TaskTime UI эти логи будут видны в блоке **Time Tracking** как `AI` с моделью и `costMoney`.
+3. В Flow Universe UI эти логи будут видны в блоке **Time Tracking** как `AI` с моделью и `costMoney`.
 
 ### 4. Коммит и (опционально) PR
 
@@ -169,7 +169,7 @@ description: MCP/skill facade for TaskTime issue control (TTMP/LIVE), used by ag
      - сообщение в формате репо: `feat: ...` / `fix: ...` и т.п.;
    - **push делать только если это явно разрешено правилами (см. `CLAUDE.md`) и пользователем.**
 
-2. В комментарии к задаче в TaskTime указать:
+2. В комментарии к задаче в Flow Universe указать:
 
    - ключ ветки (`claude/...`),
    - при наличии — ссылку на PR (если он создан),
@@ -225,7 +225,7 @@ description: MCP/skill facade for TaskTime issue control (TTMP/LIVE), used by ag
 
 ## Приоритет доверия
 
-- **Источник истины по задачам** — всегда backend TaskTime (`TTMP` и `LIVE`).
+- **Источник истины по задачам** — всегда backend Flow Universe (`TTMP` и `LIVE`).
 - Если MCP‑вызов вернул ошибку:
   - не подменять данные догадками;
   - кратко объяснить пользователю суть ошибки (например, нет доступа, задача не найдена, сервер недоступен).
@@ -237,7 +237,7 @@ description: MCP/skill facade for TaskTime issue control (TTMP/LIVE), used by ag
 Если в окружении Cursor нет MCP‑сервера `tasktime-issues`:
 
 - Агент должен:
-  - явно сказать, что автоматический доступ к TaskTime недоступен;
+  - явно сказать, что автоматический доступ к Flow Universe недоступен;
   - попросить пользователя:
     - либо прислать текст тикета и ключ вручную;
     - либо выполнить нужный HTTP‑запрос в Postman/браузере и вставить результат.

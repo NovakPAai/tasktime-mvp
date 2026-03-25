@@ -1,28 +1,35 @@
-## Что сделано
+## Что сделано / What was done
 
-<!-- Краткое описание изменений: что и зачем -->
+<!-- Краткое описание изменений / Brief description of changes -->
 
-## Тип изменений
+---
 
-- [ ] feat — новая функциональность
-- [ ] fix — исправление бага
-- [ ] refactor — рефакторинг без изменения поведения
-- [ ] chore — зависимости, конфиги, инфраструктура
-- [ ] docs — документация
+## Чеклист документации / Documentation checklist
 
-## Связанные задачи / контекст
+_Отметь одно: либо "нет изменений", либо отметь нужные файлы_
+_Check one: either "no changes" or check the relevant files_
 
-<!-- Номер задачи, ссылка на обсуждение или описание причины -->
+- [ ] Нет изменений, влияющих на документацию / No changes affecting documentation
+- [ ] `docs/api/reference.md` — добавлены/изменены API роуты / API routes added or changed
+- [ ] `docs/architecture/data-model.md` — изменена Prisma-схема / Prisma schema changed
+- [ ] `docs/architecture/backend-modules.md` — добавлен новый модуль / New backend module added
+- [ ] `docs/architecture/frontend-architecture.md` — добавлена новая страница / New frontend page added
+- [ ] `docs/user-manual/features/` — изменилось поведение для пользователя / User-visible behavior changed
+- [ ] `docs/guides/deployment.md` — изменения в деплое / Deployment changes
+- [ ] `docs/integrations/` — изменения в интеграциях / Integration changes
 
-## Чеклист
+---
 
-- [ ] CI зелёный (backend + frontend)
-- [ ] Новый код покрыт тестами (или тесты не нужны — объяснено выше)
-- [ ] Нет `console.log`, отладочного кода, закомментированного мусора
-- [ ] Prisma schema изменена → миграция создана (`npx prisma migrate dev`)
-- [ ] Нет прямых изменений в `main` (ветка создана от main)
-- [ ] Ветку можно удалить после мёрджа
+## Тест-план / Test plan
 
-## Скриншоты / демо
+<!-- Как проверить, что изменения работают / How to verify the changes work -->
 
-<!-- Для UI-изменений — скриншот до/после или гифка. Для API — curl или результат теста. -->
+- [ ] Тесты запущены (`make test`) / Tests run
+- [ ] Линтинг прошёл (`make lint`) / Lint passed
+- [ ] Ручная проверка выполнена / Manual verification done
+
+---
+
+## Связанные задачи / Related issues
+
+<!-- Пример: TTMP-83, DEMO-42 -->

@@ -2,7 +2,7 @@
 
 **Дата:** 2026-03-21
 **Тип:** STORY | **Приоритет:** HIGH | **Статус:** OPEN
-**Проект:** TaskTime UI (TTUI)
+**Проект:** Flow Universe UI (TTUI)
 **Исполнитель:** Novak Pavel
 **Автор ТЗ:** Claude Code (auto-generated)
 
