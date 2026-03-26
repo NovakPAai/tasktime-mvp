@@ -12,7 +12,10 @@ import type {
 
 const workflowInclude = {
   steps: { include: { status: true }, orderBy: { orderIndex: 'asc' as const } },
-  transitions: { orderBy: { orderIndex: 'asc' as const } },
+  transitions: {
+    include: { fromStatus: true, toStatus: true, screen: true },
+    orderBy: { orderIndex: 'asc' as const },
+  },
   _count: { select: { schemeItems: true } },
 };
 
