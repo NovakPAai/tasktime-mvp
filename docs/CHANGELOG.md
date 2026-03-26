@@ -4,6 +4,16 @@
 
 ### St1tcher86
 
+- `1859aab7` docs(version): 2.4 — fix workflow admin editor и scheme editor (2026-03-26)
+
+### github-actions[bot]
+
+- `efe7d0b8` chore: update changelog [skip ci] (2026-03-26)
+
+## 2026-03-26
+
+### St1tcher86
+
 - `15d17154` fix(admin): workflow editor crashes + scheme editor can't manage mappings (#134) (2026-03-26)
 
 ### github-actions[bot]
