@@ -1,5 +1,56 @@
 # Flow Universe MVP — Контекст проекта
 
+---
+
+## 🚨 КРИТИЧНО: UI Kit 2.0 — Paper rebuild (читать перед любой правкой frontend)
+
+**Текущая фаза:** пересборка всех страниц по артбордам Paper. Единственный источник правды — Paper MCP.
+
+### ЗАПРЕЩЕНО в Page-файлах:
+- ❌ CSS-классы (`className="..."`) — ни одного
+- ❌ `import styles from '...'` — не использовать
+- ❌ `<Layout>`, `<Sider>`, `<Content>` из Ant Design
+- ❌ смешивать старые CSS-переменные (`var(--acc)`) с inline-стилями
+- ❌ изменять логику API-вызовов, стейт, роутинг — только визуал
+
+### ОБЯЗАТЕЛЬНО:
+- ✅ Только `style={{ ... }}` — чистые React inline-styles
+- ✅ Цвета/отступы/шрифты — только из `get_jsx(nodeId, format:"inline-styles")` Paper
+- ✅ Два токен-объекта на уровне модуля: `const DARK_C = {...}` и `const LIGHT_C = {...}`
+- ✅ Внутри компонента: `const C = mode === 'light' ? LIGHT_C : DARK_C`
+- ✅ `const { mode } = useThemeStore()` для переключения темы
+- ✅ Theme-aware конфиги (STATUS, PRIORITY и т.п.) — **внутри** компонента, не на уровне модуля
+- ✅ Ant Design допустим только для Modal/Form/Input/Table/Tooltip/Dropdown (не для layout)
+
+### Эталонные файлы (смотреть перед началом):
+- `frontend/src/pages/DashboardPage.tsx` — образец dual-theme, структуры токенов, helpers
+- `frontend/src/pages/ProjectsPage.tsx` — образец карточек, аватаров, статус-бейджей
+
+### Статус страниц:
+
+| Страница | Артборд Dark | Артборд Light | Статус |
+|---------|-------------|--------------|--------|
+| Sidebar + AppLayout | `1HD-0` | — | ✅ DONE |
+| DashboardPage | `1KQ-0` | `1R5-0` | ✅ DONE |
+| ProjectsPage | `1-0` | `81-0` | ✅ DONE |
+| SprintsPage | `28O-0` | `2D3-0` | ✅ DONE |
+| LoginPage | `4O8-0` | `4Q9-0` | ⏳ TODO |
+| ProjectDetailPage | `FW-0` | `QK-0` | ⏳ TODO |
+| BoardPage | `1XE-0` | `23C-0` | ⏳ TODO (DnD — не трогать логику) |
+| GlobalSprintsPage | `2HH-0` | `2MD-0` | ⏳ TODO |
+| TimePage | `2RY-0` | `2WD-0` | ⏳ TODO |
+| IssueDetailPage | `30S-0` | `354-0` | ⏳ TODO (высокий риск) |
+| TeamsPage | `39G-0` | `3DX-0` | ⏳ TODO |
+| BusinessTeamsPage | `3IE-0` | `3ME-0` | ⏳ TODO |
+| FlowTeamsPage | `3QE-0` | `3VO-0` | ⏳ TODO |
+| ReleasesPage | `4EO-0` | `4JG-0` | ⏳ TODO |
+| SettingsPage | `4S8-0` | `4YJ-0` | ⏳ TODO |
+| AdminPage | `40Y-0` | `47T-0` | ⏳ TODO |
+
+> Полный план сессий: `docs/plans/2026-03-25-paper-ui-rebuild-plan.md`
+
+---
+
 ## Участники и совместная работа
 
 ### Команда
