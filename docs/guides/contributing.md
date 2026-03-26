@@ -81,17 +81,61 @@ make test     # Vitest
 
 ## Документация
 
-**Большинство обновляется автоматически** после мёрджа — не нужно ничего делать для API reference, data model, роутов фронтенда и т.д.
+### Как это работает
 
-Подробно: [doc-workflow.md](./doc-workflow.md)
+Документация в проекте **живая** — большая часть генерируется автоматически из кода.
 
-**Только это требует ручного обновления:**
+**Что делает GitHub Actions сразу после мёрджа в `main`:**
 
-| Изменил | Обнови |
-|---------|--------|
-| UI-страница (видимое поведение) | `docs/user-manual/features/` |
+| Изменил в коде | Обновится само |
+|----------------|---------------|
+| `*.router.ts` | `docs/api/reference.md` — таблица всех эндпоинтов |
+| `schema.prisma` | `docs/architecture/data-model.md` — все модели и enum |
+| `backend/src/app.ts` | `docs/architecture/backend-modules.md` |
+| `frontend/src/App.tsx` | `docs/architecture/frontend-architecture.md` |
+| `store/*.ts` | frontend-architecture.md (секция stores) |
+| `features.ts` | `docs/architecture/overview.md` |
+| `.env.example` | `docs/guides/getting-started.md` |
+| `Makefile` | `docs/guides/getting-started.md` |
+| `docker-compose.yml` | `docs/guides/getting-started.md` |
+| Любой коммит | `docs/CHANGELOG.md` |
+
+Бот сам сделает коммит `chore: auto-update docs [skip ci]`. Ничего делать не нужно.
+
+### Что нужно написать руками
+
+Только то, что описывает **поведение** — это не вывести из кода:
+
+| Изменил | Напиши сам |
+|---------|-----------|
+| UI-страница — изменилось поведение для пользователя | `docs/user-manual/features/<фича>.md` |
 | Новый публичный UI-компонент | `docs/design-system/overview.md` |
-| Интеграция GitLab / Telegram | `docs/integrations/` |
+| Интеграция GitLab / Telegram | `docs/integrations/gitlab.md` или `telegram.md` |
 | CI/CD или деплой-конфиг | `docs/guides/deployment.md` |
 
-Claude Code и Cursor напомнят прямо в чате при редактировании нужного файла.
+### Как тебя напомнят
+
+**Claude Code** скажет прямо в чате при редактировании нужного файла:
+```
+📋 Ремайндер: Изменена UI-страница.
+   → Обнови docs/user-manual/features/ если изменилось поведение для пользователя
+```
+
+**Cursor** покажет подсказку через правило `.cursor/rules/doc-update.mdc`.
+
+**GitHub** добавит комментарий к PR со списком файлов, которые стоит обновить.
+
+При изменении роутеров или схемы увидишь:
+```
+✅ Авто-документация обновится сама после мёрджа в main
+```
+— значит всё хорошо, ничего делать не нужно.
+
+### Сгенерировать доку локально
+
+```bash
+make docs                                  # всё сразу
+node scripts/generate-docs.js --routes     # только API reference
+node scripts/generate-docs.js --schema     # только data model
+node scripts/generate-docs.js --stale      # что нужно обновить руками
+```
