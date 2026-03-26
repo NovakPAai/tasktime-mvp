@@ -4,6 +4,16 @@
 
 ### St1tcher86
 
+- `15d17154` fix(admin): workflow editor crashes + scheme editor can't manage mappings (#134) (2026-03-26)
+
+### github-actions[bot]
+
+- `2ffdfa6d` chore: update changelog [skip ci] (2026-03-26)
+
+## 2026-03-26
+
+### St1tcher86
+
 - `8c68fe96` feat(workflow-engine): Sprint 6 — Workflow Engine (TTADM-58, 59, 62, 64, 65) (2026-03-26)
 
 ### github-actions[bot]
