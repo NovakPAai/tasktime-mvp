@@ -802,6 +802,17 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `GET` | `/api/users/:userId/time/summary` | 🔒 |
 | `GET` | `/api/time/active` | 🔒 |
 
+### transition-screens
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PATCH` | `/api/:id` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+| `PUT` | `/api/:id/items` | 🔒 |
+
 ### Users
 
 | Метод | Путь | Доступ |
@@ -817,4 +828,52 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | Метод | Путь | Доступ |
 |-------|------|--------|
 | `POST` | `/api/webhooks/gitlab` | — |
+
+### workflow-engine
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/issues/:id/transitions` | 🔒 |
+| `POST` | `/api/issues/:id/transitions` | 🔒 |
+
+### workflow-schemes
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PUT` | `/api/:id` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+| `PUT` | `/api/:id/items` | 🔒 |
+| `POST` | `/api/:id/projects` | 🔒 |
+| `DELETE` | `/api/:id/projects/:projectId` | 🔒 |
+
+### workflows
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PATCH` | `/api/:id` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+
+### workflows
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PUT` | `/api/:id` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+| `POST` | `/api/:id/copy` | 🔒 |
+| `POST` | `/api/:id/steps` | 🔒 |
+| `PATCH` | `/api/:id/steps/:stepId` | 🔒 |
+| `DELETE` | `/api/:id/steps/:stepId` | 🔒 |
+| `GET` | `/api/:id/transitions` | 🔒 |
+| `POST` | `/api/:id/transitions` | 🔒 |
+| `PUT` | `/api/:id/transitions/:tid` | 🔒 |
+| `DELETE` | `/api/:id/transitions/:tid` | 🔒 |
 <!-- AUTO-GENERATED:END -->

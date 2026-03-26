@@ -283,4 +283,9 @@ Run `make docs` to check for staleness warnings.
 | Issue Custom Fields | `/api` | `backend/src/modules/issue-custom-fields/issue-custom-fields.router.js.ts` |
 | projectFieldSchemasRouter | `/api/projects/:projectId/field-schemas` | `—` |
 | Monitoring | `/api/monitoring` | `backend/src/modules/monitoring/monitoring.router.js.ts` |
+| Workflows | `/api/admin/workflow-statuses` | `backend/src/modules/workflows/workflow-statuses.router.js.ts` |
+| Workflows | `/api/admin/workflows` | `backend/src/modules/workflows/workflows.router.js.ts` |
+| Workflow Schemes | `/api/admin/workflow-schemes` | `backend/src/modules/workflow-schemes/workflow-schemes.router.js.ts` |
+| Transition Screens | `/api/admin/transition-screens` | `backend/src/modules/transition-screens/transition-screens.router.js.ts` |
+| Workflow Engine | `/api` | `backend/src/modules/workflow-engine/workflow-engine.router.js.ts` |
 <!-- AUTO-GENERATED:END -->

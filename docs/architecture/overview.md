@@ -200,3 +200,16 @@ See [security.md](./security.md) for full details.
 - [security.md](./security.md) — RBAC, JWT flow, audit
 - [../api/reference.md](../api/reference.md) — Full API reference
 - [../guides/getting-started.md](../guides/getting-started.md) — Local setup
+
+<!-- AUTO-GENERATED:START:features -->
+> ⚡ Авто-сгенерировано из `backend/src/shared/features.ts`
+> Управление через переменные окружения в `.env`.
+
+| Флаг | Env-переменная | По умолчанию | Описание |
+|------|---------------|-------------|----------|
+| `ai` | `FEATURES_AI` | `true` | AI-оценка задач и декомпозиция |
+| `mcp` | `FEATURES_MCP` | `true` | MCP-прокси для Claude Desktop |
+| `gitlab` | `FEATURES_GITLAB` | `true` | GitLab webhook интеграция |
+| `telegram` | `FEATURES_TELEGRAM` | `false` | Telegram-бот уведомления |
+| `aiProvider` | `AI_PROVIDER` | `heuristic` | AI провайдер: `anthropic` или `heuristic` |
+<!-- AUTO-GENERATED:END:features -->

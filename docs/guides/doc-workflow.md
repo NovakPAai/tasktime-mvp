@@ -1,108 +1,89 @@
-# Documentation Workflow / Как работает документация
+# Как работает документация в Flow Universe
 
-> Для новых контрибьюторов
-> Last updated: 2026-03-25
-
----
-
-## RU: Как устроена система документации
-
-Flow Universe использует **живую** систему документации — она обновляется автоматически после каждого мержа в `main` и напоминает разработчикам обновить нужный файл.
-
-### Что происходит автоматически (ничего делать не надо)
-
-1. **После мержа в `main`** — GitHub Actions запускает `update-docs.yml`:
-   - Обновляет `docs/CHANGELOG.md` — добавляет новые коммиты с именами авторов
-   - Если изменились роуты API — регенерирует `docs/api/reference.md` из OpenAPI
-   - Коммит `chore: update changelog [skip ci]` — не запускает CI повторно
-
-2. **При создании PR** — CI-бот добавляет комментарий: список doc-файлов, которые может понадобиться обновить (на основе изменённых исходных файлов)
-
-### Что нужно сделать один раз при клонировании
-
-```bash
-make setup    # устанавливает зависимости, в том числе для генерации доков
-node --version  # убедитесь, что Node.js 20+
-```
-
-Больше ничего. Хуки Claude Code и Cursor активируются автоматически.
-
-### Правило: каждая фича = обновление документации
-
-| Что изменили | Обновите это |
-|-------------|-------------|
-| Новый/изменённый API роут | `docs/api/reference.md` |
-| Изменили Prisma schema | `docs/architecture/data-model.md` |
-| Новый модуль бэкенда | `docs/architecture/backend-modules.md` |
-| Новая страница фронтенда | `docs/architecture/frontend-architecture.md` |
-| Изменилось UX/поведение | `docs/user-manual/features/<фича>.md` |
-| Новая интеграция | `docs/integrations/<название>.md` |
-| Изменился деплой | `docs/guides/deployment.md` |
-
-### Напоминания в редакторе
-
-**Claude Code** и **Cursor** напомнят вам при редактировании:
-- `*/router.ts` → «Обнови docs/api/reference.md»
-- `frontend/src/pages/**` → «Обнови docs/user-manual/features/ и frontend-architecture.md»
-- `prisma/schema.prisma` → «Обнови docs/architecture/data-model.md»
-
-### При создании PR
-
-GitHub показывает **чеклист документации** автоматически (из `.github/PULL_REQUEST_TEMPLATE.md`). Нужно отметить галочки или написать «Нет изменений, влияющих на доки».
-
-### Генерация доков локально
-
-```bash
-make docs                                  # всё сразу
-node scripts/generate-docs.js --changelog  # только CHANGELOG
-node scripts/generate-docs.js --api        # только API reference из OpenAPI
-node scripts/generate-docs.js --stale      # проверить что устарело
-```
+> Для новых контрибьюторов · Last updated: 2026-03-26
 
 ---
 
-## EN: How the documentation system works
+## TL;DR
 
-### What happens automatically
+**Большинство документации обновляется сама.** Тебе нужно обновить вручную только то, что описывает _поведение_ (user manual, интеграции, гайды).
 
-1. **On every merge to `main`** — GitHub Actions `update-docs.yml`:
-   - Updates `docs/CHANGELOG.md` with new commits (grouped by author)
-   - If API routes changed — regenerates `docs/api/reference.md` from OpenAPI
-   - Auto-commits `chore: update changelog [skip ci]`
+---
 
-2. **On PR open** — CI bot comments with list of doc files that may need updating
+## Что обновляется автоматически
 
-### One-time setup on clone
+После каждого **мёрджа в `main`** GitHub Actions запускает генераторы из `scripts/generate-docs.js`:
+
+| Изменил | Обновится само | Куда |
+|---------|---------------|------|
+| `*.router.ts` | Таблица всех API эндпоинтов | `docs/api/reference.md` |
+| `schema.prisma` | Все модели, поля, enum | `docs/architecture/data-model.md` |
+| `backend/src/app.ts` | Список модулей и префиксов | `docs/architecture/backend-modules.md` |
+| `frontend/src/App.tsx` | Таблица роутов + авторизация | `docs/architecture/frontend-architecture.md` |
+| `frontend/src/store/*.ts` | Zustand stores (стейт + экшены) | `docs/architecture/frontend-architecture.md` |
+| `backend/src/shared/features.ts` | Feature flags | `docs/architecture/overview.md` |
+| `.env.example` | Переменные окружения | `docs/guides/getting-started.md` |
+| `Makefile` | Все make-команды | `docs/guides/getting-started.md` |
+| `docker-compose.yml` | Сервисы, порты, образы | `docs/guides/getting-started.md` |
+| Любой коммит | Changelog по авторам | `docs/CHANGELOG.md` |
+
+Бот сделает коммит `chore: auto-update docs [skip ci]` — CI не запускается повторно.
+
+---
+
+## Что нужно обновить вручную
+
+Ремайндер появится прямо в чате Claude Code / комментарии GitHub при открытии PR:
+
+| Изменил | Обнови руками |
+|---------|-------------|
+| `frontend/src/pages/**` | `docs/user-manual/features/<фича>.md` |
+| `frontend/src/components/ui/**` | `docs/design-system/overview.md` |
+| `modules/integrations/**` или `webhooks` | `docs/integrations/gitlab.md` / `telegram.md` |
+| `deploy/**`, `.github/workflows/**` | `docs/guides/deployment.md` |
+
+Всё остальное — авто.
+
+---
+
+## Напоминания в редакторе
+
+**Claude Code:** хук в `.claude/settings.json` — при редактировании нужного файла Claude скажет что обновить.
+
+**Cursor:** правило `.cursor/rules/doc-update.mdc` — аналогично.
+
+При изменении роутеров, схемы или App.tsx редактор покажет:
+```
+✅ Авто-документация обновится сама после мёрджа в main
+```
+Ничего делать не нужно.
+
+---
+
+## PR чеклист
+
+GitHub автоматически подставляет шаблон из `.github/PULL_REQUEST_TEMPLATE.md` с галочками. Заполни или напиши «не затронуто».
+
+---
+
+## Сгенерировать локально
 
 ```bash
-make setup    # installs all deps including doc generation tools
+make docs                                    # всё сразу
+node scripts/generate-docs.js --routes       # только API reference
+node scripts/generate-docs.js --schema       # только data model
+node scripts/generate-docs.js --env          # только env vars
+node scripts/generate-docs.js --stale        # проверить что устарело вручную
 ```
 
-Nothing else. Claude Code and Cursor hooks activate automatically.
+---
 
-### The rule: every feature = doc update
+## Добавить новый роутер / модуль в авто-генерацию
 
-| Changed | Update |
-|---------|--------|
-| New/changed API route | `docs/api/reference.md` |
-| Prisma schema change | `docs/architecture/data-model.md` |
-| New backend module | `docs/architecture/backend-modules.md` |
-| New frontend page | `docs/architecture/frontend-architecture.md` |
-| User-visible UX change | `docs/user-manual/features/<feature>.md` |
-| New integration | `docs/integrations/<name>.md` |
+Открой `scripts/generate-docs.js`, найди `ROUTER_MODULE_MAP` и добавь строку:
 
-### Editor reminders
-
-**Claude Code** and **Cursor** show a reminder when editing:
-- `*/router.ts` → "Update docs/api/reference.md"
-- `frontend/src/pages/**` → "Update docs/user-manual/ and frontend-architecture.md"
-- `prisma/schema.prisma` → "Update docs/architecture/data-model.md"
-
-### Generate docs locally
-
-```bash
-make docs                                  # everything
-node scripts/generate-docs.js --changelog  # changelog only
-node scripts/generate-docs.js --api        # API docs only
-node scripts/generate-docs.js --stale      # staleness check only
+```js
+'my-module.router.ts': { prefix: '/api', name: 'My Module' },
 ```
+
+Запусти `make docs` — появится в `docs/api/reference.md`.

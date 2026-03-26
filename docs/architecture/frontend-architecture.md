@@ -211,5 +211,76 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/admin/custom-fields` | `AdminCustomFieldsPage` | `frontend/src/pages/admin/AdminCustomFieldsPage` | — |
 | `/admin/field-schemas` | `AdminFieldSchemasPage` | `frontend/src/pages/admin/AdminFieldSchemasPage` | — |
 | `/admin/field-schemas/:id` | `AdminFieldSchemaDetailPage` | `frontend/src/pages/admin/AdminFieldSchemaDetailPage` | — |
+| `/admin/workflow-statuses` | `AdminWorkflowStatusesPage` | `frontend/src/pages/admin/AdminWorkflowStatusesPage` | — |
+| `/admin/workflows` | `AdminWorkflowsPage` | `frontend/src/pages/admin/AdminWorkflowsPage` | — |
+| `/admin/workflows/:id` | `AdminWorkflowEditorPage` | `frontend/src/pages/admin/AdminWorkflowEditorPage` | — |
+| `/admin/workflow-schemes` | `AdminWorkflowSchemesPage` | `frontend/src/pages/admin/AdminWorkflowSchemesPage` | — |
+| `/admin/workflow-schemes/:id` | `AdminWorkflowSchemeEditorPage` | `frontend/src/pages/admin/AdminWorkflowSchemeEditorPage` | — |
+| `/admin/transition-screens` | `AdminTransitionScreensPage` | `frontend/src/pages/admin/AdminTransitionScreensPage` | — |
+| `/admin/transition-screens/:id` | `AdminTransitionScreenEditorPage` | `frontend/src/pages/admin/AdminTransitionScreenEditorPage` | — |
 | `/settings` | `SettingsPage` | `frontend/src/pages/SettingsPage` | — |
 <!-- AUTO-GENERATED:END -->
+
+<!-- AUTO-GENERATED:START:stores -->
+> ⚡ Авто-сгенерировано из `frontend/src/store/*.ts`
+> Обновляется при изменении store-файлов.
+
+### `auth.store`
+
+Файл: `frontend/src/store/auth.store.ts` · 2 полей состояния · 4 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `user` | `User | null` | состояние |
+| `loading` | `boolean` | состояние |
+| `login` | `(email: string, password: string) => Promise<void>` | экшен |
+| `register` | `(email: string, password: string, name: string) => Promis...` | экшен |
+| `logout` | `() => Promise<void>` | экшен |
+| `loadUser` | `() => Promise<void>` | экшен |
+
+### `issues.store`
+
+Файл: `frontend/src/store/issues.store.ts` · 3 полей состояния · 3 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `issues` | `Issue[]` | состояние |
+| `loading` | `boolean` | состояние |
+| `filters` | `IssuesFilters` | состояние |
+| `setFilters` | `(filters: Partial<IssuesFilters>) => void` | экшен |
+| `resetFilters` | `() => void` | экшен |
+| `fetchIssues` | `(projectId: string) => Promise<void>` | экшен |
+
+### `projects.store`
+
+Файл: `frontend/src/store/projects.store.ts` · 2 полей состояния · 1 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `projects` | `Project[]` | состояние |
+| `loading` | `boolean` | состояние |
+| `fetchProjects` | `() => Promise<void>` | экшен |
+
+### `theme.store`
+
+Файл: `frontend/src/store/theme.store.ts` · 1 полей состояния · 2 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `mode` | `ThemeMode` | состояние |
+| `setMode` | `(mode: ThemeMode) => void` | экшен |
+| `toggle` | `() => void` | экшен |
+
+### `uatOnboarding.store`
+
+Файл: `frontend/src/store/uatOnboarding.store.ts` · 2 полей состояния · 4 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `activeTest` | `UatTest | null` | состояние |
+| `currentStepIndex` | `number` | состояние |
+| `startTest` | `(test: UatTest) => void` | экшен |
+| `nextStep` | `() => void` | экшен |
+| `prevStep` | `() => void` | экшен |
+| `stopTest` | `() => void` | экшен |
+<!-- AUTO-GENERATED:END:stores -->

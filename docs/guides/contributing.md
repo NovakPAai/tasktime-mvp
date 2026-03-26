@@ -1,124 +1,97 @@
-# Contributing Guide / Руководство контрибьютора
+# Руководство контрибьютора
 
-> Last updated: 2026-03-25
-
----
-
-## Branch naming / Именование веток
-
-| Participant | Tool | Branch prefix |
-|------------|------|---------------|
-| jackrescuer-gif | Claude Code | `claude/jack-<description>` |
-| jackrescuer-gif | Cursor | `cursor/jack-<description>` |
-| St1tcher86 | Claude Code | `claude/alex-<description>` |
-| St1tcher86 | Cursor | `cursor/alex-<description>` |
-| Anyone | — | `fix/<description>` (hotfixes) |
-
-Examples: `claude/jack-ai-estimation`, `cursor/alex-kanban-improvements`
+> Last updated: 2026-03-26
 
 ---
 
-## Workflow / Рабочий процесс
+## Быстрый старт
 
 ```bash
-# 1. Sync with main
-make sync           # = git fetch + rebase on origin/main
-
-# 2. Create branch
-git checkout -b claude/jack-your-feature
-
-# 3. Work + commit
-git commit -m "feat: add AI estimation endpoint"
-
-# 4. Ship (lint → push → PR)
-make ship           # or: make pr (skip lint)
-
-# 5. Wait for CI green + reviewer approval
-
-# 6. Merge
-make merge          # = squash merge + delete branch
+git clone git@github.com:jackrescuer-gif/tasktime-mvp.git
+cd tasktime-mvp
+make setup          # зависимости + Docker (PostgreSQL + Redis) + seed
+make dev            # backend :3000 + frontend :5173
 ```
 
----
-
-## Commit message format / Формат коммита
-
-```
-<type>: <description in English or Russian>
-```
-
-Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
-
-Examples:
-- `feat: add AI decomposition for issues`
-- `fix: исправить расчёт времени в таймере`
-- `docs: update API reference for sprints module`
-- `chore: update dependencies`
+Аккаунты: `admin@tasktime.ru` / `password123`
 
 ---
 
-## Documentation requirement / Требование к документации
+## Именование веток
 
-**Every feature = documentation update.** No exceptions.
-
-When you change code, update the corresponding doc:
-
-| What changed | Update this doc |
-|-------------|-----------------|
-| New/changed API route | `docs/api/reference.md` |
-| New/changed Prisma model | `docs/architecture/data-model.md` |
-| New backend module | `docs/architecture/backend-modules.md` |
-| New frontend page | `docs/architecture/frontend-architecture.md` |
-| User-visible behavior change | `docs/user-manual/features/<feature>.md` |
-| Deployment change | `docs/guides/deployment.md` |
-| New integration | `docs/integrations/<name>.md` |
-
-**Claude Code and Cursor will remind you** — hooks show a hint when you edit router files, schema, or pages.
-
-The PR template also has a documentation checklist — fill it in.
+| Участник | Инструмент | Префикс |
+|---------|-----------|---------|
+| jackrescuer-gif | Claude Code | `claude/jack-<описание>` |
+| jackrescuer-gif | Cursor | `cursor/jack-<описание>` |
+| St1tcher86 | Claude Code | `claude/alex-<описание>` |
+| St1tcher86 | Cursor | `cursor/alex-<описание>` |
+| Любой | — | `fix/<описание>` |
 
 ---
 
-## PR rules / Правила PR
+## Рабочий процесс
 
-- PRs go into `main` (protected branch)
-- CI must be green before merge
-- At least 1 approval from the other participant required
-- No force push to `main`
-- Squash merge only (`make merge` does this automatically)
-
----
-
-## Code quality standards / Стандарты кода
-
-- TypeScript strict mode
-- Zod validation on all API request bodies (in DTOs)
-- Authenticate middleware on all protected routes
-- `logAudit()` on all mutations
-- No hardcoded secrets (use env vars)
-- No `any` types without justification
-- Functions < 50 lines
-- Files < 800 lines
-
-Run before every PR:
 ```bash
-make lint     # ESLint + Prettier check
-make test     # Vitest unit + integration tests
+make sync                                    # fetch + rebase на origin/main
+git checkout -b claude/jack-my-feature
+# ... работа ...
+git commit -m "feat: добавить экспорт задач в CSV"
+make ship                                    # sync → lint → push → PR
+# ждёшь CI зелёный + аппрув
+make merge                                   # squash merge + удалить ветку
 ```
 
----
-
-## Documentation workflow / Как работает система документации
-
-For the full contributor doc-update workflow, see: [doc-workflow.md](./doc-workflow.md)
+Или по шагам: `make pr` (без lint), `make branches` (список открытых веток).
 
 ---
 
-## Making `git sync` available / Настройка git sync
+## Формат коммитов
 
-The `make sync` command requires a clean working directory:
+```
+<тип>: <описание>
+```
+
+Типы: `feat` `fix` `refactor` `docs` `test` `chore` `perf` `ci`
+
+---
+
+## Правила PR
+
+- Ветка → `main` (защищена)
+- CI зелёный + 1 аппрув = можно мёрджить
+- Стратегия: squash merge (`make merge`)
+- Force push в `main` — запрещён
+
+---
+
+## Стандарты кода
+
+- TypeScript strict, Zod-валидация на все DTO
+- `authenticate` middleware на всех защищённых роутах
+- `logAudit()` на всех мутациях
+- Нет хардкодных секретов — только env vars
+- Функции < 50 строк, файлы < 800 строк
+
 ```bash
-git stash          # save uncommitted changes
-make sync
-git stash pop      # restore
+make lint     # ESLint + Prettier
+make test     # Vitest
 ```
+
+---
+
+## Документация
+
+**Большинство обновляется автоматически** после мёрджа — не нужно ничего делать для API reference, data model, роутов фронтенда и т.д.
+
+Подробно: [doc-workflow.md](./doc-workflow.md)
+
+**Только это требует ручного обновления:**
+
+| Изменил | Обнови |
+|---------|--------|
+| UI-страница (видимое поведение) | `docs/user-manual/features/` |
+| Новый публичный UI-компонент | `docs/design-system/overview.md` |
+| Интеграция GitLab / Telegram | `docs/integrations/` |
+| CI/CD или деплой-конфиг | `docs/guides/deployment.md` |
+
+Claude Code и Cursor напомнят прямо в чате при редактировании нужного файла.

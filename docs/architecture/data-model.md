@@ -330,7 +330,7 @@ Run `make docs` to check for staleness warnings.
 > ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
 > Обновляется автоматически при каждом изменении схемы.
 
-## Модели (26)
+## Модели (35)
 
 ### User
 
@@ -413,6 +413,7 @@ Run `make docs` to check for staleness warnings.
 | `issueTypeScheme` | `IssueTypeSchemeProject` | да |  |
 | `userRoles` | `UserProjectRole[]` | нет |  |
 | `fieldSchemaBindings` | `FieldSchemaBinding[]` | нет |  |
+| `workflowScheme` | `WorkflowSchemeProject` | да |  |
 
 ### IssueTypeConfig
 
@@ -433,6 +434,7 @@ Run `make docs` to check for staleness warnings.
 | `schemeItems` | `IssueTypeSchemeItem[]` | нет |  |
 | `issues` | `Issue[]` | нет |  |
 | `fieldSchemaBindings` | `FieldSchemaBinding[]` | нет |  |
+| `workflowSchemeItems` | `WorkflowSchemeItem[]` | нет |  |
 
 ### IssueTypeScheme
 
@@ -502,7 +504,9 @@ Run `make docs` to check for staleness warnings.
 | `aiReasoning` | `String` | да |  |
 | `createdAt` | `DateTime` | нет | default: now( |
 | `updatedAt` | `DateTime` | нет |  |
+| `workflowStatusId` | `String` | да |  |
 | `issueTypeConfig` | `IssueTypeConfig` | да |  |
+| `workflowStatus` | `WorkflowStatus` | да |  |
 | `project` | `Project` | нет |  |
 | `comments` | `Comment[]` | нет |  |
 | `timeLogs` | `TimeLog[]` | нет |  |
@@ -665,6 +669,7 @@ Run `make docs` to check for staleness warnings.
 | `updatedAt` | `DateTime` | нет |  |
 | `schemaItems` | `FieldSchemaItem[]` | нет |  |
 | `values` | `IssueCustomFieldValue[]` | нет |  |
+| `transitionScreenItems` | `TransitionScreenItem[]` | нет |  |
 
 ### IssueCustomFieldValue
 
@@ -758,7 +763,135 @@ Run `make docs` to check for staleness warnings.
 | `team` | `Team` | нет |  |
 | `user` | `User` | нет |  |
 
-## Перечисления (13)
+### WorkflowStatus
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `category` | `StatusCategory` | нет |  |
+| `color` | `String` | нет | default: "#9E9E9E" |
+| `iconName` | `String` | да |  |
+| `isSystem` | `Boolean` | нет | default: false |
+| `systemKey` | `String` | да | UNIQUE |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `transitionsFrom` | `WorkflowTransition[]` | нет |  |
+| `transitionsTo` | `WorkflowTransition[]` | нет |  |
+| `workflowSteps` | `WorkflowStep[]` | нет |  |
+| `issues` | `Issue[]` | нет |  |
+
+### Workflow
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `isDefault` | `Boolean` | нет | default: false |
+| `isSystem` | `Boolean` | нет | default: false |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `steps` | `WorkflowStep[]` | нет |  |
+| `transitions` | `WorkflowTransition[]` | нет |  |
+| `schemeItems` | `WorkflowSchemeItem[]` | нет |  |
+
+### WorkflowStep
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `workflowId` | `String` | нет |  |
+| `statusId` | `String` | нет |  |
+| `isInitial` | `Boolean` | нет | default: false |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `workflow` | `Workflow` | нет |  |
+| `status` | `WorkflowStatus` | нет |  |
+
+### WorkflowTransition
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `workflowId` | `String` | нет |  |
+| `name` | `String` | нет |  |
+| `fromStatusId` | `String` | да |  |
+| `toStatusId` | `String` | нет |  |
+| `isGlobal` | `Boolean` | нет | default: false |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `conditions` | `Json` | да |  |
+| `validators` | `Json` | да |  |
+| `postFunctions` | `Json` | да |  |
+| `screenId` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `workflow` | `Workflow` | нет |  |
+| `fromStatus` | `WorkflowStatus` | да |  |
+| `toStatus` | `WorkflowStatus` | нет |  |
+| `screen` | `TransitionScreen` | да |  |
+
+### TransitionScreen
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `transitions` | `WorkflowTransition[]` | нет |  |
+| `items` | `TransitionScreenItem[]` | нет |  |
+
+### TransitionScreenItem
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `screenId` | `String` | нет |  |
+| `customFieldId` | `String` | нет |  |
+| `isRequired` | `Boolean` | нет | default: false |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `screen` | `TransitionScreen` | нет |  |
+| `customField` | `CustomField` | нет |  |
+
+### WorkflowScheme
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `isDefault` | `Boolean` | нет | default: false |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `items` | `WorkflowSchemeItem[]` | нет |  |
+| `projects` | `WorkflowSchemeProject[]` | нет |  |
+
+### WorkflowSchemeItem
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemeId` | `String` | нет |  |
+| `workflowId` | `String` | нет |  |
+| `issueTypeConfigId` | `String` | да |  |
+| `scheme` | `WorkflowScheme` | нет |  |
+| `workflow` | `Workflow` | нет |  |
+| `issueTypeConfig` | `IssueTypeConfig` | да |  |
+
+### WorkflowSchemeProject
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemeId` | `String` | нет |  |
+| `projectId` | `String` | нет | UNIQUE |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `scheme` | `WorkflowScheme` | нет |  |
+| `project` | `Project` | нет |  |
+
+## Перечисления (14)
 
 ### UserRole
 
@@ -852,4 +985,10 @@ Run `make docs` to check for staleness warnings.
 - `PROJECT`
 - `ISSUE_TYPE`
 - `PROJECT_ISSUE_TYPE`
+
+### StatusCategory
+
+- `TODO`
+- `IN_PROGRESS`
+- `DONE`
 <!-- AUTO-GENERATED:END -->

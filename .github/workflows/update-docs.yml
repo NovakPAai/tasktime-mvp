@@ -11,7 +11,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  # ── Job 1: Update CHANGELOG + auto-generated sections ─────────────────────
+  # ── Job 1: Update all auto-generated docs after merge to main ─────────────
   auto-generate:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -30,25 +30,23 @@ jobs:
         run: |
           CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
 
-          echo "routes=false"   >> "$GITHUB_OUTPUT"
-          echo "schema=false"   >> "$GITHUB_OUTPUT"
-          echo "modules=false"  >> "$GITHUB_OUTPUT"
-          echo "frontend=false" >> "$GITHUB_OUTPUT"
+          # Initialize all flags to false
+          for flag in routes schema modules frontend features env stores makefile docker; do
+            echo "$flag=false" >> "$GITHUB_OUTPUT"
+          done
 
-          if echo "$CHANGED" | grep -qE 'backend/src/modules/.*\.router\.ts'; then
-            echo "routes=true" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "$CHANGED" | grep -q 'backend/src/prisma/schema.prisma'; then
-            echo "schema=true" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "$CHANGED" | grep -q 'backend/src/app.ts'; then
-            echo "modules=true" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "$CHANGED" | grep -q 'frontend/src/App.tsx'; then
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
-          fi
+          # Set flags based on changed files
+          echo "$CHANGED" | grep -qE 'backend/src/modules/.*\.router\.ts'    && echo "routes=true"   >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'backend/src/prisma/schema.prisma'       && echo "schema=true"   >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'backend/src/app.ts'                     && echo "modules=true"  >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'frontend/src/App.tsx'                   && echo "frontend=true" >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'backend/src/shared/features.ts'         && echo "features=true" >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -qE '\.env\.example'                         && echo "env=true"      >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'frontend/src/store/'                    && echo "stores=true"   >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'Makefile'                               && echo "makefile=true" >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'docker-compose.yml'                     && echo "docker=true"   >> "$GITHUB_OUTPUT" || true
 
-      - name: Generate changelog
+      - name: Generate changelog (always)
         run: node scripts/generate-docs.js --changelog
 
       - name: Generate API reference
@@ -67,16 +65,40 @@ jobs:
         if: steps.changes.outputs.frontend == 'true'
         run: node scripts/generate-docs.js --frontend
 
+      - name: Generate feature flags docs
+        if: steps.changes.outputs.features == 'true'
+        run: node scripts/generate-docs.js --features
+
+      - name: Generate env vars docs
+        if: steps.changes.outputs.env == 'true'
+        run: node scripts/generate-docs.js --env
+
+      - name: Generate Zustand stores docs
+        if: steps.changes.outputs.stores == 'true'
+        run: node scripts/generate-docs.js --stores
+
+      - name: Generate Makefile commands docs
+        if: steps.changes.outputs.makefile == 'true'
+        run: node scripts/generate-docs.js --makefile
+
+      - name: Generate Docker services docs
+        if: steps.changes.outputs.docker == 'true'
+        run: node scripts/generate-docs.js --docker
+
       - name: Commit generated docs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/CHANGELOG.md .doc-sync-state \
-                  docs/api/reference.md \
-                  docs/architecture/data-model.md \
-                  docs/architecture/backend-modules.md \
-                  docs/architecture/frontend-architecture.md \
-                  2>/dev/null || true
+          git add \
+            docs/CHANGELOG.md \
+            .doc-sync-state \
+            docs/api/reference.md \
+            docs/architecture/data-model.md \
+            docs/architecture/backend-modules.md \
+            docs/architecture/frontend-architecture.md \
+            docs/architecture/overview.md \
+            docs/guides/getting-started.md \
+            2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Nothing to commit"
           else
@@ -105,11 +127,10 @@ jobs:
           WARNINGS=$(echo "$OUTPUT" | grep "⚠️" || true)
           if [ -n "$WARNINGS" ]; then
             echo "has_warnings=true" >> "$GITHUB_OUTPUT"
-            # Use heredoc format for multiline GITHUB_OUTPUT
             {
-              echo "warnings<<WARNINGS_EOF"
+              echo "warnings<<EOF"
               echo "$WARNINGS"
-              echo "WARNINGS_EOF"
+              echo "EOF"
             } >> "$GITHUB_OUTPUT"
           else
             echo "has_warnings=false" >> "$GITHUB_OUTPUT"
@@ -129,8 +150,9 @@ jobs:
 ${warnings}
 \`\`\`
 
-> 💡 Авто-генерируемые секции (API reference, data model, routes) обновятся сами после мёрджа.
-> Это напоминание только о контентной документации — \`docs/user-manual/\`, \`docs/guides/\`, \`docs/integrations/\`.
+> 💡 Авто-генерируемые секции обновятся сами после мёрджа:
+> API reference · Data model · Backend modules · Frontend routes · Feature flags · Env vars · Stores · Makefile · Docker
+>
 > Подробнее: [docs/guides/doc-workflow.md](../blob/main/docs/guides/doc-workflow.md)`;
 
             await github.rest.issues.createComment({

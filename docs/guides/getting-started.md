@@ -187,3 +187,113 @@ cd backend && npx prisma generate && npx prisma db push
 ```bash
 make clean && make setup
 ```
+
+<!-- AUTO-GENERATED:START:env -->
+> ⚡ Авто-сгенерировано из `backend/.env.example` и `frontend/.env.example`
+> Скопируй файлы и заполни нужные значения: `cp backend/.env.example backend/.env`
+
+### Backend (`backend/.env`)
+
+| Переменная | Пример | Описание |
+|-----------|--------|----------|
+| `DATABASE_URL` | `postgresql://tasktime:tasktime@localh...` |  |
+| `JWT_SECRET` | `change-me-in-production` |  |
+| `JWT_REFRESH_SECRET` | `change-me-refresh-secret` |  |
+| `JWT_EXPIRES_IN` | `15m` |  |
+| `JWT_REFRESH_EXPIRES_IN` | `7d` |  |
+| `PORT` | `3000` |  |
+| `NODE_ENV` | `development` |  |
+| `CORS_ORIGIN` | `http://localhost:5173` |  |
+| `REDIS_URL` | `redis://localhost:6379` |  |
+| `REDIS_CACHE_TTL_SECONDS` | `30` |  |
+| `BOOTSTRAP_ENABLED` | `false` | Optional local bootstrap for built-in users via `npm run db:bootstrap` |
+| `BOOTSTRAP_DEFAULT_PASSWORD` | `—` |  |
+| `BOOTSTRAP_OWNER_ADMIN_EMAIL` | `—` |  |
+| `FEATURES_AI` | `true` | Feature flags (all enabled by default; set to false to disable in restricted environments) |
+| `FEATURES_MCP` | `true` |  |
+| `FEATURES_GITLAB` | `true` |  |
+| `FEATURES_TELEGRAM` | `false` |  |
+| `AI_PROVIDER` | `heuristic` | AI provider: anthropic | heuristic (heuristic = no external LLM, formula-based) |
+
+### Frontend (`frontend/.env`)
+
+| Переменная | Значение | Описание |
+|-----------|---------|----------|
+| `VITE_API_URL` | `/api` |  |
+<!-- AUTO-GENERATED:END:env -->
+
+<!-- AUTO-GENERATED:START:makefile -->
+> ⚡ Авто-сгенерировано из `Makefile`. Запуск: `make <команда>`
+
+**First time setup**
+
+| Команда | Описание |
+|---------|----------|
+| `make setup` |  |
+
+**Infrastructure (Postgres + Redis)**
+
+| Команда | Описание |
+|---------|----------|
+| `make infra` |  |
+
+**Dev servers**
+
+| Команда | Описание |
+|---------|----------|
+| `make backend` |  |
+| `make frontend` |  |
+| `make dev` | Start both backend and frontend (backend in background) |
+
+**Database**
+
+| Команда | Описание |
+|---------|----------|
+| `make seed` |  |
+| `make db-push` |  |
+| `make db-reset` |  |
+| `make db-studio` |  |
+
+**Documentation**
+
+| Команда | Описание |
+|---------|----------|
+| `make docs` |  |
+
+**Quality**
+
+| Команда | Описание |
+|---------|----------|
+| `make test` |  |
+| `make audit` | Security: dependency vulnerabilities (run periodically and before release) |
+| `make test-cov` |  |
+| `make lint` |  |
+
+**Git workflow**
+
+| Команда | Описание |
+|---------|----------|
+| `make sync` |  |
+| `make pr` |  |
+| `make ship` |  |
+| `make merge` |  |
+| `make branches` |  |
+
+**Cleanup**
+
+| Команда | Описание |
+|---------|----------|
+| `make stop` |  |
+| `make clean` |  |
+<!-- AUTO-GENERATED:END:makefile -->
+
+<!-- AUTO-GENERATED:START:docker -->
+> ⚡ Авто-сгенерировано из `docker-compose.yml`
+> Запуск: `make infra` (только БД+Redis) или `docker compose up -d` (все сервисы)
+
+| Сервис | Image | Порты | Профиль |
+|--------|-------|-------|---------|
+| `postgres` | `postgres:16-alpine` | 5432:5432 | default |
+| `redis` | `redis:7-alpine` | 6379:6379 | default |
+| `mcp-tasktime` | `evilfreelancer/openapi-to-mcp:latest` | 3002:3000 | backend |
+<!-- AUTO-GENERATED:END:docker -->

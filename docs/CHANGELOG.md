@@ -2,6 +2,18 @@
 
 ## 2026-03-26
 
+### jackrescuer-gif
+
+- `d0d1cd5b` docs: auto-generated API reference, data model, backend/frontend architecture (2026-03-26)
+- `acd27c94` feat(docs): максимальная автоматизация документации (2026-03-26)
+- `e864e2ff` fix(hooks): использовать абсолютный путь в PostToolUse хуке (2026-03-26)
+
+### github-actions[bot]
+
+- `2b46487f` chore: update changelog [skip ci] (2026-03-26)
+
+## 2026-03-26
+
 ### St1tcher86
 
 - `1859aab7` docs(version): 2.4 — fix workflow admin editor и scheme editor (2026-03-26)

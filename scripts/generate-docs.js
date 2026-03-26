@@ -45,13 +45,16 @@ function writeState(state) {
 }
 
 /**
- * Replace the AUTO-GENERATED section inside a doc file.
- * The markers are:  <!-- AUTO-GENERATED:START -->  and  <!-- AUTO-GENERATED:END -->
- * If markers are not present, appends the section at the end.
+ * Replace an AUTO-GENERATED section inside a doc file.
+ * Supports named keys for multiple AUTO sections per file:
+ *   key=''  → <!-- AUTO-GENERATED:START --> ... <!-- AUTO-GENERATED:END -->
+ *   key='x' → <!-- AUTO-GENERATED:START:x --> ... <!-- AUTO-GENERATED:END:x -->
+ * If markers absent, appends at the end.
  */
-function injectAutoSection(filePath, newContent) {
-  const START = '<!-- AUTO-GENERATED:START -->';
-  const END   = '<!-- AUTO-GENERATED:END -->';
+function injectAutoSection(filePath, newContent, key = '') {
+  const suffix = key ? `:${key}` : '';
+  const START  = `<!-- AUTO-GENERATED:START${suffix} -->`;
+  const END    = `<!-- AUTO-GENERATED:END${suffix} -->`;
 
   let existing = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
 
@@ -406,6 +409,300 @@ function generateFrontendRoutes() {
   console.log(`  ✓ Updated docs/architecture/frontend-architecture.md (${routes.length} routes)`);
 }
 
+// ── FEATURE FLAGS → docs/architecture/overview.md ────────────────────────────
+
+function generateFeatureFlags() {
+  console.log('\n🚩 Generating feature flags docs...');
+
+  const featFile = join(ROOT, 'backend', 'src', 'shared', 'features.ts');
+  if (!existsSync(featFile)) { console.log('  features.ts not found — skipping'); return; }
+
+  const src = readFileSync(featFile, 'utf8');
+
+  // Extract flag() calls: flag('ENV_NAME', defaultValue)
+  const flags = [];
+  const re = /(\w+):\s*flag\('([^']+)',\s*(true|false)\)/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    flags.push({ key: m[1], env: m[2], defaultVal: m[3] });
+  }
+
+  // Also extract aiProvider line
+  const providerMatch = src.match(/aiProvider:.*?process\.env\.(\w+).*?'([^']+)'/);
+
+  let out = `> ⚡ Авто-сгенерировано из \`backend/src/shared/features.ts\`
+> Управление через переменные окружения в \`.env\`.
+
+| Флаг | Env-переменная | По умолчанию | Описание |
+|------|---------------|-------------|----------|
+`;
+  const DESCRIPTIONS = {
+    ai: 'AI-оценка задач и декомпозиция',
+    mcp: 'MCP-прокси для Claude Desktop',
+    gitlab: 'GitLab webhook интеграция',
+    telegram: 'Telegram-бот уведомления',
+  };
+  for (const f of flags) {
+    out += `| \`${f.key}\` | \`${f.env}\` | \`${f.defaultVal}\` | ${DESCRIPTIONS[f.key] ?? ''} |\n`;
+  }
+  if (providerMatch) {
+    out += `| \`aiProvider\` | \`${providerMatch[1]}\` | \`${providerMatch[2]}\` | AI провайдер: \`anthropic\` или \`heuristic\` |\n`;
+  }
+
+  const outFile = join(ROOT, 'docs', 'architecture', 'overview.md');
+  injectAutoSection(outFile, out, 'features');
+  console.log(`  ✓ Updated docs/architecture/overview.md — feature flags (${flags.length} flags)`);
+}
+
+// ── ENV VARS → docs/guides/getting-started.md ────────────────────────────────
+
+function generateEnvVars() {
+  console.log('\n🔐 Generating env vars docs...');
+
+  const backendEnv  = join(ROOT, 'backend', '.env.example');
+  const frontendEnv = join(ROOT, 'frontend', '.env.example');
+  if (!existsSync(backendEnv)) { console.log('  backend/.env.example not found — skipping'); return; }
+
+  function parseEnvFile(filePath) {
+    const lines = readFileSync(filePath, 'utf8').split('\n');
+    const result = [];
+    let currentComment = '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#')) {
+        currentComment = trimmed.replace(/^#+\s*/, '');
+      } else if (trimmed && trimmed.includes('=')) {
+        const eqIdx = trimmed.indexOf('=');
+        const key = trimmed.slice(0, eqIdx).replace(/^#\s*/, '');
+        const val = trimmed.slice(eqIdx + 1).replace(/^["']|["']$/g, '');
+        const optional = line.trimStart().startsWith('#') && !key.startsWith('DATABASE');
+        result.push({ key, val, comment: currentComment, optional });
+        currentComment = '';
+      } else {
+        currentComment = '';
+      }
+    }
+    return result;
+  }
+
+  const backendVars  = parseEnvFile(backendEnv);
+  const frontendVars = existsSync(frontendEnv) ? parseEnvFile(frontendEnv) : [];
+
+  let out = `> ⚡ Авто-сгенерировано из \`backend/.env.example\` и \`frontend/.env.example\`
+> Скопируй файлы и заполни нужные значения: \`cp backend/.env.example backend/.env\`
+
+### Backend (\`backend/.env\`)
+
+| Переменная | Пример | Описание |
+|-----------|--------|----------|
+`;
+  for (const v of backendVars) {
+    const displayVal = v.val.length > 40 ? v.val.slice(0, 37) + '...' : v.val;
+    out += `| \`${v.key}\` | \`${displayVal || '—'}\` | ${v.comment || ''} |\n`;
+  }
+
+  if (frontendVars.length > 0) {
+    out += `\n### Frontend (\`frontend/.env\`)\n\n| Переменная | Значение | Описание |\n|-----------|---------|----------|\n`;
+    for (const v of frontendVars) {
+      out += `| \`${v.key}\` | \`${v.val || '—'}\` | ${v.comment || ''} |\n`;
+    }
+  }
+
+  const outFile = join(ROOT, 'docs', 'guides', 'getting-started.md');
+  injectAutoSection(outFile, out, 'env');
+  console.log(`  ✓ Updated docs/guides/getting-started.md — env vars (${backendVars.length} backend, ${frontendVars.length} frontend)`);
+}
+
+// ── ZUSTAND STORES → docs/architecture/frontend-architecture.md ──────────────
+
+function generateStores() {
+  console.log('\n🗃️  Generating Zustand stores docs...');
+
+  const storeDir = join(ROOT, 'frontend', 'src', 'store');
+  if (!existsSync(storeDir)) { console.log('  frontend/src/store not found — skipping'); return; }
+
+  const files = readdirSync(storeDir).filter(f => f.endsWith('.ts') || f.endsWith('.tsx'));
+  const stores = [];
+
+  for (const file of files) {
+    const src = readFileSync(join(storeDir, file), 'utf8');
+    const storeName = file.replace(/\.tsx?$/, '');
+
+    // Extract interface fields (state + actions)
+    const stateFields = [];
+    const interfaceRe = /interface\s+\w+State\s*\{([^}]+)\}/s;
+    const ifaceMatch = src.match(interfaceRe);
+    if (ifaceMatch) {
+      const body = ifaceMatch[1];
+      for (const line of body.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//')) continue;
+        const fieldMatch = trimmed.match(/^(\w+)(\??)\s*:\s*(.+?);?\s*$/);
+        if (fieldMatch) {
+          const isAction = fieldMatch[3].startsWith('(') || fieldMatch[3].includes('=>');
+          stateFields.push({ name: fieldMatch[1], type: fieldMatch[3].replace(/;$/, ''), isAction });
+        }
+      }
+    }
+
+    const stateCount  = stateFields.filter(f => !f.isAction).length;
+    const actionCount = stateFields.filter(f => f.isAction).length;
+    stores.push({ file, storeName, stateFields, stateCount, actionCount });
+  }
+
+  let out = `> ⚡ Авто-сгенерировано из \`frontend/src/store/*.ts\`
+> Обновляется при изменении store-файлов.
+
+`;
+  for (const s of stores) {
+    out += `### \`${s.storeName}\`\n\n`;
+    out += `Файл: \`frontend/src/store/${s.file}\` · ${s.stateCount} полей состояния · ${s.actionCount} экшенов\n\n`;
+    if (s.stateFields.length > 0) {
+      out += '| Поле / Экшен | Тип | Вид |\n|-------------|-----|-----|\n';
+      for (const f of s.stateFields) {
+        const typeShort = f.type.length > 60 ? f.type.slice(0, 57) + '...' : f.type;
+        out += `| \`${f.name}\` | \`${typeShort}\` | ${f.isAction ? 'экшен' : 'состояние'} |\n`;
+      }
+      out += '\n';
+    }
+  }
+
+  const outFile = join(ROOT, 'docs', 'architecture', 'frontend-architecture.md');
+  injectAutoSection(outFile, out, 'stores');
+  console.log(`  ✓ Updated docs/architecture/frontend-architecture.md — stores (${stores.length} stores)`);
+}
+
+// ── MAKEFILE → docs/guides/getting-started.md ────────────────────────────────
+
+function generateMakefileDoc() {
+  console.log('\n🔧 Generating Makefile commands docs...');
+
+  const makeFile = join(ROOT, 'Makefile');
+  if (!existsSync(makeFile)) { console.log('  Makefile not found — skipping'); return; }
+
+  const src = readFileSync(makeFile, 'utf8');
+  const lines = src.split('\n');
+  const targets = [];
+  let pendingComment = '';
+
+  // Extract section headings and targets
+  let currentSection = 'General';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Section comment (# --- Foo ---)
+    const sectionMatch = line.match(/^#\s*---+\s*(.+?)\s*---+/);
+    if (sectionMatch) { currentSection = sectionMatch[1]; continue; }
+
+    // Inline comment
+    if (line.match(/^#\s+.+/) && !line.includes('---')) {
+      pendingComment = line.replace(/^#+\s*/, '').trim();
+      continue;
+    }
+
+    // Target: name: [deps]
+    const targetMatch = line.match(/^([a-z][a-z0-9-]*)\s*:/);
+    if (targetMatch) {
+      const name = targetMatch[1];
+      // Skip internal-ish targets
+      if (['all', '.PHONY', 'MAKEFLAGS'].includes(name)) { pendingComment = ''; continue; }
+
+      // Look for @echo on next line as description
+      let desc = pendingComment;
+      if (!desc && i + 1 < lines.length) {
+        const echoMatch = lines[i + 1].match(/@echo\s+"?(.+?)"?\s*$/);
+        if (echoMatch) desc = echoMatch[1];
+      }
+
+      targets.push({ name, section: currentSection, desc: desc || '' });
+      pendingComment = '';
+    } else {
+      pendingComment = '';
+    }
+  }
+
+  // Group by section
+  const sections = {};
+  for (const t of targets) {
+    if (!sections[t.section]) sections[t.section] = [];
+    sections[t.section].push(t);
+  }
+
+  let out = `> ⚡ Авто-сгенерировано из \`Makefile\`. Запуск: \`make <команда>\`
+
+`;
+  for (const [section, cmds] of Object.entries(sections)) {
+    out += `**${section}**\n\n| Команда | Описание |\n|---------|----------|\n`;
+    for (const c of cmds) {
+      out += `| \`make ${c.name}\` | ${c.desc} |\n`;
+    }
+    out += '\n';
+  }
+
+  const outFile = join(ROOT, 'docs', 'guides', 'getting-started.md');
+  injectAutoSection(outFile, out, 'makefile');
+  console.log(`  ✓ Updated docs/guides/getting-started.md — make targets (${targets.length} targets)`);
+}
+
+// ── DOCKER SERVICES → docs/guides/getting-started.md ─────────────────────────
+
+function generateDockerDoc() {
+  console.log('\n🐳 Generating Docker services docs...');
+
+  const composeFile = join(ROOT, 'docker-compose.yml');
+  if (!existsSync(composeFile)) { console.log('  docker-compose.yml not found — skipping'); return; }
+
+  const src = readFileSync(composeFile, 'utf8');
+  const services = [];
+
+  // Split into lines, find service blocks by indentation pattern
+  const lines = src.split('\n');
+  let inServicesSection = false;
+  let currentService = null;
+
+  for (const line of lines) {
+    if (line.startsWith('services:')) { inServicesSection = true; continue; }
+    if (inServicesSection && /^(volumes|networks):/.test(line)) { inServicesSection = false; break; }
+    if (!inServicesSection) continue;
+
+    // Top-level service name (2-space indent, ends with colon)
+    const serviceMatch = line.match(/^  (\w[\w-]*):\s*$/);
+    if (serviceMatch) {
+      if (currentService) services.push(currentService);
+      currentService = { name: serviceMatch[1], image: '—', ports: [], profiles: [] };
+      continue;
+    }
+
+    if (!currentService) continue;
+
+    const imageMatch   = line.match(/^\s+image:\s*(.+)/);
+    const portMatch    = line.match(/^\s+-\s+["']?(\d+:\d+)["']?/);
+    const profileMatch = line.match(/^\s+-\s+(\w[\w-]*)/) ;
+
+    if (imageMatch) currentService.image = imageMatch[1].trim();
+    // ports only under ports: key (heuristic: contains colon between digits)
+    if (portMatch && /\d+:\d+/.test(portMatch[1])) currentService.ports.push(portMatch[1]);
+    // profiles: look for lines after 'profiles:' that are plain words without colons
+    if (profileMatch && !line.includes(':') && line.match(/^\s{6}-/)) {
+      currentService.profiles.push(profileMatch[1]);
+    }
+  }
+  if (currentService) services.push(currentService);
+
+  let out = `> ⚡ Авто-сгенерировано из \`docker-compose.yml\`
+> Запуск: \`make infra\` (только БД+Redis) или \`docker compose up -d\` (все сервисы)
+
+| Сервис | Image | Порты | Профиль |
+|--------|-------|-------|---------|
+`;
+  for (const s of services) {
+    out += `| \`${s.name}\` | \`${s.image}\` | ${s.ports.join(', ') || '—'} | ${s.profiles.join(', ') || 'default'} |\n`;
+  }
+
+  const outFile = join(ROOT, 'docs', 'guides', 'getting-started.md');
+  injectAutoSection(outFile, out, 'docker');
+  console.log(`  ✓ Updated docs/guides/getting-started.md — docker services (${services.length} services)`);
+}
+
 // ── STALENESS CHECK ───────────────────────────────────────────────────────────
 
 // Files that CAN'T be auto-generated → need developer reminders
@@ -457,6 +754,11 @@ const runRoutes    = all || args.includes('--routes');
 const runSchema    = all || args.includes('--schema');
 const runModules   = all || args.includes('--modules');
 const runFrontend  = all || args.includes('--frontend');
+const runFeatures  = all || args.includes('--features');
+const runEnv       = all || args.includes('--env');
+const runStores    = all || args.includes('--stores');
+const runMakefile  = all || args.includes('--makefile');
+const runDocker    = all || args.includes('--docker');
 const runStale     = all || args.includes('--stale');
 
 console.log('Flow Universe Documentation Generator');
@@ -467,6 +769,11 @@ if (runRoutes)    generateApiRef();
 if (runSchema)    generateSchemaDoc();
 if (runModules)   generateModulesDoc();
 if (runFrontend)  generateFrontendRoutes();
+if (runFeatures)  generateFeatureFlags();
+if (runEnv)       generateEnvVars();
+if (runStores)    generateStores();
+if (runMakefile)  generateMakefileDoc();
+if (runDocker)    generateDockerDoc();
 
 if (runStale) {
   const staleCount = checkStale();
