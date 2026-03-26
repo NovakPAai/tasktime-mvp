@@ -16,6 +16,7 @@
     "db:seed": "npm run db:seed:dev",
     "db:seed:dev": "npx tsx src/prisma/seed.ts",
     "db:seed:ttmp": "SEED_SCOPE=TTMP_ONLY node dist/prisma/seed.js",
+    "db:seed:workflow": "npx tsx src/prisma/seed-workflow.ts",
     "db:sync:prod-to-dev": "tsx src/prisma/prod-sync.ts",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",

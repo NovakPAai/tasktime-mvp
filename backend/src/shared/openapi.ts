@@ -24,7 +24,24 @@ export const swaggerSpec = {
           description: { type: 'string', nullable: true },
           acceptanceCriteria: { type: 'string', nullable: true },
           type: { type: 'string', enum: ['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG'] },
-          status: { type: 'string', enum: ['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'] },
+          status: {
+            type: 'string',
+            enum: ['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'],
+            deprecated: true,
+            description: '[DEPRECATED] Устаревший строковый статус для обратной совместимости. Используйте workflowStatus. Поддерживается до 2026-09-01.',
+          },
+          workflowStatus: {
+            nullable: true,
+            description: 'Текущий статус в workflow engine. null — если workflow engine не настроен для проекта.',
+            type: 'object',
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              name: { type: 'string' },
+              category: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'] },
+              color: { type: 'string', nullable: true },
+              systemKey: { type: 'string', nullable: true, description: 'Совпадает с legacy status для системных статусов (OPEN, IN_PROGRESS, REVIEW, DONE, CANCELLED)' },
+            },
+          },
           priority: { type: 'string', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] },
           estimatedHours: { type: 'number', nullable: true },
           aiEligible: { type: 'boolean' },
@@ -261,7 +278,9 @@ export const swaggerSpec = {
     '/issues/{id}/status': {
       patch: {
         tags: ['issues'],
-        summary: 'Изменить статус задачи',
+        summary: 'Изменить статус задачи (backward compat)',
+        description: 'Принимает строковый статус (OPEN, IN_PROGRESS, REVIEW, DONE, CANCELLED) и обновляет задачу. Если для проекта настроен workflow engine — маппинг на transition API происходит автоматически. Поддерживается для обратной совместимости до 2026-09-01; новые клиенты должны использовать POST /issues/{id}/transitions.',
+        deprecated: true,
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         requestBody: {
           required: true,
@@ -276,7 +295,11 @@ export const swaggerSpec = {
           },
         },
         responses: {
-          200: { description: 'Задача с новым статусом' },
+          200: {
+            description: 'Задача с обновлённым status (строка) и workflowStatus (объект)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Issue' } } },
+          },
+          400: { description: 'NO_VALID_TRANSITION — нет перехода в workflow для указанного статуса' },
         },
       },
     },

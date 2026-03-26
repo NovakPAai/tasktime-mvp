@@ -2,7 +2,110 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 1.7**
+**Last version: 2.3**
+
+---
+
+## [2.3] [2026-03-26] test(workflow-engine): TTADM-65 — интеграционные тесты workflow-движка
+
+**Задача:** [TTADM-65](https://github.com/jackrescuer-gif/tasktime-mvp/issues/65)
+**PR:** [#133](https://github.com/jackrescuer-gif/tasktime-mvp/pull/133)
+**Ветка:** `claude/jack-workflow-engine-sprint6`
+
+### Что изменилось
+- `backend/tests/workflow-engine.test.ts` — 67 интеграционных тестов (Vitest + Supertest): CRUD статусов/workflow/схем, выполнение transitions, conditions (USER_HAS_GLOBAL_ROLE, USER_IS_ASSIGNEE, USER_IS_REPORTER, ANY_OF), validators (ALL_SUBTASKS_DONE, COMMENT_REQUIRED, TIME_LOGGED), screen fields, post-functions (ASSIGN_TO_CURRENT_USER, ASSIGN_TO_REPORTER, CLEAR_ASSIGNEE, LOG_AUDIT), per-issue-type routing, error cases
+- `backend/src/modules/workflows/workflows.dto.ts` — исправлен тип `conditions`/`validators`/`postFunctions` с `z.record(z.unknown())` на `z.array(z.record(z.unknown()))` (хранятся как массивы правил, не объекты)
+
+---
+
+## [2.2] [2026-03-25] feat(workflow-engine): TTADM-60 — Workflow Engine UI (экраны переходов, Issue Detail, Kanban, Admin)
+
+**Задача:** [TTADM-60](https://github.com/jackrescuer-gif/tasktime-mvp/issues/60)
+**PR:** [#133](https://github.com/jackrescuer-gif/tasktime-mvp/pull/133)
+**Ветка:** `claude/jack-workflow-engine-sprint6`
+
+### Что изменилось
+- `frontend/src/api/workflow-engine.ts` — API клиент для `GET/POST /api/issues/:id/transitions`
+- `frontend/src/api/workflow-statuses.ts` — CRUD клиент для `/api/admin/workflow-statuses`
+- `frontend/src/api/workflows.ts` — CRUD клиент для `/api/admin/workflows` (шаги, переходы, копирование)
+- `frontend/src/api/workflow-schemes.ts` — CRUD клиент для `/api/admin/workflow-schemes` (маппинг, проекты)
+- `frontend/src/api/transition-screens.ts` — CRUD клиент для `/api/admin/transition-screens` (поля экрана)
+- `frontend/src/hooks/useIssueTransitions.ts` — хук для загрузки доступных переходов задачи
+- `frontend/src/components/issues/StatusTransitionPanel.tsx` — панель с кнопками переходов (текущий статус + кнопки)
+- `frontend/src/components/issues/TransitionModal.tsx` — модалка для заполнения полей экрана перехода
+- `frontend/src/pages/IssueDetailPage.tsx` — заменён Select статуса на `StatusTransitionPanel`; удалён `handleStatusChange`
+- `frontend/src/pages/BoardPage.tsx` — drag-and-drop между колонками теперь использует `POST /api/issues/:id/transitions`; показывает `TransitionModal` если переход требует экран
+- `frontend/src/pages/admin/AdminWorkflowStatusesPage.tsx` — CRUD страница для workflow-статусов
+- `frontend/src/pages/admin/AdminWorkflowsPage.tsx` — список workflow с дублированием
+- `frontend/src/pages/admin/AdminWorkflowEditorPage.tsx` — редактор workflow: шаги и переходы через drawer
+- `frontend/src/pages/admin/AdminWorkflowSchemesPage.tsx` — список схем workflow
+- `frontend/src/pages/admin/AdminWorkflowSchemeEditorPage.tsx` — редактор схемы: маппинг типов задач → workflow, привязка проектов
+- `frontend/src/pages/admin/AdminTransitionScreensPage.tsx` — список экранов переходов
+- `frontend/src/pages/admin/AdminTransitionScreenEditorPage.tsx` — редактор экрана: добавление полей, isRequired, orderIndex
+- `frontend/src/App.tsx` — 7 новых роутов для Admin UI (`/admin/workflow-*`, `/admin/transition-screens/*`)
+- `frontend/src/components/layout/Sidebar.tsx` — раздел «Workflow» в Admin-меню (Статусы, Workflow, Схемы workflow, Экраны переходов)
+
+## [2.1] [2026-03-25] feat(issues): TTADM-64 — Backward compatibility REST API (строковые алиасы статусов)
+
+**Задача:** [TTADM-64](https://github.com/jackrescuer-gif/tasktime-mvp/issues/64)
+**PR:** [#TBD](https://github.com/jackrescuer-gif/tasktime-mvp/pull/TBD)
+**Ветка:** `claude/jack-ttadm-64-backward-compat`
+
+### Что изменилось
+- `backend/src/modules/issues/issues.service.ts` — добавлен `workflowStatus` в `include` всех issue-запросов: `listIssues`, `getIssue`, `getIssueByKey`, `createIssue`, `updateIssue`, `getChildren`
+- `createIssue` — при создании задачи автоматически устанавливается `workflowStatusId` на системный статус `OPEN`
+- `updateStatus` (legacy path) — при смене строкового статуса теперь также обновляет `workflowStatusId` (маппинг через `systemKey`), возвращает `workflowStatus` объект в ответе
+- `backend/src/shared/openapi.ts` — поле `status` помечено `deprecated: true` (поддержка до 2026-09-01), добавлено поле `workflowStatus` в схему `Issue`; эндпоинт `PATCH /issues/{id}/status` помечен `deprecated: true` с описанием маппинга
+- `backend/tests/issue-status-compat.test.ts` — 12 тестов: проверка наличия обоих полей в ответах, маппинг строковых статусов, фильтрация, round-trip, systemKey == legacy status
+
+---
+
+## [2.0] [2026-03-25] feat(workflow-engine): TTADM-59 — Runtime движок (условия, валидаторы, постфункции)
+
+**Задача:** TTADM-59
+**PR:** [#TBD](https://github.com/jackrescuer-gif/tasktime-mvp/pull/TBD)
+**Ветка:** `claude/jack-workflow-engine-runtime`
+
+### Что изменилось
+- `backend/src/modules/workflow-engine/` — новый модуль: `types.ts`, `workflow-engine.service.ts`, `workflow-engine.dto.ts`, `workflow-engine.router.ts`
+- `conditions/index.ts` — `evaluateConditions` с рекурсией для `ANY_OF`/`ALL_OF`; типы: `USER_HAS_GLOBAL_ROLE`, `USER_IS_ASSIGNEE`, `USER_IS_REPORTER`
+- `validators/` — 5 валидаторов: `required-fields`, `subtasks-done`, `comment-required`, `time-logged`, `field-value`
+- `post-functions/` — 5 постфункций: `assign`, `set-field`, `webhook` (fire-and-forget, timeout 5s), `audit`; ошибки не откатывают переход — логируются в auditLog
+- `GET /api/issues/:id/transitions` — доступные переходы с фильтром по conditions (403 → исключение, не ошибка)
+- `POST /api/issues/:id/transitions` — полный pipeline: conditions → validators → screen validation → DB transaction → post-functions → auditLog (`issue.transitioned`)
+- `issues.service.ts::updateStatus` — dual-mode: если у проекта есть workflow scheme, ищет подходящий transition и вызывает `executeTransition(bypassConditions=true)`; иначе legacy path
+- `boards.service.ts::getBoard` — dual-mode: `mode:'workflow'` с динамическими колонками из workflow steps для проектов со схемой; `mode:'legacy'` для остальных
+- `app.ts` — зарегистрирован `workflowEngineRouter` на `/api`
+
+---
+
+## [1.9] [2026-03-25] feat(workflow): TTADM-62 — дефолтный workflow + data migration (enum → dynamic statuses)
+
+**Задача:** TTADM-62
+**Ветка:** `claude/jack-ttadm-62-default-workflow-migration`
+
+### Что изменилось
+- `migrations/20260325020000_default_workflow_init_and_backfill/migration.sql` — идемпотентная миграция: вставляет 5 системных `WorkflowStatus` (ON CONFLICT DO NOTHING), default `Workflow` + 5 шагов + 8 переходов, `WorkflowScheme` со схемным item-ом; привязывает все существующие проекты к схеме; делает backfill `issues.workflow_status_id` по `status::text = workflow_statuses.system_key`. Устраняет проблему предыдущей `010000`-миграции, которая была no-op (запускалась до появления данных).
+- `scripts/rollback-workflow-migration.sql` — rollback-план: сбрасывает `workflow_status_id` → NULL на issues, удаляет данные workflow (без DDL rollback)
+- `package.json` → добавлен скрипт `db:seed:workflow` (`npx tsx src/prisma/seed-workflow.ts`) для dev-окружения
+
+---
+
+## [1.8] [2026-03-25] feat(workflow-engine): Sprint 6 — БД-схема, CRUD статусов, workflow и схем [TTADM-58]
+
+**Задача:** TTADM-58
+**Ветка:** `claude/jack-workflow-engine-foundation`
+
+### Что изменилось
+- `schema.prisma` — новый enum `StatusCategory`; новые модели: `WorkflowStatus`, `Workflow`, `WorkflowStep`, `WorkflowTransition`, `TransitionScreen`, `TransitionScreenItem`, `WorkflowScheme`, `WorkflowSchemeItem`, `WorkflowSchemeProject`; поле `workflowStatusId` в `Issue`; relations в `Project`, `IssueTypeConfig`, `CustomField`
+- `migrations/20260325000000_add_workflow_engine` — DDL всех новых таблиц, FK, индексы
+- `migrations/20260325010000_backfill_workflow_status_id` — SQL UPDATE для бэкфилла `workflow_status_id` на основе `status` enum
+- `src/prisma/seed-workflow.ts` — сид 5 системных статусов (OPEN/IN_PROGRESS/REVIEW/DONE/CANCELLED), Default Workflow, шаги, 8 переходов, Default WorkflowScheme, привязка всех проектов к схеме
+- `modules/workflows/workflow-statuses.{dto,service,router}.ts` — CRUD статусов; DELETE запрещён для `isSystem=true` или статусов в шагах
+- `modules/workflows/workflows.{dto,service,router}.ts` — CRUD workflow, управление steps/transitions, `POST /:id/copy`; защита системных workflow от изменений; валидация отсутствия дублей переходов
+- `modules/workflow-schemes/workflow-schemes.{dto,service,router}.ts` — CRUD схем, атомарная замена items (`PUT /:id/items`), attach/detach проектов
+- `modules/transition-screens/transition-screens.{dto,service,router}.ts` — CRUD экранов, атомарная замена items (`PUT /:id/items`)
+- `app.ts` — регистрация 4 новых роутеров на `/api/admin/...` + `GET /api/projects/:projectId/workflow-scheme`
 
 ---
 

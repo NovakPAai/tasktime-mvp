@@ -1,0 +1,11 @@
+{
+  "TTADM-62": {
+    "id": "4426dba5-e9b2-4ab7-b90f-9dc744611ddb",
+    "number": 62,
+    "title": "2 Дефолтный workflow + миграция production-данных (enum → dynamic statuses)",
+    "description": "Критический шаг перехода между Sprint 6 и Sprint 7.\n\n**Цель:** Обеспечить бесшовную миграцию существующих данных при переходе с hardcoded IssueStatus enum на динамические статусы.\n\n**Задачи:**\n- Создать дефолтный workflow, повторяющий текущее поведение: OPEN → IN_PROGRESS → REVIEW → DONE / CANCELLED\n- Написать скрипт data migration: маппинг всех существующих `status` строк (enum values) на новые `WorkflowStatus` записи\n- Привязать дефолтный workflow ко всем существующим проектам и типам задач\n- Обеспечить идемпотентность скрипта (безопасный повторный запуск)\n- Добавить rollback-план\n- Протестировать на staging перед применением на prod\n\n**Критерий готовности:** Все существующие issues в prod имеют корректный `workflowStatusId`, дефолтный workflow активен для всех проектов.",
+    "status": "OPEN",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTADM"
+  }
+}

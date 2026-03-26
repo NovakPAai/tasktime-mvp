@@ -84,9 +84,12 @@ jobs:
           WARNINGS=$(echo "$OUTPUT" | grep "⚠️" || true)
           if [ -n "$WARNINGS" ]; then
             echo "has_warnings=true" >> "$GITHUB_OUTPUT"
-            # Escape for multiline output
-            ESCAPED=$(echo "$WARNINGS" | sed 's/%/%25/g; s/\n/%0A/g')
-            echo "warnings=$ESCAPED" >> "$GITHUB_OUTPUT"
+            # Use heredoc format for multiline GITHUB_OUTPUT
+            {
+              echo "warnings<<WARNINGS_EOF"
+              echo "$WARNINGS"
+              echo "WARNINGS_EOF"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "has_warnings=false" >> "$GITHUB_OUTPUT"
           fi

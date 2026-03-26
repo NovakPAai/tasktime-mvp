@@ -8,6 +8,9 @@ import * as sprintsApi from '../api/sprints';
 import * as projectsApi from '../api/projects';
 import * as issuesApi from '../api/issues';
 import { listIssuesWithKanbanFields } from '../api/issues';
+import { workflowEngineApi } from '../api/workflow-engine';
+import TransitionModal from '../components/issues/TransitionModal';
+import type { TransitionOption } from '../api/workflow-engine';
 import { getProjectIssueTypes } from '../api/issue-type-configs';
 import { fieldSchemasApi } from '../api/field-schemas';
 import { issueCustomFieldsApi, type IssueCustomFieldValue } from '../api/issue-custom-fields';
@@ -69,6 +72,7 @@ export default function BoardPage() {
   const [kanbanFieldsMap, setKanbanFieldsMap] = useState<Map<string, Issue['kanbanFields']>>(new Map());
   const [createCustomFields, setCreateCustomFields] = useState<IssueCustomFieldValue[]>([]);
   const [createCustomFieldValues, setCreateCustomFieldValues] = useState<Record<string, unknown>>({});
+  const [pendingTransition, setPendingTransition] = useState<{ issueId: string; transition: TransitionOption } | null>(null);
   const watchIssueTypeConfigId = Form.useWatch('issueTypeConfigId', form);
 
   const canCreate = user?.role !== 'VIEWER';
@@ -138,33 +142,76 @@ export default function BoardPage() {
   }, [projectId, watchIssueTypeConfigId]);
 
   const onDragEnd = async (result: DropResult) => {
-    const { source, destination } = result;
+    const { source, destination, draggableId } = result;
     if (!destination || !projectId) return;
 
     const srcStatus = source.droppableId as IssueStatus;
     const dstStatus = destination.droppableId as IssueStatus;
 
-    const newCols = { ...columns };
-    const srcItems = [...(newCols[srcStatus] || [])];
-    const [moved] = srcItems.splice(source.index, 1);
-    if (!moved) return;
-
+    // Same column — just reorder
     if (srcStatus === dstStatus) {
+      const newCols = { ...columns };
+      const srcItems = [...(newCols[srcStatus] || [])];
+      const [moved] = srcItems.splice(source.index, 1);
+      if (!moved) return;
       srcItems.splice(destination.index, 0, moved);
       newCols[srcStatus] = srcItems;
-    } else {
-      const dstItems = [...(newCols[dstStatus] || [])];
+      setColumns(newCols);
+      const updates = (Object.entries(newCols) as [IssueStatus, Issue[]][]).flatMap(([status, items]) =>
+        items.map((item, idx) => ({ id: item.id, status, orderIndex: idx }))
+      );
+      await boardApi.reorderBoard(projectId, updates);
+      return;
+    }
+
+    // Cross-column — use workflow transitions
+    try {
+      const transitionsData = await workflowEngineApi.getTransitions(draggableId);
+      // Find a transition that goes to the target column's legacy status
+      const transition = transitionsData.transitions.find(
+        t => t.toStatus.category === dstStatus || (t.toStatus as unknown as Record<string, string>).systemKey === dstStatus
+      );
+
+      if (!transition) {
+        message.error('Переход недоступен');
+        return;
+      }
+
+      if (transition.requiresScreen) {
+        // Show modal first, then apply move visually on success
+        setPendingTransition({ issueId: draggableId, transition });
+        return;
+      }
+
+      await workflowEngineApi.executeTransition(draggableId, { transitionId: transition.id });
+
+      // Optimistic UI update
+      const newCols = { ...columns };
+      const srcItems = [...(newCols[srcStatus] || [])];
+      const [moved] = srcItems.splice(source.index, 1);
+      if (!moved) return;
       moved.status = dstStatus;
+      const dstItems = [...(newCols[dstStatus] || [])];
       dstItems.splice(destination.index, 0, moved);
       newCols[srcStatus] = srcItems;
       newCols[dstStatus] = dstItems;
-    }
-    setColumns(newCols);
+      setColumns(newCols);
 
-    const updates = (Object.entries(newCols) as [IssueStatus, Issue[]][]).flatMap(([status, items]) =>
-      items.map((item, idx) => ({ id: item.id, status, orderIndex: idx }))
-    );
-    await boardApi.reorderBoard(projectId, updates);
+      const updates = (Object.entries(newCols) as [IssueStatus, Issue[]][]).flatMap(([status, items]) =>
+        items.map((item, idx) => ({ id: item.id, status, orderIndex: idx }))
+      );
+      await boardApi.reorderBoard(projectId, updates);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      const code = e?.response?.data?.error;
+      if (code === 'NO_VALID_TRANSITION' || code === 'INVALID_TRANSITION') {
+        message.error('Переход недоступен');
+      } else if (code === 'CONDITION_NOT_MET') {
+        message.error('У вас нет прав для этого перехода');
+      } else {
+        message.error('Не удалось изменить статус');
+      }
+    }
   };
 
   const handleCreateIssue = async (values: issuesApi.CreateIssueBody) => {
@@ -425,6 +472,18 @@ export default function BoardPage() {
           )}
         </Form>
       </Modal>
+
+      {pendingTransition && (
+        <TransitionModal
+          open
+          issueId={pendingTransition.issueId}
+          transitionId={pendingTransition.transition.id}
+          transitionName={pendingTransition.transition.name}
+          screenFields={pendingTransition.transition.screenFields}
+          onSuccess={() => { setPendingTransition(null); load(); }}
+          onCancel={() => setPendingTransition(null)}
+        />
+      )}
     </div>
   );
 }

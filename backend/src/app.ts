@@ -31,6 +31,13 @@ import issueTypeSchemesRouter from './modules/issue-type-schemes/issue-type-sche
 import customFieldsRouter from './modules/custom-fields/custom-fields.router.js';
 import { adminRouter as fieldSchemasAdminRouter, projectFieldSchemasRouter } from './modules/field-schemas/field-schemas.router.js';
 import issueCustomFieldsRouter from './modules/issue-custom-fields/issue-custom-fields.router.js';
+import workflowStatusesRouter from './modules/workflows/workflow-statuses.router.js';
+import workflowsRouter from './modules/workflows/workflows.router.js';
+import workflowSchemesRouter from './modules/workflow-schemes/workflow-schemes.router.js';
+import transitionScreensRouter from './modules/transition-screens/transition-screens.router.js';
+import workflowEngineRouter from './modules/workflow-engine/workflow-engine.router.js';
+import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
+import { authenticate } from './shared/middleware/auth.js';
 
 export function createApp() {
   const app = express();
@@ -98,6 +105,22 @@ export function createApp() {
   app.use('/api', issueCustomFieldsRouter);
   app.use('/api/projects/:projectId/field-schemas', projectFieldSchemasRouter);
   app.use('/api/monitoring', monitoringRouter);
+
+  // Workflow Engine
+  app.use('/api/admin/workflow-statuses', workflowStatusesRouter);
+  app.use('/api/admin/workflows', workflowsRouter);
+  app.use('/api/admin/workflow-schemes', workflowSchemesRouter);
+  app.use('/api/admin/transition-screens', transitionScreensRouter);
+  app.use('/api', workflowEngineRouter);
+
+  // Public: project workflow scheme
+  app.get('/api/projects/:projectId/workflow-scheme', authenticate, async (req, res, next) => {
+    try {
+      res.json(await getSchemeForProject(req.params.projectId as string));
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // Error handler (must be last)
   app.use(errorHandler);

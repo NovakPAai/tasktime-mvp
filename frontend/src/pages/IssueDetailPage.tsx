@@ -18,7 +18,6 @@ import {
   Form,
   Modal,
   Switch,
-  Alert,
   DatePicker,
   Divider,
 } from 'antd';
@@ -45,9 +44,10 @@ import { getProjectIssueTypes } from '../api/issue-type-configs';
 import IssueLinksSection from '../components/issues/IssueLinksSection';
 import IssueCustomFieldsSection from '../components/issues/IssueCustomFieldsSection';
 import CustomFieldInput from '../components/issues/CustomFieldInput';
+import StatusTransitionPanel from '../components/issues/StatusTransitionPanel';
 import { issueCustomFieldsApi, type IssueCustomFieldValue } from '../api/issue-custom-fields';
 import { useAuthStore } from '../store/auth.store';
-import type { Issue, Comment, TimeLog, AuditEntry, IssueStatus, IssuePriority, IssueTypeConfig, User, AiExecutionStatus } from '../types';
+import type { Issue, Comment, TimeLog, AuditEntry, IssuePriority, IssueTypeConfig, User, AiExecutionStatus } from '../types';
 import api from '../api/client';
 import { hasAnyRequiredRole, hasRequiredRole } from '../lib/roles';
 import { IssueStatusTag, IssuePriorityTag, IssueTypeBadge } from '../lib/issue-kit';
@@ -74,7 +74,6 @@ export default function IssueDetailPage() {
   const [editCustomFields, setEditCustomFields] = useState<IssueCustomFieldValue[]>([]);
   const [editCustomValues, setEditCustomValues] = useState<Record<string, unknown>>({});
   const [customFieldsVersion, setCustomFieldsVersion] = useState(0);
-  const [missingFields, setMissingFields] = useState<{ name: string; fieldType: string }[]>([]);
   const customFieldsRef = useRef<HTMLDivElement>(null);
   const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
   const canAssign = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
@@ -106,21 +105,6 @@ export default function IssueDetailPage() {
       getProjectIssueTypes(issue.projectId).then(setIssueTypeConfigs).catch(() => {});
     }
   }, [issue?.projectId]);
-
-  const handleStatusChange = async (status: IssueStatus) => {
-    if (!id) return;
-    try {
-      await issuesApi.updateStatus(id, status);
-      load();
-    } catch (err: unknown) {
-      const e = err as { response?: { status?: number; data?: { error?: string; fields?: { name: string; fieldType: string }[] } } };
-      if (e?.response?.status === 422 && e?.response?.data?.error === 'REQUIRED_FIELDS_MISSING') {
-        setMissingFields(e.response.data.fields ?? []);
-      } else {
-        message.error('Не удалось изменить статус');
-      }
-    }
-  };
 
   const handleAddComment = async () => {
     if (!id || !newComment.trim()) return;
@@ -523,17 +507,9 @@ export default function IssueDetailPage() {
           <div className="tt-panel">
             <div className="tt-panel-header">Details</div>
             <div className="tt-panel-body">
-              <div className="tt-panel-row">
+              <div className="tt-panel-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
                 <span>Status</span>
-                <Select
-                  value={issue.status}
-                  size="small"
-                  style={{ width: 140 }}
-                  onChange={handleStatusChange}
-                  options={(
-                    ['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'] as IssueStatus[]
-                  ).map((v) => ({ value: v, label: v }))}
-                />
+                <StatusTransitionPanel issueId={issue.id} onTransitioned={load} />
               </div>
               <div className="tt-panel-row">
                 <span>Priority</span>
@@ -850,46 +826,6 @@ export default function IssueDetailPage() {
         </Form>
       </Modal>
 
-      <Modal
-        title="Обязательные поля не заполнены"
-        open={missingFields.length > 0}
-        onCancel={() => setMissingFields([])}
-        footer={[
-          <Button key="cancel" onClick={() => setMissingFields([])}>
-            Закрыть
-          </Button>,
-          <Button
-            key="scroll"
-            type="primary"
-            onClick={() => {
-              setMissingFields([]);
-              customFieldsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
-          >
-            Перейти к полям
-          </Button>,
-        ]}
-      >
-        <Alert
-          type="warning"
-          showIcon
-          message="Задача не может быть переведена в статус DONE"
-          description="Заполните все обязательные поля перед закрытием задачи."
-          style={{ marginBottom: 'var(--space-5)' }}
-        />
-        <List
-          size="small"
-          dataSource={missingFields}
-          renderItem={(f) => (
-            <List.Item>
-              <Typography.Text strong>{f.name}</Typography.Text>
-              <Typography.Text type="secondary" style={{ marginLeft: 'var(--space-4)', fontSize: 11 }}>
-                {f.fieldType}
-              </Typography.Text>
-            </List.Item>
-          )}
-        />
-      </Modal>
     </div>
   );
 }

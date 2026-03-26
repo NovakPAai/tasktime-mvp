@@ -154,7 +154,7 @@ router.patch('/issues/:id', validate(updateIssueDto), async (req: AuthRequest, r
 // Change status
 router.patch('/issues/:id/status', validate(updateStatusDto), async (req: AuthRequest, res, next) => {
   try {
-    const issue = await issuesService.updateStatus(req.params.id as string, req.body);
+    const issue = await issuesService.updateStatus(req.params.id as string, req.body, req.user?.userId, req.user?.role);
     await logAudit(req, 'issue.status_changed', 'issue', req.params.id as string, req.body);
     res.json(issue);
   } catch (err) {

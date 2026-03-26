@@ -3,10 +3,12 @@ import type {
   IssueStatus,
   Prisma,
   AiAssigneeType,
+  UserRole,
 } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getApplicableFields } from '../issue-custom-fields/issue-custom-fields.service.js';
+import { resolveWorkflowForIssue, executeTransition } from '../workflow-engine/workflow-engine.service.js';
 import type {
   CreateIssueDto,
   UpdateIssueDto,
@@ -114,6 +116,7 @@ export async function listIssues(projectId: string, filters?: ListIssuesFilters)
       assignee: { select: { id: true, name: true, email: true } },
       creator: { select: { id: true, name: true } },
       issueTypeConfig: true,
+      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
       _count: { select: { children: true } },
     },
     orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
@@ -252,6 +255,7 @@ export async function getIssueByKey(issueKey: string) {
     include: {
       assignee: { select: { id: true, name: true, email: true } },
       creator: { select: { id: true, name: true } },
+      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
       parent: { select: { id: true, title: true, number: true, projectId: true, issueTypeConfig: { select: { systemKey: true, name: true } } } },
       children: {
         select: { id: true, title: true, status: true, number: true, issueTypeConfig: { select: { systemKey: true, name: true } }, assignee: { select: { id: true, name: true } } },
@@ -271,6 +275,7 @@ export async function getIssue(id: string) {
       assignee: { select: { id: true, name: true, email: true } },
       creator: { select: { id: true, name: true } },
       issueTypeConfig: true,
+      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
       parent: { select: { id: true, title: true, number: true, projectId: true, issueTypeConfig: { select: { systemKey: true, name: true } } } },
       children: {
         select: {
@@ -330,6 +335,9 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
 
   const number = await getNextNumber(projectId);
 
+  // Backward compat: link to system WorkflowStatus on creation (default = OPEN)
+  const initialWfStatus = await prisma.workflowStatus.findFirst({ where: { systemKey: 'OPEN' } });
+
   return prisma.issue.create({
     data: {
       projectId,
@@ -343,12 +351,14 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
       assigneeId: dto.assigneeId,
       dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
       creatorId,
+      ...(initialWfStatus && { workflowStatusId: initialWfStatus.id }),
     },
     include: {
       assignee: { select: { id: true, name: true } },
       creator: { select: { id: true, name: true } },
       project: { select: { key: true } },
       issueTypeConfig: true,
+      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
     },
   });
 }
@@ -371,6 +381,7 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
     include: {
       assignee: { select: { id: true, name: true } },
       creator: { select: { id: true, name: true } },
+      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
     },
   });
 }
@@ -414,17 +425,39 @@ async function validateRequiredFieldsForDone(issueId: string): Promise<void> {
   }
 }
 
-export async function updateStatus(id: string, dto: UpdateStatusDto) {
+export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: string, actorRole?: UserRole) {
   const issue = await prisma.issue.findUnique({ where: { id } });
   if (!issue) throw new AppError(404, 'Issue not found');
 
+  // Workflow-mode: if project has a scheme, route through the engine (bypassConditions=true for backward compat)
+  const schemeProject = await prisma.workflowSchemeProject.findUnique({ where: { projectId: issue.projectId } });
+  if (schemeProject) {
+    const workflow = await resolveWorkflowForIssue(issue);
+    const transition = workflow.transitions.find(
+      (t) =>
+        t.toStatus?.systemKey === dto.status &&
+        (t.isGlobal || t.fromStatusId === issue.workflowStatusId),
+    );
+    if (!transition) throw new AppError(400, 'NO_VALID_TRANSITION');
+    return executeTransition(id, transition.id, actorId ?? 'system', actorRole ?? 'USER', undefined, true);
+  }
+
+  // Legacy path: map string status → workflowStatusId for backward compat
   if (dto.status === 'DONE') {
     await validateRequiredFieldsForDone(id);
   }
 
+  const wfStatus = await prisma.workflowStatus.findFirst({ where: { systemKey: dto.status } });
+
   return prisma.issue.update({
     where: { id },
-    data: { status: dto.status },
+    data: {
+      status: dto.status,
+      ...(wfStatus && { workflowStatusId: wfStatus.id }),
+    },
+    include: {
+      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
+    },
   });
 }
 
@@ -521,6 +554,7 @@ export async function getChildren(id: string) {
     where: { parentId: id },
     include: {
       assignee: { select: { id: true, name: true } },
+      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
       _count: { select: { children: true } },
     },
     orderBy: { orderIndex: 'asc' },

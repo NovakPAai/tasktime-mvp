@@ -25,6 +25,9 @@ import {
   ProfileOutlined,
   TagOutlined,
   ThunderboltOutlined,
+  NodeIndexOutlined,
+  BranchesOutlined,
+  FormOutlined,
 } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import { hasRequiredRole } from '../../lib/roles';
@@ -102,6 +105,10 @@ export default function Sidebar({
             { key: '/admin/issue-type-schemes', icon: <BlockOutlined />, label: 'Схемы типов задач' },
             { key: '/admin/custom-fields', icon: <ControlOutlined />, label: 'Кастомные поля' },
             { key: '/admin/field-schemas', icon: <ProfileOutlined />, label: 'Схемы полей' },
+            { key: '/admin/workflow-statuses', icon: <TagOutlined />, label: 'Статусы' },
+            { key: '/admin/workflows', icon: <BranchesOutlined />, label: 'Workflow' },
+            { key: '/admin/workflow-schemes', icon: <NodeIndexOutlined />, label: 'Схемы workflow' },
+            { key: '/admin/transition-screens', icon: <FormOutlined />, label: 'Экраны переходов' },
           ],
         }]
       : []),

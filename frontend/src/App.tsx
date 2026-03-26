@@ -31,6 +31,13 @@ import AdminRolesPage from './pages/admin/AdminRolesPage';
 import AdminCustomFieldsPage from './pages/admin/AdminCustomFieldsPage';
 import AdminFieldSchemasPage from './pages/admin/AdminFieldSchemasPage';
 import AdminFieldSchemaDetailPage from './pages/admin/AdminFieldSchemaDetailPage';
+import AdminWorkflowStatusesPage from './pages/admin/AdminWorkflowStatusesPage';
+import AdminWorkflowsPage from './pages/admin/AdminWorkflowsPage';
+import AdminWorkflowEditorPage from './pages/admin/AdminWorkflowEditorPage';
+import AdminWorkflowSchemesPage from './pages/admin/AdminWorkflowSchemesPage';
+import AdminWorkflowSchemeEditorPage from './pages/admin/AdminWorkflowSchemeEditorPage';
+import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
+import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import SettingsPage from './pages/SettingsPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
@@ -178,6 +185,13 @@ export default function App() {
             <Route path="admin/custom-fields" element={<AdminCustomFieldsPage />} />
             <Route path="admin/field-schemas" element={<AdminFieldSchemasPage />} />
             <Route path="admin/field-schemas/:id" element={<AdminFieldSchemaDetailPage />} />
+            <Route path="admin/workflow-statuses" element={<AdminWorkflowStatusesPage />} />
+            <Route path="admin/workflows" element={<AdminWorkflowsPage />} />
+            <Route path="admin/workflows/:id" element={<AdminWorkflowEditorPage />} />
+            <Route path="admin/workflow-schemes" element={<AdminWorkflowSchemesPage />} />
+            <Route path="admin/workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
+            <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
+            <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>
