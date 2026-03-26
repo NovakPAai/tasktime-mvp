@@ -175,3 +175,41 @@ All calls include `Authorization: Bearer <token>` header (injected via Axios int
 ## How to update this doc
 
 When new pages/routes are added to `frontend/src/App.tsx`, or new major components to `frontend/src/components/` → update this file.
+
+<!-- AUTO-GENERATED:START -->
+> ⚡ Авто-сгенерировано из `frontend/src/App.tsx`
+> 🔒 = требует авторизации. Обновляется автоматически.
+
+| Путь | Компонент | Файл | Авторизация |
+|------|-----------|------|-------------|
+| `/login` | `LoginPage` | `frontend/src/pages/LoginPage` | — |
+| `/change-password` | `ChangePasswordPage` | `frontend/src/pages/ChangePasswordPage` | — |
+| `/` | `AppLayout` | `frontend/src/pages/AppLayout` | — |
+| `/projects` | `ProjectsPage` | `frontend/src/pages/ProjectsPage` | — |
+| `/business-teams` | `BusinessTeamsPage` | `frontend/src/pages/BusinessTeamsPage` | — |
+| `/flow-teams` | `FlowTeamsPage` | `frontend/src/pages/FlowTeamsPage` | — |
+| `/projects/:id` | `ProjectDetailPage` | `frontend/src/pages/ProjectDetailPage` | — |
+| `/projects/:id/board` | `BoardPage` | `frontend/src/pages/BoardPage` | — |
+| `/projects/:id/sprints` | `SprintsPage` | `frontend/src/pages/SprintsPage` | — |
+| `/projects/:id/releases` | `ReleasesPage` | `frontend/src/pages/ReleasesPage` | — |
+| `/sprints` | `GlobalSprintsPage` | `frontend/src/pages/GlobalSprintsPage` | — |
+| `/releases` | `GlobalReleasesPage` | `frontend/src/pages/GlobalReleasesPage` | — |
+| `/issues/:id` | `IssueDetailPage` | `frontend/src/pages/IssueDetailPage` | — |
+| `/time` | `TimePage` | `frontend/src/pages/TimePage` | — |
+| `/teams` | `TeamsPage` | `frontend/src/pages/TeamsPage` | — |
+| `/uat` | `UatTestsPage` | `frontend/src/pages/UatTestsPage` | — |
+| `/admin` | `Navigate` | `frontend/src/pages/Navigate` | — |
+| `/admin/dashboard` | `AdminDashboardPage` | `frontend/src/pages/admin/AdminDashboardPage` | — |
+| `/admin/monitoring` | `AdminMonitoringPage` | `frontend/src/pages/admin/AdminMonitoringPage` | — |
+| `/admin/projects` | `AdminProjectsPage` | `frontend/src/pages/admin/AdminProjectsPage` | — |
+| `/admin/categories` | `AdminCategoriesPage` | `frontend/src/pages/admin/AdminCategoriesPage` | — |
+| `/admin/link-types` | `AdminLinkTypesPage` | `frontend/src/pages/admin/AdminLinkTypesPage` | — |
+| `/admin/issue-type-configs` | `AdminIssueTypeConfigsPage` | `frontend/src/pages/admin/AdminIssueTypeConfigsPage` | — |
+| `/admin/issue-type-schemes` | `AdminIssueTypeSchemesPage` | `frontend/src/pages/admin/AdminIssueTypeSchemesPage` | — |
+| `/admin/users` | `AdminUsersPage` | `frontend/src/pages/admin/AdminUsersPage` | — |
+| `/admin/roles` | `AdminRolesPage` | `frontend/src/pages/admin/AdminRolesPage` | — |
+| `/admin/custom-fields` | `AdminCustomFieldsPage` | `frontend/src/pages/admin/AdminCustomFieldsPage` | — |
+| `/admin/field-schemas` | `AdminFieldSchemasPage` | `frontend/src/pages/admin/AdminFieldSchemasPage` | — |
+| `/admin/field-schemas/:id` | `AdminFieldSchemaDetailPage` | `frontend/src/pages/admin/AdminFieldSchemaDetailPage` | — |
+| `/settings` | `SettingsPage` | `frontend/src/pages/SettingsPage` | — |
+<!-- AUTO-GENERATED:END -->

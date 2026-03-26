@@ -253,3 +253,34 @@ GitLab webhook auto-updates issue status based on branch/MR title containing iss
 
 When a new module is added or routes change in `backend/src/modules/*/router.ts` or `backend/src/app.ts` → update this file.
 Run `make docs` to check for staleness warnings.
+
+<!-- AUTO-GENERATED:START -->
+> ⚡ Авто-сгенерировано из `backend/src/app.ts`
+> Обновляется автоматически при каждом изменении.
+
+| Модуль | Префикс API | Файл роутера |
+|--------|-------------|--------------|
+| Auth | `/api/auth` | `backend/src/modules/auth/auth.router.js.ts` |
+| Users | `/api/users` | `backend/src/modules/users/users.router.js.ts` |
+| Projects | `/api/projects` | `backend/src/modules/projects/projects.router.js.ts` |
+| Project Categories | `/api/project-categories` | `backend/src/modules/project-categories/project-categories.router.js.ts` |
+| Issues | `/api` | `backend/src/modules/issues/issues.router.js.ts` |
+| Boards | `/api` | `backend/src/modules/boards/boards.router.js.ts` |
+| Sprints | `/api` | `backend/src/modules/sprints/sprints.router.js.ts` |
+| Releases | `/api` | `backend/src/modules/releases/releases.router.js.ts` |
+| Comments | `/api` | `backend/src/modules/comments/comments.router.js.ts` |
+| Time | `/api` | `backend/src/modules/time/time.router.js.ts` |
+| Teams | `/api` | `backend/src/modules/teams/teams.router.js.ts` |
+| Admin | `/api` | `backend/src/modules/admin/admin.router.js.ts` |
+| Ai | `/api` | `backend/src/modules/ai/ai-sessions.router.js.ts` |
+| Ai | `/api` | `backend/src/modules/ai/ai.router.js.ts` |
+| Webhooks | `/api` | `backend/src/modules/webhooks/webhooks.router.js.ts` |
+| Links | `/api` | `backend/src/modules/links/links.router.js.ts` |
+| Issue Type Configs | `/api` | `backend/src/modules/issue-type-configs/issue-type-configs.router.js.ts` |
+| Issue Type Schemes | `/api` | `backend/src/modules/issue-type-schemes/issue-type-schemes.router.js.ts` |
+| Custom Fields | `/api/admin/custom-fields` | `backend/src/modules/custom-fields/custom-fields.router.js.ts` |
+| fieldSchemasAdminRouter | `/api/admin/field-schemas` | `—` |
+| Issue Custom Fields | `/api` | `backend/src/modules/issue-custom-fields/issue-custom-fields.router.js.ts` |
+| projectFieldSchemasRouter | `/api/projects/:projectId/field-schemas` | `—` |
+| Monitoring | `/api/monitoring` | `backend/src/modules/monitoring/monitoring.router.js.ts` |
+<!-- AUTO-GENERATED:END -->

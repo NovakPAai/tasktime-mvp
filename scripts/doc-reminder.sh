@@ -1,49 +1,47 @@
 #!/usr/bin/env bash
 # doc-reminder.sh — Called by Claude Code PostToolUse hook
-# Usage: ./scripts/doc-reminder.sh "<edited-file-path>"
-# Outputs a reminder message if the file affects documentation
+# Only reminds about docs that CANNOT be auto-generated.
+# API reference, data model, modules, frontend routes → auto via CI.
 
 FILE="$1"
-
-if [ -z "$FILE" ]; then
-  exit 0
-fi
-
-# Normalize path (remove leading ./)
+[ -z "$FILE" ] && exit 0
 FILE="${FILE#./}"
 
-# Check patterns and output reminder
-if echo "$FILE" | grep -qE 'backend/src/modules/[^/]+/[^/]+\.router\.ts'; then
-  echo ""
-  echo "📋 Doc reminder: Router file changed."
-  echo "   → Update docs/api/reference.md with new/changed endpoints"
-  echo "   → Run: make docs"
-fi
-
-if echo "$FILE" | grep -qE 'backend/src/prisma/schema\.prisma'; then
-  echo ""
-  echo "📋 Doc reminder: Prisma schema changed."
-  echo "   → Update docs/architecture/data-model.md"
-  echo "   → Run: make docs"
-fi
-
-if echo "$FILE" | grep -qE 'backend/src/app\.ts'; then
-  echo ""
-  echo "📋 Doc reminder: App routes changed."
-  echo "   → Update docs/architecture/backend-modules.md if new module added"
-fi
-
-if echo "$FILE" | grep -qE 'frontend/src/App\.tsx'; then
-  echo ""
-  echo "📋 Doc reminder: Frontend routes changed."
-  echo "   → Update docs/architecture/frontend-architecture.md"
-fi
-
+# User manual — UI page changes → human must describe what changed
 if echo "$FILE" | grep -qE 'frontend/src/pages/'; then
   echo ""
-  echo "📋 Doc reminder: Frontend page changed."
-  echo "   → Update docs/user-manual/features/ if user-visible behavior changed"
-  echo "   → Update docs/architecture/frontend-architecture.md if new page added"
+  echo "📋 Ремайндер: Изменена UI-страница."
+  echo "   → Обнови docs/user-manual/features/ если изменилось поведение для пользователя"
+  echo "   (API reference и роуты обновятся автоматически после мёрджа)"
+fi
+
+# Design system — new public components
+if echo "$FILE" | grep -qE 'frontend/src/components/ui/'; then
+  echo ""
+  echo "📋 Ремайндер: Изменён UI-компонент из /ui/."
+  echo "   → Обнови docs/design-system/overview.md если компонент стал публичным"
+fi
+
+# Integration code
+if echo "$FILE" | grep -qE 'backend/src/modules/(integrations|webhooks)/'; then
+  echo ""
+  echo "📋 Ремайндер: Изменён код интеграции."
+  echo "   → Обнови docs/integrations/ (gitlab.md / telegram.md)"
+fi
+
+# Deployment config
+if echo "$FILE" | grep -qE '(deploy/|\.github/workflows/)' && ! echo "$FILE" | grep -q 'update-docs'; then
+  echo ""
+  echo "📋 Ремайндер: Изменена конфигурация деплоя/CI."
+  echo "   → Обнови docs/guides/deployment.md"
+fi
+
+# Auto-generated — just inform
+if echo "$FILE" | grep -qE 'backend/src/modules/.*\.router\.ts|backend/src/prisma/schema\.prisma|backend/src/app\.ts|frontend/src/App\.tsx'; then
+  echo ""
+  echo "✅ Авто-документация обновится сама после мёрджа в main:"
+  echo "   docs/api/reference.md • docs/architecture/data-model.md"
+  echo "   docs/architecture/backend-modules.md • docs/architecture/frontend-architecture.md"
 fi
 
 exit 0

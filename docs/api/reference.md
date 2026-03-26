@@ -550,3 +550,271 @@ Readiness check. Returns 503 if DB or Redis unavailable.
 When any route in `backend/src/modules/*/router.ts` changes → update this file.
 Run `make docs` — it will flag if API docs may be stale.
 The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from OpenAPI.
+
+<!-- AUTO-GENERATED:START -->
+> ⚡ Авто-сгенерировано из `backend/src/modules/**/*.router.ts`
+> 🔒 = требует JWT, 🔒 ADMIN/MANAGER = требует роль, — = публичный
+> Обновляется автоматически при каждом мёрдже в `main`.
+
+### Admin
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/admin/stats` | 🔒 |
+| `GET` | `/api/admin/users` | 🔒 |
+| `POST` | `/api/admin/users` | 🔒 |
+| `PATCH` | `/api/admin/users/:id` | 🔒 |
+| `DELETE` | `/api/admin/users/:id` | 🔒 |
+| `PATCH` | `/api/admin/users/:id/deactivate` | 🔒 |
+| `POST` | `/api/admin/users/:id/reset-password` | 🔒 |
+| `GET` | `/api/admin/users/:id/roles` | 🔒 |
+| `POST` | `/api/admin/users/:id/roles` | 🔒 |
+| `DELETE` | `/api/admin/users/:id/roles/:roleId` | 🔒 |
+| `GET` | `/api/admin/activity` | 🔒 |
+| `GET` | `/api/admin/settings/registration` | 🔒 |
+| `PATCH` | `/api/admin/settings/registration` | 🔒 |
+| `GET` | `/api/admin/uat-tests` | 🔒 |
+| `GET` | `/api/admin/reports/issues-by-status` | 🔒 |
+| `GET` | `/api/admin/reports/issues-by-assignee` | 🔒 |
+
+### AI Sessions
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `POST` | `/api/ai-sessions` | 🔒 |
+
+### AI
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `POST` | `/api/ai/estimate` | 🔒 |
+| `POST` | `/api/ai/decompose` | 🔒 |
+| `POST` | `/api/ai/suggest-assignee` | 🔒 |
+
+### Auth
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/auth/registration-status` | — |
+| `POST` | `/api/auth/register` | — |
+| `POST` | `/api/auth/login` | — |
+| `POST` | `/api/auth/refresh` | — |
+| `POST` | `/api/auth/logout` | 🔒 |
+| `GET` | `/api/auth/me` | 🔒 |
+| `POST` | `/api/auth/change-password` | 🔒 |
+
+### Boards
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/projects/:projectId/board` | 🔒 |
+| `PATCH` | `/api/projects/:projectId/board/reorder` | 🔒 |
+
+### Comments
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/issues/:issueId/comments` | 🔒 |
+| `POST` | `/api/issues/:issueId/comments` | 🔒 |
+| `PATCH` | `/api/comments/:id` | 🔒 |
+| `DELETE` | `/api/comments/:id` | 🔒 |
+
+### Custom Fields
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/admin/custom-fields/` | 🔒 |
+| `POST` | `/api/admin/custom-fields/` | 🔒 |
+| `PATCH` | `/api/admin/custom-fields/reorder` | 🔒 |
+| `GET` | `/api/admin/custom-fields/:id` | 🔒 |
+| `PATCH` | `/api/admin/custom-fields/:id` | 🔒 |
+| `DELETE` | `/api/admin/custom-fields/:id` | 🔒 |
+| `PATCH` | `/api/admin/custom-fields/:id/toggle` | 🔒 |
+
+### Field Schemas
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/admin/field-schemas/` | — |
+| `POST` | `/api/admin/field-schemas/` | — |
+| `GET` | `/api/admin/field-schemas/:id` | — |
+| `PATCH` | `/api/admin/field-schemas/:id` | — |
+| `DELETE` | `/api/admin/field-schemas/:id` | — |
+| `POST` | `/api/admin/field-schemas/:id/copy` | — |
+| `GET` | `/api/admin/field-schemas/:id/conflicts` | — |
+| `POST` | `/api/admin/field-schemas/:id/publish` | — |
+| `POST` | `/api/admin/field-schemas/:id/unpublish` | — |
+| `PATCH` | `/api/admin/field-schemas/:id/set-default` | — |
+| `PUT` | `/api/admin/field-schemas/:id/items` | — |
+| `POST` | `/api/admin/field-schemas/:id/items` | — |
+| `DELETE` | `/api/admin/field-schemas/:id/items/:itemId` | — |
+| `PATCH` | `/api/admin/field-schemas/:id/items/reorder` | — |
+| `GET` | `/api/admin/field-schemas/:id/bindings` | — |
+| `POST` | `/api/admin/field-schemas/:id/bindings` | — |
+| `DELETE` | `/api/admin/field-schemas/:id/bindings/:bindingId` | — |
+| `GET` | `/api/admin/field-schemas/` | — |
+
+### Issue Custom Fields
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/issues/:id/custom-fields` | 🔒 |
+| `PUT` | `/api/issues/:id/custom-fields` | 🔒 |
+
+### Issue Type Configs
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/admin/issue-type-configs` | 🔒 |
+| `POST` | `/api/admin/issue-type-configs` | 🔒 |
+| `PUT` | `/api/admin/issue-type-configs/:id` | 🔒 |
+| `PATCH` | `/api/admin/issue-type-configs/:id/toggle` | 🔒 |
+| `DELETE` | `/api/admin/issue-type-configs/:id` | 🔒 |
+
+### Issue Type Schemes
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/admin/issue-type-schemes` | 🔒 |
+| `GET` | `/api/admin/issue-type-schemes/:id` | 🔒 |
+| `POST` | `/api/admin/issue-type-schemes` | 🔒 |
+| `PUT` | `/api/admin/issue-type-schemes/:id` | 🔒 |
+| `DELETE` | `/api/admin/issue-type-schemes/:id` | 🔒 |
+| `PUT` | `/api/admin/issue-type-schemes/:id/items` | 🔒 |
+| `POST` | `/api/admin/issue-type-schemes/:id/projects` | 🔒 |
+| `DELETE` | `/api/admin/issue-type-schemes/:id/projects/:projectId` | 🔒 |
+| `GET` | `/api/projects/:id/issue-types` | 🔒 |
+
+### Issues
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/issues/search` | 🔒 |
+| `GET` | `/api/projects/:projectId/issues` | 🔒 |
+| `GET` | `/api/mvp-livecode/issues/active` | 🔒 |
+| `POST` | `/api/projects/:projectId/issues` | 🔒 |
+| `GET` | `/api/issues/key/:key` | 🔒 |
+| `GET` | `/api/issues/:id` | 🔒 |
+| `PATCH` | `/api/issues/:id` | 🔒 |
+| `PATCH` | `/api/issues/:id/status` | 🔒 |
+| `PATCH` | `/api/issues/:id/assign` | 🔒 |
+| `PATCH` | `/api/issues/:id/ai-flags` | 🔒 |
+| `PATCH` | `/api/issues/:id/ai-status` | 🔒 |
+| `POST` | `/api/projects/:projectId/issues/bulk` | 🔒 |
+| `DELETE` | `/api/projects/:projectId/issues/bulk` | 🔒 |
+| `DELETE` | `/api/issues/:id` | 🔒 |
+| `GET` | `/api/issues/:id/children` | 🔒 |
+| `GET` | `/api/issues/:id/history` | 🔒 |
+
+### Issue Links
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/issues/:id/links` | 🔒 |
+| `POST` | `/api/issues/:id/links` | 🔒 |
+| `DELETE` | `/api/issues/:id/links/:linkId` | 🔒 |
+| `GET` | `/api/link-types` | 🔒 |
+| `GET` | `/api/admin/link-types` | 🔒 |
+| `POST` | `/api/admin/link-types` | 🔒 |
+| `PATCH` | `/api/admin/link-types/:id` | 🔒 |
+
+### Monitoring
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/monitoring/metrics` | 🔒 |
+| `GET` | `/api/monitoring/endpoints` | 🔒 |
+| `DELETE` | `/api/monitoring/metrics` | 🔒 |
+| `POST` | `/api/monitoring/page-metrics` | 🔒 |
+
+### Project Categories
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/project-categories/` | 🔒 |
+| `POST` | `/api/project-categories/` | 🔒 |
+| `PATCH` | `/api/project-categories/:id` | 🔒 |
+| `DELETE` | `/api/project-categories/:id` | 🔒 |
+
+### Projects
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/projects/` | 🔒 |
+| `POST` | `/api/projects/` | 🔒 |
+| `GET` | `/api/projects/:id` | 🔒 |
+| `GET` | `/api/projects/:id/dashboard` | 🔒 |
+| `PATCH` | `/api/projects/:id` | 🔒 |
+| `DELETE` | `/api/projects/:id` | 🔒 |
+
+### Releases
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/projects/:projectId/releases` | 🔒 |
+| `GET` | `/api/releases/:id/issues` | 🔒 |
+| `GET` | `/api/releases/:id/sprints` | 🔒 |
+| `GET` | `/api/releases/:id/readiness` | 🔒 |
+| `POST` | `/api/projects/:projectId/releases` | 🔒 |
+| `PATCH` | `/api/releases/:id` | 🔒 |
+| `POST` | `/api/releases/:id/issues` | 🔒 |
+| `POST` | `/api/releases/:id/issues/remove` | 🔒 |
+| `POST` | `/api/releases/:id/sprints` | 🔒 |
+| `POST` | `/api/releases/:id/sprints/remove` | 🔒 |
+| `POST` | `/api/releases/:id/ready` | 🔒 |
+| `POST` | `/api/releases/:id/released` | 🔒 |
+
+### Sprints
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/sprints` | 🔒 |
+| `GET` | `/api/projects/:projectId/sprints` | 🔒 |
+| `GET` | `/api/sprints/:id/issues` | 🔒 |
+| `GET` | `/api/projects/:projectId/backlog` | 🔒 |
+| `POST` | `/api/projects/:projectId/sprints` | 🔒 |
+| `PATCH` | `/api/sprints/:id` | 🔒 |
+| `POST` | `/api/sprints/:id/start` | 🔒 |
+| `POST` | `/api/sprints/:id/close` | 🔒 |
+| `POST` | `/api/sprints/:id/issues` | 🔒 |
+| `POST` | `/api/projects/:projectId/backlog/issues` | 🔒 |
+
+### Teams
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/teams` | 🔒 |
+| `GET` | `/api/teams/:id` | 🔒 |
+| `POST` | `/api/teams` | 🔒 |
+| `PATCH` | `/api/teams/:id` | 🔒 |
+| `DELETE` | `/api/teams/:id` | 🔒 |
+| `PUT` | `/api/teams/:id/members` | 🔒 |
+
+### Time Tracking
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `POST` | `/api/issues/:issueId/time/start` | 🔒 |
+| `POST` | `/api/issues/:issueId/time/stop` | 🔒 |
+| `POST` | `/api/issues/:issueId/time` | 🔒 |
+| `GET` | `/api/issues/:issueId/time` | 🔒 |
+| `GET` | `/api/users/:userId/time` | 🔒 |
+| `GET` | `/api/users/:userId/time/summary` | 🔒 |
+| `GET` | `/api/time/active` | 🔒 |
+
+### Users
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/users/` | 🔒 |
+| `GET` | `/api/users/:id` | 🔒 |
+| `PATCH` | `/api/users/:id` | 🔒 |
+| `PATCH` | `/api/users/:id/role` | 🔒 |
+| `PATCH` | `/api/users/:id/deactivate` | 🔒 |
+
+### Webhooks
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `POST` | `/api/webhooks/gitlab` | — |
+<!-- AUTO-GENERATED:END -->

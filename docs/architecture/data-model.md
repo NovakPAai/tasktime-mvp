@@ -325,3 +325,531 @@ State: `DRAFT` → `READY` → `RELEASED`
 
 When `backend/src/prisma/schema.prisma` changes → update this file.
 Run `make docs` to check for staleness warnings.
+
+<!-- AUTO-GENERATED:START -->
+> ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
+> Обновляется автоматически при каждом изменении схемы.
+
+## Модели (26)
+
+### User
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `email` | `String` | нет | UNIQUE |
+| `passwordHash` | `String` | нет |  |
+| `name` | `String` | нет |  |
+| `role` | `UserRole` | нет | default: USER |
+| `isActive` | `Boolean` | нет | default: true |
+| `isSystem` | `Boolean` | нет | default: false |
+| `mustChangePassword` | `Boolean` | нет | default: false |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `assignedIssues` | `Issue[]` | нет |  |
+| `createdIssues` | `Issue[]` | нет |  |
+| `refreshTokens` | `RefreshToken[]` | нет |  |
+| `auditLogs` | `AuditLog[]` | нет |  |
+| `comments` | `Comment[]` | нет |  |
+| `timeLogs` | `TimeLog[]` | нет |  |
+| `aiSessions` | `AiSession[]` | нет |  |
+| `teamMemberships` | `TeamMember[]` | нет |  |
+| `createdLinks` | `IssueLink[]` | нет |  |
+| `ownedProjects` | `Project[]` | нет |  |
+| `projectRoles` | `UserProjectRole[]` | нет |  |
+| `customFieldUpdates` | `IssueCustomFieldValue[]` | нет |  |
+
+### RefreshToken
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `token` | `String` | нет | UNIQUE |
+| `userId` | `String` | нет |  |
+| `expiresAt` | `DateTime` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `user` | `User` | нет |  |
+
+### UserProjectRole
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `userId` | `String` | нет |  |
+| `projectId` | `String` | нет |  |
+| `role` | `ProjectRole` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `user` | `User` | нет |  |
+| `project` | `Project` | нет |  |
+
+### ProjectCategory
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет | UNIQUE |
+| `description` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `projects` | `Project[]` | нет |  |
+
+### Project
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `key` | `String` | нет | UNIQUE |
+| `description` | `String` | да |  |
+| `ownerId` | `String` | да |  |
+| `categoryId` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `owner` | `User` | да |  |
+| `category` | `ProjectCategory` | да |  |
+| `issues` | `Issue[]` | нет |  |
+| `sprints` | `Sprint[]` | нет |  |
+| `releases` | `Release[]` | нет |  |
+| `issueTypeScheme` | `IssueTypeSchemeProject` | да |  |
+| `userRoles` | `UserProjectRole[]` | нет |  |
+| `fieldSchemaBindings` | `FieldSchemaBinding[]` | нет |  |
+
+### IssueTypeConfig
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `iconName` | `String` | нет |  |
+| `iconColor` | `String` | нет |  |
+| `isSubtask` | `Boolean` | нет | default: false |
+| `isEnabled` | `Boolean` | нет | default: true |
+| `isSystem` | `Boolean` | нет | default: false |
+| `systemKey` | `String` | да | UNIQUE |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `schemeItems` | `IssueTypeSchemeItem[]` | нет |  |
+| `issues` | `Issue[]` | нет |  |
+| `fieldSchemaBindings` | `FieldSchemaBinding[]` | нет |  |
+
+### IssueTypeScheme
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `isDefault` | `Boolean` | нет | default: false |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `items` | `IssueTypeSchemeItem[]` | нет |  |
+| `projects` | `IssueTypeSchemeProject[]` | нет |  |
+
+### IssueTypeSchemeItem
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemeId` | `String` | нет |  |
+| `typeConfigId` | `String` | нет |  |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `scheme` | `IssueTypeScheme` | нет |  |
+| `typeConfig` | `IssueTypeConfig` | нет |  |
+
+### IssueTypeSchemeProject
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemeId` | `String` | нет |  |
+| `projectId` | `String` | нет | UNIQUE |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `scheme` | `IssueTypeScheme` | нет |  |
+| `project` | `Project` | нет |  |
+
+### Issue
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `projectId` | `String` | нет |  |
+| `number` | `Int` | нет |  |
+| `title` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `issueTypeConfigId` | `String` | да |  |
+| `status` | `IssueStatus` | нет | default: OPEN |
+| `priority` | `IssuePriority` | нет | default: MEDIUM |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `aiEligible` | `Boolean` | нет | default: false |
+| `aiExecutionStatus` | `AiExecutionStatus` | нет | default: NOT_STARTED |
+| `aiAssigneeType` | `AiAssigneeType` | нет | default: HUMAN |
+| `parentId` | `String` | да |  |
+| `parent` | `Issue` | да |  |
+| `children` | `Issue[]` | нет |  |
+| `assigneeId` | `String` | да |  |
+| `creatorId` | `String` | нет |  |
+| `assignee` | `User` | да |  |
+| `creator` | `User` | нет |  |
+| `sprintId` | `String` | да |  |
+| `sprint` | `Sprint` | да |  |
+| `releaseId` | `String` | да |  |
+| `release` | `Release` | да |  |
+| `estimatedHours` | `Decimal` | да |  |
+| `dueDate` | `DateTime` | да |  |
+| `acceptanceCriteria` | `String` | да |  |
+| `aiReasoning` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `issueTypeConfig` | `IssueTypeConfig` | да |  |
+| `project` | `Project` | нет |  |
+| `comments` | `Comment[]` | нет |  |
+| `timeLogs` | `TimeLog[]` | нет |  |
+| `aiSessions` | `AiSession[]` | нет |  |
+| `sourceLinks` | `IssueLink[]` | нет |  |
+| `targetLinks` | `IssueLink[]` | нет |  |
+| `customFieldValues` | `IssueCustomFieldValue[]` | нет |  |
+
+### Sprint
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `projectId` | `String` | нет |  |
+| `name` | `String` | нет |  |
+| `goal` | `String` | да |  |
+| `startDate` | `DateTime` | да |  |
+| `endDate` | `DateTime` | да |  |
+| `state` | `SprintState` | нет | default: PLANNED |
+| `projectTeamId` | `String` | да |  |
+| `businessTeamId` | `String` | да |  |
+| `flowTeamId` | `String` | да |  |
+| `releaseId` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `project` | `Project` | нет |  |
+| `issues` | `Issue[]` | нет |  |
+| `projectTeam` | `Team` | да |  |
+| `businessTeam` | `Team` | да |  |
+| `flowTeam` | `Team` | да |  |
+| `release` | `Release` | да |  |
+
+### Release
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `projectId` | `String` | нет |  |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `level` | `ReleaseLevel` | нет | default: MINOR |
+| `state` | `ReleaseState` | нет | default: DRAFT |
+| `releaseDate` | `DateTime` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `project` | `Project` | нет |  |
+| `issues` | `Issue[]` | нет |  |
+| `sprints` | `Sprint[]` | нет |  |
+
+### Comment
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `issueId` | `String` | нет |  |
+| `authorId` | `String` | нет |  |
+| `body` | `String` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `issue` | `Issue` | нет |  |
+| `author` | `User` | нет |  |
+
+### TimeLog
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `issueId` | `String` | нет |  |
+| `userId` | `String` | да |  |
+| `hours` | `Decimal` | нет |  |
+| `note` | `String` | да |  |
+| `startedAt` | `DateTime` | да |  |
+| `stoppedAt` | `DateTime` | да |  |
+| `logDate` | `DateTime` | нет | default: now( |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `source` | `TimeSource` | нет | default: HUMAN |
+| `agentSessionId` | `String` | да |  |
+| `agentSession` | `AiSession` | да |  |
+| `costMoney` | `Decimal` | да |  |
+| `issue` | `Issue` | нет |  |
+| `user` | `User` | да |  |
+
+### AiSession
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `issueId` | `String` | да |  |
+| `userId` | `String` | да |  |
+| `model` | `String` | нет |  |
+| `provider` | `String` | нет |  |
+| `startedAt` | `DateTime` | нет |  |
+| `finishedAt` | `DateTime` | нет |  |
+| `tokensInput` | `Int` | нет |  |
+| `tokensOutput` | `Int` | нет |  |
+| `costMoney` | `Decimal` | нет |  |
+| `notes` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `issue` | `Issue` | да |  |
+| `user` | `User` | да |  |
+| `logs` | `TimeLog[]` | нет |  |
+
+### AuditLog
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `action` | `String` | нет |  |
+| `entityType` | `String` | нет |  |
+| `entityId` | `String` | нет |  |
+| `userId` | `String` | да |  |
+| `details` | `Json` | да |  |
+| `ipAddress` | `String` | да |  |
+| `userAgent` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `user` | `User` | да |  |
+
+### IssueLinkType
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет | UNIQUE |
+| `outboundName` | `String` | нет |  |
+| `inboundName` | `String` | нет |  |
+| `isActive` | `Boolean` | нет | default: true |
+| `isSystem` | `Boolean` | нет | default: false |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `links` | `IssueLink[]` | нет |  |
+
+### IssueLink
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `sourceIssueId` | `String` | нет |  |
+| `targetIssueId` | `String` | нет |  |
+| `linkTypeId` | `String` | нет |  |
+| `createdById` | `String` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `sourceIssue` | `Issue` | нет |  |
+| `targetIssue` | `Issue` | нет |  |
+| `linkType` | `IssueLinkType` | нет |  |
+| `createdBy` | `User` | нет |  |
+
+### CustomField
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `fieldType` | `CustomFieldType` | нет |  |
+| `options` | `Json` | да |  |
+| `isSystem` | `Boolean` | нет | default: false |
+| `isEnabled` | `Boolean` | нет | default: true |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `schemaItems` | `FieldSchemaItem[]` | нет |  |
+| `values` | `IssueCustomFieldValue[]` | нет |  |
+
+### IssueCustomFieldValue
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `issueId` | `String` | нет |  |
+| `customFieldId` | `String` | нет |  |
+| `value` | `Json` | нет |  |
+| `updatedAt` | `DateTime` | нет |  |
+| `updatedById` | `String` | нет |  |
+| `issue` | `Issue` | нет |  |
+| `customField` | `CustomField` | нет |  |
+| `updatedBy` | `User` | нет |  |
+
+### FieldSchema
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `status` | `FieldSchemaStatus` | нет | default: DRAFT |
+| `isDefault` | `Boolean` | нет | default: false |
+| `copiedFromId` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `items` | `FieldSchemaItem[]` | нет |  |
+| `bindings` | `FieldSchemaBinding[]` | нет |  |
+| `copiedFrom` | `FieldSchema` | да |  |
+| `copies` | `FieldSchema[]` | нет |  |
+
+### FieldSchemaItem
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemaId` | `String` | нет |  |
+| `customFieldId` | `String` | нет |  |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `isRequired` | `Boolean` | нет | default: false |
+| `showOnKanban` | `Boolean` | нет | default: false |
+| `schema` | `FieldSchema` | нет |  |
+| `customField` | `CustomField` | нет |  |
+
+### FieldSchemaBinding
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemaId` | `String` | нет |  |
+| `scopeType` | `FieldScopeType` | нет |  |
+| `projectId` | `String` | да |  |
+| `issueTypeConfigId` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `schema` | `FieldSchema` | нет |  |
+| `project` | `Project` | да |  |
+| `issueTypeConfig` | `IssueTypeConfig` | да |  |
+
+### SystemSetting
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `key` | `String` | нет | PK |
+| `value` | `String` | нет |  |
+| `updatedAt` | `DateTime` | нет |  |
+
+### Team
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `members` | `TeamMember[]` | нет |  |
+| `projectSprints` | `Sprint[]` | нет |  |
+| `businessSprints` | `Sprint[]` | нет |  |
+| `flowSprints` | `Sprint[]` | нет |  |
+
+### TeamMember
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `teamId` | `String` | нет |  |
+| `userId` | `String` | нет |  |
+| `role` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `team` | `Team` | нет |  |
+| `user` | `User` | нет |  |
+
+## Перечисления (13)
+
+### UserRole
+
+- `SUPER_ADMIN`
+- `ADMIN`
+- `MANAGER`
+- `USER`
+- `VIEWER`
+
+### ProjectRole
+
+- `ADMIN`
+- `MANAGER`
+- `USER`
+- `VIEWER`
+
+### IssueStatus
+
+- `OPEN`
+- `IN_PROGRESS`
+- `REVIEW`
+- `DONE`
+- `CANCELLED`
+
+### IssuePriority
+
+- `CRITICAL`
+- `HIGH`
+- `MEDIUM`
+- `LOW`
+
+### AiExecutionStatus
+
+- `NOT_STARTED`
+- `IN_PROGRESS`
+- `DONE`
+- `FAILED`
+
+### AiAssigneeType
+
+- `HUMAN`
+- `AGENT`
+- `MIXED`
+
+### SprintState
+
+- `PLANNED`
+- `ACTIVE`
+- `CLOSED`
+
+### ReleaseLevel
+
+- `MINOR   // мелкие улучшения, баг-фиксы`
+- `MAJOR   // новые фичи`
+
+### ReleaseState
+
+- `DRAFT    // сбор задач`
+- `READY    // готов к выпуску`
+- `RELEASED // выпущен`
+
+### TimeSource
+
+- `HUMAN`
+- `AGENT`
+
+### CustomFieldType
+
+- `TEXT`
+- `TEXTAREA`
+- `NUMBER`
+- `DECIMAL`
+- `DATE`
+- `DATETIME`
+- `URL`
+- `CHECKBOX`
+- `SELECT`
+- `MULTI_SELECT`
+- `USER`
+- `LABEL`
+- `REFERENCE`
+
+### FieldSchemaStatus
+
+- `DRAFT`
+- `ACTIVE`
+
+### FieldScopeType
+
+- `GLOBAL`
+- `PROJECT`
+- `ISSUE_TYPE`
+- `PROJECT_ISSUE_TYPE`
+<!-- AUTO-GENERATED:END -->

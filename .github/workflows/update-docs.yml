@@ -11,76 +11,97 @@ permissions:
   pull-requests: write
 
 jobs:
-  # ── Job 1: Update CHANGELOG from commits ───────────────────────────────────
-  update-changelog:
+  # ── Job 1: Update CHANGELOG + auto-generated sections ─────────────────────
+  auto-generate:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+          echo "routes=false"   >> "$GITHUB_OUTPUT"
+          echo "schema=false"   >> "$GITHUB_OUTPUT"
+          echo "modules=false"  >> "$GITHUB_OUTPUT"
+          echo "frontend=false" >> "$GITHUB_OUTPUT"
+
+          if echo "$CHANGED" | grep -qE 'backend/src/modules/.*\.router\.ts'; then
+            echo "routes=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$CHANGED" | grep -q 'backend/src/prisma/schema.prisma'; then
+            echo "schema=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$CHANGED" | grep -q 'backend/src/app.ts'; then
+            echo "modules=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$CHANGED" | grep -q 'frontend/src/App.tsx'; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate changelog
         run: node scripts/generate-docs.js --changelog
 
-      - name: Commit changelog update
+      - name: Generate API reference
+        if: steps.changes.outputs.routes == 'true'
+        run: node scripts/generate-docs.js --routes
+
+      - name: Generate data model docs
+        if: steps.changes.outputs.schema == 'true'
+        run: node scripts/generate-docs.js --schema
+
+      - name: Generate backend modules docs
+        if: steps.changes.outputs.modules == 'true'
+        run: node scripts/generate-docs.js --modules
+
+      - name: Generate frontend routes docs
+        if: steps.changes.outputs.frontend == 'true'
+        run: node scripts/generate-docs.js --frontend
+
+      - name: Commit generated docs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet docs/CHANGELOG.md; then
-            echo "No changelog changes"
+          git add docs/CHANGELOG.md .doc-sync-state \
+                  docs/api/reference.md \
+                  docs/architecture/data-model.md \
+                  docs/architecture/backend-modules.md \
+                  docs/architecture/frontend-architecture.md \
+                  2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "Nothing to commit"
           else
-            git add docs/CHANGELOG.md .doc-sync-state
-            git commit -m "chore: update changelog [skip ci]"
+            git commit -m "chore: auto-update docs [skip ci]"
             git push
           fi
 
-  # ── Job 2: Check API docs staleness ────────────────────────────────────────
-  check-api-docs:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Check API docs
-        run: node scripts/generate-docs.js --api
-
-  # ── Job 3: PR staleness check and comment ──────────────────────────────────
+  # ── Job 2: PR staleness check — ремайндер для разработчика ────────────────
   check-staleness:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Check for stale docs
+      - name: Check for stale manual docs
         id: stale
         run: |
           OUTPUT=$(node scripts/generate-docs.js --stale 2>&1)
           echo "$OUTPUT"
-          # Extract warnings (lines with ⚠️)
           WARNINGS=$(echo "$OUTPUT" | grep "⚠️" || true)
           if [ -n "$WARNINGS" ]; then
             echo "has_warnings=true" >> "$GITHUB_OUTPUT"
@@ -99,17 +120,18 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const body = `## 📋 Documentation Check
+            const warnings = `${{ steps.stale.outputs.warnings }}`;
+            const body = `## 📋 Напоминание об обновлении документации
 
-            The following source files changed and their documentation may need updating:
+Следующие файлы изменились — требуется **ручное** обновление документации (контент нельзя сгенерировать автоматически):
 
-            \`\`\`
-            ${{ steps.stale.outputs.warnings }}
-            \`\`\`
+\`\`\`
+${warnings}
+\`\`\`
 
-            Please review [docs/guides/doc-workflow.md](../docs/guides/doc-workflow.md) for the doc-update process.
-
-            > This is an automated reminder — dismiss if no doc changes are needed.`;
+> 💡 Авто-генерируемые секции (API reference, data model, routes) обновятся сами после мёрджа.
+> Это напоминание только о контентной документации — \`docs/user-manual/\`, \`docs/guides/\`, \`docs/integrations/\`.
+> Подробнее: [docs/guides/doc-workflow.md](../blob/main/docs/guides/doc-workflow.md)`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
