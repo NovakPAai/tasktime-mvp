@@ -189,6 +189,10 @@ export default function Sidebar({
     ['/admin/issue-type-schemes', 'Схемы типов задач'],
     ['/admin/custom-fields', 'Кастомные поля'],
     ['/admin/field-schemas', 'Схемы полей'],
+    ['/admin/workflow-statuses', 'Статусы'],
+    ['/admin/workflows', 'Workflow'],
+    ['/admin/workflow-schemes', 'Схемы workflow'],
+    ['/admin/transition-screens', 'Экраны переходов'],
   ];
 
   return (
