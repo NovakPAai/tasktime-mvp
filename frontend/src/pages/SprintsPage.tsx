@@ -36,7 +36,7 @@ const C = {
 };
 
 const CL = {
-  bg:       '#F6F8FA',
+  bg:       '#F0F2FA',
   bgCard:   '#FFFFFF',
   border:   '#D0D7DE',
   borderHd: '#EEF0F2',

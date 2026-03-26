@@ -23,7 +23,7 @@ export const updateWorkflowStepDto = z.object({
   orderIndex: z.number().int().nonnegative().optional(),
 });
 
-const rulesField = z.array(z.record(z.unknown())).optional();
+const rulesField = z.array(z.record(z.unknown())).nullish();
 const rulesFieldNullish = z.array(z.record(z.unknown())).nullish();
 
 export const createWorkflowTransitionDto = z.object({

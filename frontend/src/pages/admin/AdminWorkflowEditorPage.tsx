@@ -5,10 +5,37 @@ import {
   Popconfirm, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, StarOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, StarOutlined, LockOutlined } from '@ant-design/icons';
 import { workflowsApi, type Workflow, type WorkflowStep, type WorkflowTransition } from '../../api/workflows';
 import { workflowStatusesApi, type WorkflowStatus } from '../../api/workflow-statuses';
 import { transitionScreensApi, type TransitionScreen } from '../../api/transition-screens';
+
+// TTADM-67 / TTADM-68: карта кодов ошибок → читаемые сообщения
+const STEP_ERRORS: Record<string, string> = {
+  SYSTEM_WORKFLOW_IMMUTABLE: 'Системный воркфлоу нельзя изменять',
+  'Status already in workflow': 'Статус уже добавлен в воркфлоу',
+  'Workflow status not found': 'Статус не найден',
+  'Workflow not found': 'Воркфлоу не найден',
+};
+
+const TRANSITION_ERRORS: Record<string, string> = {
+  SYSTEM_WORKFLOW_IMMUTABLE: 'Системный воркфлоу нельзя изменять',
+  TRANSITION_ALREADY_EXISTS: 'Такой переход уже существует',
+  'fromStatus must be a step in the workflow': 'Исходный статус не является шагом воркфлоу',
+  'toStatus must be a step in the workflow': 'Целевой статус не является шагом воркфлоу',
+  'Workflow not found': 'Воркфлоу не найден',
+};
+
+function apiErrorMessage(err: unknown, map: Record<string, string>, fallback: string): string {
+  const code = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? '';
+  return map[code] ?? fallback;
+}
+
+// TTADM-68: parseJson возвращает undefined (не null) для пустых полей
+function parseJson(s?: string): unknown[] | undefined {
+  if (!s) return undefined;
+  try { return JSON.parse(s) as unknown[]; } catch { return undefined; }
+}
 
 export default function AdminWorkflowEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -52,8 +79,9 @@ export default function AdminWorkflowEditorPage() {
       setStepDrawerOpen(false);
       stepForm.resetFields();
       load();
-    } catch {
-      message.error('Не удалось добавить шаг');
+    } catch (err) {
+      // TTADM-67: показываем конкретную причину вместо generic-сообщения
+      message.error(apiErrorMessage(err, STEP_ERRORS, 'Не удалось добавить шаг'));
     }
   };
 
@@ -89,7 +117,7 @@ export default function AdminWorkflowEditorPage() {
     setEditingTransition(t);
     transitionForm.setFieldsValue({
       name: t.name,
-      fromStatusId: t.fromStatusId ?? '__global__',
+      fromStatusId: t.fromStatusId ?? undefined,
       toStatusId: t.toStatusId,
       isGlobal: t.isGlobal,
       screenId: t.screenId ?? undefined,
@@ -102,7 +130,7 @@ export default function AdminWorkflowEditorPage() {
 
   const handleSaveTransition = async (vals: {
     name: string;
-    fromStatusId: string;
+    fromStatusId?: string;
     toStatusId: string;
     isGlobal: boolean;
     screenId?: string;
@@ -111,13 +139,14 @@ export default function AdminWorkflowEditorPage() {
     postFunctions?: string;
   }) => {
     if (!id) return;
-    const parseJson = (s?: string) => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
     const data = {
       name: vals.name,
-      fromStatusId: vals.isGlobal || vals.fromStatusId === '__global__' ? null : vals.fromStatusId,
+      // TTADM-68: fromStatusId=null только при isGlobal, иначе передаём UUID или undefined
+      fromStatusId: vals.isGlobal ? null : (vals.fromStatusId ?? null),
       toStatusId: vals.toStatusId,
       isGlobal: vals.isGlobal ?? false,
       screenId: vals.screenId || null,
+      // TTADM-68: parseJson возвращает undefined для пустых полей — Zod принимает undefined, но не null
       conditions: parseJson(vals.conditions),
       validators: parseJson(vals.validators),
       postFunctions: parseJson(vals.postFunctions),
@@ -132,8 +161,9 @@ export default function AdminWorkflowEditorPage() {
       }
       setTransitionDrawerOpen(false);
       load();
-    } catch {
-      message.error('Не удалось сохранить переход');
+    } catch (err) {
+      // TTADM-67 / TTADM-68: показываем конкретную причину
+      message.error(apiErrorMessage(err, TRANSITION_ERRORS, 'Не удалось сохранить переход'));
     }
   };
 
@@ -161,10 +191,11 @@ export default function AdminWorkflowEditorPage() {
         </Space>
       ),
     },
-    {
+    // TTADM-67: action-колонка скрыта для системных воркфлоу
+    ...(!workflow?.isSystem ? [{
       title: '',
       width: 100,
-      render: (_, s) => (
+      render: (_: unknown, s: WorkflowStep) => (
         <Space>
           {!s.isInitial && (
             <Tooltip title="Сделать начальным">
@@ -176,7 +207,7 @@ export default function AdminWorkflowEditorPage() {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] as ColumnsType<WorkflowStep> : []),
   ];
 
   const transitionColumns: ColumnsType<WorkflowTransition> = [
@@ -198,10 +229,11 @@ export default function AdminWorkflowEditorPage() {
       title: 'Экран',
       render: (_, t) => t.screen ? <Tag>{t.screen.name}</Tag> : '—',
     },
-    {
+    // TTADM-67: action-колонка скрыта для системных воркфлоу
+    ...(!workflow?.isSystem ? [{
       title: '',
       width: 80,
-      render: (_, t) => (
+      render: (_: unknown, t: WorkflowTransition) => (
         <Space>
           <Button size="small" onClick={() => openEditTransition(t)}>Изменить</Button>
           <Popconfirm title="Удалить переход?" onConfirm={() => handleDeleteTransition(t.id)} okText="Удалить" okButtonProps={{ danger: true }}>
@@ -209,7 +241,7 @@ export default function AdminWorkflowEditorPage() {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] as ColumnsType<WorkflowTransition> : []),
   ];
 
   if (loading || !workflow) return <div style={{ padding: 24 }}>Загрузка...</div>;
@@ -224,15 +256,20 @@ export default function AdminWorkflowEditorPage() {
         </Button>
         <Typography.Title level={4} style={{ margin: 0 }}>{workflow.name}</Typography.Title>
         {workflow.isDefault && <Tag color="blue">По умолчанию</Tag>}
+        {/* TTADM-67: визуальный индикатор системного воркфлоу */}
+        {workflow.isSystem && <Tag color="red" icon={<LockOutlined />}>Системный (только чтение)</Tag>}
       </div>
 
       {/* Steps */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <Typography.Text strong>Шаги (Статусы)</Typography.Text>
-          <Button size="small" icon={<PlusOutlined />} onClick={() => { stepForm.resetFields(); setStepDrawerOpen(true); }}>
-            Добавить статус
-          </Button>
+          {/* TTADM-67: кнопка скрыта для системных воркфлоу */}
+          {!workflow.isSystem && (
+            <Button size="small" icon={<PlusOutlined />} onClick={() => { stepForm.resetFields(); setStepDrawerOpen(true); }}>
+              Добавить статус
+            </Button>
+          )}
         </div>
         <Table
           rowKey="id"
@@ -247,9 +284,12 @@ export default function AdminWorkflowEditorPage() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <Typography.Text strong>Переходы</Typography.Text>
-          <Button size="small" icon={<PlusOutlined />} onClick={openAddTransition}>
-            Добавить переход
-          </Button>
+          {/* TTADM-67: кнопка скрыта для системных воркфлоу */}
+          {!workflow.isSystem && (
+            <Button size="small" icon={<PlusOutlined />} onClick={openAddTransition}>
+              Добавить переход
+            </Button>
+          )}
         </div>
         <Table
           rowKey="id"
@@ -291,13 +331,21 @@ export default function AdminWorkflowEditorPage() {
           <Form.Item name="isGlobal" label="Глобальный (из любого статуса)" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item name="fromStatusId" label="Из статуса">
-            <Select
-              options={[
-                { value: '__global__', label: '— (глобальный)' },
-                ...(workflow.steps ?? []).map(s => ({ value: s.statusId, label: s.status.name })),
-              ]}
-            />
+          {/* TTADM-68: поле «Из статуса» скрывается при isGlobal=true; убрана опция __global__ */}
+          <Form.Item noStyle shouldUpdate={(prev, curr) => prev.isGlobal !== curr.isGlobal}>
+            {({ getFieldValue }) =>
+              !getFieldValue('isGlobal') && (
+                <Form.Item
+                  name="fromStatusId"
+                  label="Из статуса"
+                  rules={[{ required: true, message: 'Выберите исходный статус' }]}
+                >
+                  <Select
+                    options={(workflow.steps ?? []).map(s => ({ value: s.statusId, label: s.status.name }))}
+                  />
+                </Form.Item>
+              )
+            }
           </Form.Item>
           <Form.Item name="toStatusId" label="В статус" rules={[{ required: true }]}>
             <Select

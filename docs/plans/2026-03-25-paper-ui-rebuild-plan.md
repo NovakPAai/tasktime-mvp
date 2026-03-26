@@ -1,8 +1,9 @@
 # Paper UI Rebuild — Сессионный план
 
-**Ветка:** `UxUi/sweet-booth`
-**Последний коммит:** `7117a42` — SprintsPage (dual-theme) + App theme tokens
-**PR:** [#131](https://github.com/jackrescuer-gif/tasktime-mvp/pull/131) — открыт, ожидает CI + аппрув
+**Ветка активной сессии:** `UxUi/session-3-login-projectdetail`
+**Последний коммит:** `c25adc5` — ProjectDetailPage (dual-theme)
+**PR сессии 3:** [#143](https://github.com/jackrescuer-gif/tasktime-mvp/pull/143) — открыт
+**PR сессии 2 (Sprints):** [#131](https://github.com/jackrescuer-gif/tasktime-mvp/pull/131) — смержен в main
 **Preview сервер:** порт 5180 (worktree `/Users/pavelnovak/tasktime-mvp/.claude/worktrees/sweet-booth`)
 
 ---
@@ -116,7 +117,8 @@ function initials(name: string) {
 | **Dashboard** | `1KQ-0` | `1R5-0` | `pages/DashboardPage.tsx` | ✅ DONE (dual-theme) |
 | **Projects** | `1-0` | `81-0` | `pages/ProjectsPage.tsx` | ✅ DONE (dual-theme) |
 | **Sprints** | `28O-0` | `2D3-0` | `pages/SprintsPage.tsx` | ✅ DONE (dual-theme) — соседняя сессия |
-| **Login** | `4O8-0` | — | `pages/LoginPage.tsx` | ⏳ TODO |
+| **Login** | `4O8-0` | `4Q9-0` | `pages/LoginPage.tsx` | ✅ DONE (dual-theme) |
+| **Project Detail** | `FW-0` | `QK-0` | `pages/ProjectDetailPage.tsx` | ✅ DONE (dual-theme) |
 | **Board** | `1XE-0` | — | `pages/BoardPage.tsx` | ⏳ TODO (DnD — осторожно) |
 | **Global Sprints** | `2HH-0` | — | `pages/GlobalSprintsPage.tsx` | ⏳ TODO |
 | **Time Tracking** | `2RY-0` | — | `pages/TimePage.tsx` | ⏳ TODO |
@@ -227,8 +229,9 @@ git push
 
 1. ~~**Сессия 1:** Dashboard + Projects (dual-theme)~~ ✅ DONE
 2. ~~**Сессия 2:** Sprints (dual-theme)~~ ✅ DONE — соседняя сессия
-3. **Сессия 3:** Login (`4O8-0`) + Time Tracking (`2RY-0`) — низкий риск
-4. **Сессия 4:** Board (`1XE-0`) + Global Sprints (`2HH-0`) — средний риск (DnD caution)
+3. ~~**Сессия 3:** Login (`4O8-0`) + ProjectDetailPage (`FW-0`)~~ ✅ DONE — PR #143
+4. **Сессия 4:** Time Tracking (`2RY-0`) + Global Sprints (`2HH-0`) — низкий риск
+5. **Сессия 5:** Board (`1XE-0`) — средний риск (DnD caution)
 5. **Сессия 5:** Teams (`39G-0`) + Business Teams (`3IE-0`) + Flow Teams (`3QE-0`)
 6. **Сессия 6:** Releases (`4EO-0`) + Settings (`4S8-0`)
 7. **Сессия 7:** Issue Detail (`30S-0`) — высокий риск, отдельная сессия
