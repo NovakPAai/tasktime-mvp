@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-03-26
+
+### St1tcher86
+
+- `8c68fe96` feat(workflow-engine): Sprint 6 — Workflow Engine (TTADM-58, 59, 62, 64, 65) (2026-03-26)
+
+### github-actions[bot]
+
+- `5b71e5dc` chore: update changelog [skip ci] (2026-03-25)
+
 ## 2026-03-25
 
 ### Novak Pavel
