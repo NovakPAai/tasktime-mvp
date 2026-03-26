@@ -2,7 +2,18 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.3**
+**Last version: 2.4**
+
+---
+
+## [2.4] [2026-03-26] fix(admin): workflow editor crashes + scheme editor can't manage mappings
+
+**PR:** [#134](https://github.com/jackrescuer-gif/tasktime-mvp/pull/134)
+**Ветка:** `claude/alex-fix-workflow-admin`
+
+### Что изменилось
+- `backend/src/modules/workflows/workflows.service.ts` — добавлены `include: { fromStatus: true, toStatus: true, screen: true }` для transitions в `workflowInclude`; без этого `AdminWorkflowEditorPage` падала с TypeError на `t.toStatus.color` и страница не открывалась
+- `frontend/src/pages/admin/AdminWorkflowSchemeEditorPage.tsx` — переписан: вместо read-only таблицы теперь локальное состояние `localItems`, добавлены кнопки "Добавить строку" и удаления каждой строки, загрузка `issueTypeConfigs` для dropdown типа задачи, валидация перед сохранением (минимум одна строка "По умолчанию")
 
 ---
 
