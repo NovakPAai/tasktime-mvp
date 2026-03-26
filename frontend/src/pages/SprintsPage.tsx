@@ -1,93 +1,168 @@
 /**
- * SprintsPage — Спринты проекта
- * Дизайн: Paper артборд "Sprints — Dark" (28O-0)
+ * SprintsPage — rebuilt from Paper artboards 28O-0 (dark) + 2D3-0 (light).
+ * All values taken directly from Paper JSX export.
+ * Zero CSS class dependencies, zero Ant Design layout.
  */
-import { useEffect, useState, useCallback, useMemo } from 'react';
+
+import { useEffect, useState, useCallback } from 'react';
 import type { AxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
-import { Button, Modal, Form, Input, Progress, Popconfirm, Select, message } from 'antd';
-import { PlusOutlined, PlayCircleOutlined, StopOutlined, FilterOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, Popconfirm, Select, Checkbox, message } from 'antd';
 import * as sprintsApi from '../api/sprints';
 import * as projectsApi from '../api/projects';
 import * as teamsApi from '../api/teams';
 import { useAuthStore } from '../store/auth.store';
-import type { Sprint, Issue, SprintState, Team, Project } from '../types';
+import { useThemeStore } from '../store/theme.store';
+import type { Sprint, Issue, SprintState, IssueStatus, IssuePriority, Team, Project } from '../types';
 import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
-import SprintPlanningDrawer from '../components/sprints/SprintPlanningDrawer';
-import { IssueTypeBadge, IssueStatusTag } from '../lib/issue-kit';
 import { hasAnyRequiredRole } from '../lib/roles';
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-const STATE_TONE_CLASS: Record<SprintState, string> = {
-  PLANNED: 'planned',
-  ACTIVE: 'active',
-  CLOSED: 'closed',
+// ─── Design tokens (Paper artboard 28O-0 dark / 2D3-0 light) ────────────────
+const C = {
+  bg:       '#080B14',
+  bgCard:   '#0F1320',
+  border:   '#21262D',
+  borderHd: '#161B22',
+  t1:       '#E2E8F8',
+  t2:       '#C9D1D9',
+  t3:       '#8B949E',
+  t4:       '#484F58',
+  acc:      '#4F6EF7',
+  issueKey: '#6366F1',
+  green:    '#4ADE80',
+  amber:    '#F59E0B',
+  violet:   '#A78BFA',
+  red:      '#EF4444',
 };
 
-
-const PRIORITY_COLOR: Record<string, string> = {
-  CRITICAL: 'var(--semantic-error)',
-  HIGH: 'var(--s-in-progress)',
-  MEDIUM: 'var(--acc)',
-  LOW: 'var(--t3)',
+const CL = {
+  bg:       '#F6F8FA',
+  bgCard:   '#FFFFFF',
+  border:   '#D0D7DE',
+  borderHd: '#EEF0F2',
+  t1:       '#1F2328',
+  t2:       '#1F2328',
+  t3:       '#656D76',
+  t4:       '#8C959F',
+  acc:      '#4F6EF7',
+  issueKey: '#6366F1',
+  green:    '#1A7F37',
+  amber:    '#D97706',
+  violet:   '#7C3AED',
+  red:      '#DC2626',
 };
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-const AVATAR_COLORS = [
-  'var(--acc)', 'var(--s-review)', 'var(--s-done)', 'var(--s-in-progress)',
-  'var(--semantic-error)', 'var(--s-info)', 'var(--s-active)', 'var(--s-accent)',
+const F = {
+  display: '"Space Grotesk", system-ui, sans-serif',
+  sans:    '"Inter", system-ui, sans-serif',
+};
+const LOGO_GRAD = 'linear-gradient(in oklab 135deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)';
+const GRADIENTS = [
+  'linear-gradient(in oklab 135deg, oklab(80% -0.160 0.086) 0%, oklab(59.6% -0.122 0.037) 100%)',
+  'linear-gradient(in oklab 135deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)',
+  'linear-gradient(in oklab 135deg, oklab(76.9% 0.056 0.155) 0%, oklab(66.6% 0.083 0.134) 100%)',
+  'linear-gradient(in oklab 135deg, oklab(62.7% 0.130 -0.193) 0%, oklab(54.1% 0.096 -0.227) 100%)',
+  'linear-gradient(in oklab 135deg, oklab(70% 0.18 0.10) 0%, oklab(55% 0.15 0.08) 100%)',
 ];
 
-function avatarColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+function avatarGradient(name: string) {
+  const h = [...name].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return GRADIENTS[h % GRADIENTS.length];
 }
 
-function fmtDate(iso?: string): string {
-  if (!iso) return '';
+function initials(name: string) {
+  return name.split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase();
+}
+
+const STATUS_DARK: Record<IssueStatus, { bg: string; color: string; label: string }> = {
+  OPEN:        { bg: '#8B949E1F', color: '#8B949E', label: 'OPEN' },
+  IN_PROGRESS: { bg: '#F59E0B1F', color: '#F59E0B', label: 'IN PROGRESS' },
+  REVIEW:      { bg: '#A78BFA1F', color: '#A78BFA', label: 'REVIEW' },
+  DONE:        { bg: '#4ADE801F', color: '#4ADE80', label: 'DONE' },
+  CANCELLED:   { bg: '#EF44441F', color: '#EF4444', label: 'CANCELLED' },
+};
+const STATUS_LIGHT: Record<IssueStatus, { bg: string; color: string; label: string }> = {
+  OPEN:        { bg: '#8C959F1A', color: '#8C959F', label: 'OPEN' },
+  IN_PROGRESS: { bg: '#D977061A', color: '#D97706', label: 'IN PROGRESS' },
+  REVIEW:      { bg: '#7C3AED1A', color: '#7C3AED', label: 'REVIEW' },
+  DONE:        { bg: '#1A7F371A', color: '#1A7F37', label: 'DONE' },
+  CANCELLED:   { bg: '#DC26261A', color: '#DC2626', label: 'CANCELLED' },
+};
+
+const PRIORITY_DARK: Record<IssuePriority, string> = {
+  CRITICAL: '#EF4444',
+  HIGH:     '#F59E0B',
+  MEDIUM:   '#8B949E',
+  LOW:      '#8B949E',
+};
+const PRIORITY_LIGHT: Record<IssuePriority, string> = {
+  CRITICAL: '#DC2626',
+  HIGH:     '#D97706',
+  MEDIUM:   '#656D76',
+  LOW:      '#656D76',
+};
+
+const STATE_BADGE_DARK: Record<SprintState, { bg: string; color: string }> = {
+  ACTIVE:  { bg: '#4ADE801F', color: '#4ADE80' },
+  PLANNED: { bg: '#4F6EF71F', color: '#4F6EF7' },
+  CLOSED:  { bg: '#8B949E1F', color: '#8B949E' },
+};
+const STATE_BADGE_LIGHT: Record<SprintState, { bg: string; color: string }> = {
+  ACTIVE:  { bg: '#1A7F371A', color: '#1A7F37' },
+  PLANNED: { bg: '#4F6EF71A', color: '#4F6EF7' },
+  CLOSED:  { bg: '#8C959F1A', color: '#8C959F' },
+};
+
+const TABS: { key: SprintState; label: string }[] = [
+  { key: 'ACTIVE',  label: 'Active'  },
+  { key: 'PLANNED', label: 'Planned' },
+  { key: 'CLOSED',  label: 'Closed'  },
+];
+
+function formatIssueKey(issue: Issue) {
+  return issue.project?.key ? `${issue.project.key}-${issue.number}` : `#${issue.number}`;
+}
+
+function formatDate(iso?: string | null): string {
+  if (!iso) return 'Не задана';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
+  if (Number.isNaN(d.getTime())) return 'Не задана';
   const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
   return `${d.getDate()} ${months[d.getMonth()] ?? ''} ${d.getFullYear()}`;
 }
 
-function getIssueProgress(issues: Issue[]): { done: number; inProgress: number; review: number; open: number; total: number } {
-  const total = issues.length;
-  const done = issues.filter((i) => i.status === 'DONE').length;
-  const inProgress = issues.filter((i) => i.status === 'IN_PROGRESS').length;
-  const review = issues.filter((i) => i.status === 'REVIEW').length;
-  const open = issues.filter((i) => i.status === 'OPEN').length;
-  return { done, inProgress, review, open, total };
+function getTimeProgress(sprint: Sprint): number {
+  if (!sprint.startDate || !sprint.endDate) return 0;
+  const start = new Date(sprint.startDate).getTime();
+  const end = new Date(sprint.endDate).getTime();
+  const now = Date.now();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
 }
 
-// ── component ─────────────────────────────────────────────────────────────────
-
-type StateFilter = 'ACTIVE' | 'PLANNED' | 'CLOSED';
-
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function SprintsPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const { user } = useAuthStore();
+  const { mode } = useThemeStore();
+  const isLight = mode === 'light';
+  const T = isLight ? CL : C;
+  const STATUS_STYLE  = isLight ? STATUS_LIGHT  : STATUS_DARK;
+  const PRIORITY_COLOR = isLight ? PRIORITY_LIGHT : PRIORITY_DARK;
+  const STATE_BADGE   = isLight ? STATE_BADGE_LIGHT : STATE_BADGE_DARK;
+  const progressTrack = isLight ? '#EEF0F2' : '#21262D';
+  const rowSep        = isLight ? '#EEF0F2'  : '#0D1017';
+  const closeBtnBg    = isLight ? '#F6F8FA'  : '#161B22';
   const [project, setProject] = useState<Project | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [backlog, setBacklog] = useState<Issue[]>([]);
   const [sprintIssues, setSprintIssues] = useState<Issue[]>([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedBacklog, setSelectedBacklog] = useState<string[]>([]);
-  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [planningOpen, setPlanningOpen] = useState(false);
-  const [stateFilter, setStateFilter] = useState<StateFilter>('ACTIVE');
   const [teams, setTeams] = useState<Team[]>([]);
+  const [activeTab, setActiveTab] = useState<SprintState>('ACTIVE');
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
+  const [selectedBacklog, setSelectedBacklog] = useState<string[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [backlogOpen, setBacklogOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [form] = Form.useForm();
   const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
@@ -102,11 +177,10 @@ export default function SprintsPage() {
     setSprints(sp);
     setTeams(ts);
     setProject(proj);
-
-    setSelectedSprintId((prev) => {
+    setSelectedSprintId(prev => {
       if (!sp.length) return null;
-      if (prev && sp.some((s) => s.id === prev)) return prev;
-      const active = sp.find((s) => s.state === 'ACTIVE');
+      if (prev && sp.some(s => s.id === prev)) return prev;
+      const active = sp.find(s => s.state === 'ACTIVE');
       return (active ?? sp[0]).id;
     });
     setBacklog(bl);
@@ -114,23 +188,33 @@ export default function SprintsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Load sprint issues when selectedSprintId changes
+  // Auto-select first sprint when tab changes
+  useEffect(() => {
+    const filtered = sprints.filter(s => s.state === activeTab);
+    setSelectedSprintId(prev => {
+      if (!filtered.length) return null;
+      if (prev && filtered.some(s => s.id === prev)) return prev;
+      return filtered[0].id;
+    });
+  }, [activeTab, sprints]);
+
+  // Load sprint issues when selected sprint changes
   useEffect(() => {
     if (!selectedSprintId) { setSprintIssues([]); return; }
-    void sprintsApi.getSprintIssues(selectedSprintId).then((res) => setSprintIssues(res.issues));
+    let alive = true;
+    void sprintsApi.getSprintIssues(selectedSprintId)
+      .then(data => { if (alive) setSprintIssues(data.issues); })
+      .catch(() => { if (alive) setSprintIssues([]); });
+    return () => { alive = false; };
   }, [selectedSprintId]);
 
   const handleCreate = async (vals: {
-    name: string;
-    goal?: string;
-    projectTeamId?: string;
-    businessTeamId?: string;
-    flowTeamId?: string;
+    name: string; goal?: string;
+    projectTeamId?: string; businessTeamId?: string; flowTeamId?: string;
   }) => {
     if (!projectId) return;
     await sprintsApi.createSprint(projectId, {
-      name: vals.name,
-      goal: vals.goal,
+      name: vals.name, goal: vals.goal,
       projectTeamId: vals.projectTeamId,
       businessTeamId: vals.businessTeamId,
       flowTeamId: vals.flowTeamId,
@@ -141,93 +225,86 @@ export default function SprintsPage() {
   };
 
   const handleStart = async (id: string) => {
-    try {
-      await sprintsApi.startSprint(id);
-      void load();
-      void message.success('Спринт запущен');
-    } catch (e) {
-      const error = e as AxiosError<{ error?: string }>;
-      void message.error(error.response?.data?.error ?? 'Ошибка');
+    try { await sprintsApi.startSprint(id); void load(); void message.success('Спринт запущен'); }
+    catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      void message.error(err.response?.data?.error ?? 'Ошибка');
     }
   };
 
   const handleClose = async (id: string) => {
-    try {
-      await sprintsApi.closeSprint(id);
-      void load();
-      void message.success('Спринт закрыт. Незавершённые задачи перенесены в бэклог.');
-    } catch (e) {
-      const error = e as AxiosError<{ error?: string }>;
-      void message.error(error.response?.data?.error ?? 'Ошибка');
+    try { await sprintsApi.closeSprint(id); void load(); void message.success('Спринт закрыт'); }
+    catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      void message.error(err.response?.data?.error ?? 'Ошибка');
     }
   };
 
-  const handleMoveToSprint = async (sprintId: string) => {
-    if (!selectedBacklog.length) return;
-    await sprintsApi.moveIssuesToSprint(sprintId, selectedBacklog);
+  const handleMoveToSprint = async () => {
+    if (!selectedSprintId || !selectedBacklog.length) return;
+    await sprintsApi.moveIssuesToSprint(selectedSprintId, selectedBacklog);
     setSelectedBacklog([]);
+    setBacklogOpen(false);
     void load();
   };
 
-  const selectedSprint = sprints.find((s) => s.id === selectedSprintId) ?? null;
+  const selectedSprint = sprints.find(s => s.id === selectedSprintId) ?? null;
+  const filteredSprints = sprints.filter(s => s.state === activeTab);
 
-  const filteredSprints = useMemo(
-    () => sprints.filter((s) => s.state === stateFilter),
-    [sprints, stateFilter],
-  );
+  // Issue stats
+  const doneCount       = sprintIssues.filter(i => i.status === 'DONE').length;
+  const inProgressCount = sprintIssues.filter(i => i.status === 'IN_PROGRESS').length;
+  const reviewCount     = sprintIssues.filter(i => i.status === 'REVIEW').length;
+  const openCount       = sprintIssues.filter(i => i.status === 'OPEN').length;
+  const totalCount      = sprintIssues.length;
+  const donePercent     = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  const timePercent     = selectedSprint ? getTimeProgress(selectedSprint) : 0;
 
-  const progress = getIssueProgress(sprintIssues);
-  const progressPercent = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
-
-  const STATE_TABS: { label: string; value: StateFilter }[] = [
-    { label: 'Active', value: 'ACTIVE' },
-    { label: 'Planned', value: 'PLANNED' },
-    { label: 'Closed', value: 'CLOSED' },
-  ];
-
+  // ─── JSX ──────────────────────────────────────────────────────────────────
   return (
-    <div className="tt-page">
-      {/* Header */}
-      <div className="tt-page-header">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: T.bg, fontFamily: F.sans, overflow: 'hidden' }}>
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingBottom: 16, paddingLeft: 28, paddingRight: 28, borderBottom: `1px solid ${T.borderHd}`, backgroundColor: T.bgCard, flexShrink: 0 }}>
         <div>
-          <div className="tt-page-breadcrumb">
-            {project && (
-              <>
-                <Link to={`/projects/${projectId}`} className="tt-page-breadcrumb-back">
-                  {project.name}
-                </Link>
-                <span className="tt-page-breadcrumb-separator">/</span>
-              </>
-            )}
-            <span className="tt-page-breadcrumb-current">Sprints</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <span style={{ color: T.t4, fontFamily: F.sans, fontSize: 12, lineHeight: '16px' }}>
+              {project?.name ?? '…'}
+            </span>
+            <span style={{ color: T.t4, fontSize: 16, lineHeight: '20px' }}>/</span>
+            <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 12, lineHeight: '16px' }}>Sprints</span>
           </div>
-          <h1 className="tt-page-title">Sprints</h1>
+          <div style={{ color: T.t1, fontFamily: F.display, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px' }}>
+            Sprints
+          </div>
         </div>
         {canManage && (
-          <div className="tt-page-actions">
-            <Button
-              className="tt-dashboard-new-btn"
-              icon={<PlusOutlined />}
-              onClick={() => setModalOpen(true)}
-            >
-              Новый спринт
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            style={{ backgroundImage: LOGO_GRAD, borderRadius: 8, paddingTop: 6, paddingBottom: 6, paddingLeft: 14, paddingRight: 14, border: 'none', cursor: 'pointer', color: '#fff', fontFamily: F.sans, fontSize: 13, fontWeight: 500, lineHeight: '20px' }}
+          >
+            + Новый спринт
+          </button>
         )}
       </div>
 
-      {/* State tabs */}
-      <div className="tt-sprint-state-tabs">
-        {STATE_TABS.map((tab) => (
+      {/* ── Tabs ───────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 4, paddingLeft: 28, paddingRight: 28, paddingTop: 12, borderBottom: `1px solid ${T.borderHd}`, backgroundColor: T.bgCard, flexShrink: 0 }}>
+        {TABS.map(tab => (
           <button
-            key={tab.value}
+            key={tab.key}
             type="button"
-            className={`tt-sprint-state-tab${stateFilter === tab.value ? ' tt-sprint-state-tab-active' : ''}`}
-            onClick={() => {
-              setStateFilter(tab.value);
-              // Auto-select first sprint of this state
-              const first = sprints.find((s) => s.state === tab.value);
-              if (first) setSelectedSprintId(first.id);
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              borderTopLeftRadius: 6, borderTopRightRadius: 6,
+              paddingTop: 7, paddingBottom: 7, paddingLeft: 16, paddingRight: 16,
+              border: 'none', background: 'none', cursor: 'pointer',
+              borderBottom: activeTab === tab.key ? `2px solid ${T.acc}` : '2px solid transparent',
+              color: activeTab === tab.key ? T.t1 : T.t3,
+              fontFamily: F.sans, fontSize: 13,
+              fontWeight: activeTab === tab.key ? 500 : 400,
+              lineHeight: '16px',
             }}
           >
             {tab.label}
@@ -235,276 +312,326 @@ export default function SprintsPage() {
         ))}
       </div>
 
-      {/* Sprint selector list */}
-      {filteredSprints.length > 1 && (
-        <div className="tt-sprint-selector">
-          {filteredSprints.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={`tt-sprint-selector-item${s.id === selectedSprintId ? ' tt-sprint-selector-item-active' : ''}`}
-              onClick={() => setSelectedSprintId(s.id)}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* ── Content ────────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {filteredSprints.length === 0 && (
-        <div className="tt-panel-empty" style={{ marginTop: 24 }}>
-          Нет спринтов в статусе «{STATE_TABS.find((t) => t.value === stateFilter)?.label}».
-        </div>
-      )}
+        {/* Sprint selector when multiple sprints in tab */}
+        {filteredSprints.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {filteredSprints.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelectedSprintId(s.id)}
+                style={{
+                  paddingTop: 5, paddingBottom: 5, paddingLeft: 12, paddingRight: 12,
+                  borderRadius: 6,
+                  border: `1px solid ${s.id === selectedSprintId ? T.acc : T.border}`,
+                  backgroundColor: s.id === selectedSprintId ? `${T.acc}1A` : T.bgCard,
+                  color: s.id === selectedSprintId ? T.acc : T.t3,
+                  fontFamily: F.sans, fontSize: 12, cursor: 'pointer',
+                }}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {/* Sprint info card */}
-      {selectedSprint && selectedSprint.state === stateFilter && (
-        <div className="tt-sprint-info-card">
-          <div className="tt-sprint-info-header">
-            <div className="tt-sprint-info-title-wrap">
-              <span className="tt-sprint-info-name">{selectedSprint.name}</span>
-              <span className={`tt-sprint-state-pill tt-sprint-state-pill-${STATE_TONE_CLASS[selectedSprint.state]}`}>
-                {selectedSprint.state === 'ACTIVE' ? 'ACTIVE'
-                  : selectedSprint.state === 'PLANNED' ? 'PLANNED'
-                  : 'CLOSED'}
-              </span>
-            </div>
-            <div className="tt-sprint-info-dates-wrap">
-              {selectedSprint.startDate || selectedSprint.endDate ? (
-                <span className="tt-sprint-info-dates">
-                  {selectedSprint.startDate ? `Дата начала ${fmtDate(selectedSprint.startDate)}` : ''}
-                  {selectedSprint.startDate && selectedSprint.endDate ? ' → ' : ''}
-                  {selectedSprint.endDate ? `Дата окончания ${fmtDate(selectedSprint.endDate)}` : ''}
-                </span>
-              ) : null}
-              {canManage && selectedSprint.state === 'PLANNED' && (
-                <Button
-                  size="small"
-                  icon={<PlayCircleOutlined />}
-                  type="primary"
-                  style={{ marginLeft: 8 }}
-                  onClick={() => void handleStart(selectedSprint.id)}
-                >
-                  Запустить спринт
-                </Button>
-              )}
-              {canManage && selectedSprint.state === 'ACTIVE' && (
-                <Popconfirm
-                  title="Закрыть спринт? Незавершённые задачи перейдут в бэклог."
-                  onConfirm={() => void handleClose(selectedSprint.id)}
-                >
-                  <Button
-                    size="small"
-                    icon={<StopOutlined />}
-                    className="tt-btn-ghost"
-                    style={{ marginLeft: 8 }}
+        {/* Empty state */}
+        {filteredSprints.length === 0 && (
+          <div style={{ color: T.t3, fontFamily: F.sans, fontSize: 13, paddingTop: 40, textAlign: 'center' }}>
+            Нет спринтов со статусом «{TABS.find(t => t.key === activeTab)?.label}»
+          </div>
+        )}
+
+        {/* ── Hero card ──────────────────────────────────────────────────── */}
+        {selectedSprint && selectedSprint.state === activeTab && (
+          <div style={{ backgroundColor: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, flexShrink: 0 }}>
+
+            {/* Top row */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ color: T.t1, fontFamily: F.display, fontSize: 16, fontWeight: 700, lineHeight: '20px' }}>
+                    {selectedSprint.name}
+                  </span>
+                  <span style={{
+                    backgroundColor: STATE_BADGE[selectedSprint.state].bg,
+                    color: STATE_BADGE[selectedSprint.state].color,
+                    borderRadius: 20, paddingTop: 3, paddingBottom: 3, paddingLeft: 10, paddingRight: 10,
+                    fontFamily: F.sans, fontSize: 10, fontWeight: 600, lineHeight: '12px',
+                  }}>
+                    {selectedSprint.state}
+                  </span>
+                </div>
+                {selectedSprint.goal && (
+                  <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 12, lineHeight: '16px' }}>
+                    Цель: {selectedSprint.goal}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <div>
+                  <div style={{ color: T.t4, fontFamily: F.sans, fontSize: 10, lineHeight: '12px', textAlign: 'right' }}>Дата начала</div>
+                  <div style={{ color: T.t2, fontFamily: F.display, fontSize: 12, fontWeight: 600, lineHeight: '16px', textAlign: 'right' }}>
+                    {formatDate(selectedSprint.startDate)}
+                  </div>
+                </div>
+                <span style={{ color: T.t4, fontSize: 16, lineHeight: '20px' }}>→</span>
+                <div>
+                  <div style={{ color: T.t4, fontFamily: F.sans, fontSize: 10, lineHeight: '12px', textAlign: 'right' }}>Дата окончания</div>
+                  <div style={{ color: T.t2, fontFamily: F.display, fontSize: 12, fontWeight: 600, lineHeight: '16px', textAlign: 'right' }}>
+                    {formatDate(selectedSprint.endDate)}
+                  </div>
+                </div>
+                {selectedSprint.state === 'PLANNED' && canManage && (
+                  <button
+                    type="button"
+                    onClick={() => void handleStart(selectedSprint.id)}
+                    style={{ marginLeft: 8, backgroundImage: LOGO_GRAD, borderRadius: 8, paddingTop: 6, paddingBottom: 6, paddingLeft: 14, paddingRight: 14, border: 'none', cursor: 'pointer', color: '#fff', fontFamily: F.sans, fontSize: 13, fontWeight: 500 }}
                   >
-                    Закрыть спринт
-                  </Button>
-                </Popconfirm>
+                    Начать спринт
+                  </button>
+                )}
+                {selectedSprint.state === 'ACTIVE' && canManage && (
+                  <Popconfirm
+                    title="Закрыть спринт?"
+                    description="Незавершённые задачи перейдут в бэклог."
+                    onConfirm={() => void handleClose(selectedSprint.id)}
+                  >
+                    <button
+                      type="button"
+                      style={{ marginLeft: 8, backgroundColor: closeBtnBg, border: `1px solid ${T.border}`, borderRadius: 8, paddingTop: 6, paddingBottom: 6, paddingLeft: 14, paddingRight: 14, cursor: 'pointer', color: T.t3, fontFamily: F.sans, fontSize: 13 }}
+                    >
+                      Закрыть спринт
+                    </button>
+                  </Popconfirm>
+                )}
+              </div>
+            </div>
+
+            {/* Progress */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>Прогресс выполнения</span>
+                <span style={{ color: T.t1, fontFamily: F.display, fontSize: 12, fontWeight: 600, lineHeight: '16px' }}>
+                  {doneCount} / {totalCount} задач
+                </span>
+              </div>
+              {/* Done progress bar */}
+              <div style={{ backgroundColor: progressTrack, borderRadius: 3, height: 4, overflow: 'hidden' }}>
+                <div style={{
+                  backgroundImage: 'linear-gradient(in oklab 90deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)',
+                  borderRadius: 3, height: '100%', width: `${donePercent}%`, transition: 'width 0.3s ease',
+                }} />
+              </div>
+              {/* Time progress (secondary) */}
+              {(selectedSprint.startDate && selectedSprint.endDate) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, backgroundColor: progressTrack, borderRadius: 2, height: 2, overflow: 'hidden' }}>
+                    <div style={{ backgroundColor: T.t4, borderRadius: 2, height: '100%', width: `${timePercent}%` }} />
+                  </div>
+                  <span style={{ color: T.t4, fontFamily: F.sans, fontSize: 10, lineHeight: '12px', flexShrink: 0 }}>
+                    Время: {timePercent}%
+                  </span>
+                </div>
               )}
+              {/* Status dots */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                {[
+                  { dot: T.green,  label: `Done: ${doneCount}` },
+                  { dot: T.amber,  label: `In Progress: ${inProgressCount}` },
+                  { dot: T.violet, label: `Review: ${reviewCount}` },
+                  { dot: T.t3,     label: `Open: ${openCount}` },
+                ].map(({ dot, label }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ backgroundColor: dot, borderRadius: '50%', width: 6, height: 6, flexShrink: 0 }} />
+                    <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>{label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+        )}
 
-          {selectedSprint.goal && (
-            <div className="tt-sprint-info-goal">
-              Цель: {selectedSprint.goal}
-            </div>
-          )}
+        {/* ── Issues table card ───────────────────────────────────────────── */}
+        {selectedSprint && selectedSprint.state === activeTab && (
+          <div style={{ backgroundColor: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 200 }}>
 
-          {/* Progress bar */}
-          <div className="tt-sprint-info-progress">
-            <div className="tt-sprint-info-progress-label">Прогресс выполнения</div>
-            <div className="tt-sprint-info-progress-bar-wrap">
-              <Progress
-                percent={progressPercent}
-                showInfo={false}
-                strokeColor="var(--acc)"
-                trailColor="rgba(255,255,255,0.08)"
-                size="small"
-              />
-              <span className="tt-sprint-info-progress-count">
-                {progress.done} / {progress.total} задач
+            {/* Card header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, paddingBottom: 14, paddingLeft: 20, paddingRight: 20, borderBottom: `1px solid ${T.borderHd}`, flexShrink: 0 }}>
+              <span style={{ color: T.t1, fontFamily: F.display, fontSize: 14, fontWeight: 600, lineHeight: '18px' }}>
+                Задачи спринта
               </span>
-            </div>
-          </div>
-
-          {/* Status dots */}
-          <div className="tt-sprint-info-status-dots">
-            <span className="tt-sprint-info-dot tt-sprint-info-dot-done">●</span>
-            <span>Done: {progress.done}</span>
-            <span className="tt-sprint-info-dot tt-sprint-info-dot-inprogress">●</span>
-            <span>In Progress: {progress.inProgress}</span>
-            <span className="tt-sprint-info-dot tt-sprint-info-dot-review">●</span>
-            <span>Review: {progress.review}</span>
-            <span className="tt-sprint-info-dot tt-sprint-info-dot-open">●</span>
-            <span>Open: {progress.open}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Issues table */}
-      {selectedSprint && selectedSprint.state === stateFilter && (
-        <div className="tt-sprint-issues-section">
-          <div className="tt-sprint-issues-header">
-            <span className="tt-sprint-issues-title">Задачи спринта</span>
-            <div className="tt-sprint-issues-actions">
-              <Button size="small" icon={<FilterOutlined />} className="tt-btn-ghost">
-                Фильтр
-              </Button>
-              {canManage && backlog.length > 0 && (
-                <Button
-                  size="small"
-                  icon={<PlusOutlined />}
-                  type="primary"
-                  onClick={() => setPlanningOpen(true)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen(true)}
+                  style={{ backgroundColor: closeBtnBg, border: `1px solid ${T.border}`, borderRadius: 6, paddingTop: 5, paddingBottom: 5, paddingLeft: 12, paddingRight: 12, cursor: 'pointer', color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}
                 >
-                  Добавить из бэклога
-                </Button>
-              )}
+                  Детали
+                </button>
+                {canManage && selectedSprint.state !== 'CLOSED' && (
+                  <button
+                    type="button"
+                    onClick={() => setBacklogOpen(true)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.acc, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', padding: 0 }}
+                  >
+                    + Добавить из беклога
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
 
-          <table className="tt-sprint-issues-table">
-            <thead>
-              <tr>
-                <th className="tt-sprint-th">КЛЮЧ</th>
-                <th className="tt-sprint-th">ТИП</th>
-                <th className="tt-sprint-th">ЗАДАЧА</th>
-                <th className="tt-sprint-th">СТАТУС</th>
-                <th className="tt-sprint-th">ПРИОРИТЕТ</th>
-                <th className="tt-sprint-th">ВРЕМЯ</th>
-                <th className="tt-sprint-th">КОМУ</th>
-              </tr>
-            </thead>
-            <tbody>
+            {/* Column headers */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 8, paddingBottom: 8, paddingLeft: 20, paddingRight: 20, borderBottom: `1px solid ${T.borderHd}`, flexShrink: 0 }}>
+              <div style={{ width: 80, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Ключ</div>
+              <div style={{ flex: 1, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Задача</div>
+              <div style={{ width: 100, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Статус</div>
+              <div style={{ width: 70, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Приоритет</div>
+              <div style={{ width: 60, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Время</div>
+              <div style={{ width: 36, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Кому</div>
+            </div>
+
+            {/* Rows */}
+            <div style={{ flex: 1, overflow: 'auto' }}>
               {sprintIssues.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="tt-sprint-issues-empty">
-                    В спринте нет задач
-                  </td>
-                </tr>
+                <div style={{ padding: '32px 20px', color: T.t3, fontFamily: F.sans, fontSize: 13, textAlign: 'center' }}>
+                  В спринте нет задач
+                </div>
               ) : (
-                sprintIssues.map((issue) => {
-                  const assigneeName = issue.assignee?.name;
+                sprintIssues.map((issue, idx) => {
+                  const st = STATUS_STYLE[issue.status];
+                  const assigneeName = issue.assignee?.name ?? '';
                   return (
-                    <tr key={issue.id} className="tt-sprint-issue-row">
-                      <td className="tt-sprint-td">
+                    <div
+                      key={issue.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        paddingTop: 9, paddingBottom: 9, paddingLeft: 20, paddingRight: 20,
+                        borderBottom: idx < sprintIssues.length - 1 ? `1px solid ${rowSep}` : 'none',
+                      }}
+                    >
+                      <div style={{ width: 80, flexShrink: 0 }}>
                         <Link
                           to={`/issues/${issue.id}`}
-                          className="tt-sprint-issue-key"
+                          style={{ color: T.issueKey, fontFamily: F.display, fontSize: 11, fontWeight: 600, lineHeight: '14px', textDecoration: 'none' }}
                         >
-                          {issue.project?.key ?? ''}-{issue.number}
+                          {formatIssueKey(issue)}
                         </Link>
-                      </td>
-                      <td className="tt-sprint-td">
-                        <IssueTypeBadge typeConfig={issue.issueTypeConfig} />
-                      </td>
-                      <td className="tt-sprint-td tt-sprint-td-title">
-                        <Link to={`/issues/${issue.id}`} className="tt-sprint-issue-title">
-                          {issue.title}
-                        </Link>
-                      </td>
-                      <td className="tt-sprint-td">
-                        <IssueStatusTag status={issue.status} size="small" />
-                      </td>
-                      <td className="tt-sprint-td">
-                        <span
-                          className="tt-sprint-priority"
-                          style={{ color: PRIORITY_COLOR[issue.priority] ?? 'var(--t2)' }}
-                        >
-                          {issue.priority}
+                      </div>
+                      <div style={{ flex: 1, color: T.t2, fontFamily: F.sans, fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {issue.title}
+                      </div>
+                      <div style={{ width: 100, flexShrink: 0 }}>
+                        <span style={{ backgroundColor: st.bg, borderRadius: 20, paddingTop: 3, paddingBottom: 3, paddingLeft: 8, paddingRight: 8, color: st.color, fontFamily: F.sans, fontSize: 10, lineHeight: '12px', display: 'inline-block' }}>
+                          {st.label}
                         </span>
-                      </td>
-                      <td className="tt-sprint-td tt-sprint-td-mono">
-                        {issue.estimatedHours != null ? (
-                          <span>— / {issue.estimatedHours}ч</span>
-                        ) : (
-                          <span className="tt-sprint-td-muted">—</span>
-                        )}
-                      </td>
-                      <td className="tt-sprint-td">
+                      </div>
+                      <div style={{ width: 70, flexShrink: 0, color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
+                        {issue.priority}
+                      </div>
+                      <div style={{ width: 60, flexShrink: 0, color: T.t3, fontFamily: F.display, fontSize: 11, lineHeight: '14px' }}>
+                        {issue.estimatedHours != null ? `${issue.estimatedHours}h` : '—'}
+                      </div>
+                      <div style={{ width: 36, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
                         {assigneeName ? (
-                          <div className="tt-sprint-assignee">
-                            <span
-                              className="tt-sprint-avatar"
-                              style={{ background: avatarColor(assigneeName) }}
-                            >
-                              {getInitials(assigneeName)}
+                          <div
+                            title={assigneeName}
+                            style={{ width: 24, height: 24, borderRadius: '50%', backgroundImage: avatarGradient(assigneeName), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                          >
+                            <span style={{ color: '#fff', fontFamily: F.display, fontSize: 9, fontWeight: 700, lineHeight: '12px' }}>
+                              {initials(assigneeName)}
                             </span>
                           </div>
                         ) : (
-                          <span className="tt-sprint-td-muted">—</span>
+                          <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: T.border }} />
                         )}
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
                 })
               )}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* Backlog (collapsed section for moving issues) */}
-      {canManage && selectedSprint && selectedSprint.state === 'ACTIVE' && backlog.length > 0 && selectedBacklog.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => void handleMoveToSprint(selectedSprint.id)}
-          >
-            + Добавить выбранные в спринт ({selectedBacklog.length})
-          </Button>
-        </div>
-      )}
-
-      {/* Create Sprint Modal */}
-      <Modal
-        title="Новый спринт"
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        onOk={() => form.submit()}
-        okText="Создать"
-        cancelText="Отмена"
-      >
-        <Form form={form} layout="vertical" onFinish={(v) => void handleCreate(v)}>
-          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="goal" label="Цель">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item name="projectTeamId" label="Проектная команда">
-            <Select allowClear options={teams.map((t) => ({ value: t.id, label: t.name }))} />
-          </Form.Item>
-          <Form.Item name="businessTeamId" label="Бизнес-функциональная команда">
-            <Select allowClear options={teams.map((t) => ({ value: t.id, label: t.name }))} />
-          </Form.Item>
-          <Form.Item name="flowTeamId" label="Flow-команда">
-            <Select allowClear options={teams.map((t) => ({ value: t.id, label: t.name }))} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
+      {/* ── Sprint details drawer ────────────────────────────────────────────── */}
       <SprintIssuesDrawer
         open={detailsOpen}
         sprintId={selectedSprintId}
         onClose={() => setDetailsOpen(false)}
       />
 
-      <SprintPlanningDrawer
-        open={planningOpen}
-        sprintId={selectedSprintId}
-        projectId={projectId ?? null}
-        onClose={() => setPlanningOpen(false)}
-        onAdded={() => {
-          void load();
-          if (selectedSprintId) {
-            void sprintsApi.getSprintIssues(selectedSprintId).then((res) => setSprintIssues(res.issues));
-          }
-        }}
-      />
+      {/* ── Backlog modal ────────────────────────────────────────────────────── */}
+      <Modal
+        title="Добавить задачи из беклога"
+        open={backlogOpen}
+        onCancel={() => { setBacklogOpen(false); setSelectedBacklog([]); }}
+        onOk={() => void handleMoveToSprint()}
+        okText={`Добавить в спринт${selectedBacklog.length ? ` (${selectedBacklog.length})` : ''}`}
+        okButtonProps={{ disabled: selectedBacklog.length === 0 }}
+        cancelText="Отмена"
+        width={640}
+      >
+        {backlog.length === 0 ? (
+          <p style={{ color: T.t3, fontFamily: F.sans, fontSize: 13 }}>Бэклог пуст</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 400, overflow: 'auto' }}>
+            {backlog.map(issue => (
+              <label
+                key={issue.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', backgroundColor: selectedBacklog.includes(issue.id) ? `${T.acc}14` : 'transparent' }}
+              >
+                <Checkbox
+                  checked={selectedBacklog.includes(issue.id)}
+                  onChange={e => {
+                    setSelectedBacklog(prev =>
+                      e.target.checked ? [...prev, issue.id] : prev.filter(id => id !== issue.id)
+                    );
+                  }}
+                />
+                <span style={{ color: T.issueKey, fontFamily: F.display, fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                  {formatIssueKey(issue)}
+                </span>
+                <span style={{ color: T.t2, fontFamily: F.sans, fontSize: 13, flex: 1 }}>{issue.title}</span>
+                <span style={{ color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11, flexShrink: 0 }}>{issue.priority}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      {/* ── New sprint modal ─────────────────────────────────────────────────── */}
+      <Modal
+        title="Новый спринт"
+        open={modalOpen}
+        onCancel={() => { setModalOpen(false); form.resetFields(); }}
+        onOk={() => form.submit()}
+        okText="Создать"
+        cancelText="Отмена"
+      >
+        <Form form={form} layout="vertical" onFinish={v => void handleCreate(v)}>
+          <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="goal" label="Цель">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <Form.Item name="projectTeamId" label="Проектная команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+          <Form.Item name="businessTeamId" label="Бизнес-функциональная команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+          <Form.Item name="flowTeamId" label="Flow-команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
