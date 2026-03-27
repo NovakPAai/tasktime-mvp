@@ -85,6 +85,32 @@ main (защищена: CI + 1 аппрув)
 - Rebase перед PR если main ушёл вперёд: `git rebase origin/main`
 - Прямой push в `main` — **запрещён**
 
+### Trunk Based Development (TBD) + Staging Gate
+
+**Модель:** TBD — все мёрджат в `main` через короткоживущие ветки. Нет release branches, нет батчей.
+
+**Pipeline:**
+```
+PR → Merge Queue (CI на merged коде) → main → auto-publish images → auto-deploy staging → ручная кнопка production
+```
+
+**4 уровня защиты деплоя:**
+1. **Merge Queue** — GitHub проверяет CI на merged коде ДО фактического мёрджа. Конфликты ловятся автоматически.
+2. **Concurrency group** — `deploy-staging` в GitHub Actions, `cancel-in-progress: false`. Деплои встают в очередь.
+3. **flock** — серверный lock (`/tmp/deploy-{env}.lock`). Невозможно запустить два деплоя одновременно на одном сервере.
+4. **SHA verification** — после деплоя `deploy.sh` проверяет что `/api/health` вернул ожидаемый `version` (git SHA).
+
+**Правила для веток:**
+- Ветка живёт ≤ 2 дней, PR ≤ 400 строк diff
+- Rebase на main перед PR (или Merge Queue сделает это)
+- Откат = `git revert <sha>` + новый PR → проходит тот же pipeline
+- Production деплой: ручной через `deploy-production.yml` (workflow_dispatch) — аварийный
+
+**Версионирование:**
+- `/api/health` возвращает `{ version: "<git-sha>", buildTime: "<timestamp>" }`
+- Docker образы тегируются SHA коммита + `main`
+- Deploy history: `deploy/history/{env}.log`
+
 ### Координация (предотвращение конфликтов)
 
 - Перед началом работы над модулем — сообщить в командный чат: «беру backend/issues»

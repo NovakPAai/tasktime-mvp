@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend infra stop clean seed test lint setup docs sync pr ship merge branches
+.PHONY: dev backend frontend infra stop clean seed test lint setup docs sync pr ship merge branches worktree-clean branch-clean
 
 # --- First time setup ---
 setup:
@@ -86,3 +86,17 @@ clean: stop
 	docker compose down -v
 	rm -rf backend/node_modules frontend/node_modules
 	@echo "Cleaned up volumes and node_modules"
+
+# --- TBD: Cleanup stale worktrees and merged branches ---
+worktree-clean:
+	@echo "Removing stale git worktrees..."
+	@git worktree prune
+	@git worktree list
+	@echo "Done."
+
+branch-clean:
+	@echo "Removing local branches merged into main..."
+	@git branch --merged main | grep -vE '^\*|main$$' | xargs -r git branch -d
+	@echo "Removing remote-tracking branches that no longer exist..."
+	@git fetch --prune
+	@echo "Done."

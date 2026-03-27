@@ -49,9 +49,14 @@ export function createApp() {
   app.use(express.json());
   app.use(cookieParser());
 
-  // Health check
+  // Health check — includes version for deploy verification
   app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: process.env.GIT_SHA || 'dev',
+      buildTime: process.env.BUILD_TIME || 'unknown',
+    });
   });
 
   app.get('/api/ready', async (_req, res) => {
