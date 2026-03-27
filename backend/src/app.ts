@@ -76,6 +76,12 @@ export function createApp() {
   });
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+  // GitLab webhook — must be first among /api routes to bypass JWT auth
+  // (uses its own X-Gitlab-Token secret mechanism, not JWT)
+  if (features.gitlab) {
+    app.use('/api', webhooksRouter);
+  }
+
   // Core routes (always enabled)
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
@@ -95,11 +101,6 @@ export function createApp() {
   if (features.ai) {
     app.use('/api', aiSessionsRouter);
     app.use('/api', aiRouter);
-  }
-
-  // GitLab webhook (feature-gated)
-  if (features.gitlab) {
-    app.use('/api', webhooksRouter);
   }
 
   app.use('/api', linksRouter);

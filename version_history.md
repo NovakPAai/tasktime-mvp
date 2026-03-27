@@ -6,24 +6,15 @@
 
 ---
 
-## [2.5] [2026-03-27] feat(workflow-engine): TTADM-61 — Redis-кэш, граф-валидация, Copy-on-Write, bulk transition, hardening
+## [2.5] [2026-03-27] feat(webhooks): TTADM-63 — адаптация GitLab-интеграции к workflow-движку
 
-**Задача:** [TTADM-61](http://5.129.242.171/issues/TTADM-61)
-**Ветка:** `claude/jack-workflow-engine-hardening`
+**Задача:** [TTADM-63](http://5.129.242.171) — Адаптация GitLab-интеграции к workflow-движку
+**Ветка:** `claude/jack-ttadm-63-gitlab-workflow-adapter`
 
 ### Что изменилось
-- `backend/src/shared/redis.ts` — добавлена `deleteCachedByPattern(pattern)` для инвалидации по glob-шаблону
-- `backend/src/modules/workflow-engine/workflow-engine.service.ts` — `resolveWorkflowForIssue` обёрнут в Redis-кэш (ключ `wf:{projectId}:{typeId}`, TTL=300s); экспортированы `invalidateWorkflowCache(projectId)` и `invalidateWorkflowCacheByWorkflowId(workflowId)`
-- `backend/src/modules/workflows/workflows.service.ts` — добавлены `validateWorkflow(workflowId): WorkflowValidationReport` (проверки NO_INITIAL_STATUS, NO_DONE_STATUS, DEAD_END, UNREACHABLE, UNUSED) и `ensureWorkflowEditable(workflowId)` (Copy-on-Write для активных workflow); инвалидация кэша в addStep/updateStep/deleteStep/createTransition/updateTransition/deleteTransition
-- `backend/src/modules/workflow-schemes/workflow-schemes.service.ts` — валидация графа при `replaceItems` (422 WORKFLOW_INVALID); инвалидация кэша в replaceItems/attachProject/detachProject
-- `backend/src/modules/workflows/workflows.router.ts` — добавлен `GET /:id/validate`; step/transition mutations оборачивают `ensureWorkflowEditable` + отдают `X-Draft-Workflow-Id` и `_isDraft`
-- `backend/src/modules/issues/issues.service.ts` — `createIssue` устанавливает `workflowStatusId` в isInitial шаг проекта; добавлена `bulkTransitionIssues` (max 50, bypassConditions=true, возвращает succeeded/failed)
-- `backend/src/modules/issues/issues.router.ts` — добавлен `POST /api/projects/:projectId/issues/bulk-transition` (HTTP 207 при частичном успехе)
-- `backend/src/modules/issues/issues.dto.ts` — добавлен `bulkTransitionDto`
-- `backend/src/shared/openapi.ts` — добавлены Swagger-схемы: `ConditionRule`, `ValidatorRule`, `PostFunctionRule`, `WorkflowValidationReport`, `TransitionResponse`
-- `CLAUDE.md` — новый раздел "Workflow Engine": архитектура, правила кэша, как добавить Condition/Validator/PostFunction
-- `backend/tests/workflow-engine.unit.test.ts` — **новый файл**: unit-тесты с vi.mock для Redis, conditions, validators, validateWorkflow, ensureWorkflowEditable
-- `backend/tests/workflow-engine.integration.test.ts` — **новый файл**: 12 групп integration-тестов (Supertest) по всем критериям Sprint 9
+- `backend/src/modules/webhooks/gitlab.service.ts` — заменён прямой `prisma.issue.update({ status })` на вызов `executeTransition` через workflow-движок; добавлены `transitionIssueBySystemKey`, `getSystemActor`; audit log с `source: 'gitlab_webhook'` для каждого успешного перехода; обработка недоступного перехода (логирует `issue.gitlab_transition_unavailable`) без краша
+- `backend/src/app.ts` — webhooksRouter перемещён выше всех роутеров с JWT-аутентификацией (bugfix: GitLab-вебхуки не могли пройти через authenticate-middleware и получали 401)
+- `backend/tests/gitlab-webhook.test.ts` — новый файл, 13 интеграционных тестов: merge_request merged → DONE, opened → REVIEW, push → IN_PROGRESS, недоступный переход, несколько ключей в одном MR, security (X-Gitlab-Token), pipeline, unknown event
 
 ---
 
