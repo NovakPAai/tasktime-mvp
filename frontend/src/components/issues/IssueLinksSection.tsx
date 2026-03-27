@@ -193,7 +193,7 @@ export default function IssueLinksSection({ issueId, readonly = false }: Props) 
   return (
     <section>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <h3 className="tt-issue-section-title" style={{ margin: 0 }}>
+        <h3 style={{ margin: 0 }}>
           <LinkOutlined style={{ marginRight: 6 }} />
           Связи ({totalCount})
         </h3>

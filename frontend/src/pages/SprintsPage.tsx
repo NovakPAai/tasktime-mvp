@@ -36,7 +36,7 @@ const C = {
 };
 
 const CL = {
-  bg:       '#F0F2FA',
+  bg:       '#F6F8FA',
   bgCard:   '#FFFFFF',
   border:   '#D0D7DE',
   borderHd: '#EEF0F2',
@@ -99,6 +99,14 @@ const PRIORITY_LIGHT: Record<IssuePriority, string> = {
   HIGH:     '#D97706',
   MEDIUM:   '#656D76',
   LOW:      '#656D76',
+};
+
+const ISSUE_TYPE_CFG: Record<string, { bg: string; color: string; label: string }> = {
+  TASK:    { bg: '#10B98126', color: '#10B981', label: 'TASK' },
+  BUG:     { bg: '#EF444426', color: '#EF4444', label: 'BUG' },
+  STORY:   { bg: '#3B82F626', color: '#3B82F6', label: 'STORY' },
+  EPIC:    { bg: '#A855F726', color: '#A855F7', label: 'EPIC' },
+  SUBTASK: { bg: '#8B949E26', color: '#8B949E', label: 'SUB' },
 };
 
 const STATE_BADGE_DARK: Record<SprintState, { bg: string; color: string }> = {
@@ -245,7 +253,12 @@ export default function SprintsPage() {
     await sprintsApi.moveIssuesToSprint(selectedSprintId, selectedBacklog);
     setSelectedBacklog([]);
     setBacklogOpen(false);
+    // Reload both the sprint list/backlog AND the sprint issues list
+    // (selectedSprintId doesn't change so the useEffect won't auto-trigger)
     void load();
+    void sprintsApi.getSprintIssues(selectedSprintId)
+      .then(data => setSprintIssues(data.issues))
+      .catch(() => {});
   };
 
   const selectedSprint = sprints.find(s => s.id === selectedSprintId) ?? null;
@@ -487,12 +500,13 @@ export default function SprintsPage() {
 
             {/* Column headers */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 8, paddingBottom: 8, paddingLeft: 20, paddingRight: 20, borderBottom: `1px solid ${T.borderHd}`, flexShrink: 0 }}>
-              <div style={{ width: 80, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Ключ</div>
+              <div style={{ width: 76, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Ключ</div>
+              <div style={{ width: 56, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Тип</div>
               <div style={{ flex: 1, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Задача</div>
               <div style={{ width: 100, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Статус</div>
               <div style={{ width: 70, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Приоритет</div>
-              <div style={{ width: 60, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Время</div>
-              <div style={{ width: 36, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Кому</div>
+              <div style={{ width: 56, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Срок</div>
+              <div style={{ width: 100, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Исполнитель</div>
             </div>
 
             {/* Rows */}
@@ -514,7 +528,8 @@ export default function SprintsPage() {
                         borderBottom: idx < sprintIssues.length - 1 ? `1px solid ${rowSep}` : 'none',
                       }}
                     >
-                      <div style={{ width: 80, flexShrink: 0 }}>
+                      {/* Key */}
+                      <div style={{ width: 76, flexShrink: 0 }}>
                         <Link
                           to={`/issues/${issue.id}`}
                           style={{ color: T.issueKey, fontFamily: F.display, fontSize: 11, fontWeight: 600, lineHeight: '14px', textDecoration: 'none' }}
@@ -522,32 +537,54 @@ export default function SprintsPage() {
                           {formatIssueKey(issue)}
                         </Link>
                       </div>
+                      {/* Type badge */}
+                      <div style={{ width: 56, flexShrink: 0 }}>
+                        {(() => {
+                          const typeKey = issue.issueTypeConfig?.systemKey ?? 'TASK';
+                          const tc = ISSUE_TYPE_CFG[typeKey] ?? ISSUE_TYPE_CFG['TASK'];
+                          return (
+                            <span style={{ backgroundColor: tc.bg, borderRadius: 3, paddingTop: 2, paddingBottom: 2, paddingLeft: 5, paddingRight: 5, color: tc.color, fontFamily: F.sans, fontSize: 9, fontWeight: 700, lineHeight: '12px', display: 'inline-block', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                              {tc.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      {/* Title */}
                       <div style={{ flex: 1, color: T.t2, fontFamily: F.sans, fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {issue.title}
                       </div>
+                      {/* Status */}
                       <div style={{ width: 100, flexShrink: 0 }}>
                         <span style={{ backgroundColor: st.bg, borderRadius: 20, paddingTop: 3, paddingBottom: 3, paddingLeft: 8, paddingRight: 8, color: st.color, fontFamily: F.sans, fontSize: 10, lineHeight: '12px', display: 'inline-block' }}>
                           {st.label}
                         </span>
                       </div>
+                      {/* Priority */}
                       <div style={{ width: 70, flexShrink: 0, color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
                         {issue.priority}
                       </div>
-                      <div style={{ width: 60, flexShrink: 0, color: T.t3, fontFamily: F.display, fontSize: 11, lineHeight: '14px' }}>
-                        {issue.estimatedHours != null ? `${issue.estimatedHours}h` : '—'}
+                      {/* Due date */}
+                      <div style={{ width: 56, flexShrink: 0, color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
+                        {issue.dueDate ? formatDate(issue.dueDate) : '—'}
                       </div>
-                      <div style={{ width: 36, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
+                      {/* Assignee */}
+                      <div style={{ width: 100, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                         {assigneeName ? (
-                          <div
-                            title={assigneeName}
-                            style={{ width: 24, height: 24, borderRadius: '50%', backgroundImage: avatarGradient(assigneeName), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                          >
-                            <span style={{ color: '#fff', fontFamily: F.display, fontSize: 9, fontWeight: 700, lineHeight: '12px' }}>
-                              {initials(assigneeName)}
+                          <>
+                            <div
+                              title={assigneeName}
+                              style={{ width: 20, height: 20, borderRadius: '50%', backgroundImage: avatarGradient(assigneeName), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                            >
+                              <span style={{ color: '#fff', fontFamily: F.display, fontSize: 8, fontWeight: 700, lineHeight: '10px' }}>
+                                {initials(assigneeName)}
+                              </span>
+                            </div>
+                            <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {assigneeName.split(' ')[0]}
                             </span>
-                          </div>
+                          </>
                         ) : (
-                          <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: T.border }} />
+                          <span style={{ color: T.t4, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>—</span>
                         )}
                       </div>
                     </div>
@@ -575,32 +612,102 @@ export default function SprintsPage() {
         okText={`Добавить в спринт${selectedBacklog.length ? ` (${selectedBacklog.length})` : ''}`}
         okButtonProps={{ disabled: selectedBacklog.length === 0 }}
         cancelText="Отмена"
-        width={640}
+        width={680}
       >
-        {backlog.length === 0 ? (
-          <p style={{ color: T.t3, fontFamily: F.sans, fontSize: 13 }}>Бэклог пуст</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 400, overflow: 'auto' }}>
-            {backlog.map(issue => (
-              <label
-                key={issue.id}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', backgroundColor: selectedBacklog.includes(issue.id) ? `${T.acc}14` : 'transparent' }}
-              >
-                <Checkbox
-                  checked={selectedBacklog.includes(issue.id)}
-                  onChange={e => {
-                    setSelectedBacklog(prev =>
-                      e.target.checked ? [...prev, issue.id] : prev.filter(id => id !== issue.id)
-                    );
-                  }}
-                />
-                <span style={{ color: T.issueKey, fontFamily: F.display, fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-                  {formatIssueKey(issue)}
+        {/* Sprint info banner */}
+        {selectedSprint && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 14px', borderRadius: 8, backgroundColor: isLight ? '#F6F8FA' : '#0F1320', border: `1px solid ${T.border}`, marginBottom: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
+              <span style={{ color: T.t1, fontFamily: F.display, fontSize: 13, fontWeight: 600, lineHeight: '16px' }}>
+                {selectedSprint.name}
+              </span>
+              {selectedSprint.goal && (
+                <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {selectedSprint.goal}
                 </span>
-                <span style={{ color: T.t2, fontFamily: F.sans, fontSize: 13, flex: 1 }}>{issue.title}</span>
-                <span style={{ color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11, flexShrink: 0 }}>{issue.priority}</span>
-              </label>
-            ))}
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: T.t4, fontFamily: F.sans, fontSize: 10, lineHeight: '12px' }}>Начало</div>
+                <div style={{ color: T.t2, fontFamily: F.display, fontSize: 11, fontWeight: 600, lineHeight: '14px' }}>{formatDate(selectedSprint.startDate)}</div>
+              </div>
+              <span style={{ color: T.t4 }}>→</span>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: T.t4, fontFamily: F.sans, fontSize: 10, lineHeight: '12px' }}>Конец</div>
+                <div style={{ color: T.t2, fontFamily: F.display, fontSize: 11, fontWeight: 600, lineHeight: '14px' }}>{formatDate(selectedSprint.endDate)}</div>
+              </div>
+              <span style={{
+                backgroundColor: STATE_BADGE[selectedSprint.state].bg,
+                color: STATE_BADGE[selectedSprint.state].color,
+                borderRadius: 20, paddingTop: 3, paddingBottom: 3, paddingLeft: 10, paddingRight: 10,
+                fontFamily: F.sans, fontSize: 10, fontWeight: 600, lineHeight: '12px',
+              }}>
+                {selectedSprint.state}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Column headers */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 6, paddingLeft: 36, paddingRight: 12, borderBottom: `1px solid ${T.border}`, marginBottom: 4 }}>
+          <div style={{ width: 72, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ключ</div>
+          <div style={{ width: 52, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Тип</div>
+          <div style={{ flex: 1, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Задача</div>
+          <div style={{ width: 90, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Статус</div>
+          <div style={{ width: 60, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Приор.</div>
+        </div>
+
+        {backlog.length === 0 ? (
+          <p style={{ color: T.t3, fontFamily: F.sans, fontSize: 13, padding: '16px 0' }}>Бэклог пуст</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 380, overflow: 'auto' }}>
+            {backlog.map(issue => {
+              const typeKey = issue.issueTypeConfig?.systemKey ?? 'TASK';
+              const tc = ISSUE_TYPE_CFG[typeKey] ?? ISSUE_TYPE_CFG['TASK'];
+              const sc = STATUS_STYLE[issue.status];
+              return (
+                <label
+                  key={issue.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 7px 8px', borderRadius: 6, cursor: 'pointer', backgroundColor: selectedBacklog.includes(issue.id) ? `${T.acc}14` : 'transparent' }}
+                >
+                  <div style={{ width: 28, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                    <Checkbox
+                      checked={selectedBacklog.includes(issue.id)}
+                      onChange={e => {
+                        setSelectedBacklog(prev =>
+                          e.target.checked ? [...prev, issue.id] : prev.filter(id => id !== issue.id)
+                        );
+                      }}
+                    />
+                  </div>
+                  {/* Key */}
+                  <span style={{ width: 72, flexShrink: 0, color: T.issueKey, fontFamily: F.display, fontSize: 11, fontWeight: 600, lineHeight: '14px' }}>
+                    {formatIssueKey(issue)}
+                  </span>
+                  {/* Type badge */}
+                  <div style={{ width: 52, flexShrink: 0 }}>
+                    <span style={{ backgroundColor: tc.bg, borderRadius: 3, paddingTop: 2, paddingBottom: 2, paddingLeft: 5, paddingRight: 5, color: tc.color, fontFamily: F.sans, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px', display: 'inline-block' }}>
+                      {tc.label}
+                    </span>
+                  </div>
+                  {/* Title */}
+                  <span style={{ flex: 1, color: T.t2, fontFamily: F.sans, fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {issue.title}
+                  </span>
+                  {/* Status */}
+                  <div style={{ width: 90, flexShrink: 0 }}>
+                    <span style={{ backgroundColor: sc.bg, borderRadius: 20, paddingTop: 2, paddingBottom: 2, paddingLeft: 7, paddingRight: 7, color: sc.color, fontFamily: F.sans, fontSize: 9, fontWeight: 500, display: 'inline-block' }}>
+                      {sc.label}
+                    </span>
+                  </div>
+                  {/* Priority */}
+                  <span style={{ width: 60, flexShrink: 0, color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11 }}>
+                    {issue.priority}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         )}
       </Modal>

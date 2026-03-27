@@ -3,38 +3,18 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
-  Typography,
-  Tag,
-  Space,
-  Button,
-  Select,
-  Input,
-  List,
-  Avatar,
-  Timeline,
   message,
   Popconfirm,
   InputNumber,
   Form,
   Modal,
+  Input,
+  Select,
   Switch,
   DatePicker,
   Divider,
 } from 'antd';
 import dayjs from 'dayjs';
-import {
-  ArrowLeftOutlined,
-  CommentOutlined,
-  HistoryOutlined,
-  ClockCircleOutlined,
-  PlayCircleOutlined,
-  PauseCircleOutlined,
-  DeleteOutlined,
-  MoreOutlined,
-  EditOutlined,
-  ThunderboltOutlined,
-  ApartmentOutlined,
-} from '@ant-design/icons';
 import * as issuesApi from '../api/issues';
 import * as commentsApi from '../api/comments';
 import * as timeApi from '../api/time';
@@ -47,15 +27,161 @@ import CustomFieldInput from '../components/issues/CustomFieldInput';
 import StatusTransitionPanel from '../components/issues/StatusTransitionPanel';
 import { issueCustomFieldsApi, type IssueCustomFieldValue } from '../api/issue-custom-fields';
 import { useAuthStore } from '../store/auth.store';
+import { useThemeStore } from '../store/theme.store';
 import type { Issue, Comment, TimeLog, AuditEntry, IssuePriority, IssueTypeConfig, User, AiExecutionStatus } from '../types';
 import api from '../api/client';
 import { hasAnyRequiredRole, hasRequiredRole } from '../lib/roles';
-import { IssueStatusTag, IssuePriorityTag, IssueTypeBadge } from '../lib/issue-kit';
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const DARK_C = {
+  bg: '#080B14',
+  bgCard: '#0F1320',
+  bgComment: '#161B22',
+  border: '#21262D',
+  borderComment: '#30363D',
+  t1: '#E2E8F8',
+  t2: '#C9D1D9',
+  t3: '#8B949E',
+  t4: '#484F58',
+  acc: '#6366F1',
+  accSoft: '#4F6EF7',
+  rightPanelBg: 'transparent',
+  timerBg: '#161B22',
+  labelColor: '#484F58',
+};
+
+const LIGHT_C = {
+  bg: '#F5F3FF',
+  bgCard: '#FFFFFF',
+  bgComment: '#FFFFFF',
+  border: '#D0D7DE',
+  borderComment: '#D0D7DE',
+  t1: '#1F2328',
+  t2: '#1F2328',
+  t3: '#656D76',
+  t4: '#8C959F',
+  acc: '#6366F1',
+  accSoft: '#4F6EF7',
+  rightPanelBg: '#F6F8FA',
+  timerBg: '#FFFFFF',
+  labelColor: '#8C959F',
+};
+
+const LOGO_GRAD = 'linear-gradient(in oklab 135deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)';
+
+const AVATAR_GRADS = [
+  LOGO_GRAD,
+  'linear-gradient(in oklab 135deg, oklab(69.6% -0.142 0.045) 0%, oklab(59.6% -0.122 0.037) 100%)',
+  'linear-gradient(in oklab 135deg, oklab(62% 0.12 -0.18) 0%, oklab(55% 0.15 -0.22) 100%)',
+  'linear-gradient(in oklab 135deg, oklab(65% -0.08 0.15) 0%, oklab(57% -0.12 0.18) 100%)',
+];
+
+function getInitials(name?: string | null) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return parts.length === 1
+    ? parts[0].substring(0, 2).toUpperCase()
+    : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getAvatarGrad(name?: string | null) {
+  if (!name) return AVATAR_GRADS[0];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return AVATAR_GRADS[Math.abs(h) % AVATAR_GRADS.length];
+}
+
+function Avatar({ name, size = 28 }: { name?: string | null; size?: number }) {
+  const fontSize = Math.round(size * 0.36);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      backgroundImage: getAvatarGrad(name),
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <span style={{ color: '#FFFFFF', fontSize, fontWeight: 700, fontFamily: '"Space Grotesk", system-ui, sans-serif', lineHeight: 1 }}>
+        {getInitials(name)}
+      </span>
+    </div>
+  );
+}
+
+// ─── Status pill styles ───────────────────────────────────────────────────────
+
+type IssueStatus = 'OPEN' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'CANCELLED';
+
+function getStatusCfg(status: string, isDark: boolean) {
+  const cfg: Record<string, { dot: string; bg: string; text: string; label: string }> = isDark ? {
+    OPEN:        { dot: '#8B949E', bg: '#1E2640',     text: '#8B949E', label: 'OPEN' },
+    IN_PROGRESS: { dot: '#F59E0B', bg: '#F59E0B26',   text: '#F59E0B', label: 'IN PROGRESS' },
+    REVIEW:      { dot: '#A78BFA', bg: '#A78BFA1F',   text: '#A78BFA', label: 'REVIEW' },
+    DONE:        { dot: '#4ADE80', bg: '#4ADE801F',   text: '#4ADE80', label: 'DONE' },
+    CANCELLED:   { dot: '#484F58', bg: '#161B22',     text: '#484F58', label: 'CANCELLED' },
+  } : {
+    OPEN:        { dot: '#8C959F', bg: '#EFF1F5',     text: '#8C959F', label: 'OPEN' },
+    IN_PROGRESS: { dot: '#D97706', bg: '#D77B001A',   text: '#D97706', label: 'IN PROGRESS' },
+    REVIEW:      { dot: '#7C3AED', bg: '#7C3AED1A',   text: '#7C3AED', label: 'REVIEW' },
+    DONE:        { dot: '#1A7F37', bg: '#1A7F371A',   text: '#1A7F37', label: 'DONE' },
+    CANCELLED:   { dot: '#8C959F', bg: '#EFF1F5',     text: '#8C959F', label: 'CANCELLED' },
+  };
+  return cfg[status] ?? cfg['OPEN'];
+}
+
+function getPriorityCfg(priority: string, isDark: boolean) {
+  const colors: Record<string, string> = isDark
+    ? { CRITICAL: '#EF4444', HIGH: '#F59E0B', MEDIUM: '#8B949E', LOW: '#8B949E' }
+    : { CRITICAL: '#EF4444', HIGH: '#D97706', MEDIUM: '#8C959F', LOW: '#8C959F' };
+  return colors[priority] ?? colors['MEDIUM'];
+}
+
+function getTypeCfg(systemKey?: string | null) {
+  const map: Record<string, { bg: string; text: string }> = {
+    TASK:    { bg: '#10B98126', text: '#10B981' },
+    BUG:     { bg: '#EF444426', text: '#EF4444' },
+    STORY:   { bg: '#3B82F626', text: '#3B82F6' },
+    EPIC:    { bg: '#A855F726', text: '#A855F7' },
+    SUBTASK: { bg: '#10B98126', text: '#10B981' },
+  };
+  return map[systemKey ?? ''] ?? { bg: '#4F6EF726', text: '#4F6EF7' };
+}
+
+// ─── Timer live display ───────────────────────────────────────────────────────
+
+function formatElapsed(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// ─── Section label ────────────────────────────────────────────────────────────
+
+function SectionLabel({ children, C }: { children: React.ReactNode; C: typeof DARK_C }) {
+  return (
+    <div style={{
+      color: C.labelColor,
+      fontFamily: '"Inter", system-ui, sans-serif',
+      fontSize: 10, fontWeight: 600,
+      letterSpacing: '0.5px',
+      lineHeight: '12px',
+      marginBottom: 6,
+      textTransform: 'uppercase' as const,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { mode } = useThemeStore();
+  const isDark = mode !== 'light';
+  const C = isDark ? DARK_C : LIGHT_C;
 
   const [issue, setIssue] = useState<Issue | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -63,6 +189,7 @@ export default function IssueDetailPage() {
   const [history, setHistory] = useState<AuditEntry[]>([]);
   const [newComment, setNewComment] = useState('');
   const [activeTimer, setActiveTimer] = useState<TimeLog | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const [timeModalOpen, setTimeModalOpen] = useState(false);
   const [timeForm] = Form.useForm();
   const [aiEstimateLoading, setAiEstimateLoading] = useState(false);
@@ -106,6 +233,19 @@ export default function IssueDetailPage() {
     }
   }, [issue?.projectId]);
 
+  // Live timer
+  const timerRunning = activeTimer?.issueId === id;
+  useEffect(() => {
+    if (!timerRunning || !activeTimer?.startedAt) { setElapsedSec(0); return; }
+    const update = () => {
+      const diff = Math.floor((Date.now() - new Date(activeTimer.startedAt!).getTime()) / 1000);
+      setElapsedSec(Math.max(0, diff));
+    };
+    update();
+    const iv = setInterval(update, 1000);
+    return () => clearInterval(iv);
+  }, [timerRunning, activeTimer?.startedAt]);
+
   const handleAddComment = async () => {
     if (!id || !newComment.trim()) return;
     await commentsApi.createComment(id, newComment);
@@ -133,6 +273,7 @@ export default function IssueDetailPage() {
     try {
       await timeApi.stopTimer(id);
       setActiveTimer(null);
+      setElapsedSec(0);
       load();
       message.success('Timer stopped');
     } catch { message.error('No running timer'); }
@@ -152,9 +293,7 @@ export default function IssueDetailPage() {
       await issuesApi.assignIssue(id, assigneeId);
       load();
       message.success('Assignee updated');
-    } catch {
-      message.error('Could not update assignee');
-    }
+    } catch { message.error('Could not update assignee'); }
   };
 
   const handleToggleAiEligible = async (checked: boolean) => {
@@ -167,9 +306,7 @@ export default function IssueDetailPage() {
       const updated = await issuesApi.getIssue(id);
       setIssue(updated);
       message.success(checked ? 'Marked as agent-eligible' : 'Marked as human-only');
-    } catch {
-      message.error('Could not update agent flag');
-    }
+    } catch { message.error('Could not update agent flag'); }
   };
 
   const handleAiEstimate = async () => {
@@ -184,9 +321,7 @@ export default function IssueDetailPage() {
         ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
         : null;
       message.error(msg || 'Не удалось оценить трудоёмкость');
-    } finally {
-      setAiEstimateLoading(false);
-    }
+    } finally { setAiEstimateLoading(false); }
   };
 
   const handleDeleteIssue = async () => {
@@ -195,9 +330,7 @@ export default function IssueDetailPage() {
       await issuesApi.deleteIssue(id);
       message.success('Issue deleted');
       navigate(-1);
-    } catch {
-      message.error('Failed to delete issue');
-    }
+    } catch { message.error('Failed to delete issue'); }
   };
 
   const handleEditOpen = async () => {
@@ -266,9 +399,7 @@ export default function IssueDetailPage() {
       await load();
       setCustomFieldsVersion(v => v + 1);
       message.success('Issue updated');
-    } catch {
-      message.error('Could not save changes');
-    }
+    } catch { message.error('Could not save changes'); }
   };
 
   const handleAiDecompose = async () => {
@@ -283,492 +414,558 @@ export default function IssueDetailPage() {
         ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
         : null;
       message.error(msg || 'Не удалось декомпозировать задачу');
-    } finally {
-      setAiDecomposeLoading(false);
-    }
+    } finally { setAiDecomposeLoading(false); }
   };
 
-  if (!issue) return <div style={{ padding: 'var(--space-8)' }}>Loading...</div>;
+  if (!issue) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13 }}>
+        Загрузка...
+      </div>
+    );
+  }
 
   const issueKey = issue.project ? `${issue.project.key}-${issue.number}` : `#${issue.number}`;
-  const timerRunning = activeTimer?.issueId === id;
+  const typeCfg = getTypeCfg(issue.issueTypeConfig?.systemKey);
+  const priorityColor = getPriorityCfg(issue.priority, isDark);
+
+  // Total logged hours
+  const totalLogged = timeLogs.reduce((sum, l) => sum + Number(l.hours), 0);
 
   return (
-    <div className="tt-page tt-issue-page">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate(-1)}
-          style={{ padding: 'var(--space-2) var(--space-4)', color: 'var(--t2)' }}
-        >
-          Back
-        </Button>
-      </div>
+    <div style={{ display: 'flex', flex: 1, height: '100%', overflow: 'hidden' }}>
 
-      <header className="tt-issue-header">
-        <div className="tt-issue-header-main">
-          <div className="tt-issue-breadcrumbs">
-            <span>Issues</span>
-            <span className="tt-issue-breadcrumb-sep">/</span>
-            <span>{issue.project?.name || 'Project'}</span>
-          </div>
-          <div className="tt-issue-title-row">
-            <h1 className="tt-page-title">{issue.title}</h1>
-            <div className="tt-issue-id-badge">
-              <span>{issueKey}</span>
-            </div>
-            <IssueTypeBadge typeConfig={issue.issueTypeConfig} showLabel />
-          </div>
-          <div className="tt-issue-header-meta">
-            <span>
-              Created by {issue.creator?.name ?? 'Unknown'} on{' '}
-              {new Date(issue.createdAt).toLocaleDateString()}
+      {/* ── Main content ────────────────────────────────────────────────────── */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        borderRight: `1px solid ${C.border}`,
+        paddingBlock: 24,
+        paddingInline: 28,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+      }}>
+
+        {/* Breadcrumb */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, lineHeight: '16px' }}
+          >
+            ← Назад
+          </button>
+          <span style={{ color: C.t4, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>/</span>
+          <span style={{ color: C.t3, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>
+            {issue.project?.name || 'Проект'}
+          </span>
+          <span style={{ color: C.t4, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>/</span>
+          <span style={{ color: C.acc, fontSize: 12, fontWeight: 600, fontFamily: '"Space Grotesk", system-ui, sans-serif' }}>
+            {issueKey}
+          </span>
+        </div>
+
+        {/* Type badge + key row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ backgroundColor: typeCfg.bg, borderRadius: 3, paddingBlock: 3, paddingInline: 8, flexShrink: 0 }}>
+            <span style={{ color: typeCfg.text, fontSize: 10, fontWeight: 600, letterSpacing: '0.3px', lineHeight: '12px', fontFamily: '"Inter", system-ui, sans-serif' }}>
+              {issue.issueTypeConfig?.systemKey ?? 'ISSUE'}
             </span>
-            {issue.parent && (
-              <span>
-                Parent:{' '}
-                <Link to={`/issues/${issue.parent.id}`}>
-                  {issue.parent.issueTypeConfig?.systemKey ?? 'ISSUE'}-{issue.parent.number}: {issue.parent.title}
-                </Link>
-              </span>
+          </div>
+          <span style={{ color: C.acc, fontSize: 11, fontWeight: 600, fontFamily: '"Space Grotesk", system-ui, sans-serif', lineHeight: '14px' }}>
+            {issueKey}
+          </span>
+          {/* Actions */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button
+              onClick={handleEditOpen}
+              style={{ background: isDark ? '#161B22' : '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: C.t2, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}
+            >
+              Редактировать
+            </button>
+            {hasRequiredRole(user?.role, 'ADMIN') && (
+              <Popconfirm
+                title={`Удалить задачу ${issueKey}?`}
+                description="Это действие нельзя отменить."
+                okText="Удалить"
+                okButtonProps={{ danger: true }}
+                cancelText="Отмена"
+                onConfirm={handleDeleteIssue}
+              >
+                <button style={{ background: isDark ? '#1A1A1A' : '#FFF5F5', border: `1px solid ${isDark ? '#3D1A1A' : '#FECACA'}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: '#EF4444', fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>
+                  Удалить
+                </button>
+              </Popconfirm>
             )}
           </div>
         </div>
-        <div className="tt-issue-header-actions">
-          <Button size="small" icon={<EditOutlined />} onClick={handleEditOpen}>
-            Edit
-          </Button>
-          {hasRequiredRole(user?.role, 'ADMIN') && (
-            <Popconfirm
-              title={`Удалить задачу ${issueKey}?`}
-              description="Это действие нельзя отменить."
-              okText="Удалить"
-              okButtonProps={{ danger: true }}
-              cancelText="Отмена"
-              onConfirm={handleDeleteIssue}
+
+        {/* Title */}
+        <h1 style={{
+          color: C.t1,
+          fontFamily: '"Space Grotesk", system-ui, sans-serif',
+          fontSize: 20,
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          lineHeight: 1.3,
+          margin: 0,
+          marginBottom: 20,
+        }}>
+          {issue.title}
+        </h1>
+
+        {/* Parent */}
+        {issue.parent && (
+          <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: C.t4, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif' }}>Родитель:</span>
+            <Link
+              to={`/issues/${issue.parent.id}`}
+              style={{ color: C.acc, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif', textDecoration: 'none' }}
             >
-              <Button size="small" danger icon={<DeleteOutlined />}>
-                Delete
-              </Button>
-            </Popconfirm>
-          )}
-          <Button size="small" icon={<MoreOutlined />} />
-        </div>
-      </header>
+              {issue.parent.issueTypeConfig?.systemKey ?? 'ISSUE'}-{issue.parent.number}: {issue.parent.title}
+            </Link>
+          </div>
+        )}
 
-      <div className="tt-issue-main">
-        <div className="tt-issue-main-body">
-          {issue.description && (
-            <section>
-              <h3 className="tt-issue-section-title">Description</h3>
-              <div className="tt-issue-description">
-                <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{issue.description}</ReactMarkdown>
+        {/* Description */}
+        {issue.description && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '16px', marginBottom: 8, textTransform: 'uppercase' }}>
+              Описание
+            </div>
+            <div style={{ color: C.t2, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13, lineHeight: 1.6 }}>
+              <div className="markdown-body" style={{ color: C.t2 }}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{issue.description}</ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Acceptance criteria */}
+        {issue.acceptanceCriteria && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '16px', marginBottom: 8, textTransform: 'uppercase' }}>
+              Критерии приёмки
+            </div>
+            <div style={{ color: C.t2, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13, lineHeight: 1.6 }}>
+              <div className="markdown-body" style={{ color: C.t2 }}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{issue.acceptanceCriteria}</ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sub-issues */}
+        {issue.children && issue.children.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '16px', marginBottom: 8, textTransform: 'uppercase' }}>
+              Подзадачи ({issue.children.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {issue.children.map(child => {
+                const childTypeCfg = getTypeCfg(child.issueTypeConfig?.systemKey);
+                const childStatusCfg = getStatusCfg(child.status as IssueStatus, isDark);
+                return (
+                  <Link
+                    key={child.id}
+                    to={`/issues/${child.id}`}
+                    style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, backgroundColor: isDark ? '#0F1320' : '#FFFFFF', border: `1px solid ${C.border}` }}
+                  >
+                    <span style={{ backgroundColor: childTypeCfg.bg, color: childTypeCfg.text, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 3, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '12px' }}>
+                      {child.issueTypeConfig?.systemKey ?? 'ISSUE'}
+                    </span>
+                    <span style={{ backgroundColor: childStatusCfg.bg, color: childStatusCfg.text, fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 10, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '14px' }}>
+                      {childStatusCfg.label}
+                    </span>
+                    <span style={{ color: C.t2, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif', flex: 1 }}>{child.title}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Links */}
+        <IssueLinksSection issueId={issue.id} />
+
+        {/* Comments */}
+        <div style={{ marginTop: 4 }}>
+          <div style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '16px', marginBottom: 12, textTransform: 'uppercase' }}>
+            Комментарии ({comments.length})
+          </div>
+
+          {/* Comment list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
+            {comments.length === 0 && (
+              <span style={{ color: C.t4, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>Нет комментариев</span>
+            )}
+            {comments.map(c => (
+              <div key={c.id} style={{ display: 'flex', gap: 10 }}>
+                <Avatar name={c.author?.name} size={28} />
+                <div style={{ flex: 1, backgroundColor: C.bgComment, border: `1px solid ${C.borderComment}`, borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ color: C.t2, fontSize: 12, fontWeight: 500, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '16px' }}>
+                      {c.author?.name}
+                    </span>
+                    <span style={{ color: C.t4, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '14px' }}>
+                      {new Date(c.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {(c.authorId === user?.id || hasRequiredRole(user?.role, 'ADMIN')) && (
+                      <Popconfirm title="Удалить комментарий?" onConfirm={() => handleDeleteComment(c.id)}>
+                        <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: C.t4, fontSize: 11, padding: 0 }}>
+                          ✕
+                        </button>
+                      </Popconfirm>
+                    )}
+                  </div>
+                  <div style={{ color: C.t3, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: 1.5 }}>
+                    {c.body}
+                  </div>
                 </div>
               </div>
-            </section>
-          )}
+            ))}
+          </div>
 
-          {issue.acceptanceCriteria && (
-            <section>
-              <h3 className="tt-issue-section-title">Acceptance Criteria</h3>
-              <div className="tt-issue-description">
-                <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{issue.acceptanceCriteria}</ReactMarkdown>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {issue.children && issue.children.length > 0 && (
-            <section>
-              <h3 className="tt-issue-section-title">
-                Sub-issues ({issue.children.length})
-              </h3>
-              <List
-                size="small"
-                className="tt-issue-subissues-list"
-                dataSource={issue.children}
-                renderItem={(child) => (
-                  <List.Item>
-                    <Link to={`/issues/${child.id}`}>
-                      <IssueTypeBadge typeConfig={child.issueTypeConfig} />{' '}
-                      <IssueStatusTag status={child.status} size="small" />{' '}
-                      {child.title}
-                    </Link>
-                  </List.Item>
-                )}
+          {/* New comment input */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <Avatar name={user?.name} size={28} />
+            <div style={{ flex: 1, backgroundColor: C.bgComment, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <textarea
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                placeholder="Добавить комментарий... (Ctrl+Enter для отправки)"
+                onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter') handleAddComment(); }}
+                rows={3}
+                style={{
+                  background: 'none', border: 'none', outline: 'none', resize: 'none', width: '100%',
+                  color: C.t2, fontSize: 13, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: 1.5,
+                }}
               />
-            </section>
-          )}
-
-          <IssueLinksSection issueId={issue.id} />
-
-          <section className="tt-issue-activity">
-            <h3 className="tt-issue-section-title">
-              <CommentOutlined style={{ marginRight: 6 }} />
-              Activity &amp; Comments ({comments.length})
-            </h3>
-
-            <div className="tt-issue-comments">
-              <List
-                dataSource={comments}
-                locale={{ emptyText: 'No comments yet' }}
-                renderItem={(c) => (
-                  <List.Item style={{ paddingInline: 0 }}>
-                    <div className="tt-comment-item">
-                      <div className="tt-comment-avatar">
-                        <Avatar size={28}>{c.author?.name?.charAt(0)}</Avatar>
-                      </div>
-                      <div className="tt-comment-bubble">
-                        <div className="tt-comment-meta">
-                          <span className="tt-comment-author">{c.author?.name}</span>
-                          <span className="tt-comment-date">
-                            {new Date(c.createdAt).toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="tt-comment-body">{c.body}</div>
-                      </div>
-                      {(c.authorId === user?.id || hasRequiredRole(user?.role, 'ADMIN')) && (
-                        <div className="tt-comment-actions">
-                          <Popconfirm
-                            title="Delete comment?"
-                            onConfirm={() => handleDeleteComment(c.id)}
-                          >
-                            <Button
-                              size="small"
-                              type="text"
-                              icon={<DeleteOutlined />}
-                              danger
-                            />
-                          </Popconfirm>
-                        </div>
-                      )}
-                    </div>
-                  </List.Item>
-                )}
-              />
-
-              <Space.Compact
-                style={{ width: '100%', marginTop: 'var(--space-2)' }}
-                className="tt-comment-input"
-              >
-                <Input.TextArea
-                  rows={2}
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Write a comment... (Ctrl+Enter to send)"
-                  onPressEnter={(e) => {
-                    if (e.ctrlKey) {
-                      handleAddComment();
-                    }
-                  }}
-                />
-                <Button
-                  type="primary"
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
                   onClick={handleAddComment}
                   disabled={!newComment.trim()}
+                  style={{
+                    backgroundImage: newComment.trim() ? LOGO_GRAD : 'none',
+                    backgroundColor: newComment.trim() ? 'transparent' : (isDark ? '#21262D' : '#E0E0E0'),
+                    border: 'none', borderRadius: 6, padding: '6px 14px',
+                    color: newComment.trim() ? '#FFFFFF' : C.t4,
+                    fontSize: 12, fontWeight: 500, fontFamily: '"Inter", system-ui, sans-serif',
+                    cursor: newComment.trim() ? 'pointer' : 'default',
+                  }}
                 >
-                  Send
-                </Button>
-              </Space.Compact>
+                  Отправить
+                </button>
+              </div>
             </div>
-
-            <div className="tt-issue-history">
-              <h3 className="tt-issue-section-title">
-                <HistoryOutlined style={{ marginRight: 6 }} />
-                History
-              </h3>
-              <Timeline
-                items={history.map((h) => ({
-                  children: (
-                    <span>
-                      <strong>{h.user?.name || 'System'}</strong>{' '}
-                      {h.action.replace('issue.', '').replace('_', ' ')}{' '}
-                      {h.details && (
-                        <Typography.Text type="secondary" code>
-                          {JSON.stringify(h.details)}
-                        </Typography.Text>
-                      )}
-                      <br />
-                      <Typography.Text type="secondary">
-                        {new Date(h.createdAt).toLocaleString()}
-                      </Typography.Text>
-                    </span>
-                  ),
-                }))}
-              />
-            </div>
-          </section>
+          </div>
         </div>
 
-        <aside className="tt-issue-main-aside">
-          <div className="tt-panel">
-            <div className="tt-panel-header">Details</div>
-            <div className="tt-panel-body">
-              <div className="tt-panel-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
-                <span>Status</span>
-                <StatusTransitionPanel issueId={issue.id} onTransitioned={load} />
-              </div>
-              <div className="tt-panel-row">
-                <span>Priority</span>
-                <IssuePriorityTag priority={issue.priority} size="small" />
-              </div>
-              <div className="tt-panel-row">
-                <span>Assignee</span>
-                {canAssign ? (
-                  <Select
-                    allowClear
-                    size="small"
-                    style={{ width: 160 }}
-                    placeholder="Unassigned"
-                    value={issue.assigneeId ?? undefined}
-                    onChange={(val) => handleAssigneeChange(val ?? null)}
-                    options={allUsers.map((u) => ({ value: u.id, label: u.name }))}
-                  />
-                ) : (
-                  <span>{issue.assignee?.name || 'Unassigned'}</span>
-                )}
-              </div>
-              <div className="tt-panel-row">
-                <span>Key</span>
-                <span className="tt-mono" style={{ fontSize: 11 }}>
-                  {issueKey}
-                </span>
-              </div>
-              {(issue.estimatedHours != null && issue.estimatedHours !== undefined) && (
-                <div className="tt-panel-row">
-                  <span>Estimated</span>
-                  <span className="tt-mono">{Number(issue.estimatedHours).toFixed(1)} h</span>
+        {/* History (full) */}
+        {history.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <div style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '16px', marginBottom: 12, textTransform: 'uppercase' }}>
+              История изменений
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {history.map((h, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <Avatar name={h.user?.name} size={16} />
+                  <div>
+                    <span style={{ color: C.t3, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '14px' }}>
+                      {h.user?.name ?? 'System'} · {h.action.replace('issue.', '').replace(/_/g, ' ')}
+                      {h.details ? ` — ${JSON.stringify(h.details)}` : ''}
+                    </span>
+                    <div style={{ color: C.t4, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '12px' }}>
+                      {new Date(h.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="tt-panel-row">
-                <span>Срок исполнения</span>
-                {issue.dueDate ? (
-                  <span>
-                    {dayjs(issue.dueDate).format('DD.MM.YYYY')}
-                    {issue.status !== 'DONE' && issue.status !== 'CANCELLED' && dayjs(issue.dueDate).isBefore(dayjs(), 'day') && (
-                      <Tag color="red" style={{ marginLeft: 'var(--space-2)', fontSize: 10 }}>просрочено</Tag>
-                    )}
-                  </span>
-                ) : (
-                  <span style={{ color: '#bbb' }}>—</span>
-                )}
-              </div>
-              <div className="tt-panel-row">
-                <span>Created</span>
-                <span>{new Date(issue.createdAt).toLocaleDateString()}</span>
-              </div>
+              ))}
             </div>
           </div>
-
-          <div ref={customFieldsRef}>
-            <IssueCustomFieldsSection issueId={issue.id} refreshKey={customFieldsVersion} />
-          </div>
-
-          <div className="tt-panel">
-            <div className="tt-panel-header">AI Execution</div>
-            <div className="tt-panel-body">
-              <div className="tt-panel-row">
-                <span>Agent can do this</span>
-                <Switch
-                  size="small"
-                  checked={!!issue.aiEligible}
-                  disabled={!canEditAi}
-                  onChange={handleToggleAiEligible}
-                />
-              </div>
-              <div className="tt-panel-row">
-                <span>Executor</span>
-                <span>
-                  {issue.aiAssigneeType === 'AGENT' || (issue.aiEligible && !issue.aiAssigneeType)
-                    ? 'Agent'
-                    : issue.aiAssigneeType === 'MIXED'
-                      ? 'Agent + Human'
-                      : 'Human'}
-                </span>
-              </div>
-              <div className="tt-panel-row">
-                <span>Agent status</span>
-                {canEditAi ? (
-                  <Select
-                    size="small"
-                    style={{ width: 140 }}
-                    value={issue.aiExecutionStatus ?? 'NOT_STARTED'}
-                    onChange={async (val) => {
-                      if (!id) return;
-                      try {
-                        await issuesApi.updateAiStatus(id, val as AiExecutionStatus);
-                        const updated = await issuesApi.getIssue(id);
-                        setIssue(updated);
-                        message.success('Agent status updated');
-                      } catch {
-                        message.error('Could not update agent status');
-                      }
-                    }}
-                    options={[
-                      { value: 'NOT_STARTED', label: 'NOT_STARTED' },
-                      { value: 'IN_PROGRESS', label: 'IN_PROGRESS' },
-                      { value: 'DONE', label: 'DONE' },
-                      { value: 'FAILED', label: 'FAILED' },
-                    ]}
-                  />
-                ) : (
-                  <span>{issue.aiExecutionStatus ?? 'NOT_STARTED'}</span>
-                )}
-              </div>
-              <div className="tt-panel-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-4)' }}>
-                <Button
-                  type="default"
-                  size="small"
-                  icon={<ThunderboltOutlined />}
-                  loading={aiEstimateLoading}
-                  onClick={handleAiEstimate}
-                >
-                  Оценить трудоёмкость
-                </Button>
-                <Button
-                  type="default"
-                  size="small"
-                  icon={<ApartmentOutlined />}
-                  loading={aiDecomposeLoading}
-                  onClick={handleAiDecompose}
-                  disabled={!issue.issueTypeConfig || issue.issueTypeConfig?.isSubtask === true}
-                >
-                  Декомпозировать в подзадачи
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="tt-panel">
-            <div className="tt-panel-header">
-              <span>
-                <ClockCircleOutlined style={{ marginRight: 6 }} />
-                Time Tracking
-              </span>
-            </div>
-            <div className="tt-panel-body" style={{ padding: 10 }}>
-              <Space style={{ marginBottom: 'var(--space-4)' }}>
-                {timerRunning ? (
-                  <Button
-                    icon={<PauseCircleOutlined />}
-                    danger
-                    size="small"
-                    onClick={handleStopTimer}
-                  >
-                    Stop
-                  </Button>
-                ) : (
-                  <Button
-                    icon={<PlayCircleOutlined />}
-                    type="primary"
-                    size="small"
-                    onClick={handleStartTimer}
-                  >
-                    Start
-                  </Button>
-                )}
-                <Button size="small" onClick={() => setTimeModalOpen(true)}>
-                  Log time
-                </Button>
-              </Space>
-              {timeLogs.length > 0 && (
-                <List
-                  size="small"
-                  dataSource={timeLogs}
-                  renderItem={(log) => {
-                    const isAgent = log.source === 'AGENT';
-                    const modelLabel =
-                      isAgent && log.agentSession
-                        ? `${log.agentSession.model}`
-                        : undefined;
-
-                    return (
-                      <List.Item style={{ paddingInline: 0 }}>
-                        <Space size={6}>
-                          <strong>{Number(log.hours).toFixed(2)}h</strong>
-                          {isAgent ? (
-                            <Tag color="purple" style={{ marginInlineEnd: 0 }}>
-                              AI{modelLabel ? ` · ${modelLabel}` : ''}
-                            </Tag>
-                          ) : (
-                            <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                              Human
-                            </Tag>
-                          )}
-                          {!isAgent && <span>{log.user?.name}</span>}
-                          {isAgent && log.costMoney != null && (
-                            <Typography.Text type="secondary" className="tt-mono">
-                              · {Number(log.costMoney).toFixed(4)}
-                            </Typography.Text>
-                          )}
-                          {log.note && (
-                            <Typography.Text type="secondary">
-                              — {log.note}
-                            </Typography.Text>
-                          )}
-                          <Typography.Text type="secondary">
-                            {new Date(log.createdAt).toLocaleDateString()}
-                          </Typography.Text>
-                        </Space>
-                      </List.Item>
-                    );
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        </aside>
+        )}
       </div>
 
+      {/* ── Right panel ─────────────────────────────────────────────────────── */}
+      <div style={{
+        width: 260,
+        flexShrink: 0,
+        overflowY: 'auto',
+        backgroundColor: C.rightPanelBg,
+        paddingBlock: 24,
+        paddingInline: 20,
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+
+        {/* Status */}
+        <div style={{ marginBottom: 16 }}>
+          <SectionLabel C={C}>Статус</SectionLabel>
+          <StatusTransitionPanel issueId={issue.id} onTransitioned={load} />
+        </div>
+
+        {/* Priority */}
+        <div style={{ marginBottom: 16 }}>
+          <SectionLabel C={C}>Приоритет</SectionLabel>
+          <span style={{ color: priorityColor, fontSize: 12, fontWeight: 600, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '16px' }}>
+            {issue.priority}
+          </span>
+        </div>
+
+        {/* Assignee */}
+        <div style={{ marginBottom: 16 }}>
+          <SectionLabel C={C}>Исполнитель</SectionLabel>
+          {canAssign ? (
+            <Select
+              allowClear
+              size="small"
+              style={{ width: '100%' }}
+              placeholder="Не назначен"
+              value={issue.assigneeId ?? undefined}
+              onChange={val => handleAssigneeChange(val ?? null)}
+              options={allUsers.map(u => ({ value: u.id, label: u.name }))}
+            />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Avatar name={issue.assignee?.name} size={24} />
+              <span style={{ color: C.t2, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '16px' }}>
+                {issue.assignee?.name ?? 'Не назначен'}
+              </span>
+            </div>
+          )}
+        </div>
+
+
+        {/* Estimation / Actual */}
+        <div style={{ marginBottom: 16 }}>
+          <SectionLabel C={C}>Оценка / Факт</SectionLabel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: C.t1, fontSize: 13, fontWeight: 700, fontFamily: '"Space Grotesk", system-ui, sans-serif', lineHeight: '16px' }}>
+              {issue.estimatedHours != null ? `${Number(issue.estimatedHours).toFixed(0)}ч` : '—'}
+            </span>
+            <span style={{ color: C.border, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>/</span>
+            <span style={{ color: priorityColor, fontSize: 13, fontWeight: 600, fontFamily: '"Space Grotesk", system-ui, sans-serif', lineHeight: '16px' }}>
+              {totalLogged > 0 ? `${totalLogged.toFixed(1)}ч` : '—'}
+            </span>
+          </div>
+        </div>
+
+        {/* Due date */}
+        {issue.dueDate && (
+          <div style={{ marginBottom: 16 }}>
+            <SectionLabel C={C}>Срок</SectionLabel>
+            <span style={{
+              color: issue.status !== 'DONE' && issue.status !== 'CANCELLED' && dayjs(issue.dueDate).isBefore(dayjs(), 'day') ? '#EF4444' : C.t2,
+              fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '16px',
+            }}>
+              {dayjs(issue.dueDate).format('DD.MM.YYYY')}
+            </span>
+          </div>
+        )}
+
+        {/* Divider */}
+        <div style={{ height: 1, backgroundColor: C.border, marginBottom: 16, flexShrink: 0 }} />
+
+        {/* Timer */}
+        <div style={{ marginBottom: 16 }}>
+          <SectionLabel C={C}>Таймер</SectionLabel>
+          <div style={{ backgroundColor: C.timerBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ color: C.accSoft, fontFamily: '"Space Grotesk", system-ui, sans-serif', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px' }}>
+              {timerRunning ? formatElapsed(elapsedSec) : '00:00:00'}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {timerRunning ? (
+                <button
+                  onClick={handleStopTimer}
+                  style={{
+                    flex: 1, backgroundColor: isDark ? '#EF444426' : '#CF222E14',
+                    border: `1px solid ${isDark ? '#EF44444D' : '#CF222E40'}`,
+                    borderRadius: 6, padding: '6px 0', cursor: 'pointer',
+                    color: isDark ? '#EF4444' : '#CF222E',
+                    fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, lineHeight: '14px',
+                  }}
+                >
+                  Стоп
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleStartTimer}
+                    style={{
+                      flex: 1, backgroundImage: LOGO_GRAD,
+                      border: 'none', borderRadius: 6, padding: '6px 0', cursor: 'pointer',
+                      color: '#FFFFFF',
+                      fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, lineHeight: '14px',
+                    }}
+                  >
+                    Старт
+                  </button>
+                  <button
+                    onClick={() => setTimeModalOpen(true)}
+                    style={{
+                      flex: 1, backgroundColor: isDark ? '#161B22' : '#FFFFFF',
+                      border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 0', cursor: 'pointer',
+                      color: C.t3,
+                      fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, lineHeight: '14px',
+                    }}
+                  >
+                    Вручную
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Time logs */}
+          {timeLogs.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {timeLogs.map((log, i) => {
+                const isAgent = log.source === 'AGENT';
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif', color: C.t3 }}>
+                    <span style={{ color: C.t2, fontWeight: 600 }}>{Number(log.hours).toFixed(2)}ч</span>
+                    <span style={{ backgroundColor: isAgent ? '#A855F726' : '#3B82F626', color: isAgent ? '#A855F7' : '#3B82F6', fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>
+                      {isAgent ? 'AI' : 'H'}
+                    </span>
+                    <span style={{ color: C.t4 }}>{new Date(log.createdAt).toLocaleDateString('ru-RU')}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, backgroundColor: C.border, marginBottom: 16, flexShrink: 0 }} />
+
+        {/* History (compact) */}
+        {history.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <SectionLabel C={C}>История изменений</SectionLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {history.slice(0, 3).map((h, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <Avatar name={h.user?.name} size={16} />
+                  <div>
+                    <div>
+                      <span style={{ color: C.t3, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '14px' }}>
+                        {h.action.replace('issue.', '').replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div style={{ color: C.t4, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '12px' }}>
+                      {new Date(h.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Custom fields */}
+        <div ref={customFieldsRef}>
+          <IssueCustomFieldsSection issueId={issue.id} refreshKey={customFieldsVersion} />
+        </div>
+
+        {/* AI Execution */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ height: 1, backgroundColor: C.border, marginBottom: 16 }} />
+          <SectionLabel C={C}>AI Execution</SectionLabel>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ color: C.t3, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif' }}>Agent can do this</span>
+              <Switch
+                size="small"
+                checked={!!issue.aiEligible}
+                disabled={!canEditAi}
+                onChange={handleToggleAiEligible}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ color: C.t3, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif' }}>Agent status</span>
+              {canEditAi ? (
+                <Select
+                  size="small"
+                  style={{ width: 120 }}
+                  value={issue.aiExecutionStatus ?? 'NOT_STARTED'}
+                  onChange={async val => {
+                    if (!id) return;
+                    try {
+                      await issuesApi.updateAiStatus(id, val as AiExecutionStatus);
+                      const updated = await issuesApi.getIssue(id);
+                      setIssue(updated);
+                    } catch { message.error('Could not update agent status'); }
+                  }}
+                  options={[
+                    { value: 'NOT_STARTED', label: 'NOT_STARTED' },
+                    { value: 'IN_PROGRESS', label: 'IN_PROGRESS' },
+                    { value: 'DONE', label: 'DONE' },
+                    { value: 'FAILED', label: 'FAILED' },
+                  ]}
+                />
+              ) : (
+                <span style={{ color: C.t3, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif' }}>{issue.aiExecutionStatus ?? 'NOT_STARTED'}</span>
+              )}
+            </div>
+            <button
+              onClick={handleAiEstimate}
+              disabled={aiEstimateLoading}
+              style={{
+                width: '100%', backgroundColor: isDark ? '#1E2640' : '#EEF2FF',
+                border: `1px solid ${isDark ? '#2A3A6B' : '#C7D2FE'}`,
+                borderRadius: 6, padding: '6px 0', cursor: 'pointer',
+                color: isDark ? '#818CF8' : '#4338CA',
+                fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, lineHeight: '14px',
+              }}
+            >
+              {aiEstimateLoading ? '...' : '⚡ Оценить трудоёмкость'}
+            </button>
+            <button
+              onClick={handleAiDecompose}
+              disabled={aiDecomposeLoading || !issue.issueTypeConfig || issue.issueTypeConfig?.isSubtask === true}
+              style={{
+                width: '100%', backgroundColor: isDark ? '#1E2640' : '#EEF2FF',
+                border: `1px solid ${isDark ? '#2A3A6B' : '#C7D2FE'}`,
+                borderRadius: 6, padding: '6px 0', cursor: 'pointer',
+                color: isDark ? '#818CF8' : '#4338CA',
+                fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, lineHeight: '14px',
+              }}
+            >
+              {aiDecomposeLoading ? '...' : '⬡ Декомпозировать'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Edit modal ──────────────────────────────────────────────────────── */}
       <Modal
-        title="Edit Issue"
+        title="Редактировать задачу"
         open={editModalOpen}
-        onCancel={() => {
-          setEditModalOpen(false);
-          setEditCustomFields([]);
-          setEditCustomValues({});
-        }}
+        onCancel={() => { setEditModalOpen(false); setEditCustomFields([]); setEditCustomValues({}); }}
         onOk={() => editForm.submit()}
-        okText="Save"
-        cancelText="Cancel"
+        okText="Сохранить"
+        cancelText="Отмена"
         width={600}
         destroyOnClose
       >
         <Form form={editForm} layout="vertical" onFinish={handleEditSave}>
-          <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Title is required' }]}>
+          <Form.Item name="title" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="issueTypeConfigId" label="Type">
-            <Select
-              options={issueTypeConfigs.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
-              onChange={handleEditTypeChange}
-            />
+          <Form.Item name="issueTypeConfigId" label="Тип">
+            <Select options={issueTypeConfigs.map(c => ({ value: c.id, label: c.name }))} onChange={handleEditTypeChange} />
           </Form.Item>
-          <Form.Item name="priority" label="Priority" rules={[{ required: true }]}>
-            <Select
-              options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map((v) => ({
-                value: v,
-                label: v,
-              }))}
-            />
+          <Form.Item name="priority" label="Приоритет" rules={[{ required: true }]}>
+            <Select options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map(v => ({ value: v, label: v }))} />
           </Form.Item>
-          <Form.Item name="assigneeId" label="Assignee">
-            <Select
-              allowClear
-              placeholder="Unassigned"
-              options={allUsers.map((u) => ({ value: u.id, label: u.name }))}
-            />
+          <Form.Item name="assigneeId" label="Исполнитель">
+            <Select allowClear placeholder="Не назначен" options={allUsers.map(u => ({ value: u.id, label: u.name }))} />
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label="Описание">
             <Input.TextArea rows={4} />
           </Form.Item>
-          <Form.Item name="acceptanceCriteria" label="Acceptance Criteria">
+          <Form.Item name="acceptanceCriteria" label="Критерии приёмки">
             <Input.TextArea rows={3} />
           </Form.Item>
           <Form.Item name="dueDate" label="Срок исполнения">
@@ -780,23 +977,12 @@ export default function IssueDetailPage() {
                 Дополнительные поля
               </Divider>
               {editCustomFields.map(field => (
-                <Form.Item
-                  key={field.customFieldId}
-                  label={
-                    <span>
-                      {field.isRequired && <Typography.Text type="danger">* </Typography.Text>}
-                      {field.name}
-                    </span>
-                  }
-                  style={{ marginBottom: 12 }}
-                >
+                <Form.Item key={field.customFieldId} label={field.name} style={{ marginBottom: 12 }}>
                   <CustomFieldInput
                     field={{ ...field, currentValue: editCustomValues[field.customFieldId] ?? field.currentValue }}
                     allUsers={allUsers}
                     inlineEdit={false}
-                    onSave={async (v) => {
-                      setEditCustomValues(prev => ({ ...prev, [field.customFieldId]: v }));
-                    }}
+                    onSave={async v => { setEditCustomValues(prev => ({ ...prev, [field.customFieldId]: v })); }}
                   />
                 </Form.Item>
               ))}
@@ -805,27 +991,22 @@ export default function IssueDetailPage() {
         </Form>
       </Modal>
 
+      {/* ── Log time modal ──────────────────────────────────────────────────── */}
       <Modal
-        title="Log Time"
+        title="Записать время"
         open={timeModalOpen}
         onCancel={() => setTimeModalOpen(false)}
         onOk={() => timeForm.submit()}
       >
         <Form form={timeForm} layout="vertical" onFinish={handleLogManual}>
-          <Form.Item name="hours" label="Hours" rules={[{ required: true }]}>
-            <InputNumber
-              min={0.01}
-              max={24}
-              step={0.25}
-              style={{ width: '100%' }}
-            />
+          <Form.Item name="hours" label="Часы" rules={[{ required: true }]}>
+            <InputNumber min={0.01} max={24} step={0.25} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="note" label="Note">
+          <Form.Item name="note" label="Заметка">
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
       </Modal>
-
     </div>
   );
 }

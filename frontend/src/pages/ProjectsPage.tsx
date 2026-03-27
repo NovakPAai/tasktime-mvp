@@ -468,7 +468,6 @@ export default function ProjectsPage() {
         onCancel={() => { setModalOpen(false); form.resetFields(); }}
         onOk={() => form.submit()}
         okText="Create"
-        className="tt-modal"
       >
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Form.Item name="name" label="Name" rules={[{ required: true }]}>
