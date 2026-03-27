@@ -4,8 +4,9 @@ import type { CustomFieldType } from './custom-fields';
 export interface TransitionScreenItem {
   id: string;
   screenId: string;
-  customFieldId: string;
-  customField: { id: string; name: string; fieldType: CustomFieldType };
+  customFieldId: string | null;
+  systemFieldKey: string | null;
+  customField: { id: string; name: string; fieldType: CustomFieldType } | null;
   isRequired: boolean;
   orderIndex: number;
 }
@@ -19,6 +20,10 @@ export interface TransitionScreen {
   items?: TransitionScreenItem[];
   _count?: { transitions: number; items: number };
 }
+
+export type ReplaceItemPayload =
+  | { customFieldId: string; systemFieldKey?: never; isRequired: boolean; orderIndex: number }
+  | { systemFieldKey: string; customFieldId?: never; isRequired: boolean; orderIndex: number };
 
 export const transitionScreensApi = {
   list: () =>
@@ -36,6 +41,6 @@ export const transitionScreensApi = {
   delete: (id: string) =>
     api.delete(`/admin/transition-screens/${id}`).then(r => r.data),
 
-  replaceItems: (id: string, items: { customFieldId: string; isRequired: boolean; orderIndex: number }[]) =>
+  replaceItems: (id: string, items: ReplaceItemPayload[]) =>
     api.put<TransitionScreen>(`/admin/transition-screens/${id}/items`, { items }).then(r => r.data),
 };

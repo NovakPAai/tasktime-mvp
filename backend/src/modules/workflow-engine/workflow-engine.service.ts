@@ -7,6 +7,8 @@ import { evaluateConditions } from './conditions/index.js';
 import { runValidators } from './validators/index.js';
 import { runPostFunctions } from './post-functions/index.js';
 import type { ConditionRule, ValidatorRule, PostFunctionRule, AvailableTransitionsResponse, TransitionResponse } from './types.js';
+import { SYSTEM_FIELD_KEYS, SYSTEM_FIELD_META } from '../transition-screens/system-fields.js';
+import type { SystemFieldKey } from '../transition-screens/system-fields.js';
 
 // ─── Redis cache helpers ──────────────────────────────────────────────────────
 
@@ -173,13 +175,27 @@ export async function getAvailableTransitions(
     };
 
     if (t.screen && t.screen.items.length > 0) {
-      response.screenFields = t.screen.items.map((item) => ({
-        customFieldId: item.customFieldId,
-        name: item.customField.name,
-        fieldType: item.customField.fieldType,
-        isRequired: item.isRequired,
-        orderIndex: item.orderIndex,
-      }));
+      response.screenFields = t.screen.items.map((item) => {
+        if (item.systemFieldKey) {
+          const meta = SYSTEM_FIELD_META[item.systemFieldKey as SystemFieldKey];
+          return {
+            systemFieldKey: item.systemFieldKey,
+            isSystemField: true,
+            name: meta.name,
+            fieldType: meta.inputType,
+            isRequired: item.isRequired,
+            orderIndex: item.orderIndex,
+          };
+        }
+        return {
+          customFieldId: item.customFieldId!,
+          isSystemField: false,
+          name: item.customField!.name,
+          fieldType: item.customField!.fieldType,
+          isRequired: item.isRequired,
+          orderIndex: item.orderIndex,
+        };
+      });
     }
 
     available.push(response);
@@ -261,28 +277,56 @@ export async function executeTransition(
   if (transition.screen && transition.screen.items.length > 0) {
     const requiredFields = transition.screen.items.filter((item) => item.isRequired);
     const missing = requiredFields.filter((item) => {
-      const val = screenFieldValues?.[item.customFieldId];
+      const key = item.systemFieldKey ?? item.customFieldId!;
+      const val = screenFieldValues?.[key];
       return val === undefined || val === null || val === '';
     });
     if (missing.length > 0) {
       throw new AppError(422, 'SCREEN_FIELD_REQUIRED', {
-        fields: missing.map((f) => ({ customFieldId: f.customFieldId, name: f.customField.name })),
+        fields: missing.map((f) => {
+          if (f.systemFieldKey) {
+            const meta = SYSTEM_FIELD_META[f.systemFieldKey as SystemFieldKey];
+            return { systemFieldKey: f.systemFieldKey, name: meta.name };
+          }
+          return { customFieldId: f.customFieldId, name: f.customField!.name };
+        }),
       });
     }
   }
 
   const newLegacyStatus = mapToLegacyStatus(transition.toStatus.systemKey, transition.toStatus.category);
 
+  // Split screen field values into system fields and custom fields
+  const systemUpdates: Record<string, unknown> = {};
+  const customFieldUpdates: Record<string, unknown> = {};
+  if (screenFieldValues && Object.keys(screenFieldValues).length > 0) {
+    for (const [key, value] of Object.entries(screenFieldValues)) {
+      if (SYSTEM_FIELD_KEYS.includes(key as SystemFieldKey)) {
+        switch (key as SystemFieldKey) {
+          case 'ASSIGNEE':
+            systemUpdates.assigneeId = value as string | null;
+            break;
+          case 'DUE_DATE':
+            systemUpdates.dueDate = value ? new Date(value as string) : null;
+            break;
+          case 'ACCEPTANCE_CRITERIA':
+            systemUpdates.acceptanceCriteria = value as string | null;
+            break;
+        }
+      } else {
+        customFieldUpdates[key] = value;
+      }
+    }
+  }
+
   // DB transaction: upsert screen field values + update issue
   const updatedIssue = await prisma.$transaction(async (tx) => {
-    if (screenFieldValues && Object.keys(screenFieldValues).length > 0) {
-      for (const [customFieldId, value] of Object.entries(screenFieldValues)) {
-        await tx.issueCustomFieldValue.upsert({
-          where: { issueId_customFieldId: { issueId, customFieldId } },
-          update: { value: value as Prisma.InputJsonValue, updatedById: actorId },
-          create: { issueId, customFieldId, value: value as Prisma.InputJsonValue, updatedById: actorId },
-        });
-      }
+    for (const [customFieldId, value] of Object.entries(customFieldUpdates)) {
+      await tx.issueCustomFieldValue.upsert({
+        where: { issueId_customFieldId: { issueId, customFieldId } },
+        update: { value: value as Prisma.InputJsonValue, updatedById: actorId },
+        create: { issueId, customFieldId, value: value as Prisma.InputJsonValue, updatedById: actorId },
+      });
     }
 
     return tx.issue.update({
@@ -290,6 +334,7 @@ export async function executeTransition(
       data: {
         workflowStatusId: transition.toStatusId,
         status: newLegacyStatus,
+        ...systemUpdates,
       },
       include: {
         workflowStatus: true,

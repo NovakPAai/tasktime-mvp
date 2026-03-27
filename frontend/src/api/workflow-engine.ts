@@ -1,5 +1,4 @@
 import api from './client';
-import type { CustomFieldType } from './custom-fields';
 
 export interface WorkflowStatus {
   id: string;
@@ -9,9 +8,11 @@ export interface WorkflowStatus {
 }
 
 export interface ScreenField {
-  customFieldId: string;
+  customFieldId?: string;
+  systemFieldKey?: string;
+  isSystemField: boolean;
   name: string;
-  fieldType: CustomFieldType;
+  fieldType: string;
   isRequired: boolean;
   orderIndex: number;
   options?: unknown;

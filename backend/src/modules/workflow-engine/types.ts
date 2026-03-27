@@ -31,7 +31,9 @@ export type PostFunctionRule =
 // ─── Response types ───────────────────────────────────────────────────────────
 
 export interface TransitionScreenFieldResponse {
-  customFieldId: string;
+  customFieldId?: string;
+  systemFieldKey?: string;
+  isSystemField: boolean;
   name: string;
   fieldType: string;
   isRequired: boolean;

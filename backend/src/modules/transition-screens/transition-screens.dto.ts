@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SYSTEM_FIELD_KEYS } from './system-fields.js';
 
 export const createTransitionScreenDto = z.object({
   name: z.string().min(1).max(200),
@@ -13,11 +14,17 @@ export const updateTransitionScreenDto = z.object({
 export const screenItemsDto = z.object({
   items: z
     .array(
-      z.object({
-        customFieldId: z.string().uuid(),
-        isRequired: z.boolean().optional(),
-        orderIndex: z.number().int().nonnegative().optional(),
-      }),
+      z
+        .object({
+          customFieldId: z.string().uuid().optional(),
+          systemFieldKey: z.enum(SYSTEM_FIELD_KEYS).optional(),
+          isRequired: z.boolean().optional(),
+          orderIndex: z.number().int().nonnegative().optional(),
+        })
+        .refine(
+          (d) => (d.customFieldId != null) !== (d.systemFieldKey != null),
+          { message: 'Exactly one of customFieldId or systemFieldKey is required' },
+        ),
     )
     .min(1),
 });

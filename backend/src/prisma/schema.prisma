@@ -744,16 +744,18 @@ model TransitionScreen {
 }
 
 model TransitionScreenItem {
-  id            String  @id @default(uuid())
-  screenId      String  @map("screen_id")
-  customFieldId String  @map("custom_field_id")
-  isRequired    Boolean @default(false) @map("is_required")
-  orderIndex    Int     @default(0) @map("order_index")
+  id             String  @id @default(uuid())
+  screenId       String  @map("screen_id")
+  customFieldId  String? @map("custom_field_id")
+  systemFieldKey String? @map("system_field_key")
+  isRequired     Boolean @default(false) @map("is_required")
+  orderIndex     Int     @default(0) @map("order_index")
 
   screen      TransitionScreen @relation(fields: [screenId], references: [id], onDelete: Cascade)
-  customField CustomField      @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  customField CustomField?     @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
 
   @@unique([screenId, customFieldId])
+  @@unique([screenId, systemFieldKey])
   @@map("transition_screen_items")
 }
 

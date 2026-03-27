@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Form, Input, InputNumber, DatePicker, Switch, Select, message } from 'antd';
 import { workflowEngineApi, type ScreenField } from '../../api/workflow-engine';
+import { adminApi, type AdminUser } from '../../api/admin';
 
 interface Props {
   open: boolean;
@@ -12,8 +13,29 @@ interface Props {
   onCancel: () => void;
 }
 
-function FieldInput({ field }: { field: ScreenField }) {
+function useUsers(hasAssignee: boolean) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  useEffect(() => {
+    if (!hasAssignee) return;
+    adminApi.listUsers({ pageSize: 200 }).then(r => setUsers(r.users)).catch(() => {});
+  }, [hasAssignee]);
+  return users;
+}
+
+function FieldInput({ field, users }: { field: ScreenField; users: AdminUser[] }) {
   const opts = Array.isArray(field.options) ? field.options as { value: string; label: string }[] : [];
+  if (field.fieldType === 'USER') {
+    return (
+      <Select
+        style={{ width: '100%' }}
+        placeholder="Выберите пользователя"
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        options={users.map(u => ({ value: u.id, label: u.name }))}
+      />
+    );
+  }
   switch (field.fieldType) {
     case 'TEXTAREA':
       return <Input.TextArea rows={3} />;
@@ -36,6 +58,9 @@ function FieldInput({ field }: { field: ScreenField }) {
 export default function TransitionModal({ open, issueId, transitionId, transitionName, screenFields, onSuccess, onCancel }: Props) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+
+  const hasAssignee = screenFields.some(f => f.systemFieldKey === 'ASSIGNEE');
+  const users = useUsers(hasAssignee);
 
   const handleOk = async () => {
     try {
@@ -75,17 +100,20 @@ export default function TransitionModal({ open, issueId, transitionId, transitio
       destroyOnClose
     >
       <Form form={form} layout="vertical">
-        {screenFields.map(field => (
-          <Form.Item
-            key={field.customFieldId}
-            name={field.customFieldId}
-            label={field.name}
-            rules={field.isRequired ? [{ required: true, message: `${field.name} обязательно` }] : []}
-            valuePropName={field.fieldType === 'CHECKBOX' ? 'checked' : 'value'}
-          >
-            <FieldInput field={field} />
-          </Form.Item>
-        ))}
+        {screenFields.map(field => {
+          const formKey = field.isSystemField ? field.systemFieldKey! : field.customFieldId!;
+          return (
+            <Form.Item
+              key={formKey}
+              name={formKey}
+              label={field.name}
+              rules={field.isRequired ? [{ required: true, message: `${field.name} обязательно` }] : []}
+              valuePropName={field.fieldType === 'CHECKBOX' ? 'checked' : 'value'}
+            >
+              <FieldInput field={field} users={users} />
+            </Form.Item>
+          );
+        })}
       </Form>
     </Modal>
   );

@@ -1,5 +1,6 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { SYSTEM_FIELD_KEYS, SYSTEM_FIELD_META } from './system-fields.js';
 import type {
   CreateTransitionScreenDto,
   UpdateTransitionScreenDto,
@@ -67,22 +68,47 @@ export async function replaceItems(id: string, dto: ScreenItemsDto) {
   const screen = await prisma.transitionScreen.findUnique({ where: { id } });
   if (!screen) throw new AppError(404, 'Transition screen not found');
 
-  // Validate all customFieldIds exist
-  const cfIds = [...new Set(dto.items.map((i) => i.customFieldId))];
-  const fields = await prisma.customField.findMany({ where: { id: { in: cfIds } }, select: { id: true } });
-  if (fields.length !== cfIds.length) throw new AppError(404, 'One or more custom fields not found');
+  const customFieldItems = dto.items.filter((i) => i.customFieldId != null);
+  const systemFieldItems = dto.items.filter((i) => i.systemFieldKey != null);
+
+  // Validate custom fields exist
+  if (customFieldItems.length > 0) {
+    const cfIds = [...new Set(customFieldItems.map((i) => i.customFieldId!))];
+    const fields = await prisma.customField.findMany({ where: { id: { in: cfIds } }, select: { id: true } });
+    if (fields.length !== cfIds.length) throw new AppError(404, 'One or more custom fields not found');
+  }
+
+  // Validate system field keys
+  for (const item of systemFieldItems) {
+    if (!SYSTEM_FIELD_KEYS.includes(item.systemFieldKey! as (typeof SYSTEM_FIELD_KEYS)[number])) {
+      throw new AppError(400, `Unknown system field key: ${item.systemFieldKey}`);
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.transitionScreenItem.deleteMany({ where: { screenId: id } });
     await tx.transitionScreenItem.createMany({
       data: dto.items.map((item, idx) => ({
         screenId: id,
-        customFieldId: item.customFieldId,
+        customFieldId: item.customFieldId ?? null,
+        systemFieldKey: item.systemFieldKey ?? null,
         isRequired: item.isRequired ?? false,
         orderIndex: item.orderIndex ?? idx,
       })),
     });
   });
 
-  return getTransitionScreen(id);
+  const updated = await getTransitionScreen(id);
+
+  // Enrich system field items with metadata
+  return {
+    ...updated,
+    items: updated.items.map((item) => {
+      if (item.systemFieldKey) {
+        const meta = SYSTEM_FIELD_META[item.systemFieldKey as (typeof SYSTEM_FIELD_KEYS)[number]];
+        return { ...item, systemFieldMeta: meta };
+      }
+      return item;
+    }),
+  };
 }
