@@ -123,11 +123,16 @@ export async function listIssues(projectId: string, filters?: ListIssuesFilters)
   });
 }
 
-export async function searchIssuesGlobal(q: string, excludeId?: string) {
+export async function searchIssuesGlobal(q: string, excludeId?: string, projectIds?: string[]) {
   const where: Prisma.IssueWhereInput = {};
 
   if (excludeId) {
     where.id = { not: excludeId };
+  }
+
+  // CVE-05: filter by accessible projects
+  if (projectIds) {
+    where.projectId = { in: projectIds };
   }
 
   const keyNumberMatch = q.match(/^([A-Za-z]+)-(\d+)$/);
@@ -157,7 +162,7 @@ export async function searchIssuesGlobal(q: string, excludeId?: string) {
       issueTypeConfig: { select: { systemKey: true, name: true, iconName: true, iconColor: true } },
       project: { select: { key: true } },
     },
-    take: 20,
+    take: 50, // CVE-13: cap search results
     orderBy: [{ project: { key: 'asc' } }, { number: 'asc' }],
   });
 }

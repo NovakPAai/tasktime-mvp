@@ -47,7 +47,7 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   const ttmpOnly = scope === 'TTMP_ONLY';
   console.log(`Seeding database${ttmpOnly ? ' (TTMP_ONLY)' : ''}...`);
 
-  const defaultPassword = 'password123';
+  const defaultPassword = 'Password123';
   const bootstrapUsers = getBootstrapUsers();
   if (!ttmpOnly) {
     await bootstrapDefaultUsers(client, defaultPassword, bootstrapUsers);

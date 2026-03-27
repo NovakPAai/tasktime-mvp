@@ -16,10 +16,10 @@ beforeEach(async () => {
   await prisma.user.deleteMany();
 
   const reg = await request.post('/api/auth/register').send({
-    email: 'admin@test.com', password: 'password123', name: 'Admin',
+    email: 'admin@test.com', password: 'Password123', name: 'Admin',
   });
   await prisma.user.update({ where: { id: reg.body.user.id }, data: { role: 'ADMIN' } });
-  const login = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+  const login = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'Password123' });
   adminToken = login.body.accessToken;
 
   const proj = await request.post('/api/projects')

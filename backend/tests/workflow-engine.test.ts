@@ -58,26 +58,26 @@ beforeEach(async () => {
   // --- Create admin user ---
   const adminReg = await request.post('/api/auth/register').send({
     email: 'admin@wf-test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'WF Admin',
   });
   adminUserId = adminReg.body.user.id;
   await prisma.user.update({ where: { id: adminUserId }, data: { role: 'ADMIN' } });
   const adminLogin = await request
     .post('/api/auth/login')
-    .send({ email: 'admin@wf-test.com', password: 'password123' });
+    .send({ email: 'admin@wf-test.com', password: 'Password123' });
   adminToken = adminLogin.body.accessToken;
 
   // --- Create regular user ---
   const userReg = await request.post('/api/auth/register').send({
     email: 'user@wf-test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'WF User',
   });
   userId = userReg.body.user.id;
   const userLogin = await request
     .post('/api/auth/login')
-    .send({ email: 'user@wf-test.com', password: 'password123' });
+    .send({ email: 'user@wf-test.com', password: 'Password123' });
   userToken = userLogin.body.accessToken;
 
   // --- Create project ---

@@ -53,14 +53,14 @@ beforeEach(async () => {
   // --- Create admin user ---
   const adminReg = await request.post('/api/auth/register').send({
     email: 'admin@gl-test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'GL Admin',
   });
   adminUserId = adminReg.body.user.id;
   await prisma.user.update({ where: { id: adminUserId }, data: { role: 'ADMIN' } });
   const adminLogin = await request
     .post('/api/auth/login')
-    .send({ email: 'admin@gl-test.com', password: 'password123' });
+    .send({ email: 'admin@gl-test.com', password: 'Password123' });
   adminToken = adminLogin.body.accessToken;
 
   // --- Create project ---

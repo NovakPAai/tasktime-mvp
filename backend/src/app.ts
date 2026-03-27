@@ -38,16 +38,20 @@ import transitionScreensRouter from './modules/transition-screens/transition-scr
 import workflowEngineRouter from './modules/workflow-engine/workflow-engine.router.js';
 import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
 import { authenticate } from './shared/middleware/auth.js';
+import { requireRole } from './shared/middleware/rbac.js';
 
 export function createApp() {
   const app = express();
 
   // Global middleware
   app.use(helmet());
-  app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+  // CVE-15: explicit CORS origin (no wildcard)
+  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  app.use(cors({ origin: corsOrigin.split(',').map((o) => o.trim()), credentials: true }));
   app.use(metricsMiddleware);
   app.use(express.json());
-  app.use(cookieParser());
+  // CVE-14: signed cookies
+  app.use(cookieParser(process.env.COOKIE_SECRET || undefined));
 
   // Health check — includes version for deploy verification
   app.get('/api/health', (_req, res) => {
@@ -70,11 +74,20 @@ export function createApp() {
   });
 
   // OpenAPI JSON must be registered before the swagger UI middleware
-  app.get('/api/docs/json', (_req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.json(swaggerSpec);
-  });
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  // CVE-09: In production, require ADMIN role to access Swagger
+  if (process.env.NODE_ENV === 'production') {
+    app.get('/api/docs/json', authenticate, requireRole('ADMIN'), (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.json(swaggerSpec);
+    });
+    app.use('/api/docs', authenticate, requireRole('ADMIN'), swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  } else {
+    app.get('/api/docs/json', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.json(swaggerSpec);
+    });
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  }
 
   // GitLab webhook — must be first among /api routes to bypass JWT auth
   // (uses its own X-Gitlab-Token secret mechanism, not JWT)

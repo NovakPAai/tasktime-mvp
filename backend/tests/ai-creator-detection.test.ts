@@ -21,7 +21,7 @@ beforeEach(async () => {
   const admin = await createAdminUser();
   adminToken = admin.accessToken;
 
-  const user = await createTestUser('user@test.com', 'password123', 'Regular User');
+  const user = await createTestUser('user@test.com', 'Password123', 'Regular User');
   userToken = user.accessToken;
 
   const proj = await request.post('/api/projects')

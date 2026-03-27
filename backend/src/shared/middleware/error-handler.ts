@@ -21,6 +21,11 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  console.error('Unhandled error:', err);
+  // CVE-12: only log stack traces in non-production
+  if (process.env.NODE_ENV === 'production') {
+    console.error('Unhandled error:', err.message);
+  } else {
+    console.error('Unhandled error:', err);
+  }
   res.status(500).json({ error: 'Internal server error' });
 }

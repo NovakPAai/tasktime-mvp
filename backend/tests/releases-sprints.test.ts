@@ -25,25 +25,25 @@ beforeEach(async () => {
 
   // Admin
   const adminReg = await request.post('/api/auth/register').send({
-    email: 'admin-rel@test.com', password: 'password123', name: 'Admin Rel',
+    email: 'admin-rel@test.com', password: 'Password123', name: 'Admin Rel',
   });
   await prisma.user.update({ where: { id: adminReg.body.user.id }, data: { role: 'ADMIN' } });
-  const adminLogin = await request.post('/api/auth/login').send({ email: 'admin-rel@test.com', password: 'password123' });
+  const adminLogin = await request.post('/api/auth/login').send({ email: 'admin-rel@test.com', password: 'Password123' });
   adminToken = adminLogin.body.accessToken;
 
   // Manager
   const mgrReg = await request.post('/api/auth/register').send({
-    email: 'mgr-rel@test.com', password: 'password123', name: 'Mgr Rel',
+    email: 'mgr-rel@test.com', password: 'Password123', name: 'Mgr Rel',
   });
   await prisma.user.update({ where: { id: mgrReg.body.user.id }, data: { role: 'MANAGER' } });
-  const mgrLogin = await request.post('/api/auth/login').send({ email: 'mgr-rel@test.com', password: 'password123' });
+  const mgrLogin = await request.post('/api/auth/login').send({ email: 'mgr-rel@test.com', password: 'Password123' });
   managerToken = mgrLogin.body.accessToken;
 
   // User
   const userReg = await request.post('/api/auth/register').send({
-    email: 'user-rel@test.com', password: 'password123', name: 'User Rel',
+    email: 'user-rel@test.com', password: 'Password123', name: 'User Rel',
   });
-  const userLogin = await request.post('/api/auth/login').send({ email: 'user-rel@test.com', password: 'password123' });
+  const userLogin = await request.post('/api/auth/login').send({ email: 'user-rel@test.com', password: 'Password123' });
   userToken = userLogin.body.accessToken;
 
   // Project

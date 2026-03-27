@@ -78,8 +78,17 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res, next
       res.status(400).json({ error: 'currentPassword and newPassword are required' });
       return;
     }
+    // CVE-11: enforce password policy
     if (newPassword.length < 8) {
       res.status(400).json({ error: 'Password must be at least 8 characters' });
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      res.status(400).json({ error: 'Password must contain at least one uppercase letter' });
+      return;
+    }
+    if (!/\d/.test(newPassword)) {
+      res.status(400).json({ error: 'Password must contain at least one digit' });
       return;
     }
     await authService.changePassword(req.user!.userId, currentPassword, newPassword);

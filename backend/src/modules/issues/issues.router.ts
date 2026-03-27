@@ -15,21 +15,50 @@ import {
 import * as issuesService from './issues.service.js';
 import { getKanbanFieldsForIssues } from '../issue-custom-fields/issue-custom-fields.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
+import { AppError } from '../../shared/middleware/error-handler.js';
 import type { AuthRequest } from '../../shared/types/index.js';
+import { isSuperAdmin } from '../../shared/auth/roles.js';
+import { prisma } from '../../prisma/client.js';
 
 const router = Router();
 
 router.use(authenticate);
 
+/**
+ * Check that the current user has access to the project that owns an issue.
+ * ADMIN / SUPER_ADMIN / MANAGER (global) bypass this check.
+ * Regular USER/VIEWER must have a project-level role.
+ */
+async function requireIssueAccess(req: AuthRequest, issueProjectId: string): Promise<void> {
+  if (!req.user) return; // authenticate middleware already handles this
+  if (isSuperAdmin(req.user.role) || req.user.role === 'ADMIN' || req.user.role === 'MANAGER') return;
+
+  const membership = await prisma.userProjectRole.findFirst({
+    where: { userId: req.user.userId, projectId: issueProjectId },
+  });
+  if (!membership) {
+    throw new AppError(403, 'You do not have access to this project');
+  }
+}
+
 // Global issue search across all projects (for linking)
-router.get('/issues/search', async (req, res, next) => {
+router.get('/issues/search', async (req: AuthRequest, res, next) => {
   try {
     const { q, excludeId } = req.query as { q?: string; excludeId?: string };
     if (!q || !q.trim()) {
       res.json([]);
       return;
     }
-    const issues = await issuesService.searchIssuesGlobal(q.trim(), excludeId);
+    // Filter by accessible projects unless ADMIN/SUPER_ADMIN
+    let projectIds: string[] | undefined;
+    if (req.user && !isSuperAdmin(req.user.role) && req.user.role !== 'ADMIN') {
+      const memberships = await prisma.userProjectRole.findMany({
+        where: { userId: req.user.userId },
+        select: { projectId: true },
+      });
+      projectIds = memberships.map((m) => m.projectId);
+    }
+    const issues = await issuesService.searchIssuesGlobal(q.trim(), excludeId, projectIds);
     res.json(issues);
   } catch (err) {
     next(err);
@@ -122,9 +151,10 @@ router.post('/projects/:projectId/issues', validate(createIssueDto), async (req:
 });
 
 // Get issue by key (e.g. TTMP-83) — for agents and automation
-router.get('/issues/key/:key', async (req, res, next) => {
+router.get('/issues/key/:key', async (req: AuthRequest, res, next) => {
   try {
     const issue = await issuesService.getIssueByKey(req.params.key as string);
+    await requireIssueAccess(req, issue.projectId);
     res.json(issue);
   } catch (err) {
     next(err);
@@ -132,9 +162,10 @@ router.get('/issues/key/:key', async (req, res, next) => {
 });
 
 // Get issue detail
-router.get('/issues/:id', async (req, res, next) => {
+router.get('/issues/:id', async (req: AuthRequest, res, next) => {
   try {
     const issue = await issuesService.getIssue(req.params.id as string);
+    await requireIssueAccess(req, issue.projectId);
     res.json(issue);
   } catch (err) {
     next(err);
@@ -144,6 +175,9 @@ router.get('/issues/:id', async (req, res, next) => {
 // Update issue
 router.patch('/issues/:id', validate(updateIssueDto), async (req: AuthRequest, res, next) => {
   try {
+    // Pre-check access before mutation
+    const existing = await issuesService.getIssue(req.params.id as string);
+    await requireIssueAccess(req, existing.projectId);
     const issue = await issuesService.updateIssue(req.params.id as string, req.body);
     await logAudit(req, 'issue.updated', 'issue', req.params.id as string, req.body);
     res.json(issue);
@@ -155,6 +189,8 @@ router.patch('/issues/:id', validate(updateIssueDto), async (req: AuthRequest, r
 // Change status
 router.patch('/issues/:id/status', validate(updateStatusDto), async (req: AuthRequest, res, next) => {
   try {
+    const existing = await issuesService.getIssue(req.params.id as string);
+    await requireIssueAccess(req, existing.projectId);
     const issue = await issuesService.updateStatus(req.params.id as string, req.body, req.user?.userId, req.user?.role);
     await logAudit(req, 'issue.status_changed', 'issue', req.params.id as string, req.body);
     res.json(issue);
@@ -228,6 +264,12 @@ router.post(
         return;
       }
 
+      // CVE-08: cap bulk operations at 100 items
+      if (issueIds.length > 100) {
+        res.status(400).json({ error: 'Maximum 100 issues per bulk operation' });
+        return;
+      }
+
       const result = await issuesService.bulkUpdateIssues(req.params.projectId as string, {
         issueIds,
         status,
@@ -288,6 +330,12 @@ router.delete(
         return;
       }
 
+      // CVE-08: cap bulk operations at 100 items
+      if (issueIds.length > 100) {
+        res.status(400).json({ error: 'Maximum 100 issues per bulk operation' });
+        return;
+      }
+
       const result = await issuesService.bulkDeleteIssues(req.params.projectId as string, issueIds);
 
       await logAudit(req, 'issues.bulk_deleted', 'project', req.params.projectId as string, {
@@ -314,8 +362,10 @@ router.delete('/issues/:id', requireRole('ADMIN', 'SUPER_ADMIN'), async (req: Au
 });
 
 // Get children
-router.get('/issues/:id/children', async (req, res, next) => {
+router.get('/issues/:id/children', async (req: AuthRequest, res, next) => {
   try {
+    const issue = await issuesService.getIssue(req.params.id as string);
+    await requireIssueAccess(req, issue.projectId);
     const children = await issuesService.getChildren(req.params.id as string);
     res.json(children);
   } catch (err) {
@@ -324,8 +374,10 @@ router.get('/issues/:id/children', async (req, res, next) => {
 });
 
 // Issue history from audit_log (2.10)
-router.get('/issues/:id/history', async (req, res, next) => {
+router.get('/issues/:id/history', async (req: AuthRequest, res, next) => {
   try {
+    const issue = await issuesService.getIssue(req.params.id as string);
+    await requireIssueAccess(req, issue.projectId);
     const history = await issuesService.getHistory(req.params.id as string);
     res.json(history);
   } catch (err) {

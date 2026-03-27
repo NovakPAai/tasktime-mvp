@@ -18,7 +18,7 @@ beforeEach(async () => {
 
   const adminReg = await request.post('/api/auth/register').send({
     email: 'admin-teams@test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'Admin Teams',
   });
   await prisma.user.update({
@@ -27,12 +27,12 @@ beforeEach(async () => {
   });
   const adminLogin = await request
     .post('/api/auth/login')
-    .send({ email: 'admin-teams@test.com', password: 'password123' });
+    .send({ email: 'admin-teams@test.com', password: 'Password123' });
   adminToken = adminLogin.body.accessToken;
 
   const userReg = await request.post('/api/auth/register').send({
     email: 'user-teams@test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'User Teams',
   });
   userToken = userReg.body.accessToken;

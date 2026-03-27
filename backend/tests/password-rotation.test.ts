@@ -16,7 +16,7 @@ beforeEach(async () => {
 
 describe('rotateUserPassword', () => {
   it('replaces the password and invalidates refresh tokens', async () => {
-    const user = await createTestUser('owner@test.com', 'password123', 'Owner');
+    const user = await createTestUser('owner@test.com', 'Password123', 'Owner');
 
     await rotateUserPassword({
       email: 'owner@test.com',
@@ -25,7 +25,7 @@ describe('rotateUserPassword', () => {
 
     const oldLogin = await request.post('/api/auth/login').send({
       email: 'owner@test.com',
-      password: 'password123',
+      password: 'Password123',
     });
     expect(oldLogin.status).toBe(401);
 
