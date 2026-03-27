@@ -2,7 +2,17 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.4**
+**Last version: 2.5**
+
+---
+
+## [2.5] [2026-03-27] fix(users): добавлять постфикс " (N/A)" при деактивации через /users API
+
+**Задача:** [TTADM-66](http://5.129.242.171)
+**Ветка:** `claude/jack-ttadm-66-deactivate-na-suffix`
+
+### Что изменилось
+- `backend/src/modules/users/users.service.ts` — в `deactivateUser()` добавлена константа `NA_SUFFIX = ' (N/A)'` и логика переименования: имя пользователя получает постфикс при деактивации (если ещё не имеет). Ранее `PATCH /users/:id/deactivate` только выставлял `isActive: false`, не меняя имя — в отличие от корректного admin-пути `/admin/users/:id/deactivate`
 
 ---
 
