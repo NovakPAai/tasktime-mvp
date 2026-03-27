@@ -10,6 +10,7 @@ import {
   assignDto,
   updateAiFlagsDto,
   updateAiStatusDto,
+  bulkTransitionDto,
 } from './issues.dto.js';
 import * as issuesService from './issues.service.js';
 import { getKanbanFieldsForIssues } from '../issue-custom-fields/issue-custom-fields.service.js';
@@ -244,6 +245,34 @@ router.post(
       next(err);
     }
   }
+);
+
+// Bulk transition issues via workflow engine
+router.post(
+  '/projects/:projectId/issues/bulk-transition',
+  validate(bulkTransitionDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const { issueIds, transitionId } = req.body as { issueIds: string[]; transitionId: string };
+      const result = await issuesService.bulkTransitionIssues(
+        req.params.projectId as string,
+        issueIds,
+        transitionId,
+        req.user!.userId,
+        req.user!.role,
+      );
+      const status = result.failed.length > 0 && result.succeeded.length > 0 ? 207 : 200;
+      await logAudit(req, 'issues.bulk_transitioned', 'project', req.params.projectId as string, {
+        issueIds,
+        transitionId,
+        succeeded: result.succeeded.length,
+        failed: result.failed.length,
+      });
+      res.status(status).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
 );
 
 // Bulk delete issues (ADMIN / SUPER_ADMIN only)

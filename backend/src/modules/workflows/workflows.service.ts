@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { invalidateWorkflowCacheByWorkflowId } from '../workflow-engine/workflow-engine.service.js';
 import type {
   CreateWorkflowDto,
   UpdateWorkflowDto,
@@ -132,6 +133,158 @@ export async function copyWorkflow(id: string) {
   return getWorkflow(copy.id);
 }
 
+// ─── Graph validation ─────────────────────────────────────────────────────────
+
+export interface WorkflowValidationReport {
+  isValid: boolean;
+  errors: Array<{ type: string; message: string; details?: object }>;
+  warnings: Array<{ type: string; message: string; statusId?: string; statusName?: string }>;
+}
+
+export async function validateWorkflow(workflowId: string): Promise<WorkflowValidationReport> {
+  const wf = await prisma.workflow.findUnique({
+    where: { id: workflowId },
+    include: {
+      steps: { include: { status: true } },
+      transitions: true,
+    },
+  });
+  if (!wf) throw new AppError(404, 'Workflow not found');
+
+  const errors: WorkflowValidationReport['errors'] = [];
+  const warnings: WorkflowValidationReport['warnings'] = [];
+
+  const initialSteps = wf.steps.filter((s) => s.isInitial);
+  if (initialSteps.length === 0) {
+    errors.push({ type: 'NO_INITIAL_STATUS', message: 'Workflow has no initial status (isInitial = true)' });
+  }
+
+  const doneSteps = wf.steps.filter((s) => s.status.category === 'DONE');
+  if (doneSteps.length === 0) {
+    errors.push({ type: 'NO_DONE_STATUS', message: 'Workflow has no status with category DONE' });
+  }
+
+  const globalTransitionToStatusIds = new Set(
+    wf.transitions.filter((t) => t.isGlobal).map((t) => t.toStatusId),
+  );
+
+  for (const step of wf.steps) {
+    const outgoing = wf.transitions.filter((t) => t.fromStatusId === step.statusId);
+    if (outgoing.length === 0 && !globalTransitionToStatusIds.has(step.statusId) && step.status.category !== 'DONE') {
+      warnings.push({
+        type: 'DEAD_END_STATUS',
+        message: `Status "${step.status.name}" has no outgoing transitions and is not DONE category`,
+        statusId: step.statusId,
+        statusName: step.status.name,
+      });
+    }
+  }
+
+  if (initialSteps.length > 0) {
+    const reachable = new Set<string>();
+    const queue = [initialSteps[0].statusId];
+    reachable.add(initialSteps[0].statusId);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const nexts = wf.transitions
+        .filter((t) => t.fromStatusId === current || t.isGlobal)
+        .map((t) => t.toStatusId);
+      for (const next of nexts) {
+        if (!reachable.has(next)) {
+          reachable.add(next);
+          queue.push(next);
+        }
+      }
+    }
+
+    for (const step of wf.steps) {
+      if (!reachable.has(step.statusId)) {
+        warnings.push({
+          type: 'UNREACHABLE_STATUS',
+          message: `Status "${step.status.name}" is not reachable from the initial status`,
+          statusId: step.statusId,
+          statusName: step.status.name,
+        });
+      }
+    }
+  }
+
+  const usedStatusIds = new Set<string>();
+  for (const t of wf.transitions) {
+    if (t.fromStatusId) usedStatusIds.add(t.fromStatusId);
+    usedStatusIds.add(t.toStatusId);
+  }
+  for (const step of wf.steps) {
+    if (!usedStatusIds.has(step.statusId)) {
+      warnings.push({
+        type: 'UNUSED_STATUS',
+        message: `Status "${step.status.name}" is not referenced in any transition`,
+        statusId: step.statusId,
+        statusName: step.status.name,
+      });
+    }
+  }
+
+  return { isValid: errors.length === 0, errors, warnings };
+}
+
+// ─── Copy-on-Write ────────────────────────────────────────────────────────────
+
+export async function ensureWorkflowEditable(workflowId: string): Promise<{ id: string; isDraft: boolean }> {
+  const usageCount = await prisma.workflowSchemeItem.count({ where: { workflowId } });
+  if (usageCount === 0) return { id: workflowId, isDraft: false };
+
+  const source = await prisma.workflow.findUniqueOrThrow({
+    where: { id: workflowId },
+    include: { steps: true, transitions: true },
+  });
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const draft = await prisma.$transaction(async (tx) => {
+    const newWf = await tx.workflow.create({
+      data: {
+        name: `${source.name} (draft ${dateStr})`,
+        description: source.description,
+        isDefault: false,
+        isSystem: false,
+      },
+    });
+
+    for (const step of source.steps) {
+      await tx.workflowStep.create({
+        data: {
+          workflowId: newWf.id,
+          statusId: step.statusId,
+          isInitial: step.isInitial,
+          orderIndex: step.orderIndex,
+        },
+      });
+    }
+
+    for (const t of source.transitions) {
+      await tx.workflowTransition.create({
+        data: {
+          workflowId: newWf.id,
+          name: t.name,
+          fromStatusId: t.fromStatusId,
+          toStatusId: t.toStatusId,
+          isGlobal: t.isGlobal,
+          orderIndex: t.orderIndex,
+          conditions: (t.conditions as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+          validators: (t.validators as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+          postFunctions: (t.postFunctions as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+          screenId: t.screenId,
+        },
+      });
+    }
+
+    return newWf;
+  });
+
+  return { id: draft.id, isDraft: true };
+}
+
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
 export async function addStep(workflowId: string, dto: CreateWorkflowStepDto) {
@@ -160,10 +313,12 @@ export async function addStep(workflowId: string, dto: CreateWorkflowStepDto) {
   });
   const orderIndex = dto.orderIndex ?? (maxOrder._max.orderIndex ?? -1) + 1;
 
-  return prisma.workflowStep.create({
+  const step = await prisma.workflowStep.create({
     data: { workflowId, statusId: dto.statusId, isInitial: dto.isInitial ?? false, orderIndex },
     include: { status: true },
   });
+  await invalidateWorkflowCacheByWorkflowId(workflowId);
+  return step;
 }
 
 export async function updateStep(workflowId: string, stepId: string, dto: UpdateWorkflowStepDto) {
@@ -181,7 +336,7 @@ export async function updateStep(workflowId: string, stepId: string, dto: Update
     });
   }
 
-  return prisma.workflowStep.update({
+  const updated = await prisma.workflowStep.update({
     where: { id: stepId },
     data: {
       ...(dto.isInitial !== undefined && { isInitial: dto.isInitial }),
@@ -189,6 +344,8 @@ export async function updateStep(workflowId: string, stepId: string, dto: Update
     },
     include: { status: true },
   });
+  await invalidateWorkflowCacheByWorkflowId(workflowId);
+  return updated;
 }
 
 export async function deleteStep(workflowId: string, stepId: string) {
@@ -200,6 +357,7 @@ export async function deleteStep(workflowId: string, stepId: string) {
   if (!step) throw new AppError(404, 'Workflow step not found');
 
   await prisma.workflowStep.delete({ where: { id: stepId } });
+  await invalidateWorkflowCacheByWorkflowId(workflowId);
   return { ok: true };
 }
 
@@ -247,7 +405,7 @@ export async function createTransition(workflowId: string, dto: CreateWorkflowTr
   });
   const orderIndex = dto.orderIndex ?? (maxOrder._max.orderIndex ?? -1) + 1;
 
-  return prisma.workflowTransition.create({
+  const transition = await prisma.workflowTransition.create({
     data: {
       workflowId,
       name: dto.name,
@@ -261,6 +419,8 @@ export async function createTransition(workflowId: string, dto: CreateWorkflowTr
       screenId: dto.screenId ?? null,
     },
   });
+  await invalidateWorkflowCacheByWorkflowId(workflowId);
+  return transition;
 }
 
 export async function updateTransition(
@@ -280,7 +440,7 @@ export async function updateTransition(
   if (dto.fromStatusId !== undefined) await assertStatusInWorkflow(workflowId, dto.fromStatusId, 'fromStatus');
   if (dto.toStatusId !== undefined) await assertStatusInWorkflow(workflowId, dto.toStatusId, 'toStatus');
 
-  return prisma.workflowTransition.update({
+  const updated = await prisma.workflowTransition.update({
     where: { id: transitionId },
     data: {
       ...(dto.name !== undefined && { name: dto.name }),
@@ -288,12 +448,14 @@ export async function updateTransition(
       ...(dto.toStatusId !== undefined && { toStatusId: dto.toStatusId }),
       ...(dto.isGlobal !== undefined && { isGlobal: dto.isGlobal }),
       ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
-      ...(dto.conditions !== undefined && { conditions: dto.conditions as Prisma.InputJsonValue ?? Prisma.JsonNull }),
-      ...(dto.validators !== undefined && { validators: dto.validators as Prisma.InputJsonValue ?? Prisma.JsonNull }),
-      ...(dto.postFunctions !== undefined && { postFunctions: dto.postFunctions as Prisma.InputJsonValue ?? Prisma.JsonNull }),
+      ...(dto.conditions !== undefined && { conditions: (dto.conditions as Prisma.InputJsonValue) ?? Prisma.JsonNull }),
+      ...(dto.validators !== undefined && { validators: (dto.validators as Prisma.InputJsonValue) ?? Prisma.JsonNull }),
+      ...(dto.postFunctions !== undefined && { postFunctions: (dto.postFunctions as Prisma.InputJsonValue) ?? Prisma.JsonNull }),
       ...(dto.screenId !== undefined && { screenId: dto.screenId }),
     },
   });
+  await invalidateWorkflowCacheByWorkflowId(workflowId);
+  return updated;
 }
 
 export async function deleteTransition(workflowId: string, transitionId: string) {
@@ -307,5 +469,6 @@ export async function deleteTransition(workflowId: string, transitionId: string)
   if (!transition) throw new AppError(404, 'Workflow transition not found');
 
   await prisma.workflowTransition.delete({ where: { id: transitionId } });
+  await invalidateWorkflowCacheByWorkflowId(workflowId);
   return { ok: true };
 }

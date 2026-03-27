@@ -39,9 +39,15 @@ export const updateAiStatusDto = z.object({
   aiExecutionStatus: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'DONE', 'FAILED']),
 });
 
+export const bulkTransitionDto = z.object({
+  issueIds: z.array(z.string().uuid()).min(1),
+  transitionId: z.string().uuid(),
+});
+
 export type CreateIssueDto = z.infer<typeof createIssueDto>;
 export type UpdateIssueDto = z.infer<typeof updateIssueDto>;
 export type UpdateStatusDto = z.infer<typeof updateStatusDto>;
 export type AssignDto = z.infer<typeof assignDto>;
 export type UpdateAiFlagsDto = z.infer<typeof updateAiFlagsDto>;
 export type UpdateAiStatusDto = z.infer<typeof updateAiStatusDto>;
+export type BulkTransitionDto = z.infer<typeof bulkTransitionDto>;

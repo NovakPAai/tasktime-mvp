@@ -1,5 +1,7 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { invalidateWorkflowCache, invalidateWorkflowCacheByWorkflowId } from '../workflow-engine/workflow-engine.service.js';
+import { validateWorkflow } from '../workflows/workflows.service.js';
 import type {
   CreateWorkflowSchemeDto,
   UpdateWorkflowSchemeDto,
@@ -81,6 +83,20 @@ export async function replaceItems(id: string, dto: SchemeItemsDto) {
   const wfs = await prisma.workflow.findMany({ where: { id: { in: wfIds } }, select: { id: true } });
   if (wfs.length !== wfIds.length) throw new AppError(404, 'One or more workflows not found');
 
+  // Validate graph integrity for each workflow
+  for (const wfId of wfIds) {
+    const report = await validateWorkflow(wfId);
+    if (!report.isValid) {
+      throw new AppError(422, 'WORKFLOW_INVALID', { workflowId: wfId, errors: report.errors });
+    }
+  }
+
+  // Collect affected projectIds before delete (for cache invalidation)
+  const affectedProjects = await prisma.workflowSchemeProject.findMany({
+    where: { schemeId: id },
+    select: { projectId: true },
+  });
+
   await prisma.$transaction(async (tx) => {
     await tx.workflowSchemeItem.deleteMany({ where: { schemeId: id } });
     await tx.workflowSchemeItem.createMany({
@@ -91,6 +107,11 @@ export async function replaceItems(id: string, dto: SchemeItemsDto) {
       })),
     });
   });
+
+  // Invalidate cache for all affected projects
+  await Promise.all(affectedProjects.map((p) => invalidateWorkflowCache(p.projectId)));
+  // Also invalidate by workflow in case newly added workflows are used elsewhere
+  await Promise.all(wfIds.map((wfId) => invalidateWorkflowCacheByWorkflowId(wfId)));
 
   return getWorkflowScheme(id);
 }
@@ -104,11 +125,13 @@ export async function attachProject(schemeId: string, projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  return prisma.workflowSchemeProject.upsert({
+  const binding = await prisma.workflowSchemeProject.upsert({
     where: { projectId },
     update: { schemeId },
     create: { schemeId, projectId },
   });
+  await invalidateWorkflowCache(projectId);
+  return binding;
 }
 
 export async function detachProject(schemeId: string, projectId: string) {
@@ -116,6 +139,7 @@ export async function detachProject(schemeId: string, projectId: string) {
   if (!binding) throw new AppError(404, 'Project not attached to this scheme');
 
   await prisma.workflowSchemeProject.delete({ where: { projectId } });
+  await invalidateWorkflowCache(projectId);
   return { ok: true };
 }
 

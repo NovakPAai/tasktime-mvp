@@ -505,6 +505,57 @@ CI (push/PR) → Build & Publish (workflow_run, main only) → Deploy Staging (a
 
 ---
 
+## Workflow Engine (обязательно читать при работе с workflow)
+
+### Архитектура
+
+```
+WorkflowScheme → WorkflowSchemeItem (workflowId + issueTypeConfigId)
+WorkflowSchemeProject (schemeId + projectId — 1:1 per project)
+Workflow → WorkflowStep (isInitial, statusId) + WorkflowTransition (fromStatusId, toStatusId, conditions, validators, postFunctions)
+```
+
+**Основные файлы:**
+- `backend/src/modules/workflow-engine/workflow-engine.service.ts` — resolveWorkflowForIssue, getAvailableTransitions, executeTransition, invalidateWorkflowCache
+- `backend/src/modules/workflows/workflows.service.ts` — CRUD, validateWorkflow, ensureWorkflowEditable
+- `backend/src/modules/workflow-schemes/workflow-schemes.service.ts` — CRUD, replaceItems, attachProject
+
+### Redis-кэш workflow resolution
+
+`resolveWorkflowForIssue` кэшируется в Redis по ключу `wf:{projectId}:{typeId|'default'}` с TTL=300 секунд.
+
+**Обязательно** вызывать `invalidateWorkflowCache(projectId)` или `invalidateWorkflowCacheByWorkflowId(workflowId)` из **service-функций** (не роутеров) при:
+- Изменении `WorkflowSchemeItem` (replaceItems) → уже реализовано
+- Привязке/отвязке проекта к схеме (attachProject, detachProject) → уже реализовано
+- Изменении шагов и переходов Workflow (addStep, updateStep, deleteStep, createTransition, updateTransition, deleteTransition) → уже реализовано
+
+### Copy-on-Write для активных Workflow
+
+При попытке изменить шаг или переход workflow, который уже используется в схемах (`WorkflowSchemeItem.count > 0`), автоматически создаётся draft-копия.
+
+- API возвращает заголовок `X-Draft-Workflow-Id: <newId>` и поля `_isDraft: true`, `_draftWorkflowId: <id>`
+- Frontend должен показать уведомление и предложить привязать draft к схеме
+
+### Как добавить новый тип Condition / Validator / PostFunction
+
+1. **Condition** — добавить case в `backend/src/modules/workflow-engine/conditions/index.ts` + тип в `types.ts`
+2. **Validator** — создать файл в `validators/`, добавить case в `validators/index.ts` + тип в `types.ts`
+3. **PostFunction** — создать файл в `post-functions/`, добавить case в `post-functions/index.ts` + тип в `types.ts`
+
+### Валидация графа
+
+`GET /api/admin/workflows/:id/validate` возвращает `WorkflowValidationReport`:
+- **Errors (isValid=false):** `NO_INITIAL_STATUS`, `NO_DONE_STATUS`
+- **Warnings:** `DEAD_END_STATUS`, `UNREACHABLE_STATUS`, `UNUSED_STATUS`
+
+Привязка невалидного workflow к схеме через `PUT /api/admin/workflow-schemes/:id/items` → 422 `WORKFLOW_INVALID`.
+
+### Prisma-правило для workflow
+
+Изменение `workflow_transitions` или `workflow_scheme_items` → `prisma migrate dev --name <описание>`.
+
+---
+
 ## Правила работы с Prisma (обязательно)
 
 > **Нарушение любого из этих правил = падение деплоя.**

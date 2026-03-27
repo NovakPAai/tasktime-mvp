@@ -2,10 +2,35 @@ import { Prisma } from '@prisma/client';
 import type { UserRole, IssueStatus } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { getCachedJson, setCachedJson, deleteCachedByPattern } from '../../shared/redis.js';
 import { evaluateConditions } from './conditions/index.js';
 import { runValidators } from './validators/index.js';
 import { runPostFunctions } from './post-functions/index.js';
 import type { ConditionRule, ValidatorRule, PostFunctionRule, AvailableTransitionsResponse, TransitionResponse } from './types.js';
+
+// ─── Redis cache helpers ──────────────────────────────────────────────────────
+
+const WORKFLOW_CACHE_TTL = 300; // 5 minutes
+
+const wfCacheKey = (projectId: string, typeId: string | null): string =>
+  `wf:${projectId}:${typeId ?? 'default'}`;
+
+export async function invalidateWorkflowCache(projectId: string): Promise<void> {
+  await deleteCachedByPattern(`wf:${projectId}:*`);
+}
+
+async function getProjectIdsForWorkflow(workflowId: string): Promise<string[]> {
+  const items = await prisma.workflowSchemeItem.findMany({
+    where: { workflowId },
+    include: { scheme: { include: { projects: { select: { projectId: true } } } } },
+  });
+  return items.flatMap((item) => item.scheme.projects.map((p) => p.projectId));
+}
+
+export async function invalidateWorkflowCacheByWorkflowId(workflowId: string): Promise<void> {
+  const projectIds = await getProjectIdsForWorkflow(workflowId);
+  await Promise.all(projectIds.map((pid) => invalidateWorkflowCache(pid)));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +55,7 @@ async function loadWorkflowFull(workflowId: string) {
 
 // ─── Resolve workflow for an issue ───────────────────────────────────────────
 
-export async function resolveWorkflowForIssue(issue: { projectId: string; issueTypeConfigId: string | null }): Promise<WorkflowFull> {
+async function resolveWorkflowFromDB(issue: { projectId: string; issueTypeConfigId: string | null }): Promise<WorkflowFull> {
   const binding = await prisma.workflowSchemeProject.findUnique({
     where: { projectId: issue.projectId },
     include: {
@@ -43,7 +68,6 @@ export async function resolveWorkflowForIssue(issue: { projectId: string; issueT
   });
 
   if (!binding) {
-    // Fallback: default workflow
     const defaultWf = await prisma.workflow.findFirst({ where: { isDefault: true } });
     if (!defaultWf) throw new AppError(409, 'NO_WORKFLOW_CONFIGURED');
     return loadWorkflowFull(defaultWf.id);
@@ -51,24 +75,31 @@ export async function resolveWorkflowForIssue(issue: { projectId: string; issueT
 
   const items = binding.scheme.items;
 
-  // Try exact match first
   let item = issue.issueTypeConfigId
     ? items.find((i) => i.issueTypeConfigId === issue.issueTypeConfigId)
     : undefined;
 
-  // Fallback to default item (null issueTypeConfigId)
   if (!item) {
     item = items.find((i) => i.issueTypeConfigId === null);
   }
 
   if (!item) {
-    // Last resort: default workflow
     const defaultWf = await prisma.workflow.findFirst({ where: { isDefault: true } });
     if (!defaultWf) throw new AppError(409, 'NO_WORKFLOW_CONFIGURED');
     return loadWorkflowFull(defaultWf.id);
   }
 
   return loadWorkflowFull(item.workflowId);
+}
+
+export async function resolveWorkflowForIssue(issue: { projectId: string; issueTypeConfigId: string | null }): Promise<WorkflowFull> {
+  const key = wfCacheKey(issue.projectId, issue.issueTypeConfigId);
+  const cached = await getCachedJson<WorkflowFull>(key);
+  if (cached) return cached;
+
+  const workflow = await resolveWorkflowFromDB(issue);
+  await setCachedJson(key, workflow, WORKFLOW_CACHE_TTL);
+  return workflow;
 }
 
 // ─── Map workflow status systemKey to legacy IssueStatus enum ────────────────
@@ -215,7 +246,7 @@ export async function executeTransition(
       });
       if (!allowed) {
         const firstRule = conditionRules[0];
-        throw new AppError(403, 'CONDITION_NOT_MET', { conditionType: firstRule?.type ?? 'UNKNOWN' });
+        throw new AppError(403, 'CONDITION_NOT_MET', { details: { conditionType: firstRule?.type ?? 'UNKNOWN' } });
       }
     }
   }

@@ -14,6 +14,12 @@ import {
 import * as service from './workflows.service.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 
+// Helper: wrap response with _isDraft flag if Copy-on-Write created a draft
+function maybeWithDraft<T extends object>(data: T, isDraft: boolean, draftId: string): T & { _isDraft?: boolean; _draftWorkflowId?: string } {
+  if (!isDraft) return data;
+  return { ...data, _isDraft: true, _draftWorkflowId: draftId };
+}
+
 const router = Router();
 
 router.use(authenticate);
@@ -77,13 +83,24 @@ router.post('/:id/copy', async (req: AuthRequest, res, next) => {
   }
 });
 
+router.get('/:id/validate', async (req, res, next) => {
+  try {
+    const report = await service.validateWorkflow(req.params.id as string);
+    res.json(report);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
 router.post('/:id/steps', validate(createWorkflowStepDto), async (req: AuthRequest, res, next) => {
   try {
-    const step = await service.addStep(req.params.id as string, req.body);
-    await logAudit(req, 'workflow_step.created', 'workflow_step', step.id, { workflowId: req.params.id });
-    res.status(201).json(step);
+    const { id: workflowId, isDraft } = await service.ensureWorkflowEditable(req.params.id as string);
+    if (isDraft) res.setHeader('X-Draft-Workflow-Id', workflowId);
+    const step = await service.addStep(workflowId, req.body);
+    await logAudit(req, 'workflow_step.created', 'workflow_step', step.id, { workflowId });
+    res.status(201).json(maybeWithDraft(step, isDraft, workflowId));
   } catch (err) {
     next(err);
   }
@@ -91,9 +108,11 @@ router.post('/:id/steps', validate(createWorkflowStepDto), async (req: AuthReque
 
 router.patch('/:id/steps/:stepId', validate(updateWorkflowStepDto), async (req: AuthRequest, res, next) => {
   try {
-    const step = await service.updateStep(req.params.id as string, req.params.stepId as string, req.body);
+    const { id: workflowId, isDraft } = await service.ensureWorkflowEditable(req.params.id as string);
+    if (isDraft) res.setHeader('X-Draft-Workflow-Id', workflowId);
+    const step = await service.updateStep(workflowId, req.params.stepId as string, req.body);
     await logAudit(req, 'workflow_step.updated', 'workflow_step', req.params.stepId as string, req.body);
-    res.json(step);
+    res.json(maybeWithDraft(step, isDraft, workflowId));
   } catch (err) {
     next(err);
   }
@@ -101,9 +120,11 @@ router.patch('/:id/steps/:stepId', validate(updateWorkflowStepDto), async (req: 
 
 router.delete('/:id/steps/:stepId', async (req: AuthRequest, res, next) => {
   try {
-    await service.deleteStep(req.params.id as string, req.params.stepId as string);
+    const { id: workflowId, isDraft } = await service.ensureWorkflowEditable(req.params.id as string);
+    if (isDraft) res.setHeader('X-Draft-Workflow-Id', workflowId);
+    await service.deleteStep(workflowId, req.params.stepId as string);
     await logAudit(req, 'workflow_step.deleted', 'workflow_step', req.params.stepId as string);
-    res.json({ ok: true });
+    res.json(maybeWithDraft({ ok: true }, isDraft, workflowId));
   } catch (err) {
     next(err);
   }
@@ -121,9 +142,11 @@ router.get('/:id/transitions', async (req, res, next) => {
 
 router.post('/:id/transitions', validate(createWorkflowTransitionDto), async (req: AuthRequest, res, next) => {
   try {
-    const t = await service.createTransition(req.params.id as string, req.body);
-    await logAudit(req, 'workflow_transition.created', 'workflow_transition', t.id, { workflowId: req.params.id });
-    res.status(201).json(t);
+    const { id: workflowId, isDraft } = await service.ensureWorkflowEditable(req.params.id as string);
+    if (isDraft) res.setHeader('X-Draft-Workflow-Id', workflowId);
+    const t = await service.createTransition(workflowId, req.body);
+    await logAudit(req, 'workflow_transition.created', 'workflow_transition', t.id, { workflowId });
+    res.status(201).json(maybeWithDraft(t, isDraft, workflowId));
   } catch (err) {
     next(err);
   }
@@ -131,9 +154,11 @@ router.post('/:id/transitions', validate(createWorkflowTransitionDto), async (re
 
 router.put('/:id/transitions/:tid', validate(updateWorkflowTransitionDto), async (req: AuthRequest, res, next) => {
   try {
-    const t = await service.updateTransition(req.params.id as string, req.params.tid as string, req.body);
+    const { id: workflowId, isDraft } = await service.ensureWorkflowEditable(req.params.id as string);
+    if (isDraft) res.setHeader('X-Draft-Workflow-Id', workflowId);
+    const t = await service.updateTransition(workflowId, req.params.tid as string, req.body);
     await logAudit(req, 'workflow_transition.updated', 'workflow_transition', req.params.tid as string, req.body);
-    res.json(t);
+    res.json(maybeWithDraft(t, isDraft, workflowId));
   } catch (err) {
     next(err);
   }
@@ -141,9 +166,11 @@ router.put('/:id/transitions/:tid', validate(updateWorkflowTransitionDto), async
 
 router.delete('/:id/transitions/:tid', async (req: AuthRequest, res, next) => {
   try {
-    await service.deleteTransition(req.params.id as string, req.params.tid as string);
+    const { id: workflowId, isDraft } = await service.ensureWorkflowEditable(req.params.id as string);
+    if (isDraft) res.setHeader('X-Draft-Workflow-Id', workflowId);
+    await service.deleteTransition(workflowId, req.params.tid as string);
     await logAudit(req, 'workflow_transition.deleted', 'workflow_transition', req.params.tid as string);
-    res.json({ ok: true });
+    res.json(maybeWithDraft({ ok: true }, isDraft, workflowId));
   } catch (err) {
     next(err);
   }

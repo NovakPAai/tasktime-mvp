@@ -338,7 +338,7 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
   // Backward compat: link to system WorkflowStatus on creation (default = OPEN)
   const initialWfStatus = await prisma.workflowStatus.findFirst({ where: { systemKey: 'OPEN' } });
 
-  return prisma.issue.create({
+  const issue = await prisma.issue.create({
     data: {
       projectId,
       number,
@@ -361,6 +361,24 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
       workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
     },
   });
+
+  // Set workflowStatusId to the isInitial step of the project's workflow
+  try {
+    const workflow = await resolveWorkflowForIssue({ projectId, issueTypeConfigId: resolvedTypeConfigId ?? null });
+    const initialStep = workflow.steps.find((s) => s.isInitial);
+    if (initialStep && initialStep.statusId !== issue.workflowStatusId) {
+      await prisma.issue.update({
+        where: { id: issue.id },
+        data: { workflowStatusId: initialStep.statusId },
+      });
+      (issue as { workflowStatusId: string | null }).workflowStatusId = initialStep.statusId;
+      (issue as { workflowStatus: unknown }).workflowStatus = initialStep.status;
+    }
+  } catch {
+    // No workflow configured — keep the OPEN fallback
+  }
+
+  return issue;
 }
 
 export async function updateIssue(id: string, dto: UpdateIssueDto) {
@@ -438,8 +456,10 @@ export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: s
         t.toStatus?.systemKey === dto.status &&
         (t.isGlobal || t.fromStatusId === issue.workflowStatusId),
     );
-    if (!transition) throw new AppError(400, 'NO_VALID_TRANSITION');
-    return executeTransition(id, transition.id, actorId ?? 'system', actorRole ?? 'USER', undefined, true);
+    if (transition) {
+      return executeTransition(id, transition.id, actorId ?? 'system', actorRole ?? 'USER', undefined, true);
+    }
+    // No matching transition in workflow — fall through to legacy direct update
   }
 
   // Legacy path: map string status → workflowStatusId for backward compat
@@ -559,4 +579,31 @@ export async function getChildren(id: string) {
     },
     orderBy: { orderIndex: 'asc' },
   });
+}
+
+export async function bulkTransitionIssues(
+  projectId: string,
+  issueIds: string[],
+  transitionId: string,
+  actorId: string,
+  actorRole: UserRole,
+): Promise<{ succeeded: string[]; failed: Array<{ id: string; error: string }> }> {
+  if (issueIds.length > 50) {
+    throw new AppError(400, 'TOO_MANY_ISSUES', { max: 50 });
+  }
+
+  const succeeded: string[] = [];
+  const failed: Array<{ id: string; error: string }> = [];
+
+  for (const id of issueIds) {
+    try {
+      await executeTransition(id, transitionId, actorId, actorRole, undefined, true);
+      succeeded.push(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'UNKNOWN_ERROR';
+      failed.push({ id, error: message });
+    }
+  }
+
+  return { succeeded, failed };
 }

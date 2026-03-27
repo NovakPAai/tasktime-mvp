@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 
 export class AppError extends Error {
+  public code: string;
+
   constructor(
     public statusCode: number,
     message: string,
@@ -8,13 +10,14 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = 'AppError';
+    this.code = message;
   }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({ error: err.message, ...err.meta });
+    res.status(err.statusCode).json({ error: err.message, code: err.code, ...err.meta });
     return;
   }
 

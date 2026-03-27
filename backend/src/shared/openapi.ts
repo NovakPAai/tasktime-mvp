@@ -15,6 +15,167 @@ export const swaggerSpec = {
       bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
     },
     schemas: {
+      ConditionRule: {
+        oneOf: [
+          {
+            type: 'object',
+            required: ['type', 'roles'],
+            properties: {
+              type: { type: 'string', enum: ['USER_HAS_GLOBAL_ROLE'] },
+              roles: { type: 'array', items: { type: 'string', enum: ['ADMIN', 'MANAGER', 'USER', 'VIEWER', 'SUPER_ADMIN'] } },
+            },
+          },
+          { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['USER_IS_ASSIGNEE'] } } },
+          { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['USER_IS_REPORTER'] } } },
+          {
+            type: 'object',
+            required: ['type', 'conditions'],
+            properties: {
+              type: { type: 'string', enum: ['ANY_OF'] },
+              conditions: { type: 'array', items: { '$ref': '#/components/schemas/ConditionRule' } },
+            },
+          },
+          {
+            type: 'object',
+            required: ['type', 'conditions'],
+            properties: {
+              type: { type: 'string', enum: ['ALL_OF'] },
+              conditions: { type: 'array', items: { '$ref': '#/components/schemas/ConditionRule' } },
+            },
+          },
+        ],
+        discriminator: { propertyName: 'type' },
+      },
+      ValidatorRule: {
+        oneOf: [
+          {
+            type: 'object',
+            required: ['type'],
+            properties: {
+              type: { type: 'string', enum: ['REQUIRED_FIELDS'] },
+              fieldIds: { type: 'array', items: { type: 'string', format: 'uuid' }, nullable: true },
+            },
+          },
+          { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['ALL_SUBTASKS_DONE'] } } },
+          { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['COMMENT_REQUIRED'] } } },
+          {
+            type: 'object',
+            required: ['type'],
+            properties: {
+              type: { type: 'string', enum: ['TIME_LOGGED'] },
+              minHours: { type: 'number', nullable: true },
+            },
+          },
+          {
+            type: 'object',
+            required: ['type', 'customFieldId', 'operator'],
+            properties: {
+              type: { type: 'string', enum: ['FIELD_VALUE'] },
+              customFieldId: { type: 'string', format: 'uuid' },
+              operator: { type: 'string', enum: ['NOT_EMPTY', 'EQUALS'] },
+              value: { nullable: true },
+            },
+          },
+        ],
+        discriminator: { propertyName: 'type' },
+      },
+      PostFunctionRule: {
+        oneOf: [
+          { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['ASSIGN_TO_REPORTER'] } } },
+          { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['ASSIGN_TO_CURRENT_USER'] } } },
+          { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['CLEAR_ASSIGNEE'] } } },
+          {
+            type: 'object',
+            required: ['type', 'customFieldId', 'value'],
+            properties: {
+              type: { type: 'string', enum: ['SET_FIELD_VALUE'] },
+              customFieldId: { type: 'string', format: 'uuid' },
+              value: {},
+            },
+          },
+          {
+            type: 'object',
+            required: ['type', 'url'],
+            properties: {
+              type: { type: 'string', enum: ['TRIGGER_WEBHOOK'] },
+              url: { type: 'string', format: 'uri' },
+              method: { type: 'string', enum: ['POST', 'GET'], default: 'POST' },
+              includeIssue: { type: 'boolean', default: true },
+            },
+          },
+          {
+            type: 'object',
+            required: ['type', 'action'],
+            properties: {
+              type: { type: 'string', enum: ['LOG_AUDIT'] },
+              action: { type: 'string' },
+            },
+          },
+        ],
+        discriminator: { propertyName: 'type' },
+      },
+      WorkflowValidationReport: {
+        type: 'object',
+        required: ['isValid', 'errors', 'warnings'],
+        properties: {
+          isValid: { type: 'boolean', description: 'false если есть errors' },
+          errors: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['NO_INITIAL_STATUS', 'NO_DONE_STATUS'], description: 'Блокирующая ошибка' },
+                message: { type: 'string' },
+                details: { type: 'object', nullable: true },
+              },
+            },
+          },
+          warnings: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['DEAD_END_STATUS', 'UNREACHABLE_STATUS', 'UNUSED_STATUS'] },
+                message: { type: 'string' },
+                statusId: { type: 'string', format: 'uuid', nullable: true },
+                statusName: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+      },
+      TransitionResponse: {
+        type: 'object',
+        required: ['id', 'name', 'toStatus', 'requiresScreen'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          toStatus: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              name: { type: 'string' },
+              category: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'] },
+              color: { type: 'string', nullable: true },
+            },
+          },
+          requiresScreen: { type: 'boolean' },
+          screenFields: {
+            nullable: true,
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                customFieldId: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                fieldType: { type: 'string' },
+                isRequired: { type: 'boolean' },
+                orderIndex: { type: 'integer' },
+              },
+            },
+          },
+        },
+      },
       Issue: {
         type: 'object',
         properties: {

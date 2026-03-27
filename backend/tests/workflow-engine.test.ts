@@ -681,6 +681,20 @@ describe('WorkflowScheme CRUD', () => {
       .send({ name: 'Items WF' });
     const workflowId = wfRes.body.id;
 
+    // Add required steps and transition to make workflow valid for attachment
+    await request
+      .post(`/api/admin/workflows/${workflowId}/steps`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ statusId: statusIds.OPEN, isInitial: true });
+    await request
+      .post(`/api/admin/workflows/${workflowId}/steps`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ statusId: statusIds.DONE, isInitial: false });
+    await request
+      .post(`/api/admin/workflows/${workflowId}/transitions`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Close', fromStatusId: statusIds.OPEN, toStatusId: statusIds.DONE, isGlobal: false });
+
     const scheme = await request
       .post('/api/admin/workflow-schemes')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -1497,7 +1511,7 @@ describe('Workflow scheme — per-issue-type routing', () => {
       .send({ name: 'Task-Specific WF' });
     const taskWorkflowId = wfRes.body.id;
 
-    // Steps
+    // Steps (DONE step is required for workflow graph validation)
     await request
       .post(`/api/admin/workflows/${taskWorkflowId}/steps`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -1506,6 +1520,10 @@ describe('Workflow scheme — per-issue-type routing', () => {
       .post(`/api/admin/workflows/${taskWorkflowId}/steps`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ statusId: statusIds.IN_PROGRESS });
+    await request
+      .post(`/api/admin/workflows/${taskWorkflowId}/steps`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ statusId: statusIds.DONE });
 
     // Transition unique to TASK workflow
     const taskTransRes = await request
@@ -1600,12 +1618,34 @@ describe('Workflow scheme — per-issue-type routing', () => {
 
 describe('Error cases', () => {
   it('INVALID_TRANSITION when fromStatus does not match current status', async () => {
-    // Build workflow where transition is from IN_PROGRESS → DONE
-    const { transitionId } = await buildCustomWorkflow({
-      fromStatusId: statusIds.IN_PROGRESS,
-      toStatusId: statusIds.DONE,
-      extraStepIds: [statusIds.IN_PROGRESS],
-    });
+    // Build workflow where OPEN is initial step but transition is from IN_PROGRESS → DONE
+    // (explicit fix: buildCustomWorkflow sets fromStatusId as initial, so we do it manually)
+    const wfRes = await request
+      .post('/api/admin/workflows')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: `WrongStatus WF ${Date.now()}` });
+    const wfId: string = wfRes.body.id;
+
+    // OPEN is initial — issue will start here
+    await request.post(`/api/admin/workflows/${wfId}/steps`).set('Authorization', `Bearer ${adminToken}`).send({ statusId: statusIds.OPEN, isInitial: true });
+    await request.post(`/api/admin/workflows/${wfId}/steps`).set('Authorization', `Bearer ${adminToken}`).send({ statusId: statusIds.IN_PROGRESS, isInitial: false });
+    await request.post(`/api/admin/workflows/${wfId}/steps`).set('Authorization', `Bearer ${adminToken}`).send({ statusId: statusIds.DONE, isInitial: false });
+
+    // Transition only from IN_PROGRESS → DONE (not from OPEN)
+    const tRes = await request
+      .post(`/api/admin/workflows/${wfId}/transitions`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Progress to Done', fromStatusId: statusIds.IN_PROGRESS, toStatusId: statusIds.DONE, isGlobal: false });
+    const transitionId: string = tRes.body.id;
+
+    const schemeRes = await request
+      .post('/api/admin/workflow-schemes')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: `WrongStatus Scheme ${Date.now()}` });
+    const schemeId: string = schemeRes.body.id;
+
+    await request.put(`/api/admin/workflow-schemes/${schemeId}/items`).set('Authorization', `Bearer ${adminToken}`).send({ items: [{ workflowId: wfId, issueTypeConfigId: null }] });
+    await request.post(`/api/admin/workflow-schemes/${schemeId}/projects`).set('Authorization', `Bearer ${adminToken}`).send({ projectId });
 
     // Issue starts at OPEN, not IN_PROGRESS
     const issue = await request
