@@ -45,7 +45,7 @@ export const workflowSchemesApi = {
     api.put<WorkflowScheme>(`/admin/workflow-schemes/${id}/items`, { items }).then(r => r.data),
 
   addProject: (id: string, projectId: string) =>
-    api.post(`/admin/workflow-schemes/${id}/projects/${projectId}`).then(r => r.data),
+    api.post(`/admin/workflow-schemes/${id}/projects`, { projectId }).then(r => r.data),
 
   removeProject: (id: string, projectId: string) =>
     api.delete(`/admin/workflow-schemes/${id}/projects/${projectId}`).then(r => r.data),
