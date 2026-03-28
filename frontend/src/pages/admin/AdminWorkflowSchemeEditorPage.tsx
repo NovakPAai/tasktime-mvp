@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Button, Table, Select, Tag, message, Popconfirm, Typography, Divider, Space,
 } from 'antd';
+import type { AxiosError } from 'axios';
 import type { ColumnsType } from 'antd/es/table';
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { workflowSchemesApi, type WorkflowScheme } from '../../api/workflow-schemes';
@@ -67,8 +68,22 @@ export default function AdminWorkflowSchemeEditorPage() {
       })));
       message.success('Маппинг сохранён');
       load();
-    } catch {
-      message.error('Не удалось сохранить');
+    } catch (err) {
+      type ErrData = { code?: string; workflowId?: string; detail?: string; errors?: Array<{ type: string; message: string }> };
+      const data = (err as AxiosError<ErrData>)?.response?.data;
+      if (data?.code === 'WORKFLOW_INVALID') {
+        const wfName = allWorkflows.find(w => w.id === data.workflowId)?.name ?? data.workflowId ?? 'неизвестный';
+        const errorLabels: Record<string, string> = {
+          NO_INITIAL_STATUS: 'нет начального статуса',
+          NO_DONE_STATUS: 'нет статуса категории DONE',
+        };
+        const reasons = (data.errors ?? []).map(e => errorLabels[e.type] ?? e.type).join(', ');
+        message.error(`Workflow «${wfName}» некорректен: ${reasons}. Настройте workflow перед сохранением маппинга.`, 8);
+      } else if (data?.code === 'DUPLICATE_ISSUE_TYPE_MAPPING' || data?.code === 'INVALID_REFERENCE') {
+        message.error(data.detail ?? 'Не удалось сохранить', 8);
+      } else {
+        message.error('Не удалось сохранить');
+      }
     } finally {
       setSaving(false);
     }

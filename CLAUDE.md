@@ -85,26 +85,34 @@ main (защищена: CI + 1 аппрув)
 - Rebase перед PR если main ушёл вперёд: `git rebase origin/main`
 - Прямой push в `main` — **запрещён**
 
-### Trunk Based Development (TBD) + Staging Gate
+### Trunk Based Development (TBD) + Batch Release
 
-**Модель:** TBD — все мёрджат в `main` через короткоживущие ветки. Нет release branches, нет батчей.
+**Модель:** TBD — все мёрджат в `main` через короткоживущие ветки. Релиз собирается в батч вручную через Pipeline Dashboard.
 
 **Pipeline:**
 ```
-PR → Merge Queue (CI на merged коде) → main → auto-publish images → auto-deploy staging → ручная кнопка production
+PR → CI → merge в main → auto-publish images → auto-deploy staging
+                                                      ↓
+                                    Pipeline Dashboard (порт 3100):
+                                    создать батч → добавить PRs
+                                    → DEPLOYING → TESTING → PASSED → RELEASED (prod)
 ```
 
-**4 уровня защиты деплоя:**
-1. **Merge Queue** — GitHub проверяет CI на merged коде ДО фактического мёрджа. Конфликты ловятся автоматически.
-2. **Concurrency group** — `deploy-staging` в GitHub Actions, `cancel-in-progress: false`. Деплои встают в очередь.
-3. **flock** — серверный lock (`/tmp/deploy-{env}.lock`). Невозможно запустить два деплоя одновременно на одном сервере.
-4. **SHA verification** — после деплоя `deploy.sh` проверяет что `/api/health` вернул ожидаемый `version` (git SHA).
+**Батч-флоу:**
+- `COLLECTING` — собираем PRs в батч
+- `DEPLOYING` → `TESTING` → `PASSED` → `RELEASED`
+- `FAILED` → `COLLECTING` — откат, исправляем
+
+**Защита деплоя:**
+1. **Concurrency group** — `deploy-staging` в GitHub Actions, `cancel-in-progress: false`
+2. **flock** — серверный lock (`/tmp/deploy-{env}.lock`)
+3. **SHA verification** — `deploy.sh` проверяет `/api/health` на ожидаемый `version`
+4. **Deploy history** — `deploy/history/{env}.log`
 
 **Правила для веток:**
 - Ветка живёт ≤ 2 дней, PR ≤ 400 строк diff
-- Rebase на main перед PR (или Merge Queue сделает это)
-- Откат = `git revert <sha>` + новый PR → проходит тот же pipeline
-- Production деплой: ручной через `deploy-production.yml` (workflow_dispatch) — аварийный
+- Rebase на main перед PR
+- Откат = `git revert <sha>` + новый PR
 
 **Версионирование:**
 - `/api/health` возвращает `{ version: "<git-sha>", buildTime: "<timestamp>" }`

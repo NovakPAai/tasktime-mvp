@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import dayjs from 'dayjs';
 import { Modal, Form, Input, InputNumber, DatePicker, Switch, Select, message } from 'antd';
 import { workflowEngineApi, type ScreenField } from '../../api/workflow-engine';
 import { adminApi, type AdminUser } from '../../api/admin';
@@ -43,7 +44,7 @@ function FieldInput({ field, users }: { field: ScreenField; users: AdminUser[] }
     case 'DECIMAL':
       return <InputNumber style={{ width: '100%' }} />;
     case 'DATE':
-      return <DatePicker style={{ width: '100%' }} />;
+      return <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />;
     case 'CHECKBOX':
       return <Switch />;
     case 'SELECT':
@@ -68,7 +69,11 @@ export default function TransitionModal({ open, issueId, transitionId, transitio
       setLoading(true);
       const screenFieldValues: Record<string, unknown> = {};
       for (const [key, val] of Object.entries(values)) {
-        screenFieldValues[key] = val ?? null;
+        if (dayjs.isDayjs(val)) {
+          screenFieldValues[key] = val.toISOString();
+        } else {
+          screenFieldValues[key] = val ?? null;
+        }
       }
       await workflowEngineApi.executeTransition(issueId, { transitionId, screenFieldValues });
       message.success('Статус изменён');
@@ -82,7 +87,11 @@ export default function TransitionModal({ open, issueId, transitionId, transitio
       else if (code === 'CONDITION_NOT_MET') message.error('У вас нет прав для этого перехода');
       else if (code === 'INVALID_TRANSITION') message.error('Переход недопустим');
       else if (code === 'VALIDATOR_FAILED') message.error(e.response?.data?.details?.message || 'Условия перехода не выполнены');
-      else message.error('Не удалось выполнить переход');
+      else if (code === 'SCREEN_FIELD_REQUIRED') {
+        const fields = (e.response?.data as { fields?: { name: string }[] })?.fields;
+        const names = fields?.map(f => f.name).join(', ');
+        message.error(`Обязательные поля не заполнены: ${names || 'неизвестные поля'}`);
+      } else message.error('Не удалось выполнить переход');
     } finally {
       setLoading(false);
     }
@@ -102,12 +111,21 @@ export default function TransitionModal({ open, issueId, transitionId, transitio
       <Form form={form} layout="vertical">
         {screenFields.map(field => {
           const formKey = field.isSystemField ? field.systemFieldKey! : field.customFieldId!;
+          const isNumeric = field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL';
+          const rules = field.isRequired
+            ? isNumeric
+              ? [{ validator: async (_: unknown, value: unknown) => {
+                  if (value === null || value === undefined) return Promise.reject(`${field.name} обязательно`);
+                  return Promise.resolve();
+                }}]
+              : [{ required: true, message: `${field.name} обязательно` }]
+            : [];
           return (
             <Form.Item
               key={formKey}
               name={formKey}
               label={field.name}
-              rules={field.isRequired ? [{ required: true, message: `${field.name} обязательно` }] : []}
+              rules={rules}
               valuePropName={field.fieldType === 'CHECKBOX' ? 'checked' : 'value'}
             >
               <FieldInput field={field} users={users} />

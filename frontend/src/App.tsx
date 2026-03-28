@@ -42,6 +42,7 @@ import ChangePasswordPage from './pages/ChangePasswordPage';
 import SettingsPage from './pages/SettingsPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import UatTestsPage from './pages/UatTestsPage';
+import PipelineDashboardPage from './pages/PipelineDashboardPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -193,6 +194,7 @@ export default function App() {
             <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
             <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="pipeline" element={<PipelineDashboardPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

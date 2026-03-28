@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { SYSTEM_FIELD_KEYS, SYSTEM_FIELD_META } from './system-fields.js';
+import { invalidateWorkflowCacheByWorkflowId } from '../workflow-engine/workflow-engine.service.js';
 import type {
   CreateTransitionScreenDto,
   UpdateTransitionScreenDto,
@@ -97,6 +98,14 @@ export async function replaceItems(id: string, dto: ScreenItemsDto) {
       })),
     });
   });
+
+  // Invalidate workflow cache for all workflows using transitions with this screen
+  const transitions = await prisma.workflowTransition.findMany({
+    where: { screenId: id },
+    select: { workflowId: true },
+  });
+  const workflowIds = [...new Set(transitions.map((t) => t.workflowId))];
+  await Promise.all(workflowIds.map((wid) => invalidateWorkflowCacheByWorkflowId(wid)));
 
   const updated = await getTransitionScreen(id);
 

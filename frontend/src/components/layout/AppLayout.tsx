@@ -120,7 +120,7 @@ export default function AppLayout() {
 
       {/* Main content area */}
       <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, padding: 0 }}>
+        <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0, padding: 0 }}>
           <Outlet />
           <UatOnboardingOverlay />
         </div>

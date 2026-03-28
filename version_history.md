@@ -2,7 +2,17 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.5**
+**Last version: 2.6**
+
+---
+
+## [2.6] [2026-03-28] fix(workflow-schemes): информативные ошибки при сохранении маппинга
+
+**Ветка:** `claude/jack-fix-workflow-scheme-mapping`
+
+### Что изменилось
+- `backend/src/modules/workflow-schemes/workflow-schemes.service.ts` — транзакция `replaceItems` обёрнута в try/catch: P2002 (unique constraint) → 409 `DUPLICATE_ISSUE_TYPE_MAPPING`, P2003 (foreign key violation) → 422 `INVALID_REFERENCE`; вместо безымянного 500
+- `frontend/src/pages/admin/AdminWorkflowSchemeEditorPage.tsx` — catch-блок `handleSaveItems` разбирает код ошибки и показывает конкретный текст: для `WORKFLOW_INVALID` — название workflow и причину (нет начального статуса / нет DONE), для `DUPLICATE_ISSUE_TYPE_MAPPING` и `INVALID_REFERENCE` — русское описание из detail-поля
 
 ---
 

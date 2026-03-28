@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { invalidateWorkflowCache, invalidateWorkflowCacheByWorkflowId } from '../workflow-engine/workflow-engine.service.js';
@@ -97,16 +98,32 @@ export async function replaceItems(id: string, dto: SchemeItemsDto) {
     select: { projectId: true },
   });
 
-  await prisma.$transaction(async (tx) => {
-    await tx.workflowSchemeItem.deleteMany({ where: { schemeId: id } });
-    await tx.workflowSchemeItem.createMany({
-      data: dto.items.map((item) => ({
-        schemeId: id,
-        workflowId: item.workflowId,
-        issueTypeConfigId: item.issueTypeConfigId ?? null,
-      })),
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.workflowSchemeItem.deleteMany({ where: { schemeId: id } });
+      await tx.workflowSchemeItem.createMany({
+        data: dto.items.map((item) => ({
+          schemeId: id,
+          workflowId: item.workflowId,
+          issueTypeConfigId: item.issueTypeConfigId ?? null,
+        })),
+      });
     });
-  });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') {
+        throw new AppError(409, 'DUPLICATE_ISSUE_TYPE_MAPPING', {
+          detail: 'Два элемента маппинга ссылаются на один и тот же тип задачи. Удалите дублирующую строку.',
+        });
+      }
+      if (err.code === 'P2003') {
+        throw new AppError(422, 'INVALID_REFERENCE', {
+          detail: 'Один из типов задачи или workflow не найден в базе данных. Обновите страницу и попробуйте снова.',
+        });
+      }
+    }
+    throw err;
+  }
 
   // Invalidate cache for all affected projects
   await Promise.all(affectedProjects.map((p) => invalidateWorkflowCache(p.projectId)));

@@ -728,7 +728,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* ── Table ── */}
-      <div style={{ padding: '0 28px 28px', flex: 1 }}>
+      <div style={{ padding: '0 28px 28px' }}>
         <div style={{
           marginTop: 16,
           background: C.bgCard,

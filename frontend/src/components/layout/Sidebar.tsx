@@ -339,6 +339,18 @@ export default function Sidebar({
             <span style={textStyle('/teams')}>Teams</span>
           </div>
 
+          {/* DevOps section */}
+          <div style={{ height: 1, backgroundColor: tokens.border, margin: '6px 4px' }} />
+          <div style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: tokens.inactive, padding: '6px 12px 4px' }}>
+            DevOps
+          </div>
+          <div style={itemStyle('/pipeline')} onClick={() => onNavigate('/pipeline')} onMouseEnter={() => setHovered('/pipeline')} onMouseLeave={() => setHovered(null)}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+              <path d="M8 2l2 4h4l-3.5 3 1.5 5L8 11l-4 3 1.5-5L2 6h4l2-4z" stroke={itemColor('/pipeline')} strokeWidth="1.5" fill="none" />
+            </svg>
+            <span style={textStyle('/pipeline')}>Pipeline</span>
+          </div>
+
           {/* Divider */}
           <div style={{ height: 1, backgroundColor: tokens.border, margin: '6px 4px' }} />
 
