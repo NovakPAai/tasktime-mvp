@@ -172,7 +172,7 @@ export default function PipelineDashboardPage() {
 
   // Derived stats
   const activeBatch = batches.find(b => ['COLLECTING','DEPLOYING','TESTING','PASSED'].includes(b.state));
-  const openPrs = batches.reduce((s, b) => s + b.pullRequests.filter(p => !p.mergedAt).length, 0);
+  const collectingPrs = batches.filter(b => b.state === 'COLLECTING').reduce((s, b) => s + b.pullRequests.length, 0);
   const mergedPrs = batches.reduce((s, b) => s + b.pullRequests.filter(p => p.mergedAt).length, 0);
   const failedCi = batches.reduce((s, b) => s + b.pullRequests.filter(p => p.ciStatus === 'FAILURE').length, 0);
   const totalPrs = batches.reduce((s, b) => s + b.pullRequests.length, 0);
@@ -234,7 +234,7 @@ export default function PipelineDashboardPage() {
         {/* Stats row */}
         <div style={{ display: 'flex', gap: 16 }}>
           <StatCard
-            label="Открытых PR" value={String(openPrs)} sub={`${mergedPrs} merged`}
+            label="Собирается батч" value={String(collectingPrs)} sub={`${mergedPrs} merged`}
             subColor={C.success} C={C}
             icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="5" cy="5" r="2.5" stroke={C.acc} strokeWidth="1.5" /><circle cx="13" cy="13" r="2.5" stroke={C.acc} strokeWidth="1.5" /><path d="M5 7.5v3a3 3 0 003 3h2.5" stroke={C.acc} strokeWidth="1.5" /></svg>}
           />
@@ -265,7 +265,7 @@ export default function PipelineDashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <span style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif', fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em', color: C.text }}>Pipeline Flow</span>
           <div style={{ display: 'flex', gap: 0 }}>
-            <PipelineStep label="PR OPEN" count={openPrs} items={collecting} active={false} C={C} />
+            <PipelineStep label="COLLECTING" count={collectingPrs} items={collecting} active={false} C={C} />
             <div style={{ width: 24, display: 'flex', alignItems: 'flex-start', paddingTop: 10, justifyContent: 'center', flexShrink: 0 }}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>

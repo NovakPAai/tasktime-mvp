@@ -194,6 +194,7 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/projects/:id/releases` | `ReleasesPage` | `frontend/src/pages/ReleasesPage` | — |
 | `/sprints` | `GlobalSprintsPage` | `frontend/src/pages/GlobalSprintsPage` | — |
 | `/releases` | `GlobalReleasesPage` | `frontend/src/pages/GlobalReleasesPage` | — |
+| `/pipeline` | `PipelineDashboardPage` | `frontend/src/pages/PipelineDashboardPage` | Standalone Pipeline Service dashboard (batches, deploys, GitHub sync). Calls `pipeline-service` on port 3100 via `VITE_PIPELINE_URL`. |
 | `/issues/:id` | `IssueDetailPage` | `frontend/src/pages/IssueDetailPage` | — |
 | `/time` | `TimePage` | `frontend/src/pages/TimePage` | — |
 | `/teams` | `TeamsPage` | `frontend/src/pages/TeamsPage` | — |

@@ -10,6 +10,7 @@ async function pipelineFetch<T>(path: string, options?: RequestInit): Promise<T>
     const text = await res.text().catch(() => '');
     throw new Error(`Pipeline API ${res.status}: ${text}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 

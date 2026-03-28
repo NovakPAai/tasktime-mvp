@@ -90,7 +90,7 @@ main (защищена: CI + 1 аппрув)
 **Модель:** TBD — все мёрджат в `main` через короткоживущие ветки. Релиз собирается в батч вручную через Pipeline Dashboard.
 
 **Pipeline:**
-```
+```text
 PR → CI → merge в main → auto-publish images → auto-deploy staging
                                                       ↓
                                     Pipeline Dashboard (порт 3100):
