@@ -120,6 +120,10 @@ export default function AdminWorkflowSchemeEditorPage() {
             ))}
             options={options}
             style={{ width: 200 }}
+            showSearch
+            filterOption={(input, opt) =>
+              (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
+            }
           />
         );
       },
@@ -135,6 +139,10 @@ export default function AdminWorkflowSchemeEditorPage() {
           options={allWorkflows.map(w => ({ value: w.id, label: w.name }))}
           style={{ width: 200 }}
           placeholder="Выберите workflow"
+          showSearch
+          filterOption={(input, opt) =>
+            (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
+          }
         />
       ),
     },
@@ -238,6 +246,10 @@ export default function AdminWorkflowSchemeEditorPage() {
             options={availableProjects.map(p => ({ value: p.id, label: `${p.key} — ${p.name}` }))}
             style={{ width: 280 }}
             allowClear
+            showSearch
+            filterOption={(input, opt) =>
+              (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
+            }
           />
           <Button icon={<PlusOutlined />} onClick={handleAddProject} disabled={!addProjectId}>
             Добавить

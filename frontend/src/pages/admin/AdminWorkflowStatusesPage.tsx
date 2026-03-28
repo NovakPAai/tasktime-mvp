@@ -1,8 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Space, Tag, message, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, Space, Tag, message, Popconfirm, ColorPicker } from 'antd';
+import type { Color } from 'antd/es/color-picker';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { workflowStatusesApi, type WorkflowStatus, type StatusCategory } from '../../api/workflow-statuses';
+
+const STATUS_PALETTE = [
+  '#F44336', '#E91E63', '#FF5722', '#FF9800',
+  '#FFC107', '#FFEB3B', '#8BC34A', '#4CAF50',
+  '#00BCD4', '#2196F3', '#3F51B5', '#9C27B0',
+  '#607D8B', '#9E9E9E', '#795548', '#000000',
+];
+
+function ColorPickerField({ value, onChange }: { value?: string; onChange?: (v: string) => void }) {
+  return (
+    <Space>
+      <ColorPicker
+        format="hex"
+        value={value}
+        presets={[{ label: 'Палитра', colors: STATUS_PALETTE }]}
+        onChange={(color: Color) => onChange?.(color.toHexString())}
+        showText
+      />
+    </Space>
+  );
+}
 
 const CATEGORY_OPTIONS: { value: StatusCategory; label: string; color: string }[] = [
   { value: 'TODO', label: 'To Do', color: 'default' },
@@ -133,8 +155,8 @@ export default function AdminWorkflowStatusesPage() {
           <Form.Item name="category" label="Категория" rules={[{ required: true }]}>
             <Select options={CATEGORY_OPTIONS} disabled={!!editing} />
           </Form.Item>
-          <Form.Item name="color" label="Цвет (hex)">
-            <Input placeholder="#4CAF50" />
+          <Form.Item name="color" label="Цвет">
+            <ColorPickerField />
           </Form.Item>
           <Form.Item name="description" label="Описание">
             <Input.TextArea rows={2} />

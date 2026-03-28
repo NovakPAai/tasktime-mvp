@@ -352,12 +352,32 @@ export default function AdminWorkflowEditorPage() {
               options={(workflow.steps ?? []).map(s => ({ value: s.statusId, label: s.status.name }))}
             />
           </Form.Item>
-          <Form.Item name="screenId" label="Экран перехода">
-            <Select
-              allowClear
-              placeholder="Без экрана"
-              options={allScreens.map(s => ({ value: s.id, label: s.name }))}
-            />
+          <Form.Item label="Экран перехода" shouldUpdate={(prev, curr) => prev.screenId !== curr.screenId}>
+            {({ getFieldValue, setFieldValue }) => {
+              const screenId: string | undefined = getFieldValue('screenId');
+              const screen = allScreens.find(s => s.id === screenId);
+              return (
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Form.Item name="screenId" noStyle>
+                    <Select
+                      allowClear
+                      placeholder="Без экрана"
+                      options={allScreens.map(s => ({ value: s.id, label: s.name }))}
+                      style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                  {screen && (
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => setFieldValue('screenId', undefined)}
+                    >
+                      Убрать экран «{screen.name}»
+                    </Button>
+                  )}
+                </Space>
+              );
+            }}
           </Form.Item>
           <Form.Item name="conditions" label="Условия (JSON)">
             <Input.TextArea rows={3} placeholder='[{"type":"user-in-group","value":"managers"}]' />
