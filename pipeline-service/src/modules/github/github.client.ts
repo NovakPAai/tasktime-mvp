@@ -11,6 +11,8 @@ export interface GithubPR {
   mergeable: boolean | null;
   draft: boolean;
   body: string | null;
+  merged_at: string | null;
+  merge_commit_sha: string | null;
 }
 
 export interface GithubCheckRun {
@@ -62,6 +64,22 @@ async function ghFetch<T>(path: string): Promise<T> {
 
 export async function listOpenPRs(owner: string, repo: string): Promise<GithubPR[]> {
   return ghFetch<GithubPR[]>(`/repos/${owner}/${repo}/pulls?state=open&per_page=100`);
+}
+
+export async function listMergedPrs(repo: string, since?: Date): Promise<GithubPR[]> {
+  const [owner, repoName] = repo.split('/');
+  const params = new URLSearchParams({ state: 'closed', per_page: '50', sort: 'updated', direction: 'desc' });
+  const prs = await ghFetch<GithubPR[]>(`/repos/${owner}/${repoName}/pulls?${params}`);
+  return prs.filter(pr => {
+    if (!pr.merged_at) return false;
+    if (since) return new Date(pr.merged_at) > since;
+    return true;
+  });
+}
+
+export async function getPrChecks(repo: string, sha: string): Promise<GithubCheckRun[]> {
+  const [owner, repoName] = repo.split('/');
+  return listCheckRunsForCommit(owner, repoName, sha);
 }
 
 export async function getPRReviews(owner: string, repo: string, prNumber: number): Promise<GithubReview[]> {
