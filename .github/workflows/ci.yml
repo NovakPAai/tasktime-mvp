@@ -229,23 +229,23 @@ jobs:
           # Remove leading whitespace (heredoc indentation)
           sed -i 's/^[[:space:]]*//' deploy/env/pipeline.staging.env
 
-      - name: Write pipeline postgres password to compose env
+      - name: Generate .env.staging from secrets
         run: |
-          echo "PIPELINE_IMAGE=ghcr.io/${{ github.repository_owner }}/tasktime-pipeline" >> deploy/env/.env.staging.pipeline-patch
-          echo "PIPELINE_POSTGRES_USER=pipeline" >> deploy/env/.env.staging.pipeline-patch
-          echo "PIPELINE_POSTGRES_DB=pipeline" >> deploy/env/.env.staging.pipeline-patch
-          echo "PIPELINE_POSTGRES_PASSWORD=${{ secrets.PIPELINE_POSTGRES_PASSWORD }}" >> deploy/env/.env.staging.pipeline-patch
+          # Fetch current .env.staging from server (must succeed — fail loudly on SSH error)
+          REMOTE_CONTENT=$(ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+            "cat '${{ secrets.STAGING_DEPLOY_PATH }}/deploy/env/.env.staging'")
+          # Strip previous PIPELINE_* lines (grep -v exits 1 if all lines match — ignore)
+          printf '%s\n' "$REMOTE_CONTENT" | grep -v '^PIPELINE_' > deploy/env/.env.staging || true
+          {
+            echo "PIPELINE_IMAGE=ghcr.io/${{ github.repository_owner }}/tasktime-pipeline"
+            echo "PIPELINE_POSTGRES_USER=pipeline"
+            echo "PIPELINE_POSTGRES_DB=pipeline"
+            echo "PIPELINE_POSTGRES_PASSWORD=${{ secrets.PIPELINE_POSTGRES_PASSWORD }}"
+          } >> deploy/env/.env.staging
 
       - name: Sync deploy assets
         run: |
           rsync -az deploy/ "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}:${{ secrets.STAGING_DEPLOY_PATH }}/deploy/"
-
-      - name: Patch .env.staging on server
-        run: |
-          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
-            "cd '${{ secrets.STAGING_DEPLOY_PATH }}' && \
-             grep -qF 'PIPELINE_IMAGE' deploy/env/.env.staging || cat deploy/env/.env.staging.pipeline-patch >> deploy/env/.env.staging && \
-             rm -f deploy/env/.env.staging.pipeline-patch"
 
       - name: Run remote deploy
         run: |

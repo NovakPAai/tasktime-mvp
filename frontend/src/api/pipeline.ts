@@ -4,7 +4,7 @@ const KEY = import.meta.env.VITE_PIPELINE_API_KEY || 'dev-pipeline-key-change-in
 async function pipelineFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
-    headers: { 'x-api-key': KEY, 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'x-pipeline-api-key': KEY, 'Content-Type': 'application/json', ...options?.headers },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

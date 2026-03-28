@@ -1,9 +1,11 @@
 import { Router } from 'express';
-import { prisma } from '../../prisma/client';
-import { listMergedPrs, getPrChecks } from './github.client';
-import { config } from '../../config';
+import { prisma } from '../../prisma/client.js';
+import { listMergedPrs, getPrChecks } from './github.client.js';
+import { config } from '../../config.js';
+import { apiKeyAuth } from '../../shared/middleware/api-key-auth.js';
 
 export const githubRouter = Router();
+githubRouter.use(apiKeyAuth);
 
 const SYNC_TYPE = 'github-merged-prs';
 
@@ -38,7 +40,7 @@ githubRouter.post('/sync', async (_req, res, next) => {
           mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
           mergedSha: pr.merge_commit_sha ?? null,
           lastSyncedAt: startedAt,
-          stagingBatchId: collectingBatchId,
+          // stagingBatchId intentionally omitted — preserve manual batch assignment
         },
         create: {
           externalId: pr.number,
