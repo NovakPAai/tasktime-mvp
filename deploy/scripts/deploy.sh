@@ -14,11 +14,13 @@ case "$ENVIRONMENT" in
     COMPOSE_FILE="deploy/docker-compose.staging.yml"
     COMPOSE_ENV_FILE="deploy/env/.env.staging"
     BACKEND_ENV_FILE="deploy/env/backend.staging.env"
+    PIPELINE_ENV_FILE="deploy/env/pipeline.staging.env"
     ;;
   production)
     COMPOSE_FILE="deploy/docker-compose.production.yml"
     COMPOSE_ENV_FILE="deploy/env/.env.production"
     BACKEND_ENV_FILE="deploy/env/backend.production.env"
+    PIPELINE_ENV_FILE="deploy/env/pipeline.production.env"
     ;;
   *)
     echo "Unsupported environment: $ENVIRONMENT"
@@ -33,6 +35,12 @@ fi
 
 if [ ! -f "$BACKEND_ENV_FILE" ]; then
   echo "Missing backend env file: $BACKEND_ENV_FILE"
+  exit 1
+fi
+
+if [ ! -f "$PIPELINE_ENV_FILE" ]; then
+  echo "Missing pipeline env file: $PIPELINE_ENV_FILE"
+  echo "Copy from example: cp ${PIPELINE_ENV_FILE}.example ${PIPELINE_ENV_FILE} and fill in secrets"
   exit 1
 fi
 
@@ -93,6 +101,8 @@ else
 fi
 
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npx prisma migrate deploy
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm \
+  --env-file "$PIPELINE_ENV_FILE" pipeline-service npx prisma migrate deploy
 if [ "${BOOTSTRAP_ENABLED:-}" = "true" ]; then
   docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npm run db:bootstrap
 else
