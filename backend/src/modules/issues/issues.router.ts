@@ -11,6 +11,8 @@ import {
   updateAiFlagsDto,
   updateAiStatusDto,
   bulkTransitionDto,
+  changeTypeDto,
+  moveIssueDto,
 } from './issues.dto.js';
 import * as issuesService from './issues.service.js';
 import { getKanbanFieldsForIssues } from '../issue-custom-fields/issue-custom-fields.service.js';
@@ -349,6 +351,41 @@ router.delete(
     }
   },
 );
+
+// Change issue type
+router.patch('/issues/:id/change-type', validate(changeTypeDto), async (req: AuthRequest, res, next) => {
+  try {
+    const existing = await issuesService.getIssue(req.params.id as string);
+    await requireIssueAccess(req, existing.projectId);
+    const issue = await issuesService.changeIssueType(req.params.id as string, req.body);
+    await logAudit(req, 'issue.type_changed', 'issue', req.params.id as string, {
+      fromTypeConfigId: existing.issueTypeConfigId,
+      toTypeConfigId: req.body.targetIssueTypeConfigId,
+    });
+    res.json(issue);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Move issue to another project
+router.post('/issues/:id/move', validate(moveIssueDto), async (req: AuthRequest, res, next) => {
+  try {
+    const existing = await issuesService.getIssue(req.params.id as string);
+    await requireIssueAccess(req, existing.projectId);
+    // Verify write access to the destination project
+    await requireIssueAccess(req, req.body.targetProjectId);
+    const issue = await issuesService.moveIssue(req.params.id as string, req.body);
+    await logAudit(req, 'issue.moved', 'issue', req.params.id as string, {
+      fromProjectId: existing.projectId,
+      toProjectId: req.body.targetProjectId,
+      moveChildren: req.body.moveChildren,
+    });
+    res.json(issue);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Delete issue
 router.delete('/issues/:id', requireRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthRequest, res, next) => {

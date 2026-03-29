@@ -74,8 +74,11 @@ export interface Issue {
   parent?: { id: string; title: string; number: number; issueTypeConfig?: Pick<IssueTypeConfig, 'systemKey' | 'iconName' | 'iconColor' | 'name'> | null };
   children?: Issue[];
   project?: { id: string; name: string; key: string };
+  sprintId?: string | null;
+  sprint?: { id: string; projectId: string } | null;
   releaseId?: string | null;
   dueDate?: string | null;
+  workflowStatusId?: string | null;
   estimatedHours?: number | null;
   kanbanFields?: KanbanField[];
   _count?: { children: number };

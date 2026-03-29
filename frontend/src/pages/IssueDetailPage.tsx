@@ -22,6 +22,7 @@ import * as aiApi from '../api/ai';
 import * as authApi from '../api/auth';
 import { getProjectIssueTypes } from '../api/issue-type-configs';
 import IssueLinksSection from '../components/issues/IssueLinksSection';
+import MoveIssueModal from '../components/issues/MoveIssueModal';
 import IssueCustomFieldsSection from '../components/issues/IssueCustomFieldsSection';
 import CustomFieldInput from '../components/issues/CustomFieldInput';
 import StatusTransitionPanel from '../components/issues/StatusTransitionPanel';
@@ -173,7 +174,13 @@ function SectionLabel({ children, C }: { children: React.ReactNode; C: typeof DA
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+/**
+ * Renders the issue detail page, showing issue metadata, description, comments, time tracking, custom fields, AI controls, and edit/move workflows.
+ *
+ * The component loads issue data, comments, time logs, and history; provides handlers for commenting, timing, assignment, editing, moving, AI actions, and custom-field management; and displays a two-column layout with main content and a right-side properties panel.
+ *
+ * @returns The rendered Issue Detail page React element.
+ */
 
 export default function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -197,6 +204,7 @@ export default function IssueDetailPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [editForm] = Form.useForm();
   const [editCustomFields, setEditCustomFields] = useState<IssueCustomFieldValue[]>([]);
   const [editCustomValues, setEditCustomValues] = useState<Record<string, unknown>>({});
@@ -482,6 +490,12 @@ export default function IssueDetailPage() {
               style={{ background: isDark ? '#161B22' : '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: C.t2, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}
             >
               Редактировать
+            </button>
+            <button
+              onClick={() => setMoveModalOpen(true)}
+              style={{ background: isDark ? '#161B22' : '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: C.t3, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}
+            >
+              Перенести
             </button>
             {hasRequiredRole(user?.role, 'ADMIN') && (
               <Popconfirm
@@ -1007,6 +1021,23 @@ export default function IssueDetailPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {moveModalOpen && issue && (
+        <MoveIssueModal
+          open={moveModalOpen}
+          issue={issue}
+          onCancel={() => setMoveModalOpen(false)}
+          onSuccess={(movedIssue) => {
+            setMoveModalOpen(false);
+            // If moved to another project, navigate to new issue URL
+            if (movedIssue.projectId !== issue.projectId) {
+              navigate(`/issues/${movedIssue.id}`);
+            } else {
+              setIssue(movedIssue);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

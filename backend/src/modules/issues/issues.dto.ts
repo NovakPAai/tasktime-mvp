@@ -44,6 +44,17 @@ export const bulkTransitionDto = z.object({
   transitionId: z.string().uuid(),
 });
 
+export const changeTypeDto = z.object({
+  targetIssueTypeConfigId: z.string().uuid(),
+  force: z.boolean().optional().default(false),
+});
+
+export const moveIssueDto = z.object({
+  targetProjectId: z.string().uuid(),
+  targetIssueTypeConfigId: z.string().uuid().optional(),
+  moveChildren: z.boolean().optional().default(false),
+});
+
 export type CreateIssueDto = z.infer<typeof createIssueDto>;
 export type UpdateIssueDto = z.infer<typeof updateIssueDto>;
 export type UpdateStatusDto = z.infer<typeof updateStatusDto>;
@@ -51,3 +62,5 @@ export type AssignDto = z.infer<typeof assignDto>;
 export type UpdateAiFlagsDto = z.infer<typeof updateAiFlagsDto>;
 export type UpdateAiStatusDto = z.infer<typeof updateAiStatusDto>;
 export type BulkTransitionDto = z.infer<typeof bulkTransitionDto>;
+export type ChangeTypeDto = z.infer<typeof changeTypeDto>;
+export type MoveIssueDto = z.infer<typeof moveIssueDto>;

@@ -16,6 +16,8 @@ import type {
   AssignDto,
   UpdateAiFlagsDto,
   UpdateAiStatusDto,
+  ChangeTypeDto,
+  MoveIssueDto,
 } from './issues.dto.js';
 
 // Hierarchy rules keyed by systemKey (null key = custom type, skip validation)
@@ -571,6 +573,13 @@ export async function getHistory(id: string) {
   });
 }
 
+/**
+ * Fetches direct child issues of the specified issue, ensuring the parent exists.
+ *
+ * @param id - The parent issue's id
+ * @returns The list of direct child issues including assignee (`id`, `name`), `workflowStatus` (`id`, `name`, `category`, `color`, `systemKey`), and `_count.children`.
+ * @throws AppError 404 'Issue not found' if the parent issue does not exist
+ */
 export async function getChildren(id: string) {
   const issue = await prisma.issue.findUnique({ where: { id } });
   if (!issue) throw new AppError(404, 'Issue not found');
@@ -586,6 +595,318 @@ export async function getChildren(id: string) {
   });
 }
 
+/**
+ * Choose the most appropriate workflow status ID for an issue after changing project or issue type.
+ *
+ * Resolves the project's workflow for the provided issue type and attempts, in order:
+ * 1. Match the systemKey of the current workflow status to a step in the resolved workflow and return that step's status ID.
+ * 2. Return the workflow's initial step status ID if present.
+ * 3. If no workflow is configured, keep `currentWorkflowStatusId` if provided or fall back to the global `OPEN` status ID (or `null` if `OPEN` is not defined).
+ *
+ * @param projectId - Target project ID used to resolve the workflow
+ * @param issueTypeConfigId - Target issue type config ID (may be `null` for custom/unspecified types)
+ * @param currentWorkflowStatusId - Current workflow status ID of the issue (may be `null`)
+ * @returns The chosen workflow status ID, or `null` if no suitable status exists
+ */
+
+async function remapWorkflowStatus(
+  projectId: string,
+  issueTypeConfigId: string | null,
+  currentWorkflowStatusId: string | null,
+): Promise<string | null> {
+  try {
+    const workflow = await resolveWorkflowForIssue({ projectId, issueTypeConfigId });
+    if (currentWorkflowStatusId) {
+      const currentStatus = await prisma.workflowStatus.findUnique({ where: { id: currentWorkflowStatusId } });
+      if (currentStatus?.systemKey) {
+        const match = workflow.steps.find((s) => s.status?.systemKey === currentStatus.systemKey);
+        if (match) return match.statusId;
+      }
+    }
+    const initial = workflow.steps.find((s) => s.isInitial);
+    return initial?.statusId ?? currentWorkflowStatusId;
+  } catch {
+    // No workflow configured — keep current or fallback to OPEN
+    if (currentWorkflowStatusId) return currentWorkflowStatusId;
+    const open = await prisma.workflowStatus.findFirst({ where: { systemKey: 'OPEN' } });
+    return open?.id ?? null;
+  }
+}
+
+/**
+ * Ensure the provided issue type config is allowed by the project's issue type scheme.
+ *
+ * Does nothing if the project has no scheme binding.
+ *
+ * @param projectId - The project identifier to validate against
+ * @param typeConfigId - The issue type configuration identifier to validate
+ * @throws AppError 400 'Issue type is not allowed in this project scheme' when the project's scheme exists and does not include `typeConfigId`
+ */
+
+async function validateTypeInProjectScheme(projectId: string, typeConfigId: string): Promise<void> {
+  const binding = await prisma.issueTypeSchemeProject.findUnique({
+    where: { projectId },
+    include: { scheme: { include: { items: { select: { typeConfigId: true } } } } },
+  });
+  if (binding) {
+    const allowed = binding.scheme.items.map((i) => i.typeConfigId);
+    if (!allowed.includes(typeConfigId)) {
+      throw new AppError(400, 'Issue type is not allowed in this project scheme');
+    }
+  }
+}
+
+// ─── Change issue type ────────────────────────────────────────────────────────
+
+export type HierarchyConflict = { conflictType: 'PARENT' | 'CHILD'; issueId: string; title: string };
+
+/**
+ * Change an issue's type, remap its workflow status, and resolve or report hierarchy conflicts.
+ *
+ * Validates the target issue type exists and is enabled, ensures the type is allowed in the project's
+ * issue type scheme, detects parent/child hierarchy conflicts against ALLOWED_PARENT_KEYS, optionally
+ * clears conflicting parent/child links when `dto.force` is true, remaps the workflow status for the
+ * new type/project, and returns the updated issue.
+ *
+ * @param id - The ID of the issue to change
+ * @param dto - Change parameters; must include `targetIssueTypeConfigId` and may include `force` to override hierarchy conflicts
+ * @returns The updated issue record (as returned by getIssue)
+ * @throws AppError 404 - If the issue or the target issue type is not found
+ * @throws AppError 400 - If the target issue type is disabled, if a SUBTASK would be created without a parent, or if the target type is not allowed in the project's scheme
+ * @throws AppError 422 - `HIERARCHY_CONFLICT` when parent/child conflicts exist and `dto.force` is not true; error metadata contains a `conflicts` array
+ */
+export async function changeIssueType(id: string, dto: ChangeTypeDto) {
+  const issue = await prisma.issue.findUnique({
+    where: { id },
+    include: {
+      parent: { select: { id: true, title: true, issueTypeConfig: { select: { systemKey: true } } } },
+      children: { select: { id: true, title: true, issueTypeConfig: { select: { systemKey: true } } } },
+    },
+  });
+  if (!issue) throw new AppError(404, 'Issue not found');
+
+  const newTypeConfig = await prisma.issueTypeConfig.findUnique({ where: { id: dto.targetIssueTypeConfigId } });
+  if (!newTypeConfig) throw new AppError(404, 'Target issue type not found');
+  if (!newTypeConfig.isEnabled) throw new AppError(400, 'Target issue type is disabled');
+
+  await validateTypeInProjectScheme(issue.projectId, dto.targetIssueTypeConfigId);
+
+  // Detect hierarchy conflicts
+  const conflicts: HierarchyConflict[] = [];
+  const newKey = newTypeConfig.systemKey;
+
+  if (newKey) {
+    const allowedParentKeys = ALLOWED_PARENT_KEYS[newKey] ?? null;
+
+    if (!issue.parentId && newKey === 'SUBTASK') {
+      throw new AppError(400, 'SUBTASK must have a parent issue');
+    }
+
+    if (issue.parentId && issue.parent) {
+      const parentKey = issue.parent.issueTypeConfig?.systemKey ?? null;
+      const parentConflict =
+        (allowedParentKeys !== null && allowedParentKeys.length === 0) ||
+        (allowedParentKeys !== null && parentKey !== null && !allowedParentKeys.includes(parentKey));
+      if (parentConflict) {
+        conflicts.push({ conflictType: 'PARENT', issueId: issue.parentId, title: issue.parent.title });
+      }
+    }
+
+    for (const child of issue.children) {
+      const childKey = child.issueTypeConfig?.systemKey ?? null;
+      if (childKey) {
+        const childAllowedParents = ALLOWED_PARENT_KEYS[childKey] ?? null;
+        if (childAllowedParents !== null && !childAllowedParents.includes(newKey)) {
+          conflicts.push({ conflictType: 'CHILD', issueId: child.id, title: child.title });
+        }
+      }
+    }
+  }
+
+  if (conflicts.length > 0 && !dto.force) {
+    throw new AppError(422, 'HIERARCHY_CONFLICT', { conflicts });
+  }
+
+  const newWorkflowStatusId = await remapWorkflowStatus(
+    issue.projectId,
+    dto.targetIssueTypeConfigId,
+    issue.workflowStatusId,
+  );
+
+  const conflictingChildIds = conflicts.filter((c) => c.conflictType === 'CHILD').map((c) => c.issueId);
+  const hasParentConflict = conflicts.some((c) => c.conflictType === 'PARENT');
+
+  await prisma.$transaction(async (tx) => {
+    if (conflictingChildIds.length > 0) {
+      await tx.issue.updateMany({ where: { id: { in: conflictingChildIds } }, data: { parentId: null } });
+    }
+    await tx.issue.update({
+      where: { id },
+      data: {
+        issueTypeConfigId: dto.targetIssueTypeConfigId,
+        workflowStatusId: newWorkflowStatusId,
+        ...(hasParentConflict && { parentId: null }),
+      },
+    });
+  });
+
+  return getIssue(id);
+}
+
+/**
+ * Resolve a compatible issue type config id for a target project, honoring explicit choice and project scheme bindings.
+ *
+ * If `explicitTargetTypeConfigId` is provided it is preferred; otherwise the `currentTypeConfigId` is used as the candidate.
+ * If the target project has no issue-type scheme binding the candidate is returned.
+ * If the candidate is not allowed by the target scheme, attempts to find a type in the target scheme with the same `systemKey` as the current type.
+ * If no match by `systemKey` is found, returns the first allowed type from the target scheme. Returns `null` when no candidate can be resolved.
+ *
+ * @param currentTypeConfigId - The current issue type config id, or `null` if none.
+ * @param targetProjectId - The id of the destination project whose scheme should be consulted.
+ * @param explicitTargetTypeConfigId - An explicit target type config id to prefer over the current type.
+ * @returns The resolved `issueTypeConfigId` allowed in the target project, or `null` if none could be determined.
+ */
+
+async function resolveTargetTypeConfig(
+  currentTypeConfigId: string | null,
+  targetProjectId: string,
+  explicitTargetTypeConfigId?: string,
+): Promise<string | null> {
+  const binding = await prisma.issueTypeSchemeProject.findUnique({
+    where: { projectId: targetProjectId },
+    include: { scheme: { include: { items: { select: { typeConfigId: true } } } } },
+  });
+
+  const candidate = explicitTargetTypeConfigId ?? currentTypeConfigId;
+  if (!candidate) return null;
+
+  if (!binding) return candidate; // no scheme restriction
+
+  const allowed = binding.scheme.items.map((i) => i.typeConfigId);
+  if (allowed.includes(candidate)) return candidate;
+
+  // Try to find same systemKey in target scheme
+  if (currentTypeConfigId) {
+    const currentConfig = await prisma.issueTypeConfig.findUnique({
+      where: { id: currentTypeConfigId },
+      select: { systemKey: true },
+    });
+    if (currentConfig?.systemKey) {
+      const sameKey = await prisma.issueTypeConfig.findFirst({
+        where: { systemKey: currentConfig.systemKey, id: { in: allowed } },
+      });
+      if (sameKey) return sameKey.id;
+    }
+  }
+
+  return allowed[0] ?? null;
+}
+
+/**
+ * Moves an issue to another project, optionally relocating its direct children.
+ *
+ * @param id - The ID of the issue to move
+ * @param dto - Move parameters: `targetProjectId` (destination project ID), optional `targetIssueTypeConfigId` (preferred issue type in target project), and `moveChildren` (when true, move direct children to the target project and assign sequential numbers; otherwise detach children)
+ * @returns The moved issue with assignee, creator, project, parent, children, and workflowStatus included
+ * @throws AppError 404 when the issue or target project cannot be found
+ */
+export async function moveIssue(id: string, dto: MoveIssueDto) {
+  const issue = await prisma.issue.findUnique({
+    where: { id },
+    include: {
+      sprint: { select: { projectId: true } },
+      children: { select: { id: true, issueTypeConfigId: true } },
+      issueTypeConfig: { select: { systemKey: true } },
+    },
+  });
+  if (!issue) throw new AppError(404, 'Issue not found');
+
+  const targetProject = await prisma.project.findUnique({ where: { id: dto.targetProjectId } });
+  if (!targetProject) throw new AppError(404, 'Target project not found');
+
+  const targetTypeConfigId = await resolveTargetTypeConfig(
+    issue.issueTypeConfigId,
+    dto.targetProjectId,
+    dto.targetIssueTypeConfigId,
+  );
+
+  const sprintId = issue.sprint?.projectId === dto.targetProjectId ? issue.sprintId : null;
+  const newWorkflowStatusId = await remapWorkflowStatus(dto.targetProjectId, targetTypeConfigId, issue.workflowStatusId);
+
+  // Pre-compute issue numbers to avoid repeated async calls inside the transaction
+  const mainNumber = await getNextNumber(dto.targetProjectId);
+  const childNumbers: Map<string, number> = new Map();
+  if (dto.moveChildren && issue.children.length > 0) {
+    let nextNum = mainNumber + 1;
+    for (const child of issue.children) {
+      childNumbers.set(child.id, nextNum++);
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (dto.moveChildren && issue.children.length > 0) {
+      for (const child of issue.children) {
+        // Remap child's type and workflow status for the target project
+        const childTypeConfigId = await resolveTargetTypeConfig(
+          child.issueTypeConfigId,
+          dto.targetProjectId,
+          undefined,
+        );
+        const childCurrentStatus = await tx.issue.findUnique({
+          where: { id: child.id },
+          select: { workflowStatusId: true },
+        });
+        const childWorkflowStatusId = await remapWorkflowStatus(
+          dto.targetProjectId,
+          childTypeConfigId,
+          childCurrentStatus?.workflowStatusId ?? null,
+        );
+
+        await tx.issue.update({
+          where: { id: child.id },
+          data: {
+            projectId: dto.targetProjectId,
+            number: childNumbers.get(child.id)!,
+            issueTypeConfigId: childTypeConfigId,
+            workflowStatusId: childWorkflowStatusId,
+            sprintId: null,
+            releaseId: null,
+          },
+        });
+      }
+    } else {
+      // Detach children — they stay in the original project
+      await tx.issue.updateMany({ where: { parentId: id }, data: { parentId: null } });
+    }
+
+    await tx.issue.update({
+      where: { id },
+      data: {
+        projectId: dto.targetProjectId,
+        number: mainNumber,
+        issueTypeConfigId: targetTypeConfigId,
+        workflowStatusId: newWorkflowStatusId,
+        sprintId,
+        releaseId: null,
+        parentId: null, // cross-project parent not supported
+      },
+    });
+  });
+
+  return getIssue(id);
+}
+
+/**
+ * Execute a workflow transition for multiple issues and collect which succeeded and which failed.
+ *
+ * @param projectId - Project identifier the operation is scoped to
+ * @param issueIds - Array of issue IDs to process (max 50)
+ * @param transitionId - Workflow transition identifier to apply to each issue
+ * @param actorId - ID of the user performing the transition (or system actor)
+ * @param actorRole - Role of the actor performing the transition
+ * @throws AppError If more than 50 issue IDs are provided (`TOO_MANY_ISSUES`)
+ * @returns An object with `succeeded` containing IDs that transitioned successfully and `failed` containing `{ id, error }` entries for each failure; `error` is the thrown error message or `'UNKNOWN_ERROR'`
+ */
 export async function bulkTransitionIssues(
   projectId: string,
   issueIds: string[],
