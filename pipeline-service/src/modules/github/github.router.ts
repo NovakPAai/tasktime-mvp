@@ -24,7 +24,7 @@ githubRouter.post('/sync', async (_req, res, next) => {
     let syncState = await prisma.syncState.findUnique({ where: { syncType: SYNC_TYPE } });
     const since = syncState?.lastSyncedAt ?? undefined;
 
-    const prs = await listMergedPrs(repo, since);
+    const { prs, truncated } = await listMergedPrs(repo, since);
     const collectingBatchId = await getOrCreateCollectingBatchId();
 
     for (const pr of prs) {
@@ -61,18 +61,21 @@ githubRouter.post('/sync', async (_req, res, next) => {
       });
     }
 
-    if (syncState) {
-      await prisma.syncState.update({
-        where: { syncType: SYNC_TYPE },
-        data: { lastSyncedAt: startedAt, syncCount: { increment: 1 } },
-      });
-    } else {
-      await prisma.syncState.create({
-        data: { syncType: SYNC_TYPE, lastSyncedAt: startedAt, syncCount: 1 },
-      });
+    // Do NOT advance the sync cursor when results were truncated — next sync will re-fetch the same range
+    if (!truncated) {
+      if (syncState) {
+        await prisma.syncState.update({
+          where: { syncType: SYNC_TYPE },
+          data: { lastSyncedAt: startedAt, syncCount: { increment: 1 } },
+        });
+      } else {
+        await prisma.syncState.create({
+          data: { syncType: SYNC_TYPE, lastSyncedAt: startedAt, syncCount: 1 },
+        });
+      }
     }
 
-    res.json({ synced: prs.length, repo });
+    res.json({ synced: prs.length, repo, truncated });
   } catch (err) {
     next(err);
   }

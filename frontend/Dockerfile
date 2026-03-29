@@ -15,7 +15,8 @@ RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
 
-COPY deploy/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+# nginx:1.27-alpine auto-runs envsubst on /etc/nginx/templates/*.template at startup
+COPY deploy/nginx/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80

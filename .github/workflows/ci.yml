@@ -248,6 +248,7 @@ jobs:
             echo "PIPELINE_POSTGRES_USER=pipeline"
             echo "PIPELINE_POSTGRES_DB=pipeline"
             echo "PIPELINE_POSTGRES_PASSWORD=${{ secrets.PIPELINE_POSTGRES_PASSWORD }}"
+            echo "PIPELINE_API_KEY=${{ secrets.PIPELINE_API_KEY }}"
           } >> deploy/env/.env.staging
 
       - name: Sync deploy assets

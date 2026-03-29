@@ -1,11 +1,13 @@
-const BASE = import.meta.env.VITE_PIPELINE_URL || 'http://localhost:3100';
-const KEY = import.meta.env.VITE_PIPELINE_API_KEY || 'dev-pipeline-key-change-in-prod';
+// In production nginx proxies /pipeline/ → pipeline-service:3100/ and injects the API key server-side.
+// In development set VITE_PIPELINE_URL=http://localhost:3100 and VITE_PIPELINE_API_KEY in .env.local.
+const BASE = import.meta.env.VITE_PIPELINE_URL ?? '/pipeline';
+const DEV_KEY = import.meta.env.VITE_PIPELINE_API_KEY;
 
 async function pipelineFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: { 'x-pipeline-api-key': KEY, 'Content-Type': 'application/json', ...options?.headers },
-  });
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...options?.headers as Record<string, string> };
+  // In development the key is injected here; in production nginx injects it server-side
+  if (DEV_KEY) headers['x-pipeline-api-key'] = DEV_KEY;
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`Pipeline API ${res.status}: ${text}`);

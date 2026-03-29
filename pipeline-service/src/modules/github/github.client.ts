@@ -66,12 +66,19 @@ export async function listOpenPRs(owner: string, repo: string): Promise<GithubPR
   return ghFetch<GithubPR[]>(`/repos/${owner}/${repo}/pulls?state=open&per_page=100`);
 }
 
-const MAX_PAGES = 20; // ~2000 PRs max — guard against rate-limit exhaustion
+const MAX_PAGES = 20; // ~2000 PRs max — guard against GitHub rate-limit exhaustion
 
-export async function listMergedPrs(repo: string, since?: Date): Promise<GithubPR[]> {
+export interface ListMergedPrsResult {
+  prs: GithubPR[];
+  /** true when MAX_PAGES was reached — sync cursor must NOT be advanced */
+  truncated: boolean;
+}
+
+export async function listMergedPrs(repo: string, since?: Date): Promise<ListMergedPrsResult> {
   const [owner, repoName] = repo.split('/');
   const result: GithubPR[] = [];
   let page = 1;
+  let truncated = false;
 
   while (page <= MAX_PAGES) {
     const params = new URLSearchParams({ state: 'closed', per_page: '100', sort: 'updated', direction: 'desc', page: String(page) });
@@ -80,7 +87,7 @@ export async function listMergedPrs(repo: string, since?: Date): Promise<GithubP
 
     for (const pr of prs) {
       if (!pr.merged_at) continue;
-      // Don't stop early — updated_at order ≠ merged_at order, collect all and filter after
+      // Don't stop early — updated_at order ≠ merged_at order, collect all pages then filter
       if (!since || new Date(pr.merged_at) > since) {
         result.push(pr);
       }
@@ -91,10 +98,11 @@ export async function listMergedPrs(repo: string, since?: Date): Promise<GithubP
   }
 
   if (page > MAX_PAGES) {
-    console.warn(`[listMergedPrs] Hit MAX_PAGES (${MAX_PAGES}) limit for ${repo} — results may be partial`);
+    truncated = true;
+    console.warn(`[listMergedPrs] Hit MAX_PAGES (${MAX_PAGES}) for ${repo} — results truncated, sync cursor will not advance`);
   }
 
-  return result;
+  return { prs: result, truncated };
 }
 
 export async function getPrChecks(repo: string, sha: string): Promise<GithubCheckRun[]> {

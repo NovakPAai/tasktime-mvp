@@ -80,6 +80,18 @@ server {
     proxy_buffers 8 8k;
   }
 
+  location /pipeline/ {
+    limit_req zone=api burst=30 nodelay;
+    proxy_pass http://pipeline-service:3100/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header x-pipeline-api-key "${PIPELINE_API_KEY}";
+    proxy_read_timeout 60s;
+  }
+
   location / {
     try_files $uri $uri/ /index.html;
   }
