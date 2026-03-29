@@ -16,6 +16,8 @@ async function pipelineFetch<T>(path: string, options?: RequestInit): Promise<T>
   return res.json();
 }
 
+// ── Frontend interfaces (UI-facing) ──────────────────────────────────────────
+
 export interface PrSnapshot {
   id: string;
   prNumber: number;
@@ -62,24 +64,107 @@ export interface PipelineHealth {
   buildTime: string;
 }
 
+// ── Backend → Frontend mappers ───────────────────────────────────────────────
+// Pipeline-service returns different field names and envelope wrappers.
+// These mappers bridge the gap without touching backend code.
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+function mapPr(raw: any): PrSnapshot {
+  return {
+    id: raw.id,
+    prNumber: raw.externalId ?? raw.prNumber ?? 0,
+    prTitle: raw.title ?? raw.prTitle ?? '',
+    prUrl: raw.htmlUrl ?? raw.prUrl ?? '',
+    author: raw.author ?? '',
+    headSha: raw.mergedSha ?? raw.branch ?? raw.headSha ?? '',
+    mergedAt: raw.mergedAt ?? null,
+    ciStatus: raw.ciStatus ?? 'PENDING',
+    batchId: raw.stagingBatchId ?? raw.batchId ?? '',
+  };
+}
+
+function mapDeploy(raw: any): DeployEvent {
+  return {
+    id: raw.id,
+    env: raw.target?.toLowerCase() ?? raw.env ?? '',
+    sha: raw.gitSha ?? raw.imageTag ?? raw.sha ?? '',
+    triggeredBy: raw.triggeredById ?? raw.triggeredBy ?? '',
+    status: raw.status ?? 'RUNNING',
+    durationMs: raw.durationMs ?? null,
+    logUrl: raw.workflowRunUrl ?? raw.logUrl ?? null,
+    errorMsg: raw.errorMessage ?? raw.errorMsg ?? null,
+    createdAt: raw.startedAt ?? raw.createdAt ?? '',
+  };
+}
+
+function mapBatch(raw: any): StagingBatch {
+  return {
+    id: raw.id,
+    title: raw.name ?? raw.title ?? '',
+    state: raw.state ?? 'COLLECTING',
+    repo: raw.repo ?? '',
+    createdBy: raw.createdById ?? raw.createdBy ?? '',
+    notes: raw.notes ?? null,
+    stagingUrl: raw.stagingUrl ?? null,
+    prodSha: raw.prodSha ?? null,
+    createdAt: raw.createdAt ?? '',
+    updatedAt: raw.updatedAt ?? '',
+    pullRequests: (raw.pullRequests ?? []).map(mapPr),
+    deploys: (raw.deployEvents ?? raw.deploys ?? []).map(mapDeploy),
+  };
+}
+
+/** Unwrap envelope: {data: T} → T, or return as-is if no envelope */
+function unwrap<T>(body: any): T {
+  if (body && typeof body === 'object' && 'data' in body) return body.data;
+  return body;
+}
+
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
 export const pipelineApi = {
   health: () => pipelineFetch<PipelineHealth>('/api/health'),
 
-  getBatches: () => pipelineFetch<StagingBatch[]>('/api/batches'),
+  getBatches: async (): Promise<StagingBatch[]> => {
+    const raw = await pipelineFetch<unknown>('/api/batches');
+    const items = unwrap<unknown[]>(raw);
+    return (Array.isArray(items) ? items : []).map(mapBatch);
+  },
 
-  getBatch: (id: string) => pipelineFetch<StagingBatch>(`/api/batches/${id}`),
+  getBatch: async (id: string): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${id}`);
+    return mapBatch(unwrap(raw));
+  },
 
-  createBatch: (data: { title: string; repo: string; createdBy: string; notes?: string }) =>
-    pipelineFetch<StagingBatch>('/api/batches', { method: 'POST', body: JSON.stringify(data) }),
+  createBatch: async (data: { title: string; repo?: string; notes?: string }): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>('/api/batches', {
+      method: 'POST',
+      body: JSON.stringify({ name: data.title, notes: data.notes }),
+    });
+    return mapBatch(unwrap(raw));
+  },
 
-  transitionState: (id: string, state: StagingBatch['state'], extra?: { stagingUrl?: string; notes?: string; prodSha?: string }) =>
-    pipelineFetch<StagingBatch>(`/api/batches/${id}/state`, { method: 'PATCH', body: JSON.stringify({ state, ...extra }) }),
+  transitionState: async (id: string, state: StagingBatch['state'], extra?: { notes?: string }): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${id}/state`, {
+      method: 'PATCH',
+      body: JSON.stringify({ state, ...extra }),
+    });
+    return mapBatch(unwrap(raw));
+  },
 
-  addPr: (batchId: string, pr: Omit<PrSnapshot, 'id' | 'batchId'>) =>
-    pipelineFetch<PrSnapshot>(`/api/batches/${batchId}/prs`, { method: 'POST', body: JSON.stringify(pr) }),
+  addPr: async (batchId: string, prIds: string[]): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${batchId}/prs`, {
+      method: 'POST',
+      body: JSON.stringify({ prIds }),
+    });
+    return mapBatch(unwrap(raw));
+  },
 
   removePr: (batchId: string, prId: string) =>
     pipelineFetch<void>(`/api/batches/${batchId}/prs/${prId}`, { method: 'DELETE' }),
 
-  syncGitHub: () => pipelineFetch<{ synced: Record<string, number> }>('/api/github/sync', { method: 'POST' }),
+  syncGitHub: () => pipelineFetch<{ synced: number; repo: string; truncated: boolean }>('/api/github/sync', { method: 'POST' }),
 };
