@@ -1,6 +1,6 @@
 // In production nginx proxies /pipeline/ → pipeline-service:3100/ and injects the API key server-side.
-// In development set VITE_PIPELINE_URL=http://localhost:3100 and VITE_PIPELINE_API_KEY in .env.local.
-const BASE = import.meta.env.VITE_PIPELINE_URL ?? '/pipeline';
+// In development falls back to http://localhost:3100 (direct). Override with VITE_PIPELINE_URL in .env.local.
+const BASE = import.meta.env.VITE_PIPELINE_URL ?? (import.meta.env.DEV ? 'http://localhost:3100' : '/pipeline');
 const DEV_KEY = import.meta.env.VITE_PIPELINE_API_KEY;
 
 async function pipelineFetch<T>(path: string, options?: RequestInit): Promise<T> {
