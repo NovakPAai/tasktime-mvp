@@ -230,8 +230,8 @@ jobs:
           PORT=3100
           NODE_ENV=production
           GITHUB_TOKEN=${{ secrets.PIPELINE_GITHUB_TOKEN }}
-          GITHUB_REPO=jackrescuer-gif/tasktime-mvp
-          API_KEY=${{ secrets.PIPELINE_API_KEY }}
+          GITHUB_REPOS=jackrescuer-gif/tasktime-mvp
+          PIPELINE_API_KEY=${{ secrets.PIPELINE_API_KEY }}
           ENVEOF
           # Remove leading whitespace (heredoc indentation)
           sed -i 's/^[[:space:]]*//' deploy/env/pipeline.staging.env
