@@ -41,5 +41,4 @@ deploy/env/.env.production
 deploy/env/backend.staging.env
 deploy/env/backend.production.env
 deploy/backups/
-# NovakPAai
-# deploy trigger
+*.tsbuildinfo
