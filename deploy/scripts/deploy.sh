@@ -102,7 +102,7 @@ fi
 
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npx prisma migrate deploy
 docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm \
-  --env-file "$PIPELINE_ENV_FILE" pipeline-service npx prisma migrate deploy
+  pipeline-service npx prisma migrate deploy
 if [ "${BOOTSTRAP_ENABLED:-}" = "true" ]; then
   docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" run --rm backend npm run db:bootstrap
 else
