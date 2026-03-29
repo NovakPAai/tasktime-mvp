@@ -47,20 +47,20 @@ jobs:
 
           {
             echo "backend_tags<<EOF"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-backend:${PRIMARY_TAG}"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-backend:${SOURCE_SHA}"
+            echo "ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/tasktime-backend:${PRIMARY_TAG}"
+            echo "ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/tasktime-backend:${SOURCE_SHA}"
             if [ "${SOURCE_BRANCH}" = "main" ]; then
-              echo "ghcr.io/${{ github.repository_owner }}/tasktime-backend:main"
+              echo "ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/tasktime-backend:main"
             fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
           {
             echo "web_tags<<EOF"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-web:${PRIMARY_TAG}"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-web:${SOURCE_SHA}"
+            echo "ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/tasktime-web:${PRIMARY_TAG}"
+            echo "ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/tasktime-web:${SOURCE_SHA}"
             if [ "${SOURCE_BRANCH}" = "main" ]; then
-              echo "ghcr.io/${{ github.repository_owner }}/tasktime-web:main"
+              echo "ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/tasktime-web:main"
             fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
