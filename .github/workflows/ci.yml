@@ -230,7 +230,7 @@ jobs:
           PORT=3100
           NODE_ENV=production
           GITHUB_TOKEN=${{ secrets.PIPELINE_GITHUB_TOKEN }}
-          GITHUB_REPOS=jackrescuer-gif/tasktime-mvp
+          APP_GITHUB_REPOS=NovakPAai/tasktime-mvp
           PIPELINE_API_KEY=${{ secrets.PIPELINE_API_KEY }}
           ENVEOF
           # Remove leading whitespace (heredoc indentation)
