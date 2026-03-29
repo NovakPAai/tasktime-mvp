@@ -206,6 +206,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v6
 
@@ -215,6 +216,12 @@ jobs:
           printf '%s\n' "${{ secrets.STAGING_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.STAGING_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Login GHCR on staging server
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+              "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
 
       - name: Write pipeline env file
         run: |
