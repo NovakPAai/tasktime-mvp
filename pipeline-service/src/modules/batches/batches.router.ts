@@ -228,7 +228,7 @@ async function getImageTag(batchId: string): Promise<string> {
     where: { id: batchId },
     include: { pullRequests: { orderBy: { mergedAt: 'desc' }, take: 1 } },
   });
-  return batch?.pullRequests[0]?.mergedSha?.slice(0, 7) ?? '';
+  return batch?.pullRequests[0]?.mergedSha ?? '';
 }
 
 // ─── POST /api/batches/:id/deploy-staging ─────────────────────────────────────
@@ -250,10 +250,6 @@ router.post('/:id/deploy-staging', async (req, res, next) => {
     }
 
     const [owner, repo] = getOwnerRepo();
-    await triggerWorkflowDispatch(owner, repo, 'deploy-staging.yml', config.PIPELINE_GITHUB_REF, {
-      image_tag: imageTag,
-      batch_id: batchId,
-    });
 
     const [deployEvent, updatedBatch] = await prisma.$transaction([
       prisma.deployEvent.create({
@@ -265,6 +261,16 @@ router.post('/:id/deploy-staging', async (req, res, next) => {
         include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
       }),
     ]);
+
+    try {
+      await triggerWorkflowDispatch(owner, repo, 'deploy-staging.yml', config.PIPELINE_GITHUB_REF, {
+        image_tag: imageTag,
+        batch_id: batchId,
+      });
+    } catch (dispatchErr) {
+      await prisma.deployEvent.update({ where: { id: deployEvent.id }, data: { status: 'FAILURE', finishedAt: new Date() } });
+      throw dispatchErr;
+    }
 
     res.json({ data: updatedBatch, deployEvent });
   } catch (err) {
@@ -284,6 +290,14 @@ router.post('/:id/deploy-production', async (req, res, next) => {
       return;
     }
 
+    const runningProd = await prisma.deployEvent.findFirst({
+      where: { stagingBatchId: batchId, target: 'PRODUCTION', status: 'RUNNING' },
+    });
+    if (runningProd) {
+      res.status(409).json({ error: 'A production deploy is already in progress for this batch' });
+      return;
+    }
+
     const imageTag = (req.body?.imageTag as string | undefined) || await getImageTag(batchId);
     if (!imageTag) {
       res.status(422).json({ error: 'No imageTag available — batch has no merged PRs with a SHA' });
@@ -291,10 +305,6 @@ router.post('/:id/deploy-production', async (req, res, next) => {
     }
 
     const [owner, repo] = getOwnerRepo();
-    await triggerWorkflowDispatch(owner, repo, 'deploy-production.yml', config.PIPELINE_GITHUB_REF, {
-      image_tag: imageTag,
-      batch_id: batchId,
-    });
 
     const [deployEvent, updatedBatch] = await prisma.$transaction([
       prisma.deployEvent.create({
@@ -306,6 +316,16 @@ router.post('/:id/deploy-production', async (req, res, next) => {
         include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
       }),
     ]);
+
+    try {
+      await triggerWorkflowDispatch(owner, repo, 'deploy-production.yml', config.PIPELINE_GITHUB_REF, {
+        image_tag: imageTag,
+        batch_id: batchId,
+      });
+    } catch (dispatchErr) {
+      await prisma.deployEvent.update({ where: { id: deployEvent.id }, data: { status: 'FAILURE', finishedAt: new Date() } });
+      throw dispatchErr;
+    }
 
     res.json({ data: updatedBatch, deployEvent });
   } catch (err) {
