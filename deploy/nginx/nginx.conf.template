@@ -80,9 +80,10 @@ server {
     proxy_buffers 8 8k;
   }
 
-  location /pipeline/ {
+  # Only proxy /pipeline/api/ to pipeline-service; /pipeline (the page) is a frontend SPA route
+  location /pipeline/api/ {
     limit_req zone=api burst=30 nodelay;
-    proxy_pass http://pipeline-service:3100/;
+    proxy_pass http://pipeline-service:3100/api/;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
