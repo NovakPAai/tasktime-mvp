@@ -14,7 +14,7 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            const title = context.payload.pull_request.title.toLowerCase();
+            const title = context.payload.pull_request.title;
             const prNumber = context.payload.pull_request.number;
 
             const typeMap = [
@@ -25,12 +25,15 @@ jobs:
               { prefix: 'docs',     label: 'docs'     },
               { prefix: 'chore',    label: 'chore'    },
               { prefix: 'ci',       label: 'ci'       },
-              { prefix: 'perf',     label: 'feat'     },
+              { prefix: 'perf',     label: 'perf'     },
             ];
 
             const autoLabels = typeMap.map(t => t.label);
 
-            const matched = typeMap.find(t => title.startsWith(t.prefix + ':') || title.startsWith(t.prefix + '('));
+            // Match: feat: / feat(scope): / feat!: / feat(scope)!:
+            const matched = typeMap.find(t =>
+              new RegExp(`^${t.prefix}(\\([^)]+\\))?!?:`).test(title)
+            );
             if (!matched) return;
 
             // Получить текущие лейблы PR
@@ -43,22 +46,18 @@ jobs:
             // Убрать старые авто-лейблы, добавить новый
             const toKeep = currentLabels
               .map(l => l.name)
-              .filter(name => !autoLabels.includes(name));
+              .filter(name => !autoLabels.includes(name) && name !== 'breaking');
+
+            const newLabels = [...toKeep, matched.label];
+
+            // Добавить breaking если есть "!" после типа
+            if (/^[a-z]+(\([^)]+\))?!:/.test(title)) {
+              newLabels.push('breaking');
+            }
 
             await github.rest.issues.setLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
-              labels: [...toKeep, matched.label],
+              labels: newLabels,
             });
-
-            // Добавить breaking если есть "!" после типа
-            const rawTitle = context.payload.pull_request.title;
-            if (rawTitle.match(/^[a-z]+(\([^)]+\))?!:/)) {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                labels: ['breaking'],
-              });
-            }

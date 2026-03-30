@@ -16,6 +16,9 @@ categories:
   - title: '🧪 Тесты'
     labels:
       - 'test'
+  - title: '⚡ Производительность'
+    labels:
+      - 'perf'
   - title: '🔧 Инфраструктура'
     labels:
       - 'chore'
@@ -47,6 +50,7 @@ version-resolver:
       - 'ci'
       - 'docs'
       - 'test'
+      - 'perf'
   default: patch
 
 exclude-labels:
