@@ -139,26 +139,27 @@ jobs:
       - id: vars
         run: |
           SHA="${{ github.sha }}"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
 
           {
             echo "backend_tags<<EOF"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-backend:${SHA}"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-backend:main"
+            echo "ghcr.io/${OWNER}/tasktime-backend:${SHA}"
+            echo "ghcr.io/${OWNER}/tasktime-backend:main"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
           {
             echo "web_tags<<EOF"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-web:${SHA}"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-web:main"
+            echo "ghcr.io/${OWNER}/tasktime-web:${SHA}"
+            echo "ghcr.io/${OWNER}/tasktime-web:main"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
           {
             echo "pipeline_tags<<EOF"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-pipeline:${SHA}"
-            echo "ghcr.io/${{ github.repository_owner }}/tasktime-pipeline:main"
+            echo "ghcr.io/${OWNER}/tasktime-pipeline:${SHA}"
+            echo "ghcr.io/${OWNER}/tasktime-pipeline:main"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -244,7 +245,8 @@ jobs:
           # Strip previous PIPELINE_* lines (grep -v exits 1 if all lines match — ignore)
           printf '%s\n' "$REMOTE_CONTENT" | grep -v '^PIPELINE_' > deploy/env/.env.staging || true
           {
-            echo "PIPELINE_IMAGE=ghcr.io/${{ github.repository_owner }}/tasktime-pipeline"
+            OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            echo "PIPELINE_IMAGE=ghcr.io/${OWNER}/tasktime-pipeline"
             echo "PIPELINE_POSTGRES_USER=pipeline"
             echo "PIPELINE_POSTGRES_DB=pipeline"
             echo "PIPELINE_POSTGRES_PASSWORD=${{ secrets.PIPELINE_POSTGRES_PASSWORD }}"
