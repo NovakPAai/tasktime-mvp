@@ -215,11 +215,13 @@ export { router as batchesRouter };
 
 /** Parse APP_GITHUB_REPOS → [owner, repo] or throw */
 function getOwnerRepo(): [string, string] {
-  const ownerRepo = config.APP_GITHUB_REPOS.split(',').map((s: string) => s.trim()).find(Boolean);
-  if (!ownerRepo) throw new Error('APP_GITHUB_REPOS is not configured');
-  const parts = ownerRepo.split('/');
-  if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error(`Invalid APP_GITHUB_REPOS: ${ownerRepo}`);
-  return [parts[0], parts[1]];
+  const ownerRepo = config.APP_GITHUB_REPOS
+    .split(',')
+    .map((s: string) => s.trim())
+    .find(r => /^[^/\s]+\/[^/\s]+$/.test(r));
+  if (!ownerRepo) throw new Error('APP_GITHUB_REPOS is empty or contains no valid "owner/repo" entry');
+  const [owner, repo] = ownerRepo.split('/');
+  return [owner, repo];
 }
 
 /** Latest mergedSha from batch PRs, or '' */
@@ -290,14 +292,6 @@ router.post('/:id/deploy-production', async (req, res, next) => {
       return;
     }
 
-    const runningProd = await prisma.deployEvent.findFirst({
-      where: { stagingBatchId: batchId, target: 'PRODUCTION', status: 'RUNNING' },
-    });
-    if (runningProd) {
-      res.status(409).json({ error: 'A production deploy is already in progress for this batch' });
-      return;
-    }
-
     const imageTag = (req.body?.imageTag as string | undefined) || await getImageTag(batchId);
     if (!imageTag) {
       res.status(422).json({ error: 'No imageTag available — batch has no merged PRs with a SHA' });
@@ -306,16 +300,34 @@ router.post('/:id/deploy-production', async (req, res, next) => {
 
     const [owner, repo] = getOwnerRepo();
 
-    const [deployEvent, updatedBatch] = await prisma.$transaction([
-      prisma.deployEvent.create({
-        data: { target: 'PRODUCTION', status: 'RUNNING', imageTag, gitSha: imageTag, triggeredById: req.caller?.userId ?? 'unknown', stagingBatchId: batchId },
-      }),
-      prisma.stagingBatch.update({
-        where: { id: batchId },
-        data: {},  // state stays PASSED until callback confirms success
-        include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
-      }),
-    ]);
+    // Duplicate-protection + event creation in a single interactive transaction
+    // to close the check-then-insert race window.
+    let deployEvent: import('@prisma/client').DeployEvent;
+    let updatedBatch: import('@prisma/client').StagingBatch & { pullRequests: { id: string; externalId: number; title: string; ciStatus: string }[]; deployEvents: import('@prisma/client').DeployEvent[] };
+    try {
+      [deployEvent, updatedBatch] = await prisma.$transaction(async (tx) => {
+        const running = await tx.deployEvent.findFirst({
+          where: { stagingBatchId: batchId, target: 'PRODUCTION', status: 'RUNNING' },
+        });
+        if (running) throw Object.assign(new Error('ALREADY_RUNNING'), { code: 'ALREADY_RUNNING' });
+
+        const event = await tx.deployEvent.create({
+          data: { target: 'PRODUCTION', status: 'RUNNING', imageTag, gitSha: imageTag, triggeredById: req.caller?.userId ?? 'unknown', stagingBatchId: batchId },
+        });
+        const btch = await tx.stagingBatch.update({
+          where: { id: batchId },
+          data: {},  // state stays PASSED until callback confirms success
+          include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
+        });
+        return [event, btch];
+      });
+    } catch (txErr: unknown) {
+      if ((txErr as { code?: string }).code === 'ALREADY_RUNNING') {
+        res.status(409).json({ error: 'A production deploy is already in progress for this batch' });
+        return;
+      }
+      throw txErr;
+    }
 
     try {
       await triggerWorkflowDispatch(owner, repo, 'deploy-production.yml', config.PIPELINE_GITHUB_REF, {

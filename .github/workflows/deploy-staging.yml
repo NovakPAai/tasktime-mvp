@@ -61,9 +61,12 @@ jobs:
 
       - name: Callback
         if: always() && inputs.batch_id != ''
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
-          STATUS=$([[ "${{ job.status }}" == "success" ]] && echo "SUCCESS" || echo "FAILURE")
+          STATUS=$([[ "$JOB_STATUS" == "success" ]] && echo "SUCCESS" || echo "FAILURE")
           curl -sf -X POST "${{ secrets.PIPELINE_SERVICE_URL }}/api/batches/${{ inputs.batch_id }}/deploy-callback" \
             -H "x-pipeline-api-key: ${{ secrets.PIPELINE_SERVICE_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"$STATUS\",\"workflowRunId\":${{ github.run_id }},\"workflowRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
+            -d "{\"status\":\"$STATUS\",\"workflowRunId\":${{ github.run_id }},\"workflowRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            || echo "WARNING: callback delivery failed — batch ${{ inputs.batch_id }} may need manual status update"
