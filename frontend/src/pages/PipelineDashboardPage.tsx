@@ -161,6 +161,8 @@ export default function PipelineDashboardPage() {
     }
   };
 
+  const [deploying, setDeploying] = useState(false);
+
   const handleTransition = async (batchId: string, state: BatchState) => {
     try {
       await pipelineApi.transitionState(batchId, state);
@@ -169,6 +171,40 @@ export default function PipelineDashboardPage() {
       setError(e instanceof Error ? e.message : 'Ошибка перехода');
     }
   };
+
+  const handleDeployStaging = async (batchId: string) => {
+    setDeploying(true);
+    setError(null);
+    try {
+      await pipelineApi.deployStagingBatch(batchId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка запуска деплоя на стейдж');
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleDeployProd = async (batchId: string) => {
+    setDeploying(true);
+    setError(null);
+    try {
+      await pipelineApi.deployProductionBatch(batchId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка запуска деплоя в прод');
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  // Poll every 10s when a batch is actively deploying
+  useEffect(() => {
+    const hasActive = batches.some(b => ['DEPLOYING'].includes(b.state));
+    if (!hasActive) return;
+    const id = setInterval(() => load(), 10_000);
+    return () => clearInterval(id);
+  }, [batches, load]);
 
   // Derived stats
   const activeBatch = batches.find(b => ['COLLECTING','DEPLOYING','TESTING','PASSED'].includes(b.state));
@@ -355,7 +391,7 @@ export default function PipelineDashboardPage() {
                 {/* Actions */}
                 <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {selected.state === 'COLLECTING' && (
-                    <ActionBtn label="→ Deploy Staging" color={C.acc} onClick={() => handleTransition(selected.id, 'DEPLOYING')} />
+                    <ActionBtn label={deploying ? 'Запуск...' : '→ Deploy Staging'} color={C.acc} onClick={() => handleDeployStaging(selected.id)} disabled={deploying} />
                   )}
                   {selected.state === 'DEPLOYING' && (
                     <>
@@ -370,7 +406,7 @@ export default function PipelineDashboardPage() {
                     </>
                   )}
                   {selected.state === 'PASSED' && (
-                    <ActionBtn label="🚀 Deploy to Production" color={C.acc} onClick={() => handleTransition(selected.id, 'RELEASED')} />
+                    <ActionBtn label={deploying ? 'Запуск...' : '🚀 Deploy to Production'} color={C.acc} onClick={() => handleDeployProd(selected.id)} disabled={deploying} />
                   )}
                   {selected.state === 'FAILED' && (
                     <ActionBtn label="↩ Restart" color={C.muted} onClick={() => handleTransition(selected.id, 'COLLECTING')} />
@@ -411,11 +447,12 @@ export default function PipelineDashboardPage() {
 }
 
 // ── Small helper ──────────────────────────────────────────────────────────────
-function ActionBtn({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
+function ActionBtn({ label, color, onClick, disabled }: { label: string; color: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
-      style={{ fontSize: 12, fontWeight: 600, color: '#FFF', backgroundColor: color, border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: '"Inter", system-ui, sans-serif' }}
+      disabled={disabled}
+      style={{ fontSize: 12, fontWeight: 600, color: '#FFF', backgroundColor: color, border: 'none', borderRadius: 6, padding: '5px 12px', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: '"Inter", system-ui, sans-serif' }}
     >
       {label}
     </button>

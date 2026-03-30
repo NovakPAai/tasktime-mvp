@@ -170,4 +170,20 @@ export const pipelineApi = {
     pipelineFetch<void>(`/api/batches/${batchId}/prs/${prId}`, { method: 'DELETE' }),
 
   syncGitHub: () => pipelineFetch<{ synced: number; repo: string; truncated: boolean }>('/api/github/sync', { method: 'POST' }),
+
+  deployStagingBatch: async (batchId: string, imageTag?: string): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${batchId}/deploy-staging`, {
+      method: 'POST',
+      body: JSON.stringify(imageTag ? { imageTag } : {}),
+    });
+    return mapBatch((raw as any)?.data ?? unwrap(raw));
+  },
+
+  deployProductionBatch: async (batchId: string, imageTag?: string): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${batchId}/deploy-production`, {
+      method: 'POST',
+      body: JSON.stringify(imageTag ? { imageTag } : {}),
+    });
+    return mapBatch((raw as any)?.data ?? unwrap(raw));
+  },
 };

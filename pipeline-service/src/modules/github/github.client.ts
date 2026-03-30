@@ -138,3 +138,27 @@ export async function listCheckRunsForCommit(
   );
   return check_runs;
 }
+
+export async function triggerWorkflowDispatch(
+  owner: string,
+  repo: string,
+  workflowFile: string,
+  ref: string,
+  inputs: Record<string, string>,
+): Promise<void> {
+  const res = await fetch(`${BASE}/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ref, inputs }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`GitHub workflow dispatch failed (${res.status}): ${text}`);
+  }
+}

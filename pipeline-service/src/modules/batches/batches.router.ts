@@ -4,6 +4,8 @@ import { prisma } from '../../prisma/client.js';
 import { apiKeyAuth } from '../../shared/middleware/api-key-auth.js';
 import { validate } from '../../shared/middleware/validate.js';
 import type { StagingBatchState } from '@prisma/client';
+import { triggerWorkflowDispatch } from '../github/github.client.js';
+import { config } from '../../config.js';
 
 const router = Router();
 router.use(apiKeyAuth);
@@ -208,3 +210,167 @@ router.delete('/:id/prs/:prId', async (req, res, next) => {
 });
 
 export { router as batchesRouter };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Parse APP_GITHUB_REPOS → [owner, repo] or throw */
+function getOwnerRepo(): [string, string] {
+  const ownerRepo = config.APP_GITHUB_REPOS.split(',').map((s: string) => s.trim()).find(Boolean);
+  if (!ownerRepo) throw new Error('APP_GITHUB_REPOS is not configured');
+  const parts = ownerRepo.split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error(`Invalid APP_GITHUB_REPOS: ${ownerRepo}`);
+  return [parts[0], parts[1]];
+}
+
+/** Latest mergedSha from batch PRs, or '' */
+async function getImageTag(batchId: string): Promise<string> {
+  const batch = await prisma.stagingBatch.findUnique({
+    where: { id: batchId },
+    include: { pullRequests: { orderBy: { mergedAt: 'desc' }, take: 1 } },
+  });
+  return batch?.pullRequests[0]?.mergedSha?.slice(0, 7) ?? '';
+}
+
+// ─── POST /api/batches/:id/deploy-staging ─────────────────────────────────────
+
+router.post('/:id/deploy-staging', async (req, res, next) => {
+  try {
+    const batchId = req.params.id as string;
+    const batch = await prisma.stagingBatch.findUnique({ where: { id: batchId } });
+    if (!batch) { res.status(404).json({ error: 'Batch not found' }); return; }
+    if (!['COLLECTING', 'MERGING'].includes(batch.state)) {
+      res.status(422).json({ error: `Batch must be COLLECTING or MERGING to deploy staging (current: ${batch.state})` });
+      return;
+    }
+
+    const imageTag = (req.body?.imageTag as string | undefined) || await getImageTag(batchId);
+    if (!imageTag) {
+      res.status(422).json({ error: 'No imageTag available — batch has no merged PRs with a SHA' });
+      return;
+    }
+
+    const [owner, repo] = getOwnerRepo();
+    await triggerWorkflowDispatch(owner, repo, 'deploy-staging.yml', config.PIPELINE_GITHUB_REF, {
+      image_tag: imageTag,
+      batch_id: batchId,
+    });
+
+    const [deployEvent, updatedBatch] = await prisma.$transaction([
+      prisma.deployEvent.create({
+        data: { target: 'STAGING', status: 'RUNNING', imageTag, gitSha: imageTag, triggeredById: req.caller?.userId ?? 'unknown', stagingBatchId: batchId },
+      }),
+      prisma.stagingBatch.update({
+        where: { id: batchId },
+        data: { state: 'DEPLOYING' },
+        include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
+      }),
+    ]);
+
+    res.json({ data: updatedBatch, deployEvent });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /api/batches/:id/deploy-production ──────────────────────────────────
+
+router.post('/:id/deploy-production', async (req, res, next) => {
+  try {
+    const batchId = req.params.id as string;
+    const batch = await prisma.stagingBatch.findUnique({ where: { id: batchId } });
+    if (!batch) { res.status(404).json({ error: 'Batch not found' }); return; }
+    if (batch.state !== 'PASSED') {
+      res.status(422).json({ error: `Batch must be PASSED to deploy production (current: ${batch.state})` });
+      return;
+    }
+
+    const imageTag = (req.body?.imageTag as string | undefined) || await getImageTag(batchId);
+    if (!imageTag) {
+      res.status(422).json({ error: 'No imageTag available — batch has no merged PRs with a SHA' });
+      return;
+    }
+
+    const [owner, repo] = getOwnerRepo();
+    await triggerWorkflowDispatch(owner, repo, 'deploy-production.yml', config.PIPELINE_GITHUB_REF, {
+      image_tag: imageTag,
+      batch_id: batchId,
+    });
+
+    const [deployEvent, updatedBatch] = await prisma.$transaction([
+      prisma.deployEvent.create({
+        data: { target: 'PRODUCTION', status: 'RUNNING', imageTag, gitSha: imageTag, triggeredById: req.caller?.userId ?? 'unknown', stagingBatchId: batchId },
+      }),
+      prisma.stagingBatch.update({
+        where: { id: batchId },
+        data: {},  // state stays PASSED until callback confirms success
+        include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
+      }),
+    ]);
+
+    res.json({ data: updatedBatch, deployEvent });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /api/batches/:id/deploy-callback ────────────────────────────────────
+
+const callbackBody = z.object({
+  status: z.enum(['SUCCESS', 'FAILURE']),
+  workflowRunId: z.number().optional(),
+  workflowRunUrl: z.string().url().optional(),
+  errorMessage: z.string().optional(),
+});
+
+router.post('/:id/deploy-callback', validate(callbackBody), async (req, res, next) => {
+  try {
+    const batchId = req.params.id as string;
+    const { status, workflowRunId, workflowRunUrl, errorMessage } = req.body as z.infer<typeof callbackBody>;
+
+    const batch = await prisma.stagingBatch.findUnique({
+      where: { id: batchId },
+      include: { deployEvents: { where: { status: 'RUNNING' }, orderBy: { startedAt: 'desc' }, take: 1 } },
+    });
+    if (!batch) { res.status(404).json({ error: 'Batch not found' }); return; }
+
+    const runningEvent = batch.deployEvents[0];
+    const finishedAt = new Date();
+
+    // Determine new batch state based on deploy target + result
+    let newBatchState: import('@prisma/client').StagingBatchState | null = null;
+    if (runningEvent) {
+      if (runningEvent.target === 'STAGING') {
+        newBatchState = status === 'SUCCESS' ? 'TESTING' : 'FAILED';
+      } else if (runningEvent.target === 'PRODUCTION') {
+        newBatchState = status === 'SUCCESS' ? 'RELEASED' : 'FAILED';
+      }
+    }
+
+    const [updatedEvent, updatedBatch] = await prisma.$transaction([
+      runningEvent
+        ? prisma.deployEvent.update({
+            where: { id: runningEvent.id },
+            data: {
+              status: status === 'SUCCESS' ? 'SUCCESS' : 'FAILURE',
+              finishedAt,
+              durationMs: runningEvent.startedAt ? finishedAt.getTime() - runningEvent.startedAt.getTime() : null,
+              workflowRunId: workflowRunId ?? null,
+              workflowRunUrl: workflowRunUrl ?? null,
+              errorMessage: errorMessage ?? null,
+            },
+          })
+        : prisma.deployEvent.create({
+            data: { target: 'STAGING', status: 'FAILURE', imageTag: 'unknown', triggeredById: 'callback', stagingBatchId: batchId, errorMessage: 'No running deploy found' },
+          }),
+      prisma.stagingBatch.update({
+        where: { id: batchId },
+        data: newBatchState ? { state: newBatchState } : {},
+        include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
+      }),
+    ]);
+
+    res.json({ data: updatedBatch, deployEvent: updatedEvent });
+  } catch (err) {
+    next(err);
+  }
+});
