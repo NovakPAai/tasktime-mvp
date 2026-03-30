@@ -58,6 +58,7 @@ echo "Deploy lock acquired: $LOCK_FILE (PID $$)"
 set -a
 . "$COMPOSE_ENV_FILE"
 . "$BACKEND_ENV_FILE"
+. "$PIPELINE_ENV_FILE"
 set +a
 
 HEALTH_URL="http://127.0.0.1:${WEB_HTTP_PORT:-80}/healthz"
