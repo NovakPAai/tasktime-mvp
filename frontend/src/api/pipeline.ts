@@ -78,7 +78,7 @@ function mapPr(raw: any): PrSnapshot {
     prTitle: raw.title ?? raw.prTitle ?? '',
     prUrl: raw.htmlUrl ?? raw.prUrl ?? '',
     author: raw.author ?? '',
-    headSha: raw.mergedSha ?? raw.branch ?? raw.headSha ?? '',
+    headSha: raw.mergedSha ?? raw.headSha ?? '',
     mergedAt: raw.mergedAt ?? null,
     ciStatus: raw.ciStatus ?? 'PENDING',
     batchId: raw.stagingBatchId ?? raw.batchId ?? '',
