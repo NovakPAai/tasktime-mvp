@@ -153,11 +153,11 @@ export default function PipelineDashboardPage() {
     try {
       await pipelineApi.syncGitHub();
       setLastSync(new Date());
-      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка синхронизации');
     } finally {
       setSyncing(false);
+      await load();
     }
   };
 
