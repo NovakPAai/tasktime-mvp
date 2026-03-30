@@ -46,6 +46,8 @@ fi
 
 # --- Level 3: flock — prevent concurrent deploys on the same server ---
 LOCK_FILE="/tmp/deploy-${ENVIRONMENT}.lock"
+# Remove stale lock files owned by other users (Permission denied on exec)
+rm -f "$LOCK_FILE" 2>/dev/null || true
 exec 200>"$LOCK_FILE"
 if ! flock -n 200; then
   echo "ERROR: Another deploy to $ENVIRONMENT is already running (lock: $LOCK_FILE)"
