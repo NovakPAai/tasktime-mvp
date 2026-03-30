@@ -62,21 +62,41 @@ export interface PipelineHealth {
   buildTime: string;
 }
 
+// Pipeline API wraps list responses in { data: T[], total, limit, offset }
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export const pipelineApi = {
   health: () => pipelineFetch<PipelineHealth>('/api/health'),
 
-  getBatches: () => pipelineFetch<StagingBatch[]>('/api/batches'),
+  getBatches: async (): Promise<StagingBatch[]> => {
+    const res = await pipelineFetch<PaginatedResponse<StagingBatch>>('/api/batches');
+    return res.data;
+  },
 
-  getBatch: (id: string) => pipelineFetch<StagingBatch>(`/api/batches/${id}`),
+  getBatch: async (id: string): Promise<StagingBatch> => {
+    const res = await pipelineFetch<{ data: StagingBatch }>(`/api/batches/${id}`);
+    return res.data;
+  },
 
-  createBatch: (data: { title: string; repo: string; createdBy: string; notes?: string }) =>
-    pipelineFetch<StagingBatch>('/api/batches', { method: 'POST', body: JSON.stringify(data) }),
+  createBatch: async (data: { title: string; repo: string; createdBy: string; notes?: string }): Promise<StagingBatch> => {
+    const res = await pipelineFetch<{ data: StagingBatch }>('/api/batches', { method: 'POST', body: JSON.stringify(data) });
+    return res.data;
+  },
 
-  transitionState: (id: string, state: StagingBatch['state'], extra?: { stagingUrl?: string; notes?: string; prodSha?: string }) =>
-    pipelineFetch<StagingBatch>(`/api/batches/${id}/state`, { method: 'PATCH', body: JSON.stringify({ state, ...extra }) }),
+  transitionState: async (id: string, state: StagingBatch['state'], extra?: { stagingUrl?: string; notes?: string; prodSha?: string }): Promise<StagingBatch> => {
+    const res = await pipelineFetch<{ data: StagingBatch }>(`/api/batches/${id}/state`, { method: 'PATCH', body: JSON.stringify({ state, ...extra }) });
+    return res.data;
+  },
 
-  addPr: (batchId: string, pr: Omit<PrSnapshot, 'id' | 'batchId'>) =>
-    pipelineFetch<PrSnapshot>(`/api/batches/${batchId}/prs`, { method: 'POST', body: JSON.stringify(pr) }),
+  addPr: async (batchId: string, pr: Omit<PrSnapshot, 'id' | 'batchId'>): Promise<PrSnapshot> => {
+    const res = await pipelineFetch<{ data: PrSnapshot }>(`/api/batches/${batchId}/prs`, { method: 'POST', body: JSON.stringify(pr) });
+    return res.data;
+  },
 
   removePr: (batchId: string, prId: string) =>
     pipelineFetch<void>(`/api/batches/${batchId}/prs/${prId}`, { method: 'DELETE' }),
