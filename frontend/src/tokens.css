@@ -1,6 +1,5 @@
 /**
  * АВТОГЕНЕРИРУЕМЫЙ ФАЙЛ. НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ.
- * Источник: src/design-tokens.ts
  */
 
 :root {
@@ -53,8 +52,8 @@
   --space-6: 16px;
   --space-7: 20px;
   --space-8: 24px;
-  --font-display: ;
-  --font-sans: ;
+  --font-display: "Space Grotesk", Inter, system-ui, sans-serif;
+  --font-sans: Inter, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --fs-xs: 12px;
   --fs-sm: 13px;

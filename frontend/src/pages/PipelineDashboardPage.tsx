@@ -153,11 +153,11 @@ export default function PipelineDashboardPage() {
     try {
       await pipelineApi.syncGitHub();
       setLastSync(new Date());
-      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка синхронизации');
     } finally {
       setSyncing(false);
+      await load();
     }
   };
 
@@ -215,6 +215,8 @@ export default function PipelineDashboardPage() {
             <button
               onClick={handleSync}
               disabled={syncing}
+              aria-busy={syncing}
+              aria-disabled={syncing}
               style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundImage: 'linear-gradient(135deg, #4B63E3 0%, #3B52D4 100%)', borderRadius: 8, padding: '6px 14px', border: 'none', cursor: syncing ? 'wait' : 'pointer', opacity: syncing ? 0.7 : 1 }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 7A6 6 0 101 7" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" /><path d="M13 3v4h-4" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -304,7 +306,11 @@ export default function PipelineDashboardPage() {
                 return (
                   <div
                     key={batch.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedBatch(isSelected ? null : batch.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedBatch(isSelected ? null : batch.id); }}
                     style={{ padding: '10px 16px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', backgroundColor: isSelected ? C.accBg : 'transparent', display: 'flex', alignItems: 'center', gap: 12 }}
                   >
                     <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: cfg.dot, flexShrink: 0 }} />

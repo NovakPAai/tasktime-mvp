@@ -165,11 +165,14 @@ async function syncDeployRuns(owner: string, repo: string): Promise<number> {
 // ─── main sync ────────────────────────────────────────────────────────────────
 
 export async function runSync(): Promise<{ prs: number; deploys: number }> {
-  const [ownerRepo] = config.GITHUB_REPOS.split(',').map(s => s.trim());
-  if (!ownerRepo) throw new Error('GITHUB_REPOS is empty');
+  const ownerRepo = config.APP_GITHUB_REPOS.split(',').map(s => s.trim()).find(Boolean);
+  if (!ownerRepo) throw new Error('APP_GITHUB_REPOS is empty');
 
-  const [owner, repo] = ownerRepo.split('/');
-  if (!owner || !repo) throw new Error(`Invalid GITHUB_REPOS format: ${ownerRepo}. Expected owner/repo`);
+  const parts = ownerRepo.split('/').map(s => s.trim());
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error(`Invalid APP_GITHUB_REPOS format: ${ownerRepo}. Expected owner/repo`);
+  }
+  const [owner, repo] = parts;
 
   const [prs, deploys] = await Promise.all([
     syncPRs(owner, repo),
