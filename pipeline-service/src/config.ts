@@ -14,7 +14,7 @@ const envSchema = z.object({
 
   // GitHub integration
   GITHUB_TOKEN: z.string().default(''),
-  APP_GITHUB_REPOS: z.string().default(''),         // comma-separated "owner/repo" list
+  APP_GITHUB_REPOS: z.string().default(process.env['GITHUB_REPOS'] ?? ''), // fallback for legacy GITHUB_REPOS env
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
 
   // Polling interval in seconds (min 30s to respect GitHub rate limits)
