@@ -99,12 +99,12 @@ router.get(
 router.post('/admin/users/:email/reset-password', requireRole('SUPER_ADMIN', 'ADMIN'), async (req, res, next) => {
   try {
     const { email } = req.params;
-    const { newPassword } = req.body as { newPassword?: string };
-    if (!newPassword) {
-      res.status(400).json({ error: 'newPassword is required' });
+    const { newPassword } = req.body as { newPassword?: unknown };
+    if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+      res.status(400).json({ error: 'newPassword is required and must be a non-empty string' });
       return;
     }
-    const user = await rotateUserPassword({ email: decodeURIComponent(email), newPassword });
+    const user = await rotateUserPassword({ email, newPassword: newPassword.trim() });
     res.json({ success: true, userId: user.id, email: user.email });
   } catch (err) {
     next(err);
