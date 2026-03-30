@@ -1,0 +1,320 @@
+# Changelog
+
+## 2026-03-26
+
+### jackrescuer-gif
+
+- `d0d1cd5b` docs: auto-generated API reference, data model, backend/frontend architecture (2026-03-26)
+- `acd27c94` feat(docs): максимальная автоматизация документации (2026-03-26)
+- `e864e2ff` fix(hooks): использовать абсолютный путь в PostToolUse хуке (2026-03-26)
+
+### github-actions[bot]
+
+- `2b46487f` chore: update changelog [skip ci] (2026-03-26)
+
+## 2026-03-26
+
+### St1tcher86
+
+- `1859aab7` docs(version): 2.4 — fix workflow admin editor и scheme editor (2026-03-26)
+
+### github-actions[bot]
+
+- `efe7d0b8` chore: update changelog [skip ci] (2026-03-26)
+
+## 2026-03-26
+
+### St1tcher86
+
+- `15d17154` fix(admin): workflow editor crashes + scheme editor can't manage mappings (#134) (2026-03-26)
+
+### github-actions[bot]
+
+- `2ffdfa6d` chore: update changelog [skip ci] (2026-03-26)
+
+## 2026-03-26
+
+### St1tcher86
+
+- `8c68fe96` feat(workflow-engine): Sprint 6 — Workflow Engine (TTADM-58, 59, 62, 64, 65) (2026-03-26)
+
+### github-actions[bot]
+
+- `5b71e5dc` chore: update changelog [skip ci] (2026-03-25)
+
+## 2026-03-25
+
+### Novak Pavel
+
+- `2c792db5` fix(ci): исправить SHA mismatch в deploy-staging (#127) (2026-03-25)
+
+### github-actions[bot]
+
+- `057f0578` chore: update changelog [skip ci] (2026-03-25)
+
+## 2026-03-25
+
+### Novak Pavel
+
+- `3aa040c0` docs: живая документационная система — архитектура, API, user manual, автоматизация (#126) (2026-03-25)
+- `98cf0555` Claude/jack paper tokens (#114) (2026-03-23)
+- `e86c2699` feat: UI Kit 2.0 delta fix — sidebar icon, dashboard greeting, accent colours (#109) (2026-03-22)
+- `a5426f71` TTUI-165/166/167: Storybook + Chromatic Visual Regression + CSS Architecture split (#108) (2026-03-22)
+- `6e679f7a` refactor: Технический долг — TTUI-118, 121, 125 (#107) (2026-03-22)
+- `5c198067` feat: Ф6 — QA + lint fixes + Visual QA checklist (TTUI-113–116) (#106) (2026-03-22)
+- `b34e97bf` feat: Ф5 — UI Kit 2.0 high-risk pages (TTUI-110–112) (#105) (2026-03-22)
+- `c121efd7` feat: Ф4 — UI Kit 2.0 medium-risk pages (TTUI-104–109) (#104) (2026-03-22)
+- `aab4a1da` feat: Ф3 Страницы низкий риск — Login, Projects, Settings (UI Kit 2.0) (#103) (2026-03-22)
+- `929291f5` feat: Ф2 Shared Components — UI Kit 2.0 компонентная база (#102) (2026-03-22)
+- `7ab9229f` feat: Ф1 Design Tokens — Flow Universe UI Kit 2.0 палитра и шрифты (#101) (2026-03-22)
+- `ae5c147f` fix: migration FK format — add ON UPDATE CASCADE to match Prisma standard (#99) (2026-03-21)
+- `2db4fc9c` feat: Release → Sprint binding with readiness guards (TTMP-140) (#98) (2026-03-21)
+- `67499066` fix: увеличить время жизни access token с 15m до 1h (#97) (2026-03-21)
+- `1060fbe5` fix: обновить страницу логина с обобщённой стилизацией (#71) (2026-03-20)
+- `3738e6b9` fix: AI decompose — semantic subtasks, fix 64-subtask bug (TTUI-6) (#51) (2026-03-20)
+- `12ef6b61` feat: AI Developer account + AI decompose semantic fix (TTUI-6) (#54) (2026-03-20)
+
+### St1tcher86
+
+- `4d575116` fix(custom-fields): принимать null в description при обновлении поля (2026-03-24)
+- `cdf6ea80` fix(custom-fields): убрать hex-regex для color в selectOptionSchema (2026-03-24)
+- `65dec247` docs(version): добавить записи 1.6 и 1.7 — sprint/ttadm (TTADM-33, TTADM-52) (2026-03-24)
+- `8314668a` feat(sprint/ttadm): TTADM-33 fix admin реактивация + TTADM-52 тип поля Справочник (#125) (2026-03-24)
+- `5c25e09c` fix(comments): разрешить SUPER_ADMIN удалять и редактировать чужие комментарии (#124) (2026-03-24)
+- `f793cc84` docs(version): добавить запись 1.5 — унификация статусов спринта (2026-03-24)
+- `026176d1` fix(sprints): заменить кастомные пилюли статусов на IssueStatusTag (#123) (2026-03-24)
+- `62040bd4` fix(sprints): добавить задачи в активный спринт + тип тикета в таблице (#122) (2026-03-24)
+- `dedc0226` fix(issues): устранить потерю фокуса и отсутствие обновления кастомных полей (TTADM-55) (#121) (2026-03-24)
+- `bcb5f653` feat(issues): custom fields in edit modal (TTADM-51) (#120) (2026-03-23)
+- `30955831` fix: обновить имена токенов в App.tsx после рефакторинга design-tokens (#119) (2026-03-23)
+- `90cde3f8` fix: убрать type из LINK_SELECT — поле удалено миграцией 20260322 (#118) (2026-03-23)
+- `b7b8df15` fix: устранить NO DATA в выборе направления связи задачи (#116) (2026-03-23)
+- `70aeeece` fix(links): 500 при сохранении видов связей + системный бейдж + заглавные буквы (#115) (2026-03-23)
+- `624bd391` fix(sprints): типы задач в бэклоге, удаление из спринта, редактирование спринта (2026-03-23)
+- `93dc0528` fix(sprints): фильтр завершённых задач и обновление списка спринта (TTMP-143) (2026-03-23)
+- `3e64bc32` fix(sprints): восстановить добавление задач в спринт (TTMP-143) (#113) (2026-03-23)
+- `f63a7b68` fix(links): исправлен no data в связях, выбор направления, группировка, редактирование видов (#112) (2026-03-23)
+- `0e155b54` feat(issues): поле «Срок исполнения» (dueDate) + custom fields fix + refactor IssueType (2026-03-22)
+- `954692bf` feat(issues): TTADM-46 — block DONE transition on missing required fields (frontend) (#96) (2026-03-21)
+- `2ace35ca` feat(issues): TTADM-45+47+48 — custom fields on issue card, kanban and create form (#95) (2026-03-21)
+- `912980db` feat(admin-ui): TTADM-42+43+44 — страницы схем полей и модалка конфликтов (#94) (2026-03-21)
+- `acdd9bca` feat(admin-ui): TTADM-49+41 — роутинг и страница управления кастомными полями (#93) (2026-03-21)
+- `f2521541` feat(issues): TTADM-40 — блокировка DONE при незаполненных обязательных полях (#92) (2026-03-21)
+- `70164d60` feat(issue-custom-fields): TTADM-39 — API кастомных полей задачи (#91) (2026-03-21)
+- `18b520c4` feat(field-schemas): TTADM-38 — проверка конфликтов при публикации схемы (#90) (2026-03-21)
+- `553cf903` feat(field-schemas): TTADM-36+37 — backend модуль схем полей и биндингов (#89) (2026-03-21)
+- `8940e134` feat(custom-fields): TTADM-35 — backend модуль кастомных полей (#80) (2026-03-21)
+- `df05eebd` docs: версионирование в version_history.md — v0.1 + правило в CLAUDE.md (2026-03-21)
+- `18032e6f` docs: version_history.md + правило фиксации изменений в CLAUDE.md (2026-03-21)
+- `1f848713` feat(admin): управление публичной регистрацией пользователей (TTADM-32) (2026-03-21)
+- `1f01936e` fix(docs): исправить email учётки Claude в CLAUDE.md (.com → .ru) (2026-03-21)
+- `bf64f9ab` feat(auth): case-insensitive email — normalize to lowercase on login/register (TTADM-31) (#78) (2026-03-21)
+- `66c120a1` feat(users): безопасное удаление с проверкой зависимостей и деактивацией (#77) (2026-03-21)
+- `8a91aa32` feat(admin): переименовать «Роли» в «Назначение ролей», добавить справку по правам (TTADM-28) (#76) (2026-03-20)
+- `598a2a11` Update CLAUDE.md (2026-03-20)
+- `c181e61f` docs: добавить access_rights.md с матрицей прав по ролям (RU + ENG) (#75) (2026-03-20)
+- `ed8c6811` fix(auth): включить mustChangePassword в ответ login (TTADM-25) (#74) (2026-03-20)
+- `c5ec6d9c` fix(admin): распаковать .users из пагинированного ответа в listAdminUsers (TTADM-24) (#73) (2026-03-20)
+- `80da76ea` Update CLAUDE.md (2026-03-20)
+- `2d023882` feat: RBAC — управление пользователями и проектными ролями (#72) (2026-03-20)
+- `5b662fa1` fix: auto-apply filters on change and strip '->' prefix from custom type names (#70) (2026-03-20)
+- `8fa8a42a` fix(issues): add issueTypeConfigId filter support for custom issue types (#69) (2026-03-20)
+- `cdf16334` fix(frontend): adapt issue types to configurable IssueTypeConfig in 11 locations (#68) (2026-03-20)
+- `91692553` fix: show correct issue type badge in links section (#67) (2026-03-19)
+- `e68d9653` feat: render issue type badge with icon and color from IssueTypeConfig (#66) (2026-03-19)
+- `bddd6ffa` feat(rbac): allow SUPER_ADMIN to delete issues (single + bulk) (#65) (2026-03-19)
+- `56bfbeb7` fix: expand arrow click triggers navigation instead of tree expand (#64) (2026-03-19)
+- `268298a0` feat(issues): delete for admin — single card + bulk from project view (#63) (2026-03-19)
+- `d7cd5f2f` feat(admin): add search by name in scheme issue types selector (#62) (2026-03-19)
+- `6b2b4f77` fix(db): add migration to seed system issue type configs on prod (#61) (2026-03-19)
+- `dd6bce18` feat: add Типы задач and Схемы типов задач to admin sidebar menu (#60) (2026-03-19)
+- `5bc7e719` feat: issue type configs, schemes, and project bindings (#59) (2026-03-19)
+- `a60ecee1` docs: update MVP_DOMAIN_MODEL to reflect implemented state (March 2026) (#58) (2026-03-19)
+- `1ace2070` refactor(admin): replace tabs with sidebar submenu (#57) (2026-03-19)
+- `872552db` fix(ui): increase tree indent to 24px per nesting level (#56) (2026-03-19)
+- `314aad83` fix(ui): hide expand icon for leaf issues in tree view (#55) (2026-03-19)
+- `612303c0` feat(issues): modal edit dialog for issue detail page (#36) (2026-03-17)
+- `a196db22` fix: кнопка создания проекта + категории в модалке Admin (2026-03-17)
+- `bffb1a20` feat: TTMP-124 Администрирование проектов (2026-03-17)
+- `dece3053` feat(issues): hierarchical tree view with flat/tree toggle (TTMP-97) (#33) (2026-03-17)
+- `f176f81d` feat(links): global issue search across all projects by code (TTMP-120) (#28) (2026-03-17)
+- `bff6b380` fix(links): allow ADMIN and MANAGER roles to read link types (#26) (2026-03-17)
+- `40434f5f` feat(links): add issue relations feature (TTMP-100, TTMP-101, TTMP-102, TTMP-107) (2026-03-17)
+- `aa5e439c` docs: add production URL to CLAUDE.md (2026-03-17)
+- `1dc9aba4` fix(ui): fix unreadable dark fonts in dark theme [TTMP-103] (2026-03-17)
+- `edaba0b4` feat: add colored backgrounds to task type icons (2026-03-17)
+- `8d490257` feat: add assignee editing for existing issues (2026-03-17)
+
+### jackrescuer-gif
+
+- `b0dfef0d` fix: structural stability and font rendering (2026-03-24)
+- `2ded6a12` feat: total design system enforcement - purged hundreds of HEX codes (2026-03-24)
+- `7358acc4` fix: resolve CSS syntax error in token synchronization script (2026-03-23)
+- `6621aaa0` fix: critical readability and font synchronization (2026-03-23)
+- `86f6bffa` feat: total design system enforcement - 100% Paper sync (2026-03-23)
+- `c377a409` fix: total layout and variable name synchronization (2026-03-23)
+- `1f134c96` fix: restore semantic tokens to design-tokens.ts to fix App.tsx type error (2026-03-23)
+- `57efe6b3` fix: total layout reconstruction - synchronized naming and removed dimension hardcode (2026-03-23)
+- `b51819a0` fix: restore layout variables - fixed sidebar and spacing (2026-03-23)
+- `c21a6f33` fix: layout recovery - synchronized JS and CSS token keys (2026-03-23)
+- `90335a75` fix: Docker build error - added scripts directory to Dockerfile (2026-03-23)
+- `5ff394b7` fix: CI/CD build error - simplified token sync script to pure JS (2026-03-23)
+- `b32a02c6` fix: frontend build error - added tsx loader for token synchronization script (2026-03-23)
+- `3c07142a` feat: implemented Design System SSOT architecture (2026-03-23)
+- `3534ccbb` style: radical cleanup of old visual effects (2026-03-23)
+- `0cd98416` fix: total aesthetic synchronization - connected Ant Design to design-tokens.ts (2026-03-23)
+- `6e009ac5` style: final design sync - refactored layout.css and pages.css (2026-03-23)
+- `08fe603e` fix: restore TypeScript fixes lost during merge conflicts (2026-03-23)
+- `40c503e5` fix: resolve TypeScript errors after design sync merge (2026-03-23)
+- `dc2a9e9a` feat: global aesthetic sync with Paper design 1:1 (2026-03-23)
+- `94818c41` feat: TimePage + SprintsPage 1:1 Paper дизайн (2026-03-22)
+- `9db8493f` feat: Board cards redesign + Issues stats bar — Paper 1:1 (2026-03-22)
+- `b5f3fb30` feat: UI Kit 2.0 — ProjectCard gradient avatars, Issues table, Login CSS, Sidebar cleanup (2026-03-22)
+- `91e10ba9` feat: Dashboard 1:1 с Paper — «Мои задачи», «Последние события», user-блок sidebar (2026-03-22)
+- `0fecc458` feat: UI Kit 2.0 delta fix — sidebar icon, dashboard greeting, accent colours (2026-03-22)
+- `db48b4a8` fix: restore missing CSS for project card grid and ProjectDetail stats (#52) (2026-03-19)
+- `03ee4d75` feat: self-monitoring dashboard for TaskTime MVP (#48) (2026-03-18)
+- `7f56e9cd` feat(ui): design tokens, issue-kit, unified components (TTUI-1..5) (#44) (2026-03-18)
+- `039a3040` feat: rebrand TaskTime to Flow Universe system-wide (#50) (2026-03-18)
+- `c4cd68d4` feat: добавить красивую анимированную кнопку переключения темы (#49) (2026-03-18)
+- `2c384acf` feat: redesign ProjectDetailPage — compact issues list UI (#46) (2026-03-18)
+- `9ebc47a2` feat: Projects page — Flow Universe card grid (#45) (2026-03-18)
+- `41b48510` fix: mobile responsive layout — sidebar overlay, topbar, tables (#43) (2026-03-18)
+- `a96ccee8` fix: mobile responsive layout, dark dropdowns, table overflow (#40) (2026-03-18)
+- `15e688ac` feat(ai): fallback на heuristic, aiReasoning в БД, suggest-assignee (#42) (2026-03-18)
+- `e46a1a91` docs: добавить Sprint 5 (AI Dev Loop + OpenAPI→MCP) в REBUILD_PLAN_V2 (#41) (2026-03-18)
+- `22e3c009` fix: strip markdown code blocks from Anthropic JSON response (#39) (2026-03-18)
+- `84310903` feat: inject AI_PROVIDER + ANTHROPIC_API_KEY from GitHub Secrets on deploy (#38) (2026-03-18)
+- `e9160526` fix: force-recreate containers on deploy to pick up env changes (#37) (2026-03-17)
+- `6abd79e5` fix: register /api/docs/json before swagger-ui middleware (#32) (2026-03-17)
+- `e37aa4be` feat: Sprint 5 — AI Dev Loop + Production (#30) (2026-03-17)
+- `ba447855` fix: TTMP-111 — скруглённые углы и прилипание IssuePreviewDrawer к дроеру спринта (#27) (2026-03-17)
+- `be6c9153` feat: добавить колонку Author в таблицу задач проекта (#29) (2026-03-17)
+- `2d8d5b9d` fix: TTMP-104 — дроер спринта отлипал от края (#24) (2026-03-17)
+- `ca30c403` feat: светлая тема интерфейса (TTMP-82/83/84) (#23) (2026-03-17)
+- `1e939336` chore: extend debug workflow (#22) (2026-03-17)
+- `ad31efb4` fix(ci): base64-encode SSH args to prevent shell re-expansion of bcrypt hash (#21) (2026-03-17)
+- `d2b15fb8` chore: temp debug workflow (#20) (2026-03-17)
+- `74aa4b76` docs: add root README with MVP infrastructure and system logic (#1) (2026-03-17)
+- `ee341762` docs: add collaboration flow for two-person AI-assisted team (#3) (2026-03-17)
+- `d9e43c0d` chore: upgrade actions/checkout@v4 → @v6 in import-ttmp-production workflow (#6) (2026-03-17)
+- `cde50a93` fix(ci): set is_active=true in reset-password upsert (#19) (2026-03-17)
+- `fa2e12b3` fix: add prisma migration drift check to CI + project rules (#10) (2026-03-17)
+- `3bcd1c3b` fix(ci): quoted heredoc + positional args to prevent bcrypt hash corruption (#18) (2026-03-17)
+- `35faf773` fix(ci): use snake_case column names in reset-password SQL (Prisma @map) (#17) (2026-03-17)
+- `9b13effd` fix(ci): use docker compose exec with production env file in reset-password workflow (#15) (2026-03-17)
+- `0b38609a` fix(ci): use correct postgres user 'tasktime' in reset-password workflow (#13) (2026-03-17)
+- `a03b9e5e` fix(ci): fix docker exec escaping in reset-password workflow — use bash heredoc over SSH (#12) (2026-03-17)
+- `4dca5805` fix(ci): add environment: production to reset-password workflow, upsert instead of update (#11) (2026-03-17)
+- `d62a7290` style: improve typography readability across the UI (#9) (2026-03-17)
+- `fef33d07` style: improve typography readability across the UI (2026-03-16)
+- `baf14be8` fix(users): update Георгий Дубовик email to georgi.dubovik@tasktime.ru (2026-03-16)
+- `a89e529b` fix(users): rename bootstrap SUPER_ADMIN to Георгий Дубовик (g.dubovik) (2026-03-16)
+- `1b203d0d` feat(users): add Egor Dubovic as SUPER_ADMIN bootstrap user (2026-03-16)
+- `3949eeb3` chore: add reset-password workflow (#5) (2026-03-17)
+- `eaeb73b6` feat: add SUPER_ADMIN role to UserRole enum and RBAC middleware (#4) (2026-03-16)
+
+## 2026-03-25
+
+### jackrescuer-gif
+
+- `697372c6` fix: export seedDatabase, TTMP_ONLY scope, ttmp-seed test and db:seed:ttmp script (2026-03-16)
+- `dc267142` fix: deploy — pull first, remove migrate status preflight that blocked on pending migrations (2026-03-16)
+- `2693777e` feat: GET /api/issues/key/:key, sync-issue-with-battle, AI estimate/decompose, releases, skill REST-first (2026-03-16)
+- `10822ea2` fix: seed sprint upsert — add state to update block so re-runs correct existing records (2026-03-16)
+- `fbec4c94` feat: update seed — Sprint 4 issues, fix PLANNED state, sync statuses (2026-03-16)
+- `81b9d325` fix: use npx tsx for db:seed:dev so it works in production container (2026-03-16)
+- `c451530a` fix: use npx tsx for db:seed so it works in production container (2026-03-16)
+- `401c2c61` feat: add Sprint 4 (AI + Интеграции + Polish) to seed (2026-03-16)
+- `8f4d0cd9` feat: add Sprint 4 (AI + Интеграции + Polish) to seed (2026-03-16)
+- `fea0eb96` fix: retry docker compose pull up to 3x on DNS timeout (2026-03-16)
+- `cf525434` fix: retry docker compose pull up to 3x on DNS timeout (2026-03-16)
+- `c2248ddd` fix: export seedDatabase with TTMP_ONLY scope support to unblock CI (2026-03-16)
+- `7d13afc0` fix: add missing prod-sync.domain.ts and fix webhooks TS type error (2026-03-16)
+- `3c82ec5b` fix: add missing prod-sync.domain.ts and fix webhooks TS type error (2026-03-16)
+- `52fca799` feat: GitLab webhook, login redesign, cursor rules, docs and plans (2026-03-16)
+- `9de0a726` feat: add launch announcement HTML page (2026-03-16)
+- `f90f496c` fix: show error instead of infinite spinner on AdminPage load failure (2026-03-16)
+- `c73041be` fix: remove unused getTimeLogCompositeKey import in prod-sync.ts (2026-03-15)
+- `039db687` fix: run TTMP import from built backend dist (2026-03-14)
+- `201fddc0` fix: run TTMP import non-interactively (2026-03-14)
+- `5ef2f768` fix: pin TTMP import to explicit image tag (2026-03-14)
+- `9be1d251` fix: add TTMP-only production import (2026-03-13)
+- `32eb1876` chore: upgrade docker/setup-buildx-action v3→v4 (Node.js 20 deprecation) (2026-03-13)
+- `2ad8ed3c` fix: harden CI/CD pipeline — Redis in CI, actions v6, deploy reliability, nginx security (2026-03-13)
+- `f1b6c0ac` fix: make production bootstrap write-only (2026-03-13)
+- `10801340` feat: add prod sync and My Time summary (2026-03-13)
+- `a617c41d` feat: add super admin access controls (2026-03-13)
+- `20970f02` fix production bootstrap and readiness checks (2026-03-13)
+- `8df88bf2` fix: restore backend CI for sprint service typing (2026-03-13)
+- `dd9738de` release 0.2 — add production deploy flow and sprint UX polish (2026-03-13)
+- `70e3ed20` feat: add AI sessions and sprints polish (2026-03-12)
+- `2c3340eb` fix: stabilize CI types and UAT flows (2026-03-12)
+- `a6502ce1` release 0.1 summary and Sprint 3 completion (2026-03-11)
+- `62ad6bd4` test: add backend e2e flows and stabilize admin reports (2026-03-11)
+- `bfb846b7` clarify workflow: local UAT and manual approval before git (2026-03-10)
+- `80110853` chore: finalize Sprint 2 and board validation (2026-03-10)
+- `39b1dd41` feat: Sprint 3 — teams and admin modules (2026-03-10)
+- `fbbf9f79` chore: refresh agent skills for Flow Universe v2 (2026-03-10)
+- `a0bb772f` test: stabilize backend suite and auth tokens (2026-03-10)
+- `9cd56bab` docs: правила экономии токенов — маршрутизация моделей Claude по ролям и задачам (2026-03-10)
+- `c96a0c36` feat: Sprint 2 — Board, Sprints, Time tracking, Comments, Issue detail (2026-03-10)
+- `7081ab48` feat(ui): топбар, дашборд Домой, командная панель ⌘K, дизайн-токены; улучшены сообщения при ошибке входа (2026-03-07)
+- `8f0dcdff` refactor: модульный бэкенд, реструктуризация docs, обновление cursor/skills (7 марта 2026) (2026-03-07)
+- `99dabcc0` feat(tasks): create story buttons and project kanban (2026-03-05)
+- `8f8b6fb5` feat(tasks): task-story link model and UI (2026-03-05)
+- `74156e71` fix(tasks): graceful fallback when project_id not migrated (2026-03-05)
+- `6eb0aad4` feat(tasks): link inline creation to real project (2026-03-05)
+- `7d02ae97` feat(tasks): inline registration block for Jira MVP (2026-03-05)
+- `5a856e09` feat(projects): real MVP Jira workspace with Kanban and real/demo split (2026-03-05)
+- `2066d9ac` docs: record HTTP/Secure-cookie auth pattern and admin panel fix (2026-03-02)
+- `fa23c503` fix(admin): use apiFetch in init() to send Bearer over HTTP (2026-03-02)
+- `ae97a5a8` fix(admin): smart Bearer+cookie retry in apiFetch; non-blocking loadStats in init (2026-03-02)
+- `0466ec50` fix(admin): cookie-only auth in apiFetch; resilient stats endpoint (2026-03-02)
+- `b44c3e2a` fix(admin): fallback to cookie if Bearer token expired; clean stale localStorage on 401 (2026-03-02)
+- `a77c5703` fix(admin): use correct localStorage key 'tasktime_token' (was 'tt_token') (2026-03-02)
+- `fbd81e1e` docs(skills): add admin panel patterns — RBAC, adminMiddleware, graceful migration, super-admin hierarchy (2026-03-02)
+- `0a36f7f2` feat(admin): admin panel with system stats, users, activity, deploys (2026-03-02)
+- `4af108fc` chore(skills): extract patterns from today's tasks (2026-03-02)
+- `377770de` docs: update DEPLOYMENT_STEPS for UX fixes (2026-03-02)
+- `6327eaca` feat: fix full UX — users page, project creation, mobile nav, impersonation (2026-03-02)
+- `0ee78355` docs: add blank page fix to DEPLOYMENT_STEPS (2026-03-02)
+- `160c1cb6` fix: non-blocking Google Fonts to fix blank page in Russia (2026-03-02)
+- `6bdb59d0` feat(workflow): добавить этап 9 — автоматический разбор изменений на знания (2026-03-02)
+- `4f9d48ad` feat(workflow): зафиксировать обязательный 8-этапный пайплайн разработки (2026-03-02)
+- `e3b74db7` docs(skills): зафиксировать знания по авто-деплою и docs-rule в скиллах (2026-03-02)
+- `b9a3ca5e` docs(skills): зафиксировать auth-грабли в скиллах infosec/tester/developer (2026-03-02)
+- `debe438f` fix: убрать server-side cookie-gate из /app, пасхалка перенесена на клиент (2026-03-02)
+- `d72f4b1e` chore: add cursor rule — update docs after every task (2026-03-02)
+- `08ede740` docs: update deployment steps and admin guide with auto-deploy info (2026-03-02)
+- `e9a57e00` test: auto-deploy retry (2026-03-02)
+- `8dd6ffed` fix: yaml syntax in deploy workflow (2026-03-02)
+- `4ca02f72` test: trigger auto-deploy (2026-03-02)
+- `7d6abccc` feat: GitHub Actions auto-deploy on push to main (2026-03-02)
+- `daed3683` security: server-side auth gate для HTML-страниц (2026-03-01)
+- `0eba9503` fix: set andrey@tasktime.demo role to cio (2026-03-01)
+- `004f00c6` feat: CIO видит все проекты/задачи/команды + импersonация для admin (2026-03-01)
+- `8995f166` feat(roles): добавить роль viewer + обновить аккаунты команды (2026-03-01)
+- `4616e06e` chore(mcp): синхронизировать gatekeeper с ролью viewer и актуальными аккаунтами (2026-03-01)
+- `f7c098b0` feat: иерархия задач, CIO Board, роль cio, seed-данные (2026-03-01)
+- `22cd520e` Адаптация под ТЗ JIRA CUT: аудит, RBAC по задачам, таблица с resize столбцов, документация (2026-03-01)
+- `1a38dfd0` Tech-debt: добавить скиллы по банковской и депозитарной тайне РФ (2026-03-01)
+- `f9f12158` Docs: DEPLOYMENT_STEPS.md (отчёт для нетехнарей), ACCOUNTS.md (формат учёток). Team users: Pavel, Georgiy, Olesya, Andrey, Anton (tasktime24). (2026-03-01)
+- `31b1be70` fix: load .env from app dir (../../.env) when running seed from backend/scripts (2026-03-01)
+- `7edede59` Deploy: DEPLOY.md, setup-script (PG version fix, init-db via backend/seed), seed.js loads .env from parent (2026-03-01)
+- `e9710bb4` init: Flow Universe MVP (2026-03-01)
+
+### Claude
+
+- `35ada271` test: add 16 tests for AI task creator detection feature (2026-03-14)
+- `ee9023ef` docs: update CLAUDE.md — Sprint 1 done, Sprint 2 scope documented (2026-03-10)
+- `b0d77cb8` feat: add local dev environment tooling (2026-03-10)
+- `01a2be4d` fix: add dotenv for .env loading in backend (2026-03-10)
+- `9131e07d` feat: Sprint 1 — complete rebuild with TypeScript stack (2026-03-10)
+- `285ccf2f` docs: remove company name references from technical specification (2026-03-10)
+- `78450196` docs: save full chat context to CLAUDE.md memory (2026-03-09)
+- `9847e422` docs: add CLAUDE.md memory + update plan with OS/browser requirements (2026-03-09)
+- `3c1a2fee` docs: add comprehensive rebuild plan v2 (2026-03-09)
+
+> Auto-updated by GitHub Actions after every merge to `main`.
+> To update locally: `make docs` or `node scripts/generate-docs.js --changelog`

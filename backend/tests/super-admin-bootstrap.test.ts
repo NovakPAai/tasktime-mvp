@@ -33,7 +33,7 @@ describe('promoteUserToSuperAdmin', () => {
 
     const newLogin = await request.post('/api/auth/login').send({
       email: admin.user.email,
-      password: 'password123',
+      password: 'Password123',
     });
     expect(newLogin.status).toBe(200);
     expect(newLogin.body.user.role).toBe('SUPER_ADMIN');

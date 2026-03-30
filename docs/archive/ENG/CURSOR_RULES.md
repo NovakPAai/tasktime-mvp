@@ -1,4 +1,4 @@
-# TaskTime — Cursor AI Development Rules
+# Flow Universe — Cursor AI Development Rules
 
 **Purpose:** Rules to improve AI (Cursor) productivity: naming, structure, typing, API, components, DB access. Use as reference and merge into `.cursor/rules/` or `cursorrules` as needed.  
 **Date:** March 2025

@@ -1,4 +1,4 @@
-# TaskTime — Performance Strategy
+# Flow Universe — Performance Strategy
 
 **Purpose:** Strategies for large boards, many issues, caching, and pagination. MVP-focused; avoid overengineering.  
 **Date:** March 2025

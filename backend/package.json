@@ -1,6 +1,8 @@
 {
   "name": "tasktime-backend",
   "version": "1.0.0",
+  "description": "TaskTime MVP backend - Russian fintech task management system",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,6 +16,7 @@
     "db:seed": "npm run db:seed:dev",
     "db:seed:dev": "npx tsx src/prisma/seed.ts",
     "db:seed:ttmp": "SEED_SCOPE=TTMP_ONLY node dist/prisma/seed.js",
+    "db:seed:workflow": "npx tsx src/prisma/seed-workflow.ts",
     "db:sync:prod-to-dev": "tsx src/prisma/prod-sync.ts",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
@@ -26,6 +29,7 @@
     "format": "prettier --write 'src/**/*.ts'"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@prisma/client": "^6.5.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
@@ -35,6 +39,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "redis": "^5.11.0",
+    "swagger-ui-express": "^5.0.1",
     "zod": "^3.24.2"
   },
   "prisma": {
@@ -48,6 +53,7 @@
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.13.10",
     "@types/supertest": "^6.0.2",
+    "@types/swagger-ui-express": "^4.1.8",
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",
     "eslint": "^9.18.0",

@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add two new top-level sidebar tabs for business-functional teams and flow teams, backed by synthetic frontend-only data and styled consistently with the existing TaskTime UI.
+**Goal:** Add two new top-level sidebar tabs for business-functional teams and flow teams, backed by synthetic frontend-only data and styled consistently with the existing Flow Universe UI.
 
 **Architecture:** Keep this iteration frontend-only. Add two new routes and pages, render synthetic datasets through reusable `tt-panel`/grid patterns, and update the sidebar order so the new sections sit between `Projects` and `Sprints`.
 

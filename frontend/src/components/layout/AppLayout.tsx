@@ -1,124 +1,131 @@
-import { Layout, Menu, Button, Typography } from 'antd';
-import {
-  ProjectOutlined,
-  LogoutOutlined,
-  DashboardOutlined,
-  ClockCircleOutlined,
-  TeamOutlined,
-  SettingOutlined,
-  CheckCircleOutlined,
-  CalendarOutlined,
-  ApartmentOutlined,
-  DeploymentUnitOutlined,
-} from '@ant-design/icons';
+/**
+ * AppLayout — оболочка приложения Flow Universe
+ * Design source: Paper (no topbar — controls folded into Sidebar footer)
+ * Pure React inline styles — zero CSS class dependencies
+ */
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
+import { useThemeStore } from '../../store/theme.store';
+import Sidebar from './Sidebar';
 import UatOnboardingOverlay from '../uat/UatOnboardingOverlay';
-import { hasRequiredRole } from '../../lib/roles';
 
-const { Header, Sider, Content } = Layout;
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 768);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+  return mobile;
+}
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const { mode, toggle } = useThemeStore();
+  const isLight = mode === 'light';
+
+  const isMobile = useIsMobile();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [animatingTheme, setAnimatingTheme] = useState(false);
+  const [openKeys, setOpenKeys] = useState<string[]>(() => {
+    const keys: string[] = [];
+    if (location.pathname.startsWith('/admin')) keys.push('admin-submenu');
+    if (location.pathname === '/sprints' || location.pathname === '/releases') keys.push('planning-submenu');
+    return keys;
+  });
+
+  // Close sidebar on route change
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  // Auto-expand submenus on navigate
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin')) {
+      setOpenKeys((prev) => prev.includes('admin-submenu') ? prev : [...prev, 'admin-submenu']);
+    }
+    if (location.pathname === '/sprints' || location.pathname === '/releases') {
+      setOpenKeys((prev) => prev.includes('planning-submenu') ? prev : [...prev, 'planning-submenu']);
+    }
+  }, [location.pathname]);
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  const mainItems = [
-    { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
-    { key: '/projects', icon: <ProjectOutlined />, label: 'Projects' },
-    {
-      key: '/business-teams',
-      icon: <ApartmentOutlined />,
-      label: 'Бизнес-функциональные команды',
-    },
-    {
-      key: '/flow-teams',
-      icon: <DeploymentUnitOutlined />,
-      label: 'Потоковые команды',
-    },
-    { key: '/sprints', icon: <CalendarOutlined />, label: 'Sprints' },
-    { key: '/time', icon: <ClockCircleOutlined />, label: 'My Time' },
-    { key: '/teams', icon: <TeamOutlined />, label: 'Teams' },
-    ...(hasRequiredRole(user?.role, 'ADMIN')
-      ? [{ key: '/admin', icon: <SettingOutlined />, label: 'Admin' } as const]
-      : []),
-  ];
+  const handleThemeToggle = () => {
+    setAnimatingTheme(true);
+    toggle();
+    setTimeout(() => setAnimatingTheme(false), 600);
+  };
 
-  const toolsItems = [
-    {
-      key: '/uat',
-      icon: <CheckCircleOutlined />,
-      label: 'UAT чек-листы (MVP)',
-    },
-  ];
+  const handleNav = (key: string) => {
+    if (key.startsWith('/')) {
+      navigate(key);
+      setMobileOpen(false);
+    }
+  };
 
-  const menuItems = [
-    {
-      type: 'group' as const,
-      key: 'main',
-      label: 'Навигация',
-      children: mainItems,
-    },
-    {
-      type: 'group' as const,
-      key: 'tools',
-      label: 'Инструменты MVP',
-      children: toolsItems,
-    },
-  ];
+  const bgColor = isLight ? '#F5F3FF' : '#080B14';
 
   return (
-    <Layout className="tt-app-shell">
-      <Sider
-        width={220}
-        theme="dark"
-        breakpoint="lg"
-        collapsedWidth={80}
-        className="tt-sidebar"
+    <div style={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden', backgroundColor: bgColor, WebkitFontSmoothing: 'antialiased' }}>
+
+      {/* Mobile hamburger — shown only when sidebar is closed on mobile */}
+      {isMobile && !mobileOpen && (
+      <button
+        onClick={() => setMobileOpen(true)}
+        aria-label="Открыть меню"
+        style={{
+          position: 'fixed', top: 12, left: 12, zIndex: 998,
+          width: 36, height: 36, borderRadius: 8,
+          backgroundColor: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(15,19,32,0.9)',
+          border: `1px solid ${isLight ? '#E5E0F5' : '#1E2640'}`,
+          display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', flexShrink: 0,
+        }}
       >
-        <div className="tt-sidebar-header">
-          <div className="tt-workspace-dot" />
-          <Typography.Text className="tt-sidebar-workspace-name">
-            TaskTime
-          </Typography.Text>
-        </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          className="tt-sidebar-menu"
-          onClick={({ key }) => {
-            if (typeof key === 'string' && key.startsWith('/')) {
-              navigate(key);
-            }
-          }}
-        />
-      </Sider>
-      <Layout className="tt-main">
-        <Header className="tt-topbar">
-          <Typography.Text className="tt-topbar-user">
-            {user?.name} ({user?.role})
-          </Typography.Text>
-          <Button
-            size="small"
-            icon={<LogoutOutlined />}
-            className="tt-topbar-logout"
-            onClick={handleLogout}
-          >
-            Logout
-          </Button>
-        </Header>
-        <Content className="tt-content">
+        <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
+          <rect x="2" y="4" width="12" height="1.5" rx="0.75" fill={isLight ? '#1A1A2E' : '#E2E8F8'} />
+          <rect x="2" y="7.25" width="9" height="1.5" rx="0.75" fill={isLight ? '#1A1A2E' : '#E2E8F8'} />
+          <rect x="2" y="10.5" width="11" height="1.5" rx="0.75" fill={isLight ? '#1A1A2E' : '#E2E8F8'} />
+        </svg>
+      </button>
+      )}
+
+      <Sidebar
+        isLight={isLight}
+        mobileOpen={mobileOpen}
+        openKeys={openKeys}
+        userRole={user?.role}
+        user={user}
+        animatingTheme={animatingTheme}
+        onClose={() => setMobileOpen(false)}
+        onOpenKeysChange={setOpenKeys}
+        onNavigate={handleNav}
+        onThemeToggle={handleThemeToggle}
+        onLogout={handleLogout}
+      />
+
+      {/* Main content area */}
+      <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0, padding: 0 }}>
           <Outlet />
           <UatOnboardingOverlay />
-        </Content>
-      </Layout>
-    </Layout>
+        </div>
+      </div>
+
+    </div>
   );
 }

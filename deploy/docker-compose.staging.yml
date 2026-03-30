@@ -5,6 +5,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      PIPELINE_API_KEY: ${PIPELINE_API_KEY:?PIPELINE_API_KEY is required}
     ports:
       - "${WEB_HTTP_PORT:-8080}:80"
 
@@ -56,6 +58,42 @@ services:
       timeout: 3s
       retries: 10
 
+  pipeline-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PIPELINE_POSTGRES_DB:-pipeline}
+      POSTGRES_USER: ${PIPELINE_POSTGRES_USER:-pipeline}
+      POSTGRES_PASSWORD: ${PIPELINE_POSTGRES_PASSWORD:?PIPELINE_POSTGRES_PASSWORD is required}
+    volumes:
+      - pipeline-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PIPELINE_POSTGRES_USER:-pipeline} -d ${PIPELINE_POSTGRES_DB:-pipeline}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pipeline-service:
+    image: ${PIPELINE_IMAGE:?PIPELINE_IMAGE is required}:${IMAGE_TAG:-staging}
+    restart: unless-stopped
+    env_file:
+      - ./env/pipeline.staging.env
+    depends_on:
+      pipeline-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3100/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # No external port — accessible only via nginx /pipeline/ proxy
+
 volumes:
   postgres-data:
   redis-data:
+  pipeline-postgres-data:

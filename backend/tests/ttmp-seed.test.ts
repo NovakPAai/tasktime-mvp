@@ -44,7 +44,7 @@ describe('seedDatabase', () => {
   });
 
   it('seeds only TTMP project data in TTMP_ONLY scope and stays idempotent', async () => {
-    await bootstrapDefaultUsers(prisma, 'password123');
+    await bootstrapDefaultUsers(prisma, 'Password123');
 
     await seedDatabase(prisma, { scope: 'TTMP_ONLY' });
     await seedDatabase(prisma, { scope: 'TTMP_ONLY' });
@@ -59,7 +59,7 @@ describe('seedDatabase', () => {
       {
         id: ttmpProject?.id,
         key: 'TTMP',
-        name: 'TaskTime MVP (vibe-code)',
+        name: 'Flow Universe MVP (vibe-code)',
       },
     ]);
     expect(await prisma.sprint.count()).toBe(6);

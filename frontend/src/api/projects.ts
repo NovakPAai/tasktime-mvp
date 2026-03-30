@@ -1,5 +1,5 @@
 import api from './client';
-import type { Project, IssueStatus, IssueType, IssuePriority } from '../types';
+import type { Project, IssueStatus, IssuePriority, IssueTypeConfig } from '../types';
 
 export async function listProjects(): Promise<Project[]> {
   const { data } = await api.get<Project[]>('/projects');
@@ -11,12 +11,21 @@ export async function getProject(id: string): Promise<Project> {
   return data;
 }
 
-export async function createProject(body: { name: string; key: string; description?: string }): Promise<Project> {
+export async function createProject(body: {
+  name: string;
+  key: string;
+  description?: string;
+  ownerId?: string | null;
+  categoryId?: string | null;
+}): Promise<Project> {
   const { data } = await api.post<Project>('/projects', body);
   return data;
 }
 
-export async function updateProject(id: string, body: { name?: string; description?: string }): Promise<Project> {
+export async function updateProject(
+  id: string,
+  body: { name?: string; description?: string; ownerId?: string | null; categoryId?: string | null },
+): Promise<Project> {
   const { data } = await api.patch<Project>(`/projects/${id}`, body);
   return data;
 }
@@ -32,7 +41,7 @@ export interface ProjectDashboard {
     key: string;
   };
   issuesByStatus: { status: IssueStatus; _count: { _all: number } }[];
-  issuesByType: { type: IssueType; _count: { _all: number } }[];
+  issuesByType: { issueTypeConfig: Pick<IssueTypeConfig, 'id' | 'name' | 'systemKey'> | null; _count: { _all: number } }[];
   issuesByPriority: { priority: IssuePriority; _count: { _all: number } }[];
   totals: {
     totalIssues: number;

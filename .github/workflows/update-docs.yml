@@ -1,0 +1,163 @@
+name: Update Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ── Job 1: Update all auto-generated docs after merge to main ─────────────
+  auto-generate:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+          # Initialize all flags to false
+          for flag in routes schema modules frontend features env stores makefile docker; do
+            echo "$flag=false" >> "$GITHUB_OUTPUT"
+          done
+
+          # Set flags based on changed files
+          echo "$CHANGED" | grep -qE 'backend/src/modules/.*\.router\.ts'    && echo "routes=true"   >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'backend/src/prisma/schema.prisma'       && echo "schema=true"   >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'backend/src/app.ts'                     && echo "modules=true"  >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'frontend/src/App.tsx'                   && echo "frontend=true" >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'backend/src/shared/features.ts'         && echo "features=true" >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -qE '\.env\.example'                         && echo "env=true"      >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'frontend/src/store/'                    && echo "stores=true"   >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'Makefile'                               && echo "makefile=true" >> "$GITHUB_OUTPUT" || true
+          echo "$CHANGED" | grep -q  'docker-compose.yml'                     && echo "docker=true"   >> "$GITHUB_OUTPUT" || true
+
+      - name: Generate changelog (always)
+        run: node scripts/generate-docs.js --changelog
+
+      - name: Generate API reference
+        if: steps.changes.outputs.routes == 'true'
+        run: node scripts/generate-docs.js --routes
+
+      - name: Generate data model docs
+        if: steps.changes.outputs.schema == 'true'
+        run: node scripts/generate-docs.js --schema
+
+      - name: Generate backend modules docs
+        if: steps.changes.outputs.modules == 'true'
+        run: node scripts/generate-docs.js --modules
+
+      - name: Generate frontend routes docs
+        if: steps.changes.outputs.frontend == 'true'
+        run: node scripts/generate-docs.js --frontend
+
+      - name: Generate feature flags docs
+        if: steps.changes.outputs.features == 'true'
+        run: node scripts/generate-docs.js --features
+
+      - name: Generate env vars docs
+        if: steps.changes.outputs.env == 'true'
+        run: node scripts/generate-docs.js --env
+
+      - name: Generate Zustand stores docs
+        if: steps.changes.outputs.stores == 'true'
+        run: node scripts/generate-docs.js --stores
+
+      - name: Generate Makefile commands docs
+        if: steps.changes.outputs.makefile == 'true'
+        run: node scripts/generate-docs.js --makefile
+
+      - name: Generate Docker services docs
+        if: steps.changes.outputs.docker == 'true'
+        run: node scripts/generate-docs.js --docker
+
+      - name: Commit generated docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add \
+            docs/CHANGELOG.md \
+            .doc-sync-state \
+            docs/api/reference.md \
+            docs/architecture/data-model.md \
+            docs/architecture/backend-modules.md \
+            docs/architecture/frontend-architecture.md \
+            docs/architecture/overview.md \
+            docs/guides/getting-started.md \
+            2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "Nothing to commit"
+          else
+            git commit -m "chore: auto-update docs [skip ci]"
+            git push
+          fi
+
+  # ── Job 2: PR staleness check — ремайндер для разработчика ────────────────
+  check-staleness:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check for stale manual docs
+        id: stale
+        run: |
+          OUTPUT=$(node scripts/generate-docs.js --stale 2>&1)
+          echo "$OUTPUT"
+          WARNINGS=$(echo "$OUTPUT" | grep "⚠️" || true)
+          if [ -n "$WARNINGS" ]; then
+            echo "has_warnings=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "warnings<<EOF"
+              echo "$WARNINGS"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "has_warnings=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR
+        if: steps.stale.outputs.has_warnings == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const warnings = `${{ steps.stale.outputs.warnings }}`;
+            const body = `## 📋 Напоминание об обновлении документации
+
+Следующие файлы изменились — требуется **ручное** обновление документации (контент нельзя сгенерировать автоматически):
+
+\`\`\`
+${warnings}
+\`\`\`
+
+> 💡 Авто-генерируемые секции обновятся сами после мёрджа:
+> API reference · Data model · Backend modules · Frontend routes · Feature flags · Env vars · Stores · Makefile · Docker
+>
+> Подробнее: [docs/guides/doc-workflow.md](../blob/main/docs/guides/doc-workflow.md)`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

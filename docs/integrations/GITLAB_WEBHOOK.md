@@ -1,4 +1,4 @@
-# Подключение GitLab webhook к TaskTime — пошагово
+# Подключение GitLab webhook к Flow Universe — пошагово
 
 Пошаговая инструкция: зачем каждый шаг и что именно делать.
 
@@ -6,13 +6,13 @@
 
 ## Что вы в итоге получите
 
-GitLab будет сам сообщать TaskTime о событиях в репозитории. TaskTime по ключам задач (например `DEMO-42`) будет менять статусы:
+GitLab будет сам сообщать Flow Universe о событиях в репозитории. Flow Universe по ключам задач (например `DEMO-42`) будет менять статусы:
 
 - **Push** в ветку с таким ключом → задача «В работе» (IN_PROGRESS)
 - **Merge request открыт** → задача «На ревью» (REVIEW)
 - **Merge request влит** → задача «Готово» (DONE)
 
-Чтобы это работало, нужно один раз настроить webhook в GitLab и секрет в TaskTime.
+Чтобы это работало, нужно один раз настроить webhook в GitLab и секрет в Flow Universe.
 
 ---
 
@@ -22,7 +22,7 @@ GitLab будет сам сообщать TaskTime о событиях в реп
 
 **Что делать:**
 
-- Если TaskTime уже на сервере (staging/production) — запомните его URL, например `https://api.tasktime.example.com`. Это и есть «ваш backend».
+- Если Flow Universe уже на сервере (staging/production) — запомните его URL, например `https://api.tasktime.example.com`. Это и есть «ваш backend».
 - Если пока работаете локально — поднимите туннель, чтобы извне был доступ на ваш компьютер:
   - [ngrok](https://ngrok.com): `ngrok http 3000` → скопируйте выданный URL (типа `https://abc123.ngrok.io`).
   - Или другой туннель (cloudflared, localtunnel и т.п.).
@@ -37,7 +37,7 @@ GitLab будет сам сообщать TaskTime о событиях в реп
 
 **Что делать:**
 
-1. Зайдите в **ваш проект** в GitLab (тот репозиторий, с которым хотите связать задачи TaskTime).
+1. Зайдите в **ваш проект** в GitLab (тот репозиторий, с которым хотите связать задачи Flow Universe).
 2. В левом меню: **Settings** (или **Configure**) → **Webhooks**.  
    Либо: **Settings** → **Integrations** → вкладка **Webhooks**.
 3. У вас откроется форма «Add new webhook» / «New webhook».
@@ -116,13 +116,13 @@ https://<ваш-backend>/api/integrations/gitlab/webhook
 
 ---
 
-## Шаг 6. Добавить тот же секрет в backend (TaskTime)
+## Шаг 6. Добавить тот же секрет в backend (Flow Universe)
 
 **Зачем:** Backend проверяет заголовок `X-Gitlab-Token`: если в запросе пришёл тот же токен, что и в переменной окружения, запрос считается подлинным.
 
 **Что делать:**
 
-1. Откройте файл `.env` в папке **backend** вашего проекта TaskTime (рядом с `package.json`).
+1. Откройте файл `.env` в папке **backend** вашего проекта Flow Universe (рядом с `package.json`).
 2. Добавьте строку (подставьте тот же Secret token, что в шаге 3):
 
    ```bash
@@ -139,7 +139,7 @@ https://<ваш-backend>/api/integrations/gitlab/webhook
 
 ## Шаг 7. Проверить, что запросы доходят
 
-**Зачем:** Убедиться, что GitLab успешно стучится в TaskTime и что секрет совпадает.
+**Зачем:** Убедиться, что GitLab успешно стучится в Flow Universe и что секрет совпадает.
 
 **Что делать:**
 
@@ -155,20 +155,20 @@ https://<ваш-backend>/api/integrations/gitlab/webhook
 
 ---
 
-## Шаг 8. Как TaskTime понимает, какую задачу обновлять (ключи задач)
+## Шаг 8. Как Flow Universe понимает, какую задачу обновлять (ключи задач)
 
 **Зачем:** Чтобы не путаться, когда вы пушите код или открываете MR.
 
 **Как это устроено:**
 
-У каждой задачи в TaskTime есть ключ: **код проекта + номер**, например `DEMO-42`, `BACK-1`. Этот ключ TaskTime ищет в:
+У каждой задачи в Flow Universe есть ключ: **код проекта + номер**, например `DEMO-42`, `BACK-1`. Этот ключ Flow Universe ищет в:
 
 - имени ветки (например `feature/DEMO-42-fix-bug`);
 - названии merge request (например «DEMO-42: починить баг»);
 - описании merge request;
 - тексте коммита (например «Fix DEMO-42: описание»).
 
-Если ключ найден и такая задача есть в TaskTime, её статус обновится по правилам из таблицы ниже.
+Если ключ найден и такая задача есть в Flow Universe, её статус обновится по правилам из таблицы ниже.
 
 **Что делать с вашей стороны:** называйте ветки и MR так, чтобы в них фигурировал ключ задачи (например `DEMO-42`), тогда статусы будут подтягиваться автоматически.
 
@@ -184,7 +184,7 @@ https://<ваш-backend>/api/integrations/gitlab/webhook
 | 3 | GitLab + терминал | Генерируете секрет (`openssl rand -hex 24`), вставляете в поле Secret token в GitLab, копируете для шага 6. |
 | 4 | GitLab | Включаете события Merge request events и Push events. |
 | 5 | GitLab | Нажимаете Add webhook / Save. |
-| 6 | TaskTime backend | В `.env` добавляете `GITLAB_WEBHOOK_SECRET=<тот же секрет>`, перезапускаете backend. |
+| 6 | Flow Universe backend | В `.env` добавляете `GITLAB_WEBHOOK_SECRET=<тот же секрет>`, перезапускаете backend. |
 | 7 | GitLab | Test → Merge requests events → смотрите 200 и `ok: true` в Recent deliveries. |
 
-После этого при push и merge request с ключом задачи (например `DEMO-42`) статусы в TaskTime будут обновляться автоматически, а в аудите будет указан источник `GITLAB`.
+После этого при push и merge request с ключом задачи (например `DEMO-42`) статусы в Flow Universe будут обновляться автоматически, а в аудите будет указан источник `GITLAB`.

@@ -1,6 +1,6 @@
-# Skill: tester (TaskTime)
+# Skill: tester (Flow Universe)
 
-Цель: дать компактный чеклист для ручного и semi‑auto тестирования ключевых фич TaskTime MVP.
+Цель: дать компактный чеклист для ручного и semi‑auto тестирования ключевых фич Flow Universe MVP.
 
 ## 1. Auth и сессии
 

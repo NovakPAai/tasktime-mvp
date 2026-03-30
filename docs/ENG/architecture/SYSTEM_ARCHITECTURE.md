@@ -1,4 +1,4 @@
-# TaskTime — System Architecture (Final Summary)
+# Flow Universe — System Architecture (Final Summary)
 
 **Purpose:** Single entry point for architecture: diagram, domain model, module layout, and migration roadmap. Start here for any architecture understanding or MVP implementation.  
 **Date:** March 2025
@@ -119,7 +119,8 @@ This document is the **single entry point** for architecture. For MVP implementa
 | **MVP_DOMAIN_MODEL.md** | Target entities, ER diagram, relationships |
 | **REPO_RESTRUCTURE_PLAN.md** | Target folder structure, how to migrate code into modules |
 | **ISSUE_ENGINE.md** | Issue lifecycle, statuses, board, sprint, history |
-| **FRONTEND_UI_ARCHITECTURE.md** | Frontend UI: layout, pages, design system, components, API mapping |
+| ~~**FRONTEND_UI_ARCHITECTURE.md**~~ | ~~DEPRECATED~~ → заменён [`docs/UI_DESIGN_SYSTEM.md`](../../UI_DESIGN_SYSTEM.md) |
+| **[`docs/UI_DESIGN_SYSTEM.md`](../../UI_DESIGN_SYSTEM.md)** | Актуальная дизайн-система: токены, типографика, компоненты, правила |
 
 Other architecture and planning documents (CURRENT_ARCHITECTURE, DOMAIN_MODEL, ARCHITECTURE_PROPOSAL, MIGRATION_PLAN, PERFORMANCE_PLAN, KANBAN_ARCHITECTURE, AI_AGENTS, CURSOR_RULES) have been moved to **docs/archive/** (ENG and RU). See **docs/ARCHITECTURE_HISTORY.md** for what was archived and why.
 

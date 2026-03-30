@@ -1,0 +1,162 @@
+{
+  "key": "TTSEC-1",
+  "title": "ИБ: Устранение уязвимостей безопасности — v0.1 (17 CVE)",
+  "generatedAt": "2026-03-26T12:00:00.000Z",
+  "generatedBy": "claude-code",
+  "contextAge": "2026-03-26T12:00:00.000Z",
+  "taskType": "fix",
+  "source": {
+    "apiUrl": "http://5.129.242.171/api",
+    "issueId": "901f98a9-61d6-4a1e-823f-7fa901bbb547",
+    "fetchedAt": "2026-03-26T12:00:00.000Z"
+  },
+  "issue": {
+    "type": "EPIC",
+    "status": "OPEN",
+    "priority": "CRITICAL",
+    "project": "TTSEC",
+    "assignee": null,
+    "creator": "Admin User",
+    "estimatedHours": null,
+    "description": "Устранение 17 CVE: JWT secrets, GitLab webhook fail-open, nginx TLS, IDOR, project RBAC, brute force, Redis auth, bulk limits, Swagger access, CSP, password policy, logging",
+    "acceptanceCriteria": "Все 17 CVE устранены; CRITICAL/HIGH — обязательно; MEDIUM — по возможности; LOW — документированы"
+  },
+  "dependencies": {
+    "backendModules": ["auth", "issues", "webhooks", "users"],
+    "frontendComponents": [],
+    "prismaModels": [],
+    "externalPackages": [],
+    "blockers": [],
+    "securityFiles": [
+      "backend/src/config.ts",
+      "backend/src/shared/utils/jwt.ts",
+      "backend/src/shared/middleware/auth.ts",
+      "backend/src/shared/middleware/rbac.ts",
+      "backend/src/shared/middleware/audit.ts",
+      "backend/src/shared/middleware/error-handler.ts",
+      "backend/src/shared/redis.ts",
+      "backend/src/shared/openapi.ts",
+      "backend/src/app.ts",
+      "backend/src/modules/auth/auth.router.ts",
+      "backend/src/modules/auth/auth.service.ts",
+      "backend/src/modules/auth/auth.dto.ts",
+      "backend/src/modules/issues/issues.router.ts",
+      "backend/src/modules/issues/issues.service.ts",
+      "backend/src/modules/webhooks/webhooks.router.ts",
+      "deploy/nginx/nginx.conf",
+      "docker-compose.yml"
+    ]
+  },
+  "risks": [
+    {
+      "id": 1,
+      "description": "IDOR фикс может сломать существующий frontend (issues доступ по id)",
+      "probability": "MEDIUM",
+      "impact": "Frontend перестанет получать задачи без project context",
+      "mitigation": "Проверить все frontend API-вызовы перед изменением middleware"
+    },
+    {
+      "id": 2,
+      "description": "Nginx TLS требует реальный сертификат или Let's Encrypt",
+      "probability": "HIGH",
+      "impact": "Нельзя включить HTTPS без сертификата на VPS",
+      "mitigation": "Подготовить конфиг, применить при наличии сертификата"
+    },
+    {
+      "id": 3,
+      "description": "Redis requirepass может сломать существующие подключения",
+      "probability": "LOW",
+      "impact": "Backend не подключится к Redis после включения пароля",
+      "mitigation": "Обновить REDIS_URL и docker-compose одновременно"
+    }
+  ],
+  "requirements": {
+    "functional": [
+      "CVE-01: JWT_SECRET из .env, минимум 32 символа, валидация при старте",
+      "CVE-02: GitLab webhook — fail-closed (reject если secret не настроен)",
+      "CVE-03: Nginx — TLS 1.2+ конфигурация (шаблон, активация при сертификате)",
+      "CVE-04: IDOR — ownership check на GET/PATCH /issues/:id",
+      "CVE-05: Project RBAC — requireProjectRole на issue endpoints",
+      "CVE-06: Brute force — account lockout после 5 неудачных попыток",
+      "CVE-07: Redis — requirepass в docker-compose + password в REDIS_URL",
+      "CVE-08: Bulk operations — максимум 100 элементов в issueIds",
+      "CVE-09: Swagger — доступ только для ADMIN в production",
+      "CVE-10: CSP header — default-src 'self'",
+      "CVE-11: Password policy — минимум 8 символов, 1 заглавная, 1 цифра",
+      "CVE-12: Audit — не логировать пароли и токены",
+      "CVE-13: Issue search — лимит 50 результатов",
+      "CVE-14: Cookie parser — signed cookies",
+      "CVE-15: CORS — явный whitelist вместо wildcard",
+      "CVE-16: Rate limit на /auth/refresh",
+      "CVE-17: Audit — использовать singleton PrismaClient"
+    ],
+    "nonFunctional": [
+      "API response < 200ms (p95) — без деградации после фиксов",
+      "Обратная совместимость frontend API"
+    ],
+    "security": [
+      "Все 17 CVE — подтверждены анализом кода",
+      "OWASP Top 10 покрытие"
+    ]
+  },
+  "acceptanceCriteria": [
+    "AC-1: JWT_SECRET валидация при старте (< 32 символов → crash)",
+    "AC-2: GitLab webhook reject без GITLAB_WEBHOOK_SECRET",
+    "AC-3: Nginx конфиг с TLS (ssl_protocols TLSv1.2 TLSv1.3)",
+    "AC-4: GET /issues/:id без project membership → 403",
+    "AC-5: requireProjectRole на issue CRUD endpoints",
+    "AC-6: 6-й неудачный login → 429 (lockout 15 min)",
+    "AC-7: Redis подключение с паролем",
+    "AC-8: POST bulk с > 100 ids → 400",
+    "AC-9: GET /api/docs в production без ADMIN → 403",
+    "AC-10: Response содержит Content-Security-Policy header",
+    "AC-11: Регистрация с 'abc12345' → ошибка (нет заглавной)",
+    "AC-12: Пароль не появляется в audit_log.details",
+    "AC-13: make test зелёный",
+    "AC-14: make lint OK"
+  ],
+  "estimation": {
+    "analysis": 2,
+    "backend": 12,
+    "frontend": 1,
+    "testing": 4,
+    "review": 2,
+    "total": 21
+  },
+  "backendEstimate": {
+    "estimatedHours": 5,
+    "estimatedAt": "2026-03-26T12:00:00.000Z",
+    "source": "api",
+    "reasoning": "Heuristic estimate based on text length (7661 chars)."
+  },
+  "syncState": {
+    "pulledAt": "2026-03-26T12:00:00.000Z",
+    "pushedAt": "2026-03-26T22:45:00.000Z",
+    "pushedFields": ["ai-estimate", "ai-flags", "ai-status", "ai-session", "comment"]
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [],
+    "blocks": [],
+    "dependsOn": []
+  },
+  "cveMatrix": [
+    {"id": "CVE-01", "category": "JWT Secrets", "severity": "MEDIUM", "file": "config.ts, jwt.ts"},
+    {"id": "CVE-02", "category": "GitLab Webhook Fail-Open", "severity": "HIGH", "file": "webhooks.router.ts:14"},
+    {"id": "CVE-03", "category": "Nginx TLS", "severity": "HIGH", "file": "nginx.conf"},
+    {"id": "CVE-04", "category": "IDOR", "severity": "CRITICAL", "file": "issues.router.ts, issues.service.ts"},
+    {"id": "CVE-05", "category": "Project RBAC unused", "severity": "CRITICAL", "file": "rbac.ts, issues.router.ts"},
+    {"id": "CVE-06", "category": "Brute Force", "severity": "MEDIUM", "file": "auth.router.ts"},
+    {"id": "CVE-07", "category": "Redis No Auth", "severity": "HIGH", "file": "docker-compose.yml, redis.ts"},
+    {"id": "CVE-08", "category": "Bulk Limits", "severity": "MEDIUM", "file": "issues.router.ts"},
+    {"id": "CVE-09", "category": "Swagger Public", "severity": "MEDIUM", "file": "app.ts:67-72"},
+    {"id": "CVE-10", "category": "CSP Missing", "severity": "MEDIUM", "file": "nginx.conf"},
+    {"id": "CVE-11", "category": "Password Policy", "severity": "MEDIUM", "file": "auth.router.ts"},
+    {"id": "CVE-12", "category": "Sensitive Logging", "severity": "LOW", "file": "audit.ts, error-handler.ts"},
+    {"id": "CVE-13", "category": "Search No Limit", "severity": "MEDIUM", "file": "issues.router.ts:24"},
+    {"id": "CVE-14", "category": "Cookie Unsigned", "severity": "LOW", "file": "app.ts:50"},
+    {"id": "CVE-15", "category": "CORS Wildcard", "severity": "LOW", "file": "app.ts:47"},
+    {"id": "CVE-16", "category": "Refresh Rate Limit", "severity": "MEDIUM", "file": "auth.router.ts:44"},
+    {"id": "CVE-17", "category": "Audit PrismaClient", "severity": "LOW", "file": "audit.ts:4"}
+  ]
+}

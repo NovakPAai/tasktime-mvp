@@ -35,8 +35,8 @@ afterAll(async () => {
 
 describe('bootstrapDefaultUsers', () => {
   it('creates the default users idempotently', async () => {
-    await bootstrapDefaultUsers(prisma, 'password123');
-    await bootstrapDefaultUsers(prisma, 'password123');
+    await bootstrapDefaultUsers(prisma, 'Password123');
+    await bootstrapDefaultUsers(prisma, 'Password123');
 
     const users = await prisma.user.findMany({
       orderBy: { email: 'asc' },
@@ -53,7 +53,7 @@ describe('bootstrapDefaultUsers', () => {
       [...BOOTSTRAP_USERS].map((user) => user.email).sort(),
     );
     expect(users.every((user) => user.isActive)).toBe(true);
-    expect(await comparePassword('password123', users[0]!.passwordHash)).toBe(true);
+    expect(await comparePassword('Password123', users[0]!.passwordHash)).toBe(true);
   });
 
   it('adds an owner admin from env without mutating built-in users', async () => {

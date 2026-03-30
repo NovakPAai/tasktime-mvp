@@ -1,9 +1,9 @@
 ---
-description: MOEX Flow Universe — UI Kit. Визуальная система проекта: цвета, типографика, радиусы, тени, компоненты, паттерны.
+description: Flow Universe — UI Kit. Визуальная система проекта: цвета, типографика, радиусы, тени, компоненты, паттерны.
 globs: frontend/src/**/*.tsx, frontend/src/**/*.css
 alwaysApply: false
 ---
-# MOEX Flow Universe — UI Kit
+# Flow Universe — UI Kit
 
 Справочный документ по визуальной системе. Не менять существующий код — только описание того, что уже работает.
 

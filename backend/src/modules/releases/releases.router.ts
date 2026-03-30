@@ -6,6 +6,7 @@ import {
   createReleaseDto,
   updateReleaseDto,
   moveIssuesToReleaseDto,
+  manageSprintsInReleaseDto,
 } from './releases.dto.js';
 import * as releasesService from './releases.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
@@ -27,6 +28,24 @@ router.get('/releases/:id/issues', async (req, res, next) => {
   try {
     const release = await releasesService.getReleaseWithIssues(req.params.id as string);
     res.json(release);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/releases/:id/sprints', async (req, res, next) => {
+  try {
+    const sprints = await releasesService.getReleaseSprints(req.params.id as string);
+    res.json(sprints);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/releases/:id/readiness', async (req, res, next) => {
+  try {
+    const readiness = await releasesService.getReleaseReadiness(req.params.id as string);
+    res.json(readiness);
   } catch (err) {
     next(err);
   }
@@ -91,6 +110,40 @@ router.post(
       await releasesService.removeIssuesFromRelease(req.params.id as string, req.body.issueIds);
       await logAudit(req, 'release.issues_removed', 'release', req.params.id as string, {
         issueIds: req.body.issueIds,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/releases/:id/sprints',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(manageSprintsInReleaseDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      await releasesService.addSprintsToRelease(req.params.id as string, req.body.sprintIds);
+      await logAudit(req, 'release.sprints_added', 'release', req.params.id as string, {
+        sprintIds: req.body.sprintIds,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/releases/:id/sprints/remove',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(manageSprintsInReleaseDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      await releasesService.removeSprintsFromRelease(req.params.id as string, req.body.sprintIds);
+      await logAudit(req, 'release.sprints_removed', 'release', req.params.id as string, {
+        sprintIds: req.body.sprintIds,
       });
       res.json({ ok: true });
     } catch (err) {

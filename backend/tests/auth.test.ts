@@ -16,7 +16,7 @@ describe('Auth API', () => {
   it('POST /api/auth/register - should register a new user', async () => {
     const res = await request.post('/api/auth/register').send({
       email: 'new@test.com',
-      password: 'password123',
+      password: 'Password123',
       name: 'New User',
     });
     expect(res.status).toBe(201);
@@ -28,10 +28,10 @@ describe('Auth API', () => {
 
   it('POST /api/auth/register - should reject duplicate email', async () => {
     await request.post('/api/auth/register').send({
-      email: 'dup@test.com', password: 'password123', name: 'First',
+      email: 'dup@test.com', password: 'Password123', name: 'First',
     });
     const res = await request.post('/api/auth/register').send({
-      email: 'dup@test.com', password: 'password123', name: 'Second',
+      email: 'dup@test.com', password: 'Password123', name: 'Second',
     });
     expect(res.status).toBe(409);
   });
@@ -45,10 +45,10 @@ describe('Auth API', () => {
 
   it('POST /api/auth/login - should login with valid credentials', async () => {
     await request.post('/api/auth/register').send({
-      email: 'login@test.com', password: 'password123', name: 'Login',
+      email: 'login@test.com', password: 'Password123', name: 'Login',
     });
     const res = await request.post('/api/auth/login').send({
-      email: 'login@test.com', password: 'password123',
+      email: 'login@test.com', password: 'Password123',
     });
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toBeDefined();
@@ -56,7 +56,7 @@ describe('Auth API', () => {
 
   it('POST /api/auth/login - should reject wrong password', async () => {
     await request.post('/api/auth/register').send({
-      email: 'wrong@test.com', password: 'password123', name: 'Wrong',
+      email: 'wrong@test.com', password: 'Password123', name: 'Wrong',
     });
     const res = await request.post('/api/auth/login').send({
       email: 'wrong@test.com', password: 'wrongpass',
@@ -66,7 +66,7 @@ describe('Auth API', () => {
 
   it('GET /api/auth/me - should return current user', async () => {
     const reg = await request.post('/api/auth/register').send({
-      email: 'me@test.com', password: 'password123', name: 'Me',
+      email: 'me@test.com', password: 'Password123', name: 'Me',
     });
     const res = await request.get('/api/auth/me')
       .set('Authorization', `Bearer ${reg.body.accessToken}`);
@@ -76,7 +76,7 @@ describe('Auth API', () => {
 
   it('POST /api/auth/login and GET /api/auth/me - should preserve SUPER_ADMIN role', async () => {
     const reg = await request.post('/api/auth/register').send({
-      email: 'super-auth@test.com', password: 'password123', name: 'Super Auth',
+      email: 'super-auth@test.com', password: 'Password123', name: 'Super Auth',
     });
 
     await prisma.$executeRawUnsafe(
@@ -84,7 +84,7 @@ describe('Auth API', () => {
     );
 
     const login = await request.post('/api/auth/login').send({
-      email: 'super-auth@test.com', password: 'password123',
+      email: 'super-auth@test.com', password: 'Password123',
     });
     expect(login.status).toBe(200);
     expect(login.body.user.role).toBe('SUPER_ADMIN');
@@ -102,7 +102,7 @@ describe('Auth API', () => {
 
   it('POST /api/auth/refresh - should refresh tokens', async () => {
     const reg = await request.post('/api/auth/register').send({
-      email: 'refresh@test.com', password: 'password123', name: 'Refresh',
+      email: 'refresh@test.com', password: 'Password123', name: 'Refresh',
     });
     const res = await request.post('/api/auth/refresh').send({
       refreshToken: reg.body.refreshToken,
@@ -114,7 +114,7 @@ describe('Auth API', () => {
 
   it('POST /api/auth/refresh - should reject repeated use of rotated refresh token', async () => {
     const reg = await request.post('/api/auth/register').send({
-      email: 'refresh-reuse@test.com', password: 'password123', name: 'Refresh Reuse',
+      email: 'refresh-reuse@test.com', password: 'Password123', name: 'Refresh Reuse',
     });
 
     const firstRefresh = await request.post('/api/auth/refresh').send({
@@ -130,7 +130,7 @@ describe('Auth API', () => {
 
   it('POST /api/auth/logout - should invalidate refresh token', async () => {
     const reg = await request.post('/api/auth/register').send({
-      email: 'logout@test.com', password: 'password123', name: 'Logout',
+      email: 'logout@test.com', password: 'Password123', name: 'Logout',
     });
     await request.post('/api/auth/logout').send({
       refreshToken: reg.body.refreshToken,

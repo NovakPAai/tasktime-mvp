@@ -9,12 +9,17 @@ const userSelect = {
   name: true,
   role: true,
   isActive: true,
+  isSystem: true,
   createdAt: true,
   updatedAt: true,
 };
 
 export async function listUsers() {
-  return prisma.user.findMany({ select: userSelect, orderBy: { createdAt: 'desc' } });
+  return prisma.user.findMany({
+    where: { isSystem: false, isActive: true },
+    select: userSelect,
+    orderBy: { createdAt: 'desc' },
+  });
 }
 
 export async function getUser(id: string) {
@@ -27,9 +32,12 @@ export async function updateUser(id: string, dto: UpdateUserDto) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
 
-  if (dto.email && dto.email !== user.email) {
-    const existing = await prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) throw new AppError(409, 'Email already in use');
+  if (dto.email) {
+    dto.email = dto.email.trim().toLowerCase();
+    if (dto.email !== user.email) {
+      const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+      if (existing) throw new AppError(409, 'Email already in use');
+    }
   }
 
   return prisma.user.update({ where: { id }, data: dto, select: userSelect });
@@ -67,13 +75,17 @@ export async function changeRole(actor: RoleChangeActor, id: string, dto: Change
   });
 }
 
+const NA_SUFFIX = ' (N/A)';
+
 export async function deactivateUser(id: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
 
+  const newName = user.name.endsWith(NA_SUFFIX) ? user.name : user.name + NA_SUFFIX;
+
   return prisma.user.update({
     where: { id },
-    data: { isActive: false },
+    data: { isActive: false, name: newName },
     select: userSelect,
   });
 }

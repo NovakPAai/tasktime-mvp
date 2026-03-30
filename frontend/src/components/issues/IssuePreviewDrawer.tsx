@@ -1,56 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Alert, Button, Drawer, Empty, List, Spin, Tag, Typography } from 'antd';
+import { Alert, Button, Drawer, Empty, List, Spin, Typography } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import * as issuesApi from '../../api/issues';
 import type { Issue } from '../../types';
+import { IssueStatusTag, IssuePriorityTag, IssueTypeBadge } from '../../lib/issue-kit';
 
 type IssuePreviewDrawerProps = {
   open: boolean;
   issueId: string | null;
   onClose: () => void;
-};
-
-const STATUS_LABEL_RU: Record<Issue['status'], string> = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'Ревью',
-  DONE: 'Готово',
-  CANCELLED: 'Отменена',
-};
-
-const TYPE_LABEL_RU: Record<Issue['type'], string> = {
-  EPIC: 'Эпик',
-  STORY: 'История',
-  TASK: 'Задача',
-  SUBTASK: 'Подзадача',
-  BUG: 'Ошибка',
-};
-
-const PRIORITY_LABEL_RU: Record<Issue['priority'], string> = {
-  CRITICAL: 'Критичный',
-  HIGH: 'Высокий',
-  MEDIUM: 'Средний',
-  LOW: 'Низкий',
-};
-
-const STATUS_TONE_CLASS: Record<Issue['status'], string> = {
-  OPEN: 'open',
-  IN_PROGRESS: 'in_progress',
-  REVIEW: 'review',
-  DONE: 'done',
-  CANCELLED: 'cancelled',
-};
-
-const TYPE_TONE_CLASS: Record<Issue['type'], string> = {
-  EPIC: 'epic',
-  STORY: 'story',
-  TASK: 'task',
-  SUBTASK: 'subtask',
-  BUG: 'bug',
 };
 
 function formatIssueKey(issue: Issue) {
@@ -152,9 +114,7 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                 <div className="tt-issue-id-badge">
                   <span>{issueKey}</span>
                 </div>
-                <span className={`tt-issue-tag tt-sprint-drawer-type-pill tt-sprint-drawer-type-${TYPE_TONE_CLASS[issue.type]}`}>
-                  {TYPE_LABEL_RU[issue.type]}
-                </span>
+                <IssueTypeBadge typeConfig={issue.issueTypeConfig} showLabel />
               </div>
               <div className="tt-issue-header-meta">
                 <span>Создана: {formatDate(issue.createdAt)}</span>
@@ -194,7 +154,7 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                     <div className="tt-panel-row">
                       <span>Родитель</span>
                       <span className="tt-aside-value">
-                        {issue.parent ? `${issue.parent.type}-${issue.parent.number}: ${issue.parent.title}` : 'Нет'}
+                        {issue.parent ? `${issue.parent.issueTypeConfig?.systemKey ?? 'ISSUE'}-${issue.parent.number}: ${issue.parent.title}` : 'Нет'}
                       </span>
                     </div>
                     <div className="tt-panel-row">
@@ -216,10 +176,8 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                       <List.Item>
                         <div className="tt-issue-preview-subissue">
                           <div className="tt-issue-preview-subissue-top">
-                            <Tag>{child.type}</Tag>
-                            <span className={`tt-sprint-drawer-status-pill tt-sprint-drawer-status-pill-${STATUS_TONE_CLASS[child.status]}`}>
-                              {STATUS_LABEL_RU[child.status]}
-                            </span>
+                            <IssueTypeBadge typeConfig={child.issueTypeConfig} />
+                            <IssueStatusTag status={child.status} size="small" />
                           </div>
                           <span>{child.title}</span>
                         </div>
@@ -236,22 +194,15 @@ export default function IssuePreviewDrawer({ open, issueId, onClose }: IssuePrev
                 <div className="tt-panel-body tt-issue-preview-fields">
                   <div className="tt-panel-row">
                     <span>Статус</span>
-                    <span className={`tt-sprint-drawer-status-pill tt-sprint-drawer-status-pill-${STATUS_TONE_CLASS[issue.status]}`}>
-                      {STATUS_LABEL_RU[issue.status]}
-                    </span>
+                    <IssueStatusTag status={issue.status} size="small" />
                   </div>
                   <div className="tt-panel-row">
                     <span>Приоритет</span>
-                    <span className={`tt-priority-pill tt-priority-${issue.priority.toLowerCase()}`}>
-                      <span className="tt-priority-dot" />
-                      <span>{PRIORITY_LABEL_RU[issue.priority]}</span>
-                    </span>
+                    <IssuePriorityTag priority={issue.priority} size="small" />
                   </div>
                   <div className="tt-panel-row">
                     <span>Тип</span>
-                    <span className={`tt-issue-tag tt-sprint-drawer-type-pill tt-sprint-drawer-type-${TYPE_TONE_CLASS[issue.type]}`}>
-                      {TYPE_LABEL_RU[issue.type]}
-                    </span>
+                    <IssueTypeBadge typeConfig={issue.issueTypeConfig} showLabel />
                   </div>
                   <div className="tt-panel-row">
                     <span>Исполнитель</span>

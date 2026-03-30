@@ -2,9 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 
 import { errorHandler } from './shared/middleware/error-handler.js';
+import { metricsMiddleware } from './shared/middleware/metrics.js';
 import { getReadinessStatus } from './shared/health.js';
+import { features } from './shared/features.js';
+import { swaggerSpec } from './shared/openapi.js';
 import authRouter from './modules/auth/auth.router.js';
 import usersRouter from './modules/users/users.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
@@ -19,19 +23,44 @@ import adminRouter from './modules/admin/admin.router.js';
 import aiSessionsRouter from './modules/ai/ai-sessions.router.js';
 import aiRouter from './modules/ai/ai.router.js';
 import webhooksRouter from './modules/webhooks/webhooks.router.js';
+import linksRouter from './modules/links/links.router.js';
+import projectCategoriesRouter from './modules/project-categories/project-categories.router.js';
+import monitoringRouter from './modules/monitoring/monitoring.router.js';
+import issueTypeConfigsRouter from './modules/issue-type-configs/issue-type-configs.router.js';
+import issueTypeSchemesRouter from './modules/issue-type-schemes/issue-type-schemes.router.js';
+import customFieldsRouter from './modules/custom-fields/custom-fields.router.js';
+import { adminRouter as fieldSchemasAdminRouter, projectFieldSchemasRouter } from './modules/field-schemas/field-schemas.router.js';
+import issueCustomFieldsRouter from './modules/issue-custom-fields/issue-custom-fields.router.js';
+import workflowStatusesRouter from './modules/workflows/workflow-statuses.router.js';
+import workflowsRouter from './modules/workflows/workflows.router.js';
+import workflowSchemesRouter from './modules/workflow-schemes/workflow-schemes.router.js';
+import transitionScreensRouter from './modules/transition-screens/transition-screens.router.js';
+import workflowEngineRouter from './modules/workflow-engine/workflow-engine.router.js';
+import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
+import { authenticate } from './shared/middleware/auth.js';
+import { requireRole } from './shared/middleware/rbac.js';
 
 export function createApp() {
   const app = express();
 
   // Global middleware
   app.use(helmet());
-  app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+  // CVE-15: explicit CORS origin (no wildcard)
+  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  app.use(cors({ origin: corsOrigin.split(',').map((o) => o.trim()), credentials: true }));
+  app.use(metricsMiddleware);
   app.use(express.json());
-  app.use(cookieParser());
+  // CVE-14: signed cookies
+  app.use(cookieParser(process.env.COOKIE_SECRET || undefined));
 
-  // Health check
+  // Health check — includes version for deploy verification
   app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: process.env.GIT_SHA || 'dev',
+      buildTime: process.env.BUILD_TIME || 'unknown',
+    });
   });
 
   app.get('/api/ready', async (_req, res) => {
@@ -39,10 +68,38 @@ export function createApp() {
     res.status(readiness.status === 'ok' ? 200 : 503).json(readiness);
   });
 
-  // Routes
+  // Feature flags endpoint — фронт и агенты читают что включено
+  app.get('/api/features', (_req, res) => {
+    res.json(features);
+  });
+
+  // OpenAPI JSON must be registered before the swagger UI middleware
+  // CVE-09: In production, require ADMIN role to access Swagger
+  if (process.env.NODE_ENV === 'production') {
+    app.get('/api/docs/json', authenticate, requireRole('ADMIN'), (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.json(swaggerSpec);
+    });
+    app.use('/api/docs', authenticate, requireRole('ADMIN'), swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  } else {
+    app.get('/api/docs/json', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.json(swaggerSpec);
+    });
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  }
+
+  // GitLab webhook — must be first among /api routes to bypass JWT auth
+  // (uses its own X-Gitlab-Token secret mechanism, not JWT)
+  if (features.gitlab) {
+    app.use('/api', webhooksRouter);
+  }
+
+  // Core routes (always enabled)
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/projects', projectsRouter);
+  app.use('/api/project-categories', projectCategoriesRouter);
   // Issues router has mixed paths: /api/projects/:projectId/issues and /api/issues/:id
   app.use('/api', issuesRouter);
   app.use('/api', boardsRouter);
@@ -52,9 +109,37 @@ export function createApp() {
   app.use('/api', timeRouter);
   app.use('/api', teamsRouter);
   app.use('/api', adminRouter);
-  app.use('/api', aiSessionsRouter);
-  app.use('/api', aiRouter);
-  app.use('/api', webhooksRouter);
+
+  // AI routes (feature-gated)
+  if (features.ai) {
+    app.use('/api', aiSessionsRouter);
+    app.use('/api', aiRouter);
+  }
+
+  app.use('/api', linksRouter);
+  app.use('/api', issueTypeConfigsRouter);
+  app.use('/api', issueTypeSchemesRouter);
+  app.use('/api/admin/custom-fields', customFieldsRouter);
+  app.use('/api/admin/field-schemas', fieldSchemasAdminRouter);
+  app.use('/api', issueCustomFieldsRouter);
+  app.use('/api/projects/:projectId/field-schemas', projectFieldSchemasRouter);
+  app.use('/api/monitoring', monitoringRouter);
+
+  // Workflow Engine
+  app.use('/api/admin/workflow-statuses', workflowStatusesRouter);
+  app.use('/api/admin/workflows', workflowsRouter);
+  app.use('/api/admin/workflow-schemes', workflowSchemesRouter);
+  app.use('/api/admin/transition-screens', transitionScreensRouter);
+  app.use('/api', workflowEngineRouter);
+
+  // Public: project workflow scheme
+  app.get('/api/projects/:projectId/workflow-scheme', authenticate, async (req, res, next) => {
+    try {
+      res.json(await getSchemeForProject(req.params.projectId as string));
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // Error handler (must be last)
   app.use(errorHandler);

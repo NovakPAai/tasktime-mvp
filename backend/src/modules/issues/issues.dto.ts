@@ -3,18 +3,23 @@ import { z } from 'zod';
 export const createIssueDto = z.object({
   title: z.string().min(1).max(500),
   description: z.string().max(10000).optional(),
-  type: z.enum(['EPIC', 'STORY', 'TASK', 'SUBTASK', 'BUG']).default('TASK'),
+  acceptanceCriteria: z.string().max(10000).optional(),
+  issueTypeConfigId: z.string().uuid().optional(),
+  type: z.string().optional(), // backward compat: systemKey alias (e.g. 'TASK', 'EPIC')
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
   parentId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().optional(),
+  dueDate: z.string().date().optional(),
 });
 
 export const updateIssueDto = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(10000).optional(),
+  acceptanceCriteria: z.string().max(10000).nullable().optional(),
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   parentId: z.string().uuid().nullable().optional(),
+  dueDate: z.string().date().nullable().optional(),
 });
 
 export const updateStatusDto = z.object({
@@ -34,9 +39,28 @@ export const updateAiStatusDto = z.object({
   aiExecutionStatus: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'DONE', 'FAILED']),
 });
 
+export const bulkTransitionDto = z.object({
+  issueIds: z.array(z.string().uuid()).min(1),
+  transitionId: z.string().uuid(),
+});
+
+export const changeTypeDto = z.object({
+  targetIssueTypeConfigId: z.string().uuid(),
+  force: z.boolean().optional().default(false),
+});
+
+export const moveIssueDto = z.object({
+  targetProjectId: z.string().uuid(),
+  targetIssueTypeConfigId: z.string().uuid().optional(),
+  moveChildren: z.boolean().optional().default(false),
+});
+
 export type CreateIssueDto = z.infer<typeof createIssueDto>;
 export type UpdateIssueDto = z.infer<typeof updateIssueDto>;
 export type UpdateStatusDto = z.infer<typeof updateStatusDto>;
 export type AssignDto = z.infer<typeof assignDto>;
 export type UpdateAiFlagsDto = z.infer<typeof updateAiFlagsDto>;
 export type UpdateAiStatusDto = z.infer<typeof updateAiStatusDto>;
+export type BulkTransitionDto = z.infer<typeof bulkTransitionDto>;
+export type ChangeTypeDto = z.infer<typeof changeTypeDto>;
+export type MoveIssueDto = z.infer<typeof moveIssueDto>;

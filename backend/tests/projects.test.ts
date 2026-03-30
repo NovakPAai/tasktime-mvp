@@ -17,15 +17,15 @@ beforeEach(async () => {
 
   // Create admin
   const adminReg = await request.post('/api/auth/register').send({
-    email: 'admin@test.com', password: 'password123', name: 'Admin',
+    email: 'admin@test.com', password: 'Password123', name: 'Admin',
   });
   await prisma.user.update({ where: { id: adminReg.body.user.id }, data: { role: 'ADMIN' } });
-  const adminLogin = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+  const adminLogin = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'Password123' });
   adminToken = adminLogin.body.accessToken;
 
   // Create regular user
   const userReg = await request.post('/api/auth/register').send({
-    email: 'user@test.com', password: 'password123', name: 'User',
+    email: 'user@test.com', password: 'Password123', name: 'User',
   });
   userToken = userReg.body.accessToken;
 
@@ -110,7 +110,6 @@ describe('Projects API', () => {
         projectId,
         number: 1,
         title: 'Issue 1',
-        type: 'TASK',
         status: 'OPEN',
         priority: 'MEDIUM',
         creatorId: (await prisma.user.findFirstOrThrow({ where: { email: 'admin@test.com' } })).id,

@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   deploy:
@@ -28,6 +29,23 @@ jobs:
       - name: Sync deploy assets
         run: |
           rsync -az deploy/ "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}:${{ secrets.PRODUCTION_DEPLOY_PATH }}/deploy/"
+
+      - name: Docker login on server
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" \
+            "echo '$GHCR_TOKEN' | docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+
+      - name: Inject secrets into backend env
+        run: |
+          ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" "
+            ENV_FILE='${{ secrets.PRODUCTION_DEPLOY_PATH }}/deploy/env/backend.production.env'
+            # Remove stale secret lines (idempotent)
+            sed -i '/^AI_PROVIDER=/d; /^ANTHROPIC_API_KEY=/d' \"\$ENV_FILE\"
+            echo 'AI_PROVIDER=${{ secrets.AI_PROVIDER }}' >> \"\$ENV_FILE\"
+            echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' >> \"\$ENV_FILE\"
+          "
 
       - name: Run remote deploy
         run: |

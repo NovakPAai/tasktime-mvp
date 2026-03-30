@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd /Users/pavelnovak/tasktime-mvp && PORT=3002 ./backend/node_modules/.bin/tsx watch backend/src/server.ts"],
+      "port": 3002
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd /Users/pavelnovak/tasktime-mvp/frontend && node_modules/.bin/vite --port 5181"],
+      "port": 5181
+    }
+  ]
+}

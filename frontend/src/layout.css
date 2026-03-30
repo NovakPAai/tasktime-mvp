@@ -1,0 +1,192 @@
+/**
+ * Flow Universe UI Kit 2.0 — Layout
+ * TTUI-167: вынесен из styles.css
+ * Содержит: App shell (topbar, sidebar, hamburger, responsive breakpoints)
+ * (.tt-topbar-*, .tt-sidebar-backdrop, @media ≤768px, @media ≤480px)
+ */
+/* =========================================================
+   TOPBAR LAYOUT — right cluster + user badge
+   ========================================================= */
+
+.tt-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tt-topbar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tt-topbar-user-name {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.tt-topbar-role {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--t3);
+  background: var(--bg-active);
+  border: 1px solid var(--b2);
+  border-radius: var(--r3);
+  padding: 2px var(--space-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tt-theme-switch {
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   MOBILE HAMBURGER + SIDEBAR OVERLAY
+   ========================================================= */
+
+.tt-sidebar-close-btn {
+  display: none;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tt-sidebar-backdrop {
+  display: none;
+}
+
+/* =========================================================
+   RESPONSIVE ≤ 768px
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+  .tt-mobile-hamburger {
+    display: flex !important;
+    flex-shrink: 0;
+  }
+
+  .tt-topbar {
+    justify-content: flex-start;
+    padding: 0 var(--space-5);
+    gap: var(--space-3);
+  }
+
+  .tt-topbar-right {
+    flex: 1;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  .tt-topbar-user-name {
+    display: none;
+  }
+
+  .tt-topbar-role {
+    display: none;
+  }
+
+  .tt-topbar-logout-label {
+    display: none;
+  }
+
+  /* Collapse Ant Design sider in flex layout */
+  .tt-app-shell > .ant-layout-sider {
+    flex: 0 0 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    width: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Sidebar as fixed overlay */
+  .tt-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    width: var(--sidebar-width) !important;
+    z-index: 1000 !important;
+    transform: translateX(-100%);
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+  }
+
+  .tt-sidebar--open {
+    transform: translateX(0) !important;
+    box-shadow: 8px 0 40px rgba(0, 0, 0, 0.75) !important;
+  }
+
+  .tt-sidebar-close-btn {
+    display: flex !important;
+    color: var(--t2);
+  }
+
+  .tt-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 999;
+    animation: tt-fade-in 0.18s ease;
+  }
+
+  .tt-main {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .tt-content {
+    padding: var(--space-5) var(--space-5) var(--space-7);
+  }
+
+  .tt-main::before {
+    left: 0;
+    border-radius: 0;
+  }
+
+  .tt-table,
+  .ant-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tt-table .ant-table,
+  .ant-table-wrapper .ant-table {
+    min-width: 560px;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE ≤ 480px
+   ========================================================= */
+
+@media (max-width: 480px) {
+
+  .tt-content {
+    padding: var(--space-5) var(--space-5) var(--space-6);
+  }
+
+  .moex-shell {
+    min-width: 0;
+    flex-direction: column;
+  }
+
+  .moex-right {
+    display: none;
+  }
+}
+

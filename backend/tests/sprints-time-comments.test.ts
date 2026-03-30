@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { request } from './helpers.js';
+import { request, getIssueTypeConfigId } from './helpers.js';
 
 const prisma = new PrismaClient();
 
@@ -25,31 +25,31 @@ beforeEach(async () => {
 
   const reg = await request.post('/api/auth/register').send({
     email: 'admin2@test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'Admin 2',
   });
   adminUserId = reg.body.user.id as string;
   await prisma.user.update({ where: { id: reg.body.user.id }, data: { role: 'ADMIN' } });
-  const login = await request.post('/api/auth/login').send({ email: 'admin2@test.com', password: 'password123' });
+  const login = await request.post('/api/auth/login').send({ email: 'admin2@test.com', password: 'Password123' });
   adminToken = login.body.accessToken;
 
   const managerReg = await request.post('/api/auth/register').send({
     email: 'manager2@test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'Manager 2',
   });
   managerUserId = managerReg.body.user.id as string;
   await prisma.user.update({ where: { id: managerUserId }, data: { role: 'MANAGER' } });
-  const managerLogin = await request.post('/api/auth/login').send({ email: 'manager2@test.com', password: 'password123' });
+  const managerLogin = await request.post('/api/auth/login').send({ email: 'manager2@test.com', password: 'Password123' });
   managerToken = managerLogin.body.accessToken;
 
   const userReg = await request.post('/api/auth/register').send({
     email: 'user2@test.com',
-    password: 'password123',
+    password: 'Password123',
     name: 'User 2',
   });
   userUserId = userReg.body.user.id as string;
-  const userLogin = await request.post('/api/auth/login').send({ email: 'user2@test.com', password: 'password123' });
+  const userLogin = await request.post('/api/auth/login').send({ email: 'user2@test.com', password: 'Password123' });
   userToken = userLogin.body.accessToken;
 
   const proj = await request.post('/api/projects')
@@ -57,9 +57,10 @@ beforeEach(async () => {
     .send({ name: 'Sprint Project', key: 'SPR' });
   projectId = proj.body.id;
 
+  const taskConfigId = await getIssueTypeConfigId('TASK');
   const issue = await request.post(`/api/projects/${projectId}/issues`)
     .set('Authorization', `Bearer ${adminToken}`)
-    .send({ title: 'Issue for sprint', type: 'TASK' });
+    .send({ title: 'Issue for sprint', issueTypeConfigId: taskConfigId });
   issueId = issue.body.id;
 });
 
@@ -113,7 +114,6 @@ describe('Sprint 2 APIs: sprints, time, comments, history', () => {
       id: issueId,
       projectId,
       title: 'Issue for sprint',
-      type: 'TASK',
       status: 'OPEN',
       priority: 'MEDIUM',
       project: {

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, claude/*]
+    branches: [main, claude/*, cursor/*]
   pull_request:
     branches: [main]
 
@@ -55,6 +55,8 @@ jobs:
       - run: cd backend && npm run typecheck
       - run: cd backend && npm run build
       - run: cd backend && npm run db:migrate:deploy
+      - name: Check schema/migration drift
+        run: cd backend && npx prisma migrate diff --from-schema-datasource src/prisma/schema.prisma --to-schema-datamodel src/prisma/schema.prisma --exit-code
       - run: cd backend && npm test
 
   frontend:
@@ -68,16 +70,192 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: cd frontend && npm ci
+      - run: cd frontend && npm ci --legacy-peer-deps
       - run: cd frontend && npm run lint
       - run: cd frontend && npm run typecheck
       - run: cd frontend && npm run build
 
+  pipeline:
+    runs-on: ubuntu-latest
+    services:
+      pipeline-postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pipeline
+          POSTGRES_PASSWORD: pipeline
+          POSTGRES_DB: pipeline_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://pipeline:pipeline@localhost:5433/pipeline_test
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: pipeline-service/package-lock.json
+      - run: cd pipeline-service && npm ci
+      - run: cd pipeline-service && npm run db:generate
+      - run: cd pipeline-service && npm run typecheck
+      - run: cd pipeline-service && npm run build
+      - run: cd pipeline-service && npm run db:migrate:deploy
+
   docker:
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend, frontend, pipeline]
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v4
-      - run: docker build -f backend/Dockerfile .
-      - run: docker build -f frontend/Dockerfile .
+      - run: docker build --no-cache -f backend/Dockerfile .
+      - run: docker build --no-cache -f frontend/Dockerfile .
+      - run: docker build --no-cache -f pipeline-service/Dockerfile .
+
+  # --- Publish images to GHCR (main branch only) ---
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, pipeline, docker]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: vars
+        run: |
+          SHA="${{ github.sha }}"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "backend_tags<<EOF"
+            echo "ghcr.io/${{ github.repository_owner }}/tasktime-backend:${SHA}"
+            echo "ghcr.io/${{ github.repository_owner }}/tasktime-backend:main"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "web_tags<<EOF"
+            echo "ghcr.io/${{ github.repository_owner }}/tasktime-web:${SHA}"
+            echo "ghcr.io/${{ github.repository_owner }}/tasktime-web:main"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "pipeline_tags<<EOF"
+            echo "ghcr.io/${{ github.repository_owner }}/tasktime-pipeline:${SHA}"
+            echo "ghcr.io/${{ github.repository_owner }}/tasktime-pipeline:main"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ steps.vars.outputs.backend_tags }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.vars.outputs.web_tags }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: pipeline-service/Dockerfile
+          push: true
+          tags: ${{ steps.vars.outputs.pipeline_tags }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha,scope=pipeline
+          cache-to: type=gha,mode=max,scope=pipeline
+
+  # --- Auto-deploy to staging (main branch only, after publish) ---
+  deploy-staging:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [publish]
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.STAGING_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.STAGING_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Login GHCR on staging server
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+              "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+
+      - name: Write pipeline env file
+        run: |
+          cat > deploy/env/pipeline.staging.env << 'ENVEOF'
+          DATABASE_URL=postgresql://pipeline:${{ secrets.PIPELINE_POSTGRES_PASSWORD }}@pipeline-postgres:5432/pipeline
+          PORT=3100
+          NODE_ENV=production
+          GITHUB_TOKEN=${{ secrets.PIPELINE_GITHUB_TOKEN }}
+          GITHUB_REPOS=jackrescuer-gif/tasktime-mvp
+          PIPELINE_API_KEY=${{ secrets.PIPELINE_API_KEY }}
+          ENVEOF
+          # Remove leading whitespace (heredoc indentation)
+          sed -i 's/^[[:space:]]*//' deploy/env/pipeline.staging.env
+
+      - name: Generate .env.staging from secrets
+        run: |
+          # Fetch current .env.staging from server (must succeed — fail loudly on SSH error)
+          REMOTE_CONTENT=$(ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+            "cat '${{ secrets.STAGING_DEPLOY_PATH }}/deploy/env/.env.staging'")
+          # Strip previous PIPELINE_* lines (grep -v exits 1 if all lines match — ignore)
+          printf '%s\n' "$REMOTE_CONTENT" | grep -v '^PIPELINE_' > deploy/env/.env.staging || true
+          {
+            echo "PIPELINE_IMAGE=ghcr.io/${{ github.repository_owner }}/tasktime-pipeline"
+            echo "PIPELINE_POSTGRES_USER=pipeline"
+            echo "PIPELINE_POSTGRES_DB=pipeline"
+            echo "PIPELINE_POSTGRES_PASSWORD=${{ secrets.PIPELINE_POSTGRES_PASSWORD }}"
+            echo "PIPELINE_API_KEY=${{ secrets.PIPELINE_API_KEY }}"
+          } >> deploy/env/.env.staging
+
+      - name: Sync deploy assets
+        run: |
+          rsync -az deploy/ "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}:${{ secrets.STAGING_DEPLOY_PATH }}/deploy/"
+
+      - name: Run remote deploy
+        run: |
+          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+            "cd '${{ secrets.STAGING_DEPLOY_PATH }}' && chmod +x deploy/scripts/*.sh && ./deploy/scripts/deploy.sh staging '${{ github.sha }}'"

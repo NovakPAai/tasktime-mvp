@@ -1,0 +1,178 @@
+# =============================================================================
+# CodeRabbit Configuration — Flow Universe (TaskTime MVP)
+# Repository: github.com/jackrescuer-gif/tasktime-mvp
+# Stack: TypeScript, React 18, Vite, Express 4, Prisma 6, Ant Design 5
+# =============================================================================
+
+# Язык ревью — русский
+language: "ru"
+
+# Тон: конструктивный, по существу
+tone_instructions: >
+  Пиши ревью конструктивно и по существу. Указывай конкретные проблемы
+  с примерами исправлений. Не повторяй очевидное. Код на английском,
+  комментарии и ревью на русском.
+
+# ---------------------------------------------------------------------------
+# Reviews
+# ---------------------------------------------------------------------------
+reviews:
+  # "chill" — меньше шума от мелочей, фокус на реальных проблемах
+  profile: "chill"
+
+  # Summary и walkthrough
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: true
+
+  # Оценка трудоёмкости ревью
+  estimate_code_review_effort: true
+
+  # Связанные issues и PR
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+
+  # Без стихов
+  poem: false
+
+  # Commit status
+  commit_status: true
+  review_status: true
+
+  # Лейблы и ревьюеры
+  suggested_labels: true
+  suggested_reviewers: true
+
+  # Прерывать ревью при закрытии PR
+  abort_on_close: true
+
+  # ---------------------------------------------------------------------------
+  # Фильтры путей: исключить файлы, не требующие ревью
+  # ---------------------------------------------------------------------------
+  path_filters:
+    - "!docs/**"
+    - "!**/*.md"
+    - "!backend/package-lock.json"
+    - "!frontend/package-lock.json"
+    - "!**/pnpm-lock.yaml"
+
+    - "!deploy/**"
+    - "!fgm des/**"
+    - "!**/*.generated.*"
+    - "!**/dist/**"
+    - "!**/node_modules/**"
+
+  # ---------------------------------------------------------------------------
+  # Auto Review — ФИКС проблемы PR #160
+  # ---------------------------------------------------------------------------
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 7
+    drafts: false
+
+    # *** ФИКС PR #160 ***
+    # По умолчанию CodeRabbit ревьюит только PR в default branch (main).
+    # '.*' — regex, матчит ЛЮБУЮ base branch (main, claude/*, cursor/*, UxUi/*, fix/*)
+    base_branches:
+      - ".*"
+
+    # Пропускать PR от ботов
+    ignore_usernames:
+      - "github-actions[bot]"
+      - "dependabot[bot]"
+      - "renovate[bot]"
+
+    # Пропускать PR с этими словами в заголовке
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT REVIEW"
+
+  # ---------------------------------------------------------------------------
+  # Path Instructions — контекстные инструкции для ревьюера
+  # ---------------------------------------------------------------------------
+  path_instructions:
+    - path: "backend/src/modules/auth/**"
+      instructions: >
+        Модуль аутентификации. Проверяй:
+        — безопасность JWT (срок жизни, алгоритм, refresh rotation)
+        — хеширование паролей (bcrypt, cost factor)
+        — защита от brute-force и timing attacks
+        — валидация входных данных через Zod
+        — нет утечки секретов в ответах API
+
+    - path: "backend/src/modules/**/router.ts"
+      instructions: >
+        Express роутеры. Проверяй:
+        — наличие RBAC middleware (requireRole) на каждом эндпоинте
+        — валидация body/params/query через Zod DTO
+        — корректные HTTP статусы (201 создание, 204 удаление)
+        — async error handling (try-catch или asyncHandler)
+        — rate limiting на мутирующих эндпоинтах
+
+    - path: "backend/src/modules/**/service.ts"
+      instructions: >
+        Сервисный слой. Проверяй:
+        — нет прямых import из других модулей (модульный монолит)
+        — транзакции Prisma для связанных операций
+        — audit log для всех мутаций (ФЗ-152 compliance)
+        — immutability (новые объекты вместо мутации)
+        — обработка ошибок с понятными сообщениями
+
+    - path: "backend/src/prisma/schema.prisma"
+      instructions: >
+        Prisma schema. Проверяй:
+        — безопасность миграций (нет DROP COLUMN/TABLE без подтверждения)
+        — индексы на часто используемых полях (foreign keys, search fields)
+        — каскадное удаление — только где ожидается
+        — enum изменения — только добавление значений (не удаление)
+        — @updatedAt на полях updated_at
+
+    - path: "frontend/src/pages/**"
+      instructions: >
+        React страницы. Проверяй:
+        — нет бизнес-логики в компонентах (выносить в store/api)
+        — корректная обработка loading/error/empty состояний
+        — accessibility: aria-labels, keyboard navigation
+        — нет утечек памяти (cleanup в useEffect)
+
+    - path: "frontend/src/components/**"
+      instructions: >
+        React компоненты. Проверяй:
+        — типизация props через interface (не type alias)
+        — нет any в пропсах
+        — мемоизация дорогих вычислений (useMemo/useCallback)
+        — Ant Design компоненты по документации
+        — поддержка dark/light темы
+
+    - path: ".github/workflows/**"
+      instructions: >
+        CI/CD workflows. Проверяй:
+        — actions pinned к SHA или major version (v4, не latest)
+        — secrets не логируются
+        — concurrency groups
+        — кеширование dependencies
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+# ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
+chat:
+  auto_reply: true
+
+# ---------------------------------------------------------------------------
+# Knowledge Base
+# ---------------------------------------------------------------------------
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
