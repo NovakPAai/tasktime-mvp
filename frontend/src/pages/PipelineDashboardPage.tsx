@@ -346,7 +346,7 @@ export default function PipelineDashboardPage() {
                     tabIndex={0}
                     aria-pressed={isSelected}
                     onClick={() => setSelectedBatch(isSelected ? null : batch.id)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedBatch(isSelected ? null : batch.id); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBatch(isSelected ? null : batch.id); } }}
                     style={{ padding: '10px 16px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer', backgroundColor: isSelected ? C.accBg : 'transparent', display: 'flex', alignItems: 'center', gap: 12 }}
                   >
                     <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: cfg.dot, flexShrink: 0 }} />

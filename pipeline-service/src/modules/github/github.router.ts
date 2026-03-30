@@ -12,12 +12,15 @@ const SYNC_TYPE = 'github-merged-prs';
 // POST /api/github/sync — pull merged PRs from configured repo
 githubRouter.post('/sync', async (_req, res, next) => {
   try {
-    const repo = config.APP_GITHUB_REPOS
-      .split(',')
-      .map(r => r.trim())
-      .find(r => /^[^/\s]+\/[^/\s]+$/.test(r));
+    const repos = config.APP_GITHUB_REPOS.split(',').map(r => r.trim()).filter(Boolean);
+    const invalid = repos.find(r => !/^[^/\s]+\/[^/\s]+$/.test(r));
+    if (invalid) {
+      res.status(422).json({ error: `Invalid APP_GITHUB_REPOS entry: "${invalid}" (expected "owner/repo")` });
+      return;
+    }
+    const repo = repos[0];
     if (!repo) {
-      res.status(422).json({ error: 'APP_GITHUB_REPOS not configured or invalid (expected "owner/repo")' });
+      res.status(422).json({ error: 'APP_GITHUB_REPOS not configured (expected "owner/repo")' });
       return;
     }
 

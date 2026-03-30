@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"file_path\\\",d.get(\\\"path\\\",\\\"\\\")))\" 2>/dev/null); if [ -n \"$FILE\" ]; then MAIN_REPO=$(git worktree list --porcelain 2>/dev/null | awk \"/^worktree/{print \\$2; exit}\"); [ -z \"$MAIN_REPO\" ] && MAIN_REPO=$(git rev-parse --show-toplevel 2>/dev/null); bash \"$MAIN_REPO/scripts/doc-reminder.sh\" \"$FILE\"; fi || true'"
+            "command": "bash -c 'FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"file_path\\\",d.get(\\\"path\\\",\\\"\\\")))\" 2>/dev/null); if [ -n \"$FILE\" ]; then MAIN_REPO=$(git worktree list --porcelain 2>/dev/null | awk \"/^worktree/{sub(/^worktree /, \\\"\\\"); print; exit}\"); [ -z \"$MAIN_REPO\" ] && MAIN_REPO=$(git rev-parse --show-toplevel 2>/dev/null); bash \"$MAIN_REPO/scripts/doc-reminder.sh\" \"$FILE\"; fi || true'"
           }
         ]
       }

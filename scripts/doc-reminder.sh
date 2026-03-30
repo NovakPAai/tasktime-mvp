@@ -10,7 +10,7 @@ FILE="$1"
 FILE="${FILE#./}"
 
 # Always resolve MAIN REPO (works from worktrees too)
-MAIN_REPO=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree/{print $2; exit}')
+MAIN_REPO=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')
 [ -z "$MAIN_REPO" ] && MAIN_REPO=$(git rev-parse --show-toplevel 2>/dev/null)
 [ -z "$MAIN_REPO" ] && exit 0
 
@@ -43,16 +43,14 @@ remind() {
 if echo "$FILE" | grep -qE '\.(ts|tsx|js|jsx|prisma|yml|yaml|sh)$' && \
    ! echo "$FILE" | grep -qE '(node_modules|\.gen\.|\.d\.ts|dist/|build/)'; then
 
-  CHANGELOG="$MAIN_REPO/docs/CHANGELOG-CLAUDE-2026-03.md"
-  if [ -f "$CHANGELOG" ]; then
-    # Find or create today's entry
-    TODAY=$(date '+%Y-%m-%d')
-    if ! grep -q "^## $TODAY" "$CHANGELOG" 2>/dev/null; then
-      echo "" >> "$CHANGELOG"
-      echo "## $TODAY" >> "$CHANGELOG"
-    fi
-    echo "- \`$FILE\`" >> "$CHANGELOG"
+  CHANGELOG="$MAIN_REPO/docs/CHANGELOG-CLAUDE-$(date '+%Y-%m').md"
+  mkdir -p "$(dirname "$CHANGELOG")"
+  TODAY=$(date '+%Y-%m-%d')
+  if ! grep -q "^## $TODAY" "$CHANGELOG" 2>/dev/null; then
+    echo "" >> "$CHANGELOG"
+    echo "## $TODAY" >> "$CHANGELOG"
   fi
+  echo "- \`$FILE\`" >> "$CHANGELOG"
 fi
 
 # ── AUTO: generate-docs for API/schema/routing files ─────────────────────────
