@@ -6,6 +6,7 @@ import * as adminService from './admin.service.js';
 import { createUserDto, updateUserAdminDto, assignProjectRoleDto } from './admin.dto.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
+import { rotateUserPassword } from '../users/password-rotation.service.js';
 import type { UatRole } from './uat-tests.data.js';
 
 const router = Router();
@@ -205,5 +206,20 @@ router.get(
     }
   }
 );
+
+router.post('/admin/users/by-email/:email/reset-password', requireRole('SUPER_ADMIN', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { email } = req.params;
+    const { newPassword } = req.body as { newPassword?: string };
+    if (typeof newPassword !== 'string' || !newPassword) {
+      res.status(400).json({ error: 'newPassword is required' });
+      return;
+    }
+    const user = await rotateUserPassword({ email, newPassword });
+    res.json({ success: true, userId: user.id, email: user.email });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;
