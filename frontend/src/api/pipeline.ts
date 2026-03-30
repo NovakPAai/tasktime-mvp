@@ -71,8 +71,9 @@ export interface PipelineHealth {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 function mapPr(raw: any): PrSnapshot {
+  if (!raw?.id) console.warn('mapPr: missing id', raw);
   return {
-    id: raw.id,
+    id: raw.id ?? '',
     prNumber: raw.externalId ?? raw.prNumber ?? 0,
     prTitle: raw.title ?? raw.prTitle ?? '',
     prUrl: raw.htmlUrl ?? raw.prUrl ?? '',
@@ -85,8 +86,9 @@ function mapPr(raw: any): PrSnapshot {
 }
 
 function mapDeploy(raw: any): DeployEvent {
+  if (!raw?.id) console.warn('mapDeploy: missing id', raw);
   return {
-    id: raw.id,
+    id: raw.id ?? '',
     env: raw.target?.toLowerCase() ?? raw.env ?? '',
     sha: raw.gitSha ?? raw.imageTag ?? raw.sha ?? '',
     triggeredBy: raw.triggeredById ?? raw.triggeredBy ?? '',
@@ -99,8 +101,9 @@ function mapDeploy(raw: any): DeployEvent {
 }
 
 function mapBatch(raw: any): StagingBatch {
+  if (!raw?.id) console.warn('mapBatch: missing id', raw);
   return {
-    id: raw.id,
+    id: raw.id ?? '',
     title: raw.name ?? raw.title ?? '',
     state: raw.state ?? 'COLLECTING',
     repo: raw.repo ?? '',
