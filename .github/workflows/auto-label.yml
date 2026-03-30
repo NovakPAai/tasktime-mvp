@@ -1,0 +1,64 @@
+name: Auto Label PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title.toLowerCase();
+            const prNumber = context.payload.pull_request.number;
+
+            const typeMap = [
+              { prefix: 'feat',     label: 'feat'     },
+              { prefix: 'fix',      label: 'fix'      },
+              { prefix: 'refactor', label: 'refactor' },
+              { prefix: 'test',     label: 'test'     },
+              { prefix: 'docs',     label: 'docs'     },
+              { prefix: 'chore',    label: 'chore'    },
+              { prefix: 'ci',       label: 'ci'       },
+              { prefix: 'perf',     label: 'feat'     },
+            ];
+
+            const autoLabels = typeMap.map(t => t.label);
+
+            const matched = typeMap.find(t => title.startsWith(t.prefix + ':') || title.startsWith(t.prefix + '('));
+            if (!matched) return;
+
+            // Получить текущие лейблы PR
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            // Убрать старые авто-лейблы, добавить новый
+            const toKeep = currentLabels
+              .map(l => l.name)
+              .filter(name => !autoLabels.includes(name));
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: [...toKeep, matched.label],
+            });
+
+            // Добавить breaking если есть "!" после типа
+            const rawTitle = context.payload.pull_request.title;
+            if (rawTitle.match(/^[a-z]+(\([^)]+\))?!:/)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['breaking'],
+              });
+            }
