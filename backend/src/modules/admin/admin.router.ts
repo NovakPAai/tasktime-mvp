@@ -207,16 +207,18 @@ router.get(
   }
 );
 
-router.post('/admin/users/by-email/:email/reset-password', requireRole('SUPER_ADMIN', 'ADMIN'), async (req, res, next) => {
+router.post('/admin/users/reset-password', requireRole('SUPER_ADMIN', 'ADMIN'), async (req, res, next) => {
   try {
-    const { email } = req.params;
-<<<<<<< HEAD
-    const { newPassword } = req.body as { newPassword?: unknown };
+    const { email, newPassword } = req.body as { email?: unknown; newPassword?: unknown };
+    if (typeof email !== 'string' || email.trim().length === 0) {
+      res.status(400).json({ error: 'email is required and must be a non-empty string' });
+      return;
+    }
     if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
       res.status(400).json({ error: 'newPassword is required and must be a non-empty string' });
       return;
     }
-    const user = await rotateUserPassword({ email, newPassword: newPassword.trim() });
+    const user = await rotateUserPassword({ email: email.trim(), newPassword: newPassword.trim() });
     res.json({ success: true, userId: user.id, email: user.email });
   } catch (err) {
     next(err);
