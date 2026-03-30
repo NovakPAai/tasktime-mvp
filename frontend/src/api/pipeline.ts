@@ -139,7 +139,7 @@ export const pipelineApi = {
     return mapBatch(unwrap(raw));
   },
 
-  createBatch: async (data: { title: string; repo?: string; notes?: string }): Promise<StagingBatch> => {
+  createBatch: async (data: { title: string; notes?: string }): Promise<StagingBatch> => {
     const raw = await pipelineFetch<unknown>('/api/batches', {
       method: 'POST',
       body: JSON.stringify({ name: data.title, notes: data.notes }),
