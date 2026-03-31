@@ -65,6 +65,12 @@ githubRouter.post('/sync', async (_req, res, next) => {
           stagingBatchId: collectingBatchId,
         },
       });
+
+      // If the PR existed as an open PR (batchId=null), assign it to collecting batch now
+      await prisma.pullRequestSnapshot.updateMany({
+        where: { source: 'GITHUB', repo, externalId: pr.number, stagingBatchId: null },
+        data: { stagingBatchId: collectingBatchId },
+      });
     }
 
     // Do NOT advance the sync cursor when results were truncated — next sync will re-fetch the same range
