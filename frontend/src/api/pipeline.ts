@@ -176,7 +176,7 @@ export const pipelineApi = {
       method: 'POST',
       body: JSON.stringify(imageTag ? { imageTag } : {}),
     });
-    return mapBatch((raw as any)?.data ?? unwrap(raw));
+    return mapBatch(unwrap(raw));
   },
 
   deployProductionBatch: async (batchId: string, imageTag?: string): Promise<StagingBatch> => {
@@ -184,6 +184,6 @@ export const pipelineApi = {
       method: 'POST',
       body: JSON.stringify(imageTag ? { imageTag } : {}),
     });
-    return mapBatch((raw as any)?.data ?? unwrap(raw));
+    return mapBatch(unwrap(raw));
   },
 };

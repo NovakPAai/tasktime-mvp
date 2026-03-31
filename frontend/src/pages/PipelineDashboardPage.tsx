@@ -200,7 +200,7 @@ export default function PipelineDashboardPage() {
 
   // Poll every 10s when a batch is actively deploying
   useEffect(() => {
-    const hasActive = batches.some(b => ['DEPLOYING'].includes(b.state));
+    const hasActive = batches.some(b => b.state === 'DEPLOYING');
     if (!hasActive) return;
     const id = setInterval(() => load(), 10_000);
     return () => clearInterval(id);

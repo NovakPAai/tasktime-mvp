@@ -18,6 +18,10 @@ githubRouter.post('/sync', async (_req, res, next) => {
       res.status(422).json({ error: `Invalid APP_GITHUB_REPOS entry: "${invalid}" (expected "owner/repo")` });
       return;
     }
+    if (repos.length > 1) {
+      res.status(422).json({ error: 'Multiple repositories not supported; supply a single "owner/repo" in APP_GITHUB_REPOS' });
+      return;
+    }
     const repo = repos[0];
     if (!repo) {
       res.status(422).json({ error: 'APP_GITHUB_REPOS not configured (expected "owner/repo")' });
