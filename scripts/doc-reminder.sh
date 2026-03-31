@@ -9,8 +9,8 @@ FILE="$1"
 [ -z "$FILE" ] && exit 0
 FILE="${FILE#./}"
 
-# Always resolve MAIN REPO (works from worktrees too)
-MAIN_REPO=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')
+# Resolve the repo that actually contains FILE (correct in multi-worktree scenarios)
+MAIN_REPO=$(git -C "$(dirname "$FILE")" rev-parse --show-toplevel 2>/dev/null)
 [ -z "$MAIN_REPO" ] && MAIN_REPO=$(git rev-parse --show-toplevel 2>/dev/null)
 [ -z "$MAIN_REPO" ] && exit 0
 
