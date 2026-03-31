@@ -29,7 +29,9 @@ export default function GlobalReleasesPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    apiClient.get<Project[]>('/projects').then((r) => setProjects(r.data));
+    apiClient.get<Project[]>('/projects')
+      .then((r) => setProjects(r.data))
+      .catch((err) => console.error('Failed to load projects:', err));
   }, []);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function GlobalReleasesPage() {
       projects.map((p) =>
         releasesApi.listReleases(p.id)
           .then((releases) => ({ project: p, releases }))
-          .catch(() => ({ project: p, releases: [] as Release[] })),
+          .catch((err) => { console.error(`Failed to load releases for project ${p.id} (${p.name}):`, err); return { project: p, releases: [] as Release[] }; }),
       ),
     )
       .then((results) => setData(results.filter((r) => r.releases.length > 0)))

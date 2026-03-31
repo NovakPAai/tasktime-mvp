@@ -52,10 +52,12 @@ export default function TopBar({
           />
         </Tooltip>
 
-        <Typography.Text className="tt-topbar-user">
-          <span className="tt-topbar-user-name">{user?.name}</span>
-          <span className="tt-topbar-role">{user?.role}</span>
-        </Typography.Text>
+        {user && (
+          <Typography.Text className="tt-topbar-user">
+            <span className="tt-topbar-user-name">{user.name}</span>
+            <span className="tt-topbar-role">{user.role}</span>
+          </Typography.Text>
+        )}
 
         <Button
           size="small"

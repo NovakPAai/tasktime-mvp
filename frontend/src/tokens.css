@@ -54,7 +54,7 @@
   --space-8: 24px;
   --font-display: "Space Grotesk", Inter, system-ui, sans-serif;
   --font-sans: Inter, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-md: 14px;
