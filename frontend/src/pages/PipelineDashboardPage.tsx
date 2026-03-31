@@ -47,6 +47,7 @@ interface StateCfg {
 function getStateCfg(state: BatchState, C: typeof DARK_C): StateCfg {
   const map: Record<BatchState, StateCfg> = {
     COLLECTING: { label: 'Сбор',      dot: C.muted,    bg: C.card },
+    MERGING:    { label: 'Мёрдж',     dot: C.warn,     bg: C.card },
     DEPLOYING:  { label: 'Деплой',    dot: C.warn,     bg: C.card },
     TESTING:    { label: 'Тестирует', dot: C.acc,      bg: C.card },
     PASSED:     { label: 'ОК',        dot: C.success,  bg: C.card },
@@ -213,17 +214,20 @@ export default function PipelineDashboardPage() {
     }
   };
 
-  // Poll every 10s when staging deploy active OR production dispatch in flight
+  // Poll every 10s while any staging deploy is active OR a production deploy is RUNNING
   useEffect(() => {
-    const hasActive = batches.some(b => b.state === 'DEPLOYING') || prodDeploying !== null;
+    const allDeploys = batches.flatMap(b => b.deploys);
+    const hasActive =
+      batches.some(b => b.state === 'DEPLOYING') ||
+      allDeploys.some(d => d.env === 'production' && d.status === 'RUNNING');
     if (!hasActive) return;
     const id = setInterval(() => load(), 10_000);
     return () => clearInterval(id);
-  }, [batches, prodDeploying, load]);
+  }, [batches, load]);
 
   // Derived stats
   const collectingBatch = batches.find(b => b.state === 'COLLECTING');
-  const stagingBatch = batches.find(b => ['DEPLOYING','TESTING','PASSED'].includes(b.state));
+  const stagingBatch = batches.find(b => ['MERGING','DEPLOYING','TESTING','PASSED'].includes(b.state));
   const lastRelease = batches.find(b => b.state === 'RELEASED');
   const allBatchPrs = batches.flatMap(b => b.pullRequests);
   const failedCi = allBatchPrs.filter(p => p.ciStatus === 'FAILURE').length;

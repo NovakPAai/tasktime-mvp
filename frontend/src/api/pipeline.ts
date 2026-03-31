@@ -45,7 +45,7 @@ export interface DeployEvent {
 export interface StagingBatch {
   id: string;
   title: string;
-  state: 'COLLECTING' | 'DEPLOYING' | 'TESTING' | 'PASSED' | 'FAILED' | 'RELEASED';
+  state: 'COLLECTING' | 'MERGING' | 'DEPLOYING' | 'TESTING' | 'PASSED' | 'FAILED' | 'RELEASED';
   repo: string;
   createdBy: string;
   notes: string | null;
