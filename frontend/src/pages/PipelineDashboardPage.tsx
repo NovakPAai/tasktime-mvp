@@ -147,14 +147,14 @@ export default function PipelineDashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [b, h, open] = await Promise.all([
+      const [b, h] = await Promise.all([
         pipelineApi.getBatches(),
         pipelineApi.health(),
-        pipelineApi.getOpenPrs().catch(() => []),
       ]);
       setBatches(b);
       setHealth(h);
-      setOpenPrs(open);
+      // getOpenPrs is best-effort: failure does not block the dashboard
+      pipelineApi.getOpenPrs().then(setOpenPrs).catch(() => {});
       setError(null);
     } catch {
       setError('Pipeline Service недоступен');
@@ -227,7 +227,10 @@ export default function PipelineDashboardPage() {
 
   // Derived stats
   const collectingBatch = batches.find(b => b.state === 'COLLECTING');
-  const stagingBatch = batches.find(b => ['MERGING','DEPLOYING','TESTING','PASSED'].includes(b.state));
+  // Priority: TESTING/PASSED > DEPLOYING/MERGING — avoid MERGING shadowing an active staging deploy
+  const stagingBatch =
+    batches.find(b => ['TESTING', 'PASSED'].includes(b.state)) ??
+    batches.find(b => ['DEPLOYING', 'MERGING'].includes(b.state));
   const lastRelease = batches.find(b => b.state === 'RELEASED');
   const allBatchPrs = batches.flatMap(b => b.pullRequests);
   const failedCi = allBatchPrs.filter(p => p.ciStatus === 'FAILURE').length;
