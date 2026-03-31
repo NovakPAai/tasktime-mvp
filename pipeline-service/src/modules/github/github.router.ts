@@ -12,12 +12,19 @@ const SYNC_TYPE = 'github-merged-prs';
 // POST /api/github/sync — pull merged PRs from configured repo
 githubRouter.post('/sync', async (_req, res, next) => {
   try {
-    const repo = config.APP_GITHUB_REPOS
-      .split(',')
-      .map(r => r.trim())
-      .find(r => /^[^/\s]+\/[^/\s]+$/.test(r));
+    const repos = config.APP_GITHUB_REPOS.split(',').map(r => r.trim()).filter(Boolean);
+    const invalid = repos.find(r => !/^[^/\s]+\/[^/\s]+$/.test(r));
+    if (invalid) {
+      res.status(422).json({ error: `Invalid APP_GITHUB_REPOS entry: "${invalid}" (expected "owner/repo")` });
+      return;
+    }
+    if (repos.length > 1) {
+      res.status(422).json({ error: 'Multiple repositories not supported; supply a single "owner/repo" in APP_GITHUB_REPOS' });
+      return;
+    }
+    const repo = repos[0];
     if (!repo) {
-      res.status(422).json({ error: 'APP_GITHUB_REPOS not configured or invalid (expected "owner/repo")' });
+      res.status(422).json({ error: 'APP_GITHUB_REPOS not configured (expected "owner/repo")' });
       return;
     }
 
@@ -62,6 +69,12 @@ githubRouter.post('/sync', async (_req, res, next) => {
           stagingBatchId: collectingBatchId,
         },
       });
+
+      // If the PR existed as an open PR (batchId=null), assign it to collecting batch now
+      await prisma.pullRequestSnapshot.updateMany({
+        where: { source: 'GITHUB', repo, externalId: pr.number, stagingBatchId: null },
+        data: { stagingBatchId: collectingBatchId },
+      });
     }
 
     // Do NOT advance the sync cursor when results were truncated — next sync will re-fetch the same range
@@ -101,17 +114,19 @@ githubRouter.get('/prs', async (req, res, next) => {
 
 // ── Helper: get or create COLLECTING batch ────────────────────────────────────
 async function getOrCreateCollectingBatchId(): Promise<string> {
-  const existing = await prisma.stagingBatch.findFirst({
-    where: { state: 'COLLECTING' },
-    orderBy: { createdAt: 'desc' },
-  });
-  if (existing) return existing.id;
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.stagingBatch.findFirst({
+      where: { state: 'COLLECTING' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) return existing.id;
 
-  const created = await prisma.stagingBatch.create({
-    data: {
-      name: `Batch ${new Date().toISOString().slice(0, 10)}`,
-      createdById: 'system',
-    },
+    const created = await tx.stagingBatch.create({
+      data: {
+        name: `Batch ${new Date().toISOString().slice(0, 10)}`,
+        createdById: 'system',
+      },
+    });
+    return created.id;
   });
-  return created.id;
 }

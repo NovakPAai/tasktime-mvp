@@ -1,4 +1,4 @@
-name: Deploy Production
+name: Deploy Staging
 
 on:
   workflow_dispatch:
@@ -19,9 +19,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: staging
     concurrency:
-      group: deploy-production
+      group: deploy-staging
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
@@ -29,25 +29,25 @@ jobs:
       - name: Prepare SSH key
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.STAGING_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.PRODUCTION_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.STAGING_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Sync deploy assets
         run: |
-          rsync -az deploy/ "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}:${{ secrets.PRODUCTION_DEPLOY_PATH }}/deploy/"
+          rsync -az deploy/ "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}:${{ secrets.STAGING_DEPLOY_PATH }}/deploy/"
 
       - name: Docker login on server
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" \
+          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
             "echo '$GHCR_TOKEN' | docker login ghcr.io -u ${{ github.actor }} --password-stdin"
 
       - name: Inject secrets into backend env
         run: |
-          ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" "
-            ENV_FILE='${{ secrets.PRODUCTION_DEPLOY_PATH }}/deploy/env/backend.production.env'
+          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" "
+            ENV_FILE='${{ secrets.STAGING_DEPLOY_PATH }}/deploy/env/backend.staging.env'
             sed -i '/^AI_PROVIDER=/d; /^ANTHROPIC_API_KEY=/d' \"\$ENV_FILE\"
             echo 'AI_PROVIDER=${{ secrets.AI_PROVIDER }}' >> \"\$ENV_FILE\"
             echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' >> \"\$ENV_FILE\"
@@ -56,8 +56,8 @@ jobs:
       - name: Run remote deploy
         id: remote_deploy
         run: |
-          ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" \
-            "cd '${{ secrets.PRODUCTION_DEPLOY_PATH }}' && chmod +x deploy/scripts/*.sh && ./deploy/scripts/deploy.sh production '${{ inputs.image_tag }}'"
+          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+            "cd '${{ secrets.STAGING_DEPLOY_PATH }}' && chmod +x deploy/scripts/*.sh && ./deploy/scripts/deploy.sh staging '${{ inputs.image_tag }}'"
 
       - name: Callback to Pipeline Service
         if: always() && inputs.batch_id != ''
@@ -67,4 +67,4 @@ jobs:
           curl -sf -X POST "${{ secrets.PIPELINE_SERVICE_URL }}/api/batches/${{ inputs.batch_id }}/deploy-callback" \
             -H "x-pipeline-api-key: ${{ secrets.PIPELINE_SERVICE_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"${DEPLOY_STATUS}\",\"target\":\"PRODUCTION\",\"workflowRunId\":${{ github.run_id }},\"workflowRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
+            -d "{\"status\":\"${DEPLOY_STATUS}\",\"target\":\"STAGING\",\"workflowRunId\":${{ github.run_id }},\"workflowRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true

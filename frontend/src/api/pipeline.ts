@@ -1,7 +1,7 @@
 // In production nginx proxies /pipeline/ → pipeline-service:3100/ and injects the API key server-side.
 // In development set VITE_PIPELINE_URL=http://localhost:3100 and VITE_PIPELINE_API_KEY in .env.local.
 const BASE = import.meta.env.VITE_PIPELINE_URL ?? '/pipeline';
-const DEV_KEY = import.meta.env.VITE_PIPELINE_API_KEY;
+const DEV_KEY = import.meta.env.DEV ? (import.meta.env.VITE_PIPELINE_API_KEY as string | undefined) : undefined;
 
 async function pipelineFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...options?.headers as Record<string, string> };
@@ -170,4 +170,20 @@ export const pipelineApi = {
     pipelineFetch<void>(`/api/batches/${batchId}/prs/${prId}`, { method: 'DELETE' }),
 
   syncGitHub: () => pipelineFetch<{ synced: number; repo: string; truncated: boolean }>('/api/github/sync', { method: 'POST' }),
+
+  deployStagingBatch: async (batchId: string, imageTag?: string): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${batchId}/deploy-staging`, {
+      method: 'POST',
+      body: JSON.stringify(imageTag ? { imageTag } : {}),
+    });
+    return mapBatch(unwrap(raw));
+  },
+
+  deployProductionBatch: async (batchId: string, imageTag?: string): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${batchId}/deploy-production`, {
+      method: 'POST',
+      body: JSON.stringify(imageTag ? { imageTag } : {}),
+    });
+    return mapBatch(unwrap(raw));
+  },
 };

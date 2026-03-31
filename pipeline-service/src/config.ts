@@ -20,6 +20,9 @@ const envSchema = z.object({
   // Polling interval in seconds (min 30s to respect GitHub rate limits)
   SYNC_INTERVAL_SEC: z.coerce.number().min(30).max(3600).default(60),
 
+  // GitHub Actions dispatch — owner/repo derived from APP_GITHUB_REPOS, override if needed
+  PIPELINE_GITHUB_REF: z.string().default('main'),
+
   // Flow Universe API (for issue/release resolution)
   FU_API_URL: z.string().optional(),
   FU_API_KEY: z.string().optional(),
