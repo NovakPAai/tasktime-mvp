@@ -114,17 +114,19 @@ githubRouter.get('/prs', async (req, res, next) => {
 
 // ── Helper: get or create COLLECTING batch ────────────────────────────────────
 async function getOrCreateCollectingBatchId(): Promise<string> {
-  const existing = await prisma.stagingBatch.findFirst({
-    where: { state: 'COLLECTING' },
-    orderBy: { createdAt: 'desc' },
-  });
-  if (existing) return existing.id;
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.stagingBatch.findFirst({
+      where: { state: 'COLLECTING' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) return existing.id;
 
-  const created = await prisma.stagingBatch.create({
-    data: {
-      name: `Batch ${new Date().toISOString().slice(0, 10)}`,
-      createdById: 'system',
-    },
+    const created = await tx.stagingBatch.create({
+      data: {
+        name: `Batch ${new Date().toISOString().slice(0, 10)}`,
+        createdById: 'system',
+      },
+    });
+    return created.id;
   });
-  return created.id;
 }

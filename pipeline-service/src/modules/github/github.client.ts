@@ -150,16 +150,25 @@ export async function triggerWorkflowDispatch(
     throw new Error('GITHUB_TOKEN is not configured — cannot trigger workflow dispatch');
   }
 
-  const res = await fetch(`${BASE}/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ ref, inputs }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref, inputs }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');

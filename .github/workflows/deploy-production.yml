@@ -67,4 +67,4 @@ jobs:
           curl -sf -X POST "${{ secrets.PIPELINE_SERVICE_URL }}/api/batches/${{ inputs.batch_id }}/deploy-callback" \
             -H "x-pipeline-api-key: ${{ secrets.PIPELINE_SERVICE_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"${DEPLOY_STATUS}\",\"workflowRunId\":${{ github.run_id }},\"workflowRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true
+            -d "{\"status\":\"${DEPLOY_STATUS}\",\"target\":\"PRODUCTION\",\"workflowRunId\":${{ github.run_id }},\"workflowRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true

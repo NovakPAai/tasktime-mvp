@@ -161,7 +161,8 @@ export default function PipelineDashboardPage() {
     }
   };
 
-  const [deploying, setDeploying] = useState(false);
+  const [stagingDeploying, setStagingDeploying] = useState<string | null>(null);
+  const [prodDeploying, setProdDeploying] = useState<string | null>(null);
 
   const handleTransition = async (batchId: string, state: BatchState) => {
     try {
@@ -173,7 +174,7 @@ export default function PipelineDashboardPage() {
   };
 
   const handleDeployStaging = async (batchId: string) => {
-    setDeploying(true);
+    setStagingDeploying(batchId);
     setError(null);
     try {
       await pipelineApi.deployStagingBatch(batchId);
@@ -181,12 +182,12 @@ export default function PipelineDashboardPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка запуска деплоя на стейдж');
     } finally {
-      setDeploying(false);
+      setStagingDeploying(null);
     }
   };
 
   const handleDeployProd = async (batchId: string) => {
-    setDeploying(true);
+    setProdDeploying(batchId);
     setError(null);
     try {
       await pipelineApi.deployProductionBatch(batchId);
@@ -194,17 +195,17 @@ export default function PipelineDashboardPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка запуска деплоя в прод');
     } finally {
-      setDeploying(false);
+      setProdDeploying(null);
     }
   };
 
-  // Poll every 10s when a batch is actively deploying
+  // Poll every 10s when staging deploy active OR production dispatch in flight
   useEffect(() => {
-    const hasActive = batches.some(b => b.state === 'DEPLOYING');
+    const hasActive = batches.some(b => b.state === 'DEPLOYING') || prodDeploying !== null;
     if (!hasActive) return;
     const id = setInterval(() => load(), 10_000);
     return () => clearInterval(id);
-  }, [batches, load]);
+  }, [batches, prodDeploying, load]);
 
   // Derived stats
   const activeBatch = batches.find(b => ['COLLECTING','DEPLOYING','TESTING','PASSED'].includes(b.state));
@@ -391,7 +392,7 @@ export default function PipelineDashboardPage() {
                 {/* Actions */}
                 <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {selected.state === 'COLLECTING' && (
-                    <ActionBtn label={deploying ? 'Запуск...' : '→ Deploy Staging'} color={C.acc} onClick={() => handleDeployStaging(selected.id)} disabled={deploying} />
+                    <ActionBtn label={stagingDeploying === selected.id ? 'Запуск...' : '→ Deploy Staging'} color={C.acc} onClick={() => handleDeployStaging(selected.id)} disabled={stagingDeploying !== null} />
                   )}
                   {selected.state === 'DEPLOYING' && (
                     <span style={{ fontSize: 12, color: C.warn, fontStyle: 'italic' }}>⟳ Деплой в процессе...</span>
@@ -403,7 +404,7 @@ export default function PipelineDashboardPage() {
                     </>
                   )}
                   {selected.state === 'PASSED' && (
-                    <ActionBtn label={deploying ? 'Запуск...' : '🚀 Deploy to Production'} color={C.acc} onClick={() => handleDeployProd(selected.id)} disabled={deploying} />
+                    <ActionBtn label={prodDeploying === selected.id ? 'Запуск...' : '🚀 Deploy to Production'} color={C.acc} onClick={() => handleDeployProd(selected.id)} disabled={prodDeploying !== null} />
                   )}
                   {selected.state === 'FAILED' && (
                     <ActionBtn label="↩ Restart" color={C.muted} onClick={() => handleTransition(selected.id, 'COLLECTING')} />
