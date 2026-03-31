@@ -402,7 +402,7 @@ export default function PipelineDashboardPage() {
 
                 {/* Actions */}
                 <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {selected.state === 'COLLECTING' && (
+                  {['COLLECTING', 'MERGING'].includes(selected.state) && (
                     <ActionBtn label={stagingDeploying === selected.id ? 'Запуск...' : '→ Deploy Staging'} color={C.acc} onClick={() => handleDeployStaging(selected.id)} disabled={stagingDeploying !== null} />
                   )}
                   {selected.state === 'DEPLOYING' && (
