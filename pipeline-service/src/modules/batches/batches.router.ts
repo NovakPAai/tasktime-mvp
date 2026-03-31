@@ -349,6 +349,7 @@ router.post('/:id/deploy-production', async (req, res, next) => {
 
 const callbackBody = z.object({
   status: z.enum(['SUCCESS', 'FAILURE']),
+  target: z.enum(['STAGING', 'PRODUCTION']).optional(),
   workflowRunId: z.number().optional(),
   workflowRunUrl: z.string().url().optional(),
   errorMessage: z.string().optional(),
@@ -357,7 +358,7 @@ const callbackBody = z.object({
 router.post('/:id/deploy-callback', validate(callbackBody), async (req, res, next) => {
   try {
     const batchId = req.params.id as string;
-    const { status, workflowRunId, workflowRunUrl, errorMessage } = req.body as z.infer<typeof callbackBody>;
+    const { status, target: callbackTarget, workflowRunId, workflowRunUrl, errorMessage } = req.body as z.infer<typeof callbackBody>;
 
     const batch = await prisma.stagingBatch.findUnique({
       where: { id: batchId },
@@ -374,7 +375,9 @@ router.post('/:id/deploy-callback', validate(callbackBody), async (req, res, nex
       if (runningEvent.target === 'STAGING') {
         newBatchState = status === 'SUCCESS' ? 'TESTING' : 'FAILED';
       } else if (runningEvent.target === 'PRODUCTION') {
-        newBatchState = status === 'SUCCESS' ? 'RELEASED' : 'FAILED';
+        // On production failure, keep batch in PASSED state so deploy can be retried
+        // (PASSED → FAILED is not a valid transition)
+        newBatchState = status === 'SUCCESS' ? 'RELEASED' : null;
       }
     }
 
@@ -392,7 +395,7 @@ router.post('/:id/deploy-callback', validate(callbackBody), async (req, res, nex
             },
           })
         : prisma.deployEvent.create({
-            data: { target: 'STAGING', status: 'FAILURE', imageTag: 'unknown', triggeredById: 'callback', stagingBatchId: batchId, errorMessage: 'No running deploy found' },
+            data: { target: callbackTarget ?? 'STAGING', status: 'FAILURE', imageTag: 'unknown', triggeredById: 'callback', stagingBatchId: batchId, errorMessage: 'No running deploy found' },
           }),
       prisma.stagingBatch.update({
         where: { id: batchId },
