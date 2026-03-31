@@ -1557,7 +1557,8 @@
   color: var(--t1);
   text-decoration: none;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   line-height: 1.45;
 }
 
@@ -2169,7 +2170,7 @@
 }
 
 .tt-aside-mono {
-  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: var(--fs-xs);
 }
 
@@ -2295,7 +2296,7 @@
 }
 
 .tt-issue-id {
-  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: var(--fs-xs);
   letter-spacing: 0.3px;
   color: var(--t1);
@@ -2486,7 +2487,7 @@
   width: 100%;
   min-height: 100vh;
   min-width: 900px;
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-family: Inter, -apple-system, system-ui, sans-serif;
 }
 
 /* ── Левая панель ── */
@@ -2841,7 +2842,7 @@
 }
 
 .auth-hero-desc {
-  font-family: 'Inter', sans-serif;
+  font-family: Inter, sans-serif;
   font-weight: 300;
   font-size: var(--fs-md);
   color: rgba(255, 255, 255, 0.3);
@@ -2875,7 +2876,7 @@
 }
 
 .tt-board-key {
-  font-family: ui-monospace, SF Mono, Menlo, Monaco, Consolas, 'Liberation Mono',
+  font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono",
     'Courier New', monospace;
   font-size: var(--fs-xs);
   color: var(--acc);
@@ -3031,7 +3032,7 @@
 }
 
 .tt-board-card-id {
-  font-family: ui-monospace, SF Mono, Menlo, Monaco, Consolas, 'Liberation Mono',
+  font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono",
     'Courier New', monospace;
   font-size: var(--fs-xs);
   color: var(--t3);
