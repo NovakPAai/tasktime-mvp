@@ -394,10 +394,7 @@ export default function PipelineDashboardPage() {
                     <ActionBtn label={deploying ? 'Запуск...' : '→ Deploy Staging'} color={C.acc} onClick={() => handleDeployStaging(selected.id)} disabled={deploying} />
                   )}
                   {selected.state === 'DEPLOYING' && (
-                    <>
-                      <ActionBtn label="→ Testing" color={C.warn} onClick={() => handleTransition(selected.id, 'TESTING')} />
-                      <ActionBtn label="✗ Failed" color={C.error} onClick={() => handleTransition(selected.id, 'FAILED')} />
-                    </>
+                    <span style={{ fontSize: 12, color: C.warn, fontStyle: 'italic' }}>⟳ Деплой в процессе...</span>
                   )}
                   {selected.state === 'TESTING' && (
                     <>

@@ -146,6 +146,10 @@ export async function triggerWorkflowDispatch(
   ref: string,
   inputs: Record<string, string>,
 ): Promise<void> {
+  if (!config.GITHUB_TOKEN) {
+    throw new Error('GITHUB_TOKEN is not configured — cannot trigger workflow dispatch');
+  }
+
   const res = await fetch(`${BASE}/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`, {
     method: 'POST',
     headers: {
@@ -159,6 +163,7 @@ export async function triggerWorkflowDispatch(
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`GitHub workflow dispatch failed (${res.status}): ${text}`);
+    const hint = res.status === 403 ? ' — check that GITHUB_TOKEN has Actions: write permission on this repo' : '';
+    throw new Error(`GitHub workflow dispatch failed (${res.status})${hint}: ${text}`);
   }
 }
