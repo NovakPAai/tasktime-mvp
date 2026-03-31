@@ -169,6 +169,12 @@ export const pipelineApi = {
   removePr: (batchId: string, prId: string) =>
     pipelineFetch<void>(`/api/batches/${batchId}/prs/${prId}`, { method: 'DELETE' }),
 
+  getOpenPrs: async (): Promise<PrSnapshot[]> => {
+    const raw = await pipelineFetch<unknown>('/api/github/prs?state=open');
+    const items = unwrap<unknown[]>(raw);
+    return (Array.isArray(items) ? items : []).map(mapPr);
+  },
+
   syncGitHub: () => pipelineFetch<{ synced: number; repo: string; truncated: boolean }>('/api/github/sync', { method: 'POST' }),
 
   deployStagingBatch: async (batchId: string, imageTag?: string): Promise<StagingBatch> => {

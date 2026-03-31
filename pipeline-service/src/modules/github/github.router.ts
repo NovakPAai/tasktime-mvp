@@ -97,13 +97,20 @@ githubRouter.post('/sync', async (_req, res, next) => {
   }
 });
 
-// GET /api/github/prs — list merged PRs with batch info
+// GET /api/github/prs — list PRs; ?state=open|merged (default: merged)
 githubRouter.get('/prs', async (req, res, next) => {
   try {
     const repo = req.query.repo as string | undefined;
+    const state = req.query.state as string | undefined;
+
+    const mergedFilter =
+      state === 'open'   ? { mergedAt: null } :
+      state === 'all'    ? {} :
+      /* default merged */{ mergedAt: { not: null } };
+
     const prs = await prisma.pullRequestSnapshot.findMany({
-      where: { mergedAt: { not: null }, ...(repo ? { repo } : {}) },
-      orderBy: { mergedAt: 'desc' },
+      where: { ...mergedFilter, ...(repo ? { repo } : {}) },
+      orderBy: [{ mergedAt: 'desc' }, { lastSyncedAt: 'desc' }],
       include: { stagingBatch: { select: { id: true, name: true, state: true } } },
     });
     res.json(prs);
