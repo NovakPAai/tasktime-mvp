@@ -252,17 +252,36 @@ router.post('/:id/deploy-staging', async (req, res, next) => {
     }
 
     const [owner, repo] = getOwnerRepo();
+    const prevState = batch.state;
 
-    const [deployEvent, updatedBatch] = await prisma.$transaction([
-      prisma.deployEvent.create({
-        data: { target: 'STAGING', status: 'RUNNING', imageTag, gitSha: imageTag, triggeredById: req.caller?.userId ?? 'unknown', stagingBatchId: batchId },
-      }),
-      prisma.stagingBatch.update({
-        where: { id: batchId },
-        data: { state: 'DEPLOYING' },
-        include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
-      }),
-    ]);
+    // Duplicate-protection + event creation in a single interactive transaction
+    // to close the check-then-insert race window.
+    let deployEvent: import('@prisma/client').DeployEvent;
+    let updatedBatch: import('@prisma/client').StagingBatch & { pullRequests: { id: string; externalId: number; title: string; ciStatus: string }[]; deployEvents: import('@prisma/client').DeployEvent[] };
+    try {
+      [deployEvent, updatedBatch] = await prisma.$transaction(async (tx) => {
+        const running = await tx.deployEvent.findFirst({
+          where: { stagingBatchId: batchId, target: 'STAGING', status: 'RUNNING' },
+        });
+        if (running) throw Object.assign(new Error('ALREADY_RUNNING'), { code: 'ALREADY_RUNNING' });
+
+        const event = await tx.deployEvent.create({
+          data: { target: 'STAGING', status: 'RUNNING', imageTag, gitSha: imageTag, triggeredById: req.caller?.userId ?? 'unknown', stagingBatchId: batchId },
+        });
+        const btch = await tx.stagingBatch.update({
+          where: { id: batchId },
+          data: { state: 'DEPLOYING' },
+          include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
+        });
+        return [event, btch];
+      });
+    } catch (txErr: unknown) {
+      if ((txErr as { code?: string }).code === 'ALREADY_RUNNING') {
+        res.status(409).json({ error: 'A staging deploy is already in progress for this batch' });
+        return;
+      }
+      throw txErr;
+    }
 
     try {
       await triggerWorkflowDispatch(owner, repo, 'deploy-staging.yml', config.PIPELINE_GITHUB_REF, {
@@ -270,7 +289,11 @@ router.post('/:id/deploy-staging', async (req, res, next) => {
         batch_id: batchId,
       });
     } catch (dispatchErr) {
-      await prisma.deployEvent.update({ where: { id: deployEvent.id }, data: { status: 'FAILURE', finishedAt: new Date() } });
+      // Revert batch to previous state so operator can retry
+      await prisma.$transaction([
+        prisma.deployEvent.update({ where: { id: deployEvent.id }, data: { status: 'FAILURE', finishedAt: new Date() } }),
+        prisma.stagingBatch.update({ where: { id: batchId }, data: { state: prevState } }),
+      ]);
       throw dispatchErr;
     }
 

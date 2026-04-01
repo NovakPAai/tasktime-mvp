@@ -166,6 +166,11 @@ export async function triggerWorkflowDispatch(
       body: JSON.stringify({ ref, inputs }),
       signal: controller.signal,
     });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`GitHub workflow dispatch timed out after 10s for ${workflowFile}`);
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
   }

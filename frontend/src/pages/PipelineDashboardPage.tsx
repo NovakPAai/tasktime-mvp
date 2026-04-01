@@ -47,6 +47,7 @@ interface StateCfg {
 function getStateCfg(state: BatchState, C: typeof DARK_C): StateCfg {
   const map: Record<BatchState, StateCfg> = {
     COLLECTING: { label: 'Сбор',      dot: C.muted,    bg: C.card },
+    MERGING:    { label: 'Мёрдж',     dot: C.warn,     bg: C.card },
     DEPLOYING:  { label: 'Деплой',    dot: C.warn,     bg: C.card },
     TESTING:    { label: 'Тестирует', dot: C.acc,      bg: C.card },
     PASSED:     { label: 'ОК',        dot: C.success,  bg: C.card },
@@ -123,12 +124,21 @@ function PipelineStep({ label, count, items, active, C }: {
   );
 }
 
+function Arrow({ C }: { C: typeof DARK_C }) {
+  return (
+    <div style={{ width: 20, display: 'flex', alignItems: 'flex-start', paddingTop: 10, justifyContent: 'center', flexShrink: 0 }}>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PipelineDashboardPage() {
   const { mode } = useThemeStore();
   const C = mode === 'light' ? LIGHT_C : DARK_C;
 
   const [batches, setBatches] = useState<StagingBatch[]>([]);
+  const [openPrs, setOpenPrs] = useState<import('../api/pipeline').PrSnapshot[]>([]);
   const [health, setHealth] = useState<{ version: string } | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -137,9 +147,14 @@ export default function PipelineDashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [b, h] = await Promise.all([pipelineApi.getBatches(), pipelineApi.health()]);
+      const [b, h] = await Promise.all([
+        pipelineApi.getBatches(),
+        pipelineApi.health(),
+      ]);
       setBatches(b);
       setHealth(h);
+      // getOpenPrs is best-effort: failure does not block the dashboard
+      pipelineApi.getOpenPrs().then(setOpenPrs).catch(() => {});
       setError(null);
     } catch {
       setError('Pipeline Service недоступен');
@@ -199,29 +214,35 @@ export default function PipelineDashboardPage() {
     }
   };
 
-  // Poll every 10s when staging deploy active OR production dispatch in flight
+  // Poll every 10s while any staging deploy is active OR a production deploy is RUNNING
   useEffect(() => {
-    const hasActive = batches.some(b => b.state === 'DEPLOYING') || prodDeploying !== null;
+    const allDeploys = batches.flatMap(b => b.deploys);
+    const hasActive =
+      batches.some(b => b.state === 'DEPLOYING') ||
+      allDeploys.some(d => d.env === 'production' && d.status === 'RUNNING');
     if (!hasActive) return;
     const id = setInterval(() => load(), 10_000);
     return () => clearInterval(id);
-  }, [batches, prodDeploying, load]);
+  }, [batches, load]);
 
   // Derived stats
-  const activeBatch = batches.find(b => ['COLLECTING','DEPLOYING','TESTING','PASSED'].includes(b.state));
-  const collectingPrs = batches.filter(b => b.state === 'COLLECTING').reduce((s, b) => s + b.pullRequests.length, 0);
-  const mergedPrs = batches.reduce((s, b) => s + b.pullRequests.filter(p => p.mergedAt).length, 0);
-  const failedCi = batches.reduce((s, b) => s + b.pullRequests.filter(p => p.ciStatus === 'FAILURE').length, 0);
-  const totalPrs = batches.reduce((s, b) => s + b.pullRequests.length, 0);
-  const passCi = batches.reduce((s, b) => s + b.pullRequests.filter(p => p.ciStatus === 'SUCCESS').length, 0);
-  const stagingBatch = batches.find(b => ['DEPLOYING','TESTING','PASSED'].includes(b.state));
+  const collectingBatch = batches.find(b => b.state === 'COLLECTING');
+  // Priority: TESTING/PASSED > DEPLOYING/MERGING — avoid MERGING shadowing an active staging deploy
+  const stagingBatch =
+    batches.find(b => ['TESTING', 'PASSED'].includes(b.state)) ??
+    batches.find(b => ['DEPLOYING', 'MERGING'].includes(b.state));
   const lastRelease = batches.find(b => b.state === 'RELEASED');
+  const allBatchPrs = batches.flatMap(b => b.pullRequests);
+  const failedCi = allBatchPrs.filter(p => p.ciStatus === 'FAILURE').length;
+  const passCi = allBatchPrs.filter(p => p.ciStatus === 'SUCCESS').length;
+  const totalPrs = allBatchPrs.length;
 
-  // Pipeline flow data
-  const collecting = activeBatch?.state === 'COLLECTING' ? (activeBatch.pullRequests.map(p => p.prTitle).slice(0, 3)) : [];
-  const inCi = batches.flatMap(b => b.pullRequests.filter(p => p.ciStatus === 'RUNNING').map(p => p.prTitle)).slice(0, 3);
-  const staging = stagingBatch ? stagingBatch.pullRequests.map(p => p.prTitle).slice(0, 3) : [];
-  const released = lastRelease ? lastRelease.pullRequests.map(p => p.prTitle).slice(0, 2) : [];
+  // Pipeline flow — 5 stages
+  const flowReview   = openPrs.map(p => `#${p.prNumber} ${p.prTitle}`).slice(0, 3);
+  const flowCi       = allBatchPrs.filter(p => p.ciStatus === 'RUNNING').map(p => p.prTitle).slice(0, 3);
+  const flowBatch    = collectingBatch ? collectingBatch.pullRequests.map(p => p.prTitle).slice(0, 3) : [];
+  const flowStaging  = stagingBatch ? stagingBatch.pullRequests.map(p => p.prTitle).slice(0, 3) : [];
+  const flowProd     = lastRelease ? lastRelease.pullRequests.map(p => p.prTitle).slice(0, 2) : [];
 
   const displayBatches = batches.slice(0, 8);
   const selected = selectedBatch ? batches.find(b => b.id === selectedBatch) : null;
@@ -273,9 +294,10 @@ export default function PipelineDashboardPage() {
         {/* Stats row */}
         <div style={{ display: 'flex', gap: 16 }}>
           <StatCard
-            label="Собирается батч" value={String(collectingPrs)} sub={`${mergedPrs} merged`}
-            subColor={C.success} C={C}
-            icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="5" cy="5" r="2.5" stroke={C.acc} strokeWidth="1.5" /><circle cx="13" cy="13" r="2.5" stroke={C.acc} strokeWidth="1.5" /><path d="M5 7.5v3a3 3 0 003 3h2.5" stroke={C.acc} strokeWidth="1.5" /></svg>}
+            label="В ревью" value={String(openPrs.length)}
+            sub={openPrs.length > 0 ? `${openPrs.filter(p => p.ciStatus === 'SUCCESS').length} CI ✓` : 'нет открытых PR'}
+            subColor={C.acc} C={C}
+            icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="6" cy="6" r="3" stroke={C.acc} strokeWidth="1.5" /><circle cx="12" cy="12" r="3" stroke={C.acc} strokeWidth="1.5" /><path d="M9 6h2a3 3 0 010 6H9" stroke={C.acc} strokeWidth="1.5" strokeLinecap="round" /></svg>}
           />
           <StatCard
             label="CI пайплайн"
@@ -300,27 +322,19 @@ export default function PipelineDashboardPage() {
           />
         </div>
 
-        {/* Pipeline flow */}
+        {/* Pipeline flow — full lifecycle */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <span style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif', fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em', color: C.text }}>Pipeline Flow</span>
           <div style={{ display: 'flex', gap: 0 }}>
-            <PipelineStep label="COLLECTING" count={collectingPrs} items={collecting} active={false} C={C} />
-            <div style={{ width: 24, display: 'flex', alignItems: 'flex-start', paddingTop: 10, justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </div>
-            <PipelineStep label="CI" count={inCi.length} items={inCi} active={inCi.length > 0} C={C} />
-            <div style={{ width: 24, display: 'flex', alignItems: 'flex-start', paddingTop: 10, justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </div>
-            <PipelineStep label="БАТЧ" count={activeBatch?.pullRequests.length ?? 0} items={collecting.slice(0, 3)} active={!!activeBatch} C={C} />
-            <div style={{ width: 24, display: 'flex', alignItems: 'flex-start', paddingTop: 10, justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </div>
-            <PipelineStep label="STAGING" count={staging.length} items={staging} active={!!stagingBatch} C={C} />
-            <div style={{ width: 24, display: 'flex', alignItems: 'flex-start', paddingTop: 10, justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </div>
-            <PipelineStep label="PROD" count={released.length} items={released} active={false} C={C} />
+            <PipelineStep label="РЕВЬЮ" count={openPrs.length} items={flowReview} active={openPrs.length > 0} C={C} />
+            <Arrow C={C} />
+            <PipelineStep label="CI" count={flowCi.length} items={flowCi} active={flowCi.length > 0} C={C} />
+            <Arrow C={C} />
+            <PipelineStep label="БАТЧ" count={collectingBatch?.pullRequests.length ?? 0} items={flowBatch} active={!!collectingBatch} C={C} />
+            <Arrow C={C} />
+            <PipelineStep label="STAGING" count={flowStaging.length} items={flowStaging} active={!!stagingBatch} C={C} />
+            <Arrow C={C} />
+            <PipelineStep label="ПРОД" count={flowProd.length} items={flowProd} active={!!lastRelease} C={C} />
           </div>
         </div>
 
@@ -391,7 +405,7 @@ export default function PipelineDashboardPage() {
 
                 {/* Actions */}
                 <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {selected.state === 'COLLECTING' && (
+                  {['COLLECTING', 'MERGING'].includes(selected.state) && (
                     <ActionBtn label={stagingDeploying === selected.id ? 'Запуск...' : '→ Deploy Staging'} color={C.acc} onClick={() => handleDeployStaging(selected.id)} disabled={stagingDeploying !== null} />
                   )}
                   {selected.state === 'DEPLOYING' && (

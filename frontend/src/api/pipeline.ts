@@ -45,7 +45,7 @@ export interface DeployEvent {
 export interface StagingBatch {
   id: string;
   title: string;
-  state: 'COLLECTING' | 'DEPLOYING' | 'TESTING' | 'PASSED' | 'FAILED' | 'RELEASED';
+  state: 'COLLECTING' | 'MERGING' | 'DEPLOYING' | 'TESTING' | 'PASSED' | 'FAILED' | 'RELEASED';
   repo: string;
   createdBy: string;
   notes: string | null;
@@ -168,6 +168,12 @@ export const pipelineApi = {
 
   removePr: (batchId: string, prId: string) =>
     pipelineFetch<void>(`/api/batches/${batchId}/prs/${prId}`, { method: 'DELETE' }),
+
+  getOpenPrs: async (): Promise<PrSnapshot[]> => {
+    const raw = await pipelineFetch<unknown>('/api/github/prs?state=open');
+    const items = unwrap<unknown[]>(raw);
+    return (Array.isArray(items) ? items : []).map(mapPr);
+  },
 
   syncGitHub: () => pipelineFetch<{ synced: number; repo: string; truncated: boolean }>('/api/github/sync', { method: 'POST' }),
 
