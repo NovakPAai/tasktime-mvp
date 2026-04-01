@@ -53,6 +53,19 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     await bootstrapDefaultUsers(client, defaultPassword, bootstrapUsers);
   }
 
+  // MCP system agent user — upsert so it's always present
+  await client.user.upsert({
+    where: { email: 'agent@flow-universe.internal' },
+    create: {
+      email: 'agent@flow-universe.internal',
+      name: 'Flow Universe Agent',
+      passwordHash: 'mcp-system-no-login',
+      role: 'USER',
+      isActive: true,
+    },
+    update: {},
+  });
+
   const seededUsers = await Promise.all(
     bootstrapUsers.map((user) =>
       client.user.findUniqueOrThrow({

@@ -1,0 +1,55 @@
+import { prisma } from '../prisma/client.js';
+
+export const AGENT_EMAIL = 'agent@flow-universe.internal';
+
+let _agentUserId: string | null = null;
+
+export async function getAgentUserId(): Promise<string> {
+  if (_agentUserId) return _agentUserId;
+  const user = await prisma.user.findUnique({ where: { email: AGENT_EMAIL } });
+  if (!user) throw new Error('Agent user not found. Run: npm run db:seed');
+  _agentUserId = user.id;
+  return _agentUserId;
+}
+
+const ISSUE_KEY_RE = /^([A-Z]{2,10})-(\d+)$/;
+
+export type ResolvedIssue = {
+  id: string;
+  key: string;
+  projectKey: string;
+  projectId: string;
+  title: string;
+  status: string;
+  type: string;
+  number: number;
+};
+
+export async function resolveKey(key: string): Promise<ResolvedIssue> {
+  const m = key.trim().toUpperCase().match(ISSUE_KEY_RE);
+  if (!m) throw new Error(`Invalid issue key: ${key}`);
+  const projectKey = m[1];
+  const number = parseInt(m[2], 10);
+
+  const project = await prisma.project.findUnique({ where: { key: projectKey } });
+  if (!project) throw new Error(`Project ${projectKey} not found`);
+
+  const issue = await prisma.issue.findUnique({
+    where: { projectId_number: { projectId: project.id, number } },
+    select: { id: true, title: true, status: true, type: true, projectId: true, number: true },
+  });
+  if (!issue) throw new Error(`Issue ${key} not found`);
+
+  return { ...issue, key: key.toUpperCase(), projectKey, status: issue.status as string, type: issue.type as string };
+}
+
+export function text(content: string) {
+  return { content: [{ type: 'text' as const, text: content }] };
+}
+
+export function errText(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return { content: [{ type: 'text' as const, text: `Error: ${msg}` }], isError: true };
+}
+
+export { prisma };

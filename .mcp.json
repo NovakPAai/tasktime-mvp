@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "flow-universe": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/Users/pavelnovak/tasktime-mvp/.claude/worktrees/dazzling-blackwell/backend",
+      "env": {
+        "AI_HOURLY_RATE": "50"
+      }
+    }
+  }
+}
