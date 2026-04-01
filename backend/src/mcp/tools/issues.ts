@@ -31,7 +31,7 @@ export function registerIssueTools(server: McpServer) {
         });
 
         const parentStr = issue.parent
-          ? `${issue.parent.project.key}-${issue.parent.type} "${issue.parent.title}"`
+          ? `${issue.parent.project.key}-${issue.parent.number} [${issue.parent.type}] "${issue.parent.title}"`
           : 'none';
 
         const sprintStr = issue.sprint
@@ -90,7 +90,7 @@ export function registerIssueTools(server: McpServer) {
         let sprintId: string | null | undefined;
         if (sprint === 'active') {
           const activeSprint = await prisma.sprint.findFirst({ where: { projectId: proj.id, state: 'ACTIVE' } });
-          sprintId = activeSprint?.id ?? null;
+          sprintId = activeSprint?.id ?? undefined;
         } else if (sprint === 'backlog') {
           sprintId = null;
         } else if (sprint) {
@@ -172,9 +172,9 @@ export function registerIssueTools(server: McpServer) {
       try {
         const parent = await resolveKey(parentKey);
 
-        const allowedParents = ['EPIC', 'STORY', 'TASK'];
+        const allowedParents = ['EPIC', 'STORY', 'TASK', 'BUG'];
         if (!allowedParents.includes(parent.type)) {
-          return errText(`${parent.type} cannot have subtasks. Allowed parents: EPIC, STORY, TASK`);
+          return errText(`${parent.type} cannot have subtasks. Allowed parents: EPIC, STORY, TASK, BUG`);
         }
 
         const agentUserId = await getAgentUserId();

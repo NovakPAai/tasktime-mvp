@@ -19,7 +19,7 @@ export function registerSprintTools(server: McpServer) {
             projectId: proj.id,
             state: { in: ['ACTIVE', 'PLANNED'] },
           },
-          orderBy: [{ state: 'asc' }, { startDate: 'desc' }],
+          orderBy: [{ state: 'desc' }, { startDate: 'desc' }],
           include: {
             issues: {
               select: {
