@@ -21,7 +21,6 @@ export type ResolvedIssue = {
   projectId: string;
   title: string;
   status: string;
-  type: string;
   number: number;
 };
 
@@ -36,11 +35,11 @@ export async function resolveKey(key: string): Promise<ResolvedIssue> {
 
   const issue = await prisma.issue.findUnique({
     where: { projectId_number: { projectId: project.id, number } },
-    select: { id: true, title: true, status: true, type: true, projectId: true, number: true },
+    select: { id: true, title: true, status: true, projectId: true, number: true },
   });
   if (!issue) throw new Error(`Issue ${key} not found`);
 
-  return { ...issue, key: key.toUpperCase(), projectKey, status: issue.status as string, type: issue.type as string };
+  return { ...issue, key: key.toUpperCase(), projectKey, status: issue.status as string };
 }
 
 export function text(content: string) {

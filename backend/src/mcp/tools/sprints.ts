@@ -28,7 +28,7 @@ export function registerSprintTools(server: McpServer) {
                 aiEligible: true,
                 aiExecutionStatus: true,
                 aiAssigneeType: true,
-                type: true,
+                issueTypeConfig: { select: { name: true } },
                 number: true,
                 title: true,
                 assignee: { select: { name: true } },
@@ -74,7 +74,7 @@ export function registerSprintTools(server: McpServer) {
           lines.push('');
           lines.push('Ready for agent:');
           for (const i of aiNotStarted.slice(0, 10)) {
-            lines.push(`  ${project.toUpperCase()}-${i.number} [${i.type}] [${i.priority}] ${i.title.slice(0, 60)}`);
+            lines.push(`  ${project.toUpperCase()}-${i.number} [${i.issueTypeConfig?.name ?? '?'}] [${i.priority}] ${i.title.slice(0, 60)}`);
           }
         }
 
@@ -106,6 +106,7 @@ export function registerSprintTools(server: McpServer) {
           },
           include: {
             _count: { select: { children: true } },
+            issueTypeConfig: { select: { name: true } },
           },
           orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
           take: limit,
@@ -114,7 +115,7 @@ export function registerSprintTools(server: McpServer) {
         if (issues.length === 0) return text('Backlog is empty.');
 
         const rows = issues.map(i =>
-          `${project.toUpperCase()}-${i.number} [${i.type}] [${i.priority}] ${i.title.slice(0, 60)} | children: ${i._count.children}${i.aiEligible ? ' | AI✓' : ''}`,
+          `${project.toUpperCase()}-${i.number} [${i.issueTypeConfig?.name ?? '?'}] [${i.priority}] ${i.title.slice(0, 60)} | children: ${i._count.children}${i.aiEligible ? ' | AI✓' : ''}`,
         );
         return text(`Backlog (${issues.length} issues):\n${rows.join('\n')}`);
       } catch (err) {

@@ -17,9 +17,9 @@ export function registerIssueTools(server: McpServer) {
           include: {
             assignee: { select: { name: true, email: true } },
             creator: { select: { name: true } },
-            parent: { select: { title: true, type: true, number: true, project: { select: { key: true } } } },
+            parent: { select: { title: true, number: true, issueTypeConfig: { select: { name: true } }, project: { select: { key: true } } } },
             children: {
-              select: { title: true, type: true, status: true, number: true, project: { select: { key: true } } },
+              select: { title: true, status: true, number: true, issueTypeConfig: { select: { name: true } }, project: { select: { key: true } } },
               orderBy: { orderIndex: 'asc' },
               take: 30,
             },
@@ -31,7 +31,7 @@ export function registerIssueTools(server: McpServer) {
         });
 
         const parentStr = issue.parent
-          ? `${issue.parent.project.key}-${issue.parent.number} [${issue.parent.type}] "${issue.parent.title}"`
+          ? `${issue.parent.project.key}-${issue.parent.number} [${issue.parent.issueTypeConfig?.name ?? '?'}] "${issue.parent.title}"`
           : 'none';
 
         const sprintStr = issue.sprint
@@ -39,11 +39,11 @@ export function registerIssueTools(server: McpServer) {
           : 'none';
 
         const childrenStr = issue.children.length > 0
-          ? issue.children.map(c => `  • ${c.project.key}-${c.number} [${c.type}] [${c.status}] ${c.title}`).join('\n')
+          ? issue.children.map(c => `  • ${c.project.key}-${c.number} [${c.issueTypeConfig?.name ?? '?'}] [${c.status}] ${c.title}`).join('\n')
           : '  none';
 
         const lines = [
-          `${resolved.key} [${issue.type}] [${issue.status}] [${issue.priority}]`,
+          `${resolved.key} [${issue.issueTypeConfig?.name ?? '?'}] [${issue.status}] [${issue.priority}]`,
           `Title: ${issue.title}`,
           ``,
           `Sprint:   ${sprintStr}`,
@@ -108,6 +108,7 @@ export function registerIssueTools(server: McpServer) {
           include: {
             assignee: { select: { name: true } },
             sprint: { select: { name: true } },
+            issueTypeConfig: { select: { name: true } },
           },
           orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
           take: limit,
@@ -117,7 +118,7 @@ export function registerIssueTools(server: McpServer) {
 
         const header = `Found ${issues.length} issue(s) in ${project}:\n`;
         const rows = issues.map(i =>
-          `${project.toUpperCase()}-${i.number} [${i.type}] [${i.status}] [${i.priority}] ${i.title.slice(0, 60)}${i.title.length > 60 ? '…' : ''} | ${i.assignee?.name ?? 'unassigned'}${i.aiEligible ? ' | AI✓' : ''}`,
+          `${project.toUpperCase()}-${i.number} [${i.issueTypeConfig?.name ?? '?'}] [${i.status}] [${i.priority}] ${i.title.slice(0, 60)}${i.title.length > 60 ? '…' : ''} | ${i.assignee?.name ?? 'unassigned'}${i.aiEligible ? ' | AI✓' : ''}`,
         );
 
         return text(header + rows.join('\n'));
@@ -171,24 +172,14 @@ export function registerIssueTools(server: McpServer) {
     async ({ parentKey, title, description, priority }) => {
       try {
         const parent = await resolveKey(parentKey);
-
-        const allowedParents = ['EPIC', 'STORY', 'TASK', 'BUG'];
-        if (!allowedParents.includes(parent.type)) {
-          return errText(`${parent.type} cannot have subtasks. Allowed parents: EPIC, STORY, TASK, BUG`);
-        }
-
         const agentUserId = await getAgentUserId();
 
-        const parentIssue = await prisma.issue.findUniqueOrThrow({
-          where: { id: parent.id },
-          select: { sprintId: true },
-        });
-
-        const last = await prisma.issue.findFirst({
-          where: { projectId: parent.projectId },
-          orderBy: { number: 'desc' },
-          select: { number: true },
-        });
+        const [parentIssue, subtaskConfig, last] = await Promise.all([
+          prisma.issue.findUniqueOrThrow({ where: { id: parent.id }, select: { sprintId: true } }),
+          prisma.issueTypeConfig.findFirst({ where: { isSubtask: true }, select: { id: true } }),
+          prisma.issue.findFirst({ where: { projectId: parent.projectId }, orderBy: { number: 'desc' }, select: { number: true } }),
+        ]);
+        if (!subtaskConfig) return errText('No subtask issue type configured in this project');
         const number = (last?.number ?? 0) + 1;
 
         const child = await prisma.issue.create({
@@ -197,7 +188,7 @@ export function registerIssueTools(server: McpServer) {
             number,
             title,
             description,
-            type: 'SUBTASK',
+            issueTypeConfigId: subtaskConfig.id,
             priority,
             status: 'OPEN',
             parentId: parent.id,

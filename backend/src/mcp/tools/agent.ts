@@ -31,6 +31,7 @@ export function registerAgentTools(server: McpServer) {
           include: {
             project: { select: { key: true } },
             sprint: { select: { name: true, state: true } },
+            issueTypeConfig: { select: { name: true } },
           },
           orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
           take: limit,
@@ -41,7 +42,7 @@ export function registerAgentTools(server: McpServer) {
         }
 
         const rows = issues.map(i =>
-          `${i.project.key}-${i.number} [${i.type}] [${i.priority}] [${i.status}] ${i.title.slice(0, 60)}${i.sprint ? ` | sprint: ${i.sprint.name}` : ' | backlog'}`,
+          `${i.project.key}-${i.number} [${i.issueTypeConfig?.name ?? '?'}] [${i.priority}] [${i.status}] ${i.title.slice(0, 60)}${i.sprint ? ` | sprint: ${i.sprint.name}` : ' | backlog'}`,
         );
         return text(`Eligible issues (${issues.length}):\n${rows.join('\n')}\n\nUse claim_issue(key) to take one.`);
       } catch (err) {
