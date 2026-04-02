@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "flow-universe": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "backend",
+      "env": {
+        "MCP_ENV": "development",
+        "AI_HOURLY_RATE": "50"
+      }
+    },
+    "flow-universe-staging": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "backend",
+      "env": {
+        "MCP_ENV": "staging",
+        "AI_HOURLY_RATE": "50"
+      }
+    },
+    "flow-universe-prod": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "backend",
+      "env": {
+        "MCP_ENV": "production",
+        "AI_HOURLY_RATE": "50"
+      }
+    }
+  }
+}
