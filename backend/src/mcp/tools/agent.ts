@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { prisma, resolveKey, getAgentUserId, text, errText } from '../context.js';
+import { api } from '../api-client.js';
 
 export function registerAgentTools(server: McpServer) {
   // ── get_eligible_issues ───────────────────────────────────────────────────────
@@ -76,26 +77,16 @@ export function registerAgentTools(server: McpServer) {
           return errText(`${key} is already done.`);
         }
 
-        await prisma.$transaction([
-          prisma.issue.update({
-            where: { id: issue.id },
-            data: {
-              aiExecutionStatus: 'IN_PROGRESS',
-              aiAssigneeType: 'AGENT',
-              status: 'IN_PROGRESS',
-              assigneeId: agentUserId,
-            },
-          }),
-          prisma.auditLog.create({
-            data: {
-              action: 'UPDATE',
-              entityType: 'Issue',
-              entityId: issue.id,
-              userId: agentUserId,
-              details: { event: 'agent_claimed', key },
-            },
-          }),
-        ]);
+        // Status transition goes through the workflow engine via API.
+        // Assignee update uses the general PATCH endpoint (USER role is sufficient).
+        // AI-specific metadata (execution status, assignee type) are set directly —
+        // they have no workflow logic and the /ai-status endpoint requires MANAGER.
+        await api.patch(`/api/issues/${issue.id}/status`, { status: 'IN_PROGRESS' });
+        await api.patch(`/api/issues/${issue.id}`, { assigneeId: agentUserId });
+        await prisma.issue.update({
+          where: { id: issue.id },
+          data: { aiExecutionStatus: 'IN_PROGRESS', aiAssigneeType: 'AGENT' },
+        });
 
         return text(`${key} claimed by agent ✓\nStatus: IN_PROGRESS | aiExecutionStatus: IN_PROGRESS\nNext: get_issue("${key}") to read the full spec.`);
       } catch (err) {
@@ -115,33 +106,16 @@ export function registerAgentTools(server: McpServer) {
     async ({ key, summary }) => {
       try {
         const issue = await resolveKey(key);
-        const agentUserId = await getAgentUserId();
 
-        await prisma.$transaction([
-          prisma.issue.update({
-            where: { id: issue.id },
-            data: {
-              aiExecutionStatus: 'DONE',
-              status: 'REVIEW',
-            },
-          }),
-          prisma.comment.create({
-            data: {
-              issueId: issue.id,
-              authorId: agentUserId,
-              body: `🤖 Agent completed work:\n\n${summary}`,
-            },
-          }),
-          prisma.auditLog.create({
-            data: {
-              action: 'UPDATE',
-              entityType: 'Issue',
-              entityId: issue.id,
-              userId: agentUserId,
-              details: { event: 'agent_completed', key },
-            },
-          }),
-        ]);
+        await api.patch(`/api/issues/${issue.id}/status`, { status: 'REVIEW' });
+        await api.post(`/api/issues/${issue.id}/comments`, {
+          body: `🤖 Agent completed work:\n\n${summary}`,
+        });
+        // AI execution status is metadata only — no workflow logic, set directly.
+        await prisma.issue.update({
+          where: { id: issue.id },
+          data: { aiExecutionStatus: 'DONE' },
+        });
 
         return text(`${key}: IN_PROGRESS → REVIEW ✓\nSummary comment added.\nAwaiting human review before DONE.`);
       } catch (err) {
@@ -161,35 +135,17 @@ export function registerAgentTools(server: McpServer) {
     async ({ key, reason }) => {
       try {
         const issue = await resolveKey(key);
-        const agentUserId = await getAgentUserId();
 
-        await prisma.$transaction([
-          prisma.issue.update({
-            where: { id: issue.id },
-            data: {
-              aiExecutionStatus: 'FAILED',
-              status: 'OPEN',
-              aiAssigneeType: 'HUMAN',
-              assigneeId: null,
-            },
-          }),
-          prisma.comment.create({
-            data: {
-              issueId: issue.id,
-              authorId: agentUserId,
-              body: `⚠️ Agent escalation — could not complete:\n\n${reason}\n\nRequires manual intervention.`,
-            },
-          }),
-          prisma.auditLog.create({
-            data: {
-              action: 'UPDATE',
-              entityType: 'Issue',
-              entityId: issue.id,
-              userId: agentUserId,
-              details: { event: 'agent_failed', key, reason: reason.slice(0, 200) },
-            },
-          }),
-        ]);
+        await api.patch(`/api/issues/${issue.id}/status`, { status: 'OPEN' });
+        await api.patch(`/api/issues/${issue.id}`, { assigneeId: null });
+        await api.post(`/api/issues/${issue.id}/comments`, {
+          body: `⚠️ Agent escalation — could not complete:\n\n${reason}\n\nRequires manual intervention.`,
+        });
+        // AI metadata — no workflow logic, set directly.
+        await prisma.issue.update({
+          where: { id: issue.id },
+          data: { aiExecutionStatus: 'FAILED', aiAssigneeType: 'HUMAN' },
+        });
 
         return text(`${key}: FAILED | Returned to OPEN for human ✓\nEscalation comment added.`);
       } catch (err) {
