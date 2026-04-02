@@ -382,6 +382,8 @@
     <div class="stat-pill red"><span class="num">N+1</span><span class="lbl">исправлен (gitlab)</span></div>
     <div class="stat-pill blue"><span class="num">7</span><span class="lbl">endpoint с pagination</span></div>
     <div class="stat-pill orange"><span class="num">8</span><span class="lbl">новых Redis-кешей</span></div>
+    <div class="stat-pill green"><span class="num">✓</span><span class="lbl">cache invalidation</span></div>
+    <div class="stat-pill red"><span class="num">✓</span><span class="lbl">TOCTOU fix</span></div>
   </div>
 
   <!-- SECTION 1: DEPLOY -->
@@ -435,6 +437,56 @@ docker exec -it tasktime-postgres psql -U tasktime -d tasktime
             <div class="fail-label">Если пусто</div>
             Запустить вручную: <code>docker exec tasktime-backend npx prisma migrate deploy</code>
           </div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Production: индексы созданы через CONCURRENTLY</div>
+          <span class="check-badge badge-critical">Critical (prod only)</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">На production с живым трафиком <code>CREATE INDEX</code> внутри транзакции блокирует запись.
+          Нужно предварительно создать индексы вручную с <code>CONCURRENTLY</code>, до применения миграции.</p>
+          <pre><span class="comment">-- Выполнять на prod PostgreSQL ДО prisma migrate deploy</span>
+<span class="comment">-- CONCURRENTLY не блокирует запись, но нельзя внутри транзакции</span>
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"refresh_tokens_user_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"refresh_tokens"</span>(<span class="string">"user_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"sprints_project_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"sprints"</span>(<span class="string">"project_team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"sprints_business_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"sprints"</span>(<span class="string">"business_team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"sprints_flow_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"sprints"</span>(<span class="string">"flow_team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"comments_author_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"comments"</span>(<span class="string">"author_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"team_members_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"team_members"</span>(<span class="string">"team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"audit_logs_action_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"audit_logs"</span>(<span class="string">"action"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"issues_created_at_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"issues"</span>(<span class="string">"created_at"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"issues_updated_at_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"issues"</span>(<span class="string">"updated_at"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"issues_status_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"issues"</span>(<span class="string">"status"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"time_logs_log_date_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"time_logs"</span>(<span class="string">"log_date"</span>);</pre>
+          <div class="expected-label">После — запустить migrate deploy</div>
+          <div class="expected">prisma migrate deploy обнаружит IF NOT EXISTS и пропустит CREATE INDEX.
+Статус миграции в _prisma_migrations будет: finished_at IS NOT NULL</div>
         </div>
       </div>
 
@@ -688,6 +740,46 @@ Query 3: INSERT INTO "audit_logs" ...</div>
         </div>
       </div>
 
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">TOCTOU fix — webhook не открывает DONE/CANCELLED задачи</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">Webhook теперь использует транзакцию с повторной проверкой статуса.
+          Убедиться, что задачи в терминальных состояниях не изменяются.</p>
+          <pre><span class="comment"># 1. Найти DONE-задачу в проекте DEMO</span>
+docker exec -it tasktime-postgres psql -U tasktime -d tasktime -c \
+  "SELECT key_combined, status FROM issues
+   JOIN projects ON issues.project_id = projects.id
+   WHERE projects.key = 'DEMO' AND issues.status = 'DONE'
+   LIMIT 1;"
+
+<span class="comment"># Допустим, задача DEMO-5 имеет статус DONE</span>
+<span class="comment"># 2. Отправить webhook, ссылающийся на эту задачу</span>
+curl -s -X POST http://${STAGING_HOST}/api/webhooks/gitlab \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{
+    "object_kind": "push",
+    "ref": "refs/heads/feature/DEMO-5",
+    "commits": []
+  }'</span>
+
+<span class="comment"># 3. Проверить, что статус не изменился</span>
+docker exec -it tasktime-postgres psql -U tasktime -d tasktime -c \
+  "SELECT status FROM issues
+   JOIN projects ON issues.project_id = projects.id
+   WHERE projects.key = 'DEMO' AND issues.number = 5;"</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">status = DONE  ← не изменился, TOCTOU guard сработал</div>
+          <div class="fail-note">
+            <div class="fail-label">Если статус изменился на IN_PROGRESS</div>
+            TOCTOU fix не применился — проверить, что задеплоился новый код gitlab.service.ts с $transaction
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -759,6 +851,103 @@ docker exec tasktime-redis redis-cli --scan --pattern "issues:*" \
         </div>
       </div>
 
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Cache invalidation — создание задачи сбрасывает кеш</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">После создания/обновления задачи старые ключи <code>issues:list:*</code> должны удалиться из Redis.</p>
+          <pre><span class="comment"># 1. Прогреть кеш</span>
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+<span class="comment"># 2. Убедиться, что ключи есть</span>
+docker exec tasktime-redis redis-cli KEYS "issues:list:*" | wc -l
+<span class="comment"># Ожидаем: 1 (или больше)</span>
+
+<span class="comment"># 3. Создать новую задачу</span>
+curl -s -X POST http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"title":"Cache invalidation test","type":"TASK","priority":"LOW"}'</span> &gt; /dev/null
+
+<span class="comment"># 4. Проверить, что ключи удалились</span>
+docker exec tasktime-redis redis-cli KEYS "issues:list:*" | wc -l
+<span class="comment"># Ожидаем: 0</span></pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">До создания:  1+ ключей в Redis
+После создания: 0 ключей (инвалидированы)</div>
+          <div class="fail-note">
+            <div class="fail-label">Если ключи остались</div>
+            delCacheByPrefix не вызывается — проверить, что createIssue в issues.service.ts задеплоился корректно
+          </div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Cache invalidation — старт спринта сбрасывает sprint-кеши</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># 1. Прогреть кеш спринтов</span>
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/sprints" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+docker exec tasktime-redis redis-cli KEYS "sprints:*" | wc -l
+<span class="comment"># Ожидаем: 1+</span>
+
+<span class="comment"># 2. Получить ID PLANNED-спринта</span>
+SPRINT_ID=$(curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/sprints" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  | <span class="fn">jq</span> -r <span class="string">'.data[] | select(.state=="PLANNED") | .id'</span> | head -1)
+
+<span class="comment"># 3. Стартовать спринт</span>
+curl -s -X POST http://${STAGING_HOST}/api/sprints/$SPRINT_ID/start \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+<span class="comment"># 4. Проверить кеш</span>
+docker exec tasktime-redis redis-cli KEYS "sprints:*" | wc -l
+<span class="comment"># Ожидаем: 0</span></pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">После startSprint: 0 ключей sprints:* в Redis</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Cache invalidation — логирование времени сбрасывает time:summary</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># 1. Прогреть кеш</span>
+curl -s http://${STAGING_HOST}/api/time/summary \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+docker exec tasktime-redis redis-cli KEYS "time:summary:*"
+<span class="comment"># Ожидаем: 1 ключ</span>
+
+<span class="comment"># 2. Залогировать время вручную</span>
+ISSUE_ID=$(curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?limit=1" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> -r '.data[0].id')
+
+curl -s -X POST http://${STAGING_HOST}/api/issues/$ISSUE_ID/time \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"hours": 1, "note": "cache invalidation test"}'</span> &gt; /dev/null
+
+<span class="comment"># 3. Проверить кеш</span>
+docker exec tasktime-redis redis-cli KEYS "time:summary:*"
+<span class="comment"># Ожидаем: пусто (ключ удалён)</span></pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">После logManual: ключ time:summary:* удалён из Redis</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -774,7 +963,7 @@ docker exec tasktime-redis redis-cli --scan --pattern "issues:*" \
 
     <div class="info-box">
       <span>ℹ</span>
-      <div>API-функции в frontend обновлены: теперь делают <code>.data.data</code> вместо <code>.data</code>. Компоненты по-прежнему получают массивы. Нужно убедиться, что данные отображаются.</div>
+      <div>API-функции в frontend обновлены: <code>listSprints</code>, <code>getBacklog</code>, <code>listAllSprints</code>, <code>listAdminUsers</code> теперь возвращают <code>PaginatedResponse&lt;T&gt;</code> вместо <code>T[]</code>. Компоненты извлекают <code>.data</code> самостоятельно. Нужно убедиться, что данные отображаются корректно.</div>
     </div>
 
     <div class="checks">
@@ -834,6 +1023,32 @@ http://${STAGING_HOST}/projects/&lt;PROJECT_ID&gt;</pre>
           <pre>http://${STAGING_HOST}/admin  <span class="comment">(вкладка Users)</span></pre>
           <div class="expected-label">Проверить</div>
           <div class="expected">✓  Пользователи отображаются с метриками (_count)</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Admin stats — задачи без исполнителя в breakdown</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">issuesByAssignee теперь содержит null-bucket «Без исполнителя».
+          Ранее задачи без assigneeId пропадали из статистики.</p>
+          <pre><span class="comment"># Проверить ответ /api/admin/stats</span>
+curl -s http://${STAGING_HOST}/api/admin/stats \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  | <span class="fn">jq</span> <span class="string">'.issuesByAssignee[] | select(.assigneeId == null)'</span></pre>
+          <div class="expected-label">Ожидаемый результат (если есть неназначенные задачи)</div>
+          <div class="expected">{
+  "assigneeId": null,
+  "assigneeName": "Без исполнителя",
+  "_count": { "_all": &lt;N&gt; }
+}</div>
+          <div class="fail-note">
+            <div class="fail-label">Если null-bucket отсутствует</div>
+            Проверить, что все задачи имеют assigneeId. Если нет — admin.service.ts обновился некорректно.
+          </div>
         </div>
       </div>
 
@@ -914,16 +1129,20 @@ time curl -s http://${STAGING_HOST}/api/admin/stats \
 
   <!-- Summary -->
   <div style="background:#161b22;border:1px solid #21262d;border-radius:8px;padding:20px 24px;">
-    <div style="font-size:13px;color:#8b949e;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Что было оптимизировано</div>
+    <div style="font-size:13px;color:#8b949e;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Что было оптимизировано и исправлено</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
       <div style="color:#c9d1d9;">✦ 11 индексов на FK и date-range колонках</div>
       <div style="color:#c9d1d9;">✦ N+1 fix в GitLab webhook (2N → 3 запроса)</div>
+      <div style="color:#c9d1d9;">✦ TOCTOU fix: $transaction + повтор guard в gitlab</div>
       <div style="color:#c9d1d9;">✦ JS aggregation → DB count в dashboard</div>
       <div style="color:#c9d1d9;">✦ double query → single в admin stats</div>
+      <div style="color:#c9d1d9;">✦ Null-bucket «Без исполнителя» в issuesByAssignee</div>
       <div style="color:#c9d1d9;">✦ Pagination на 7 endpoint'ах</div>
       <div style="color:#c9d1d9;">✦ Hard cap take:500 на Board</div>
       <div style="color:#c9d1d9;">✦ Redis cache на 8 дорогих запросах</div>
-      <div style="color:#c9d1d9;">✦ Frontend API-функции обновлены под {data,meta}</div>
+      <div style="color:#c9d1d9;">✦ Cache invalidation в 13 write-методах</div>
+      <div style="color:#c9d1d9;">✦ Frontend API возвращает PaginatedResponse&lt;T&gt;</div>
+      <div style="color:#c9d1d9;">✦ IF NOT EXISTS + CONCURRENTLY guide в миграции</div>
     </div>
   </div>
 
