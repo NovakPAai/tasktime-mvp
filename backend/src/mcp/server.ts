@@ -2,9 +2,11 @@ import { config } from 'dotenv';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Load .env from backend root
+// Load env file based on MCP_ENV (development | staging | production)
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, '../../.env') });
+const MCP_ENV = process.env.MCP_ENV ?? 'development';
+const envFile = MCP_ENV === 'development' ? '.env' : `.env.${MCP_ENV}`;
+config({ path: resolve(__dirname, `../../${envFile}`) });
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
