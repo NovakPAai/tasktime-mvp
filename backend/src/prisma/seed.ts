@@ -68,7 +68,7 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
       role: 'MANAGER',
       isActive: true,
     },
-    update: { passwordHash: agentPasswordHash },
+    update: { passwordHash: agentPasswordHash, role: 'MANAGER' },
   });
 
   const seededUsers = await Promise.all(
