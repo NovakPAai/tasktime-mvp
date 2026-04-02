@@ -401,7 +401,7 @@
       <div class="meta-item">📦 <strong>14 инструментов</strong></div>
       <div class="meta-item">🔐 <strong>Техническая УЗ с ограниченными правами</strong></div>
       <div class="meta-item">🌍 <strong>Staging + Production</strong></div>
-      <div class="meta-item">⚡ <strong>Прямой доступ к БД через SSH-туннель</strong></div>
+      <div class="meta-item">⚡ <strong>HTTP transport, без туннелей</strong></div>
     </div>
   </div>
 
@@ -450,15 +450,15 @@
     <div class="arch">
 <span class="hl">Claude Code / Cursor</span>  (твой ноутбук)
     │
-    │  stdio  (JSON-RPC 2.0, защищённый канал)
+    │  HTTP + Bearer token  (JSON-RPC 2.0)
     ▼
-<span class="hl">flow-universe MCP сервер</span>  (tsx process, локально)
-    │  DATABASE_URL из .env.production
+<span class="gr">http://72.56.7.218:3002/mcp</span>
     │
-    │  TCP через SSH-туннель
+    │  Docker service  mcp-flow-universe
+    │  (--profile mcp, restart: unless-stopped)
     ▼
-<span class="gr">localhost:5435</span>  ←─── <span class="gr">ssh -L 5435:localhost:5432 root@72.56.7.218 -N</span>
-    │
+<span class="hl">flow-universe MCP сервер</span>  (StreamableHTTP, Express)
+    │  localhost  (внутри Docker network)
     ▼
 <span class="ye">PostgreSQL на 72.56.7.218</span>
     └─ пользователь: <span class="ye">flowuniverse_mcp</span>
@@ -469,7 +469,7 @@
     </div>
 
     <p style="margin-top: 16px">
-      Туннель нужен потому что Postgres на сервере слушает только <code style="font-family: monospace; color: var(--accent2); font-size: 13px">localhost</code> — снаружи недоступен. SSH-туннель пробрасывает его к тебе на ноутбук безопасно, внутри зашифрованного канала.
+      MCP-сервер работает как Docker-сервис прямо на боевом сервере. Коллеге нужен только URL и токен — никаких туннелей, никакого локального бэкенда.
     </p>
   </section>
 
@@ -483,20 +483,20 @@
       <div class="step">
         <div class="step-num">1</div>
         <div class="step-body">
-          <h3>Создать техпользователя в PostgreSQL (один раз)</h3>
-          <p>На каждом сервере (staging и production) выполнить SQL-скрипт. Сначала придумать пароль для flowuniverse_mcp и вставить вместо CHANGE_ME.</p>
+          <h3>Запустить MCP-сервис на сервере (один раз, делает администратор)</h3>
+          <p>На сервере придумать токен и запустить Docker-сервис. Токен передать команде через 1Password / командный Vault.</p>
           <div class="code-block">
             <span class="code-lang">bash</span>
             <span class="comment"># Подключиться к серверу</span><br>
             <span class="cmd">ssh root@72.56.7.218</span><br><br>
-            <span class="comment"># Создать пользователя (заменить CHANGE_ME на реальный пароль)</span><br>
-            <span class="cmd">sed 's/CHANGE_ME_STRONG_PASSWORD/МОЙ_ПАРОЛЬ/' \<br>
-  &nbsp;&nbsp;/opt/tasktime/backend/scripts/mcp-db-user.sql \<br>
-  &nbsp;&nbsp;| docker exec -i tasktime-postgres-1 psql -U postgres -d tasktime</span>
+            <span class="comment"># Запустить MCP как Docker-сервис (токен придумать самостоятельно)</span><br>
+            <span class="cmd">cd /opt/tasktime<br>
+MCP_SERVICE_TOKEN=мой_секретный_токен \<br>
+  docker compose --profile mcp up -d mcp-flow-universe</span>
           </div>
-          <div class="callout warn">
-            <span class="callout-icon">⚠️</span>
-            <div>Пароль сохранить в надёжном месте (1Password / командный Vault). В репо не коммитить.</div>
+          <div class="callout">
+            <span class="callout-icon">💡</span>
+            <div>Сервис стартует автоматически при перезагрузке сервера (<code style="font-family: monospace; font-size: 12px">restart: unless-stopped</code>). Повторно запускать не нужно.</div>
           </div>
         </div>
       </div>
@@ -504,72 +504,40 @@
       <div class="step">
         <div class="step-num">2</div>
         <div class="step-body">
-          <h3>Создать локальные env-файлы</h3>
-          <p>Скопировать примеры и вставить реальный пароль от flowuniverse_mcp.</p>
+          <h3>Добавить конфиг в свой .mcp.json (каждый коллега, один раз)</h3>
+          <p>Открыть <code style="font-family: monospace; color: var(--accent2); font-size: 13px">~/.claude/mcp.json</code> (или <code style="font-family: monospace; color: var(--accent2); font-size: 13px">.mcp.json</code> в корне репо) и добавить:</p>
           <div class="code-block">
-            <span class="code-lang">bash</span>
-            <span class="cmd">cd /путь/к/tasktime-mvp/backend</span><br><br>
-            <span class="comment"># Для staging</span><br>
-            <span class="cmd">cp .env.staging.example .env.staging</span><br>
-            <span class="comment"># Открыть .env.staging, вписать пароль в DATABASE_URL</span><br><br>
-            <span class="comment"># Для production</span><br>
-            <span class="cmd">cp .env.production.example .env.production</span><br>
-            <span class="comment"># Открыть .env.production, вписать пароль в DATABASE_URL</span>
+            <span class="code-lang">json</span>
+            {<br>
+            &nbsp;&nbsp;<span class="str">"mcpServers"</span>: {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"flow-universe-prod"</span>: {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"type"</span>: <span class="str">"streamable-http"</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"url"</span>: <span class="str">"http://72.56.7.218:3002/mcp"</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"headers"</span>: {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"Authorization"</span>: <span class="str">"Bearer МОЙ_ТОКЕН"</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+            &nbsp;&nbsp;}<br>
+            }
           </div>
-          <p>Строка которую нужно заменить:</p>
-          <div class="code-block">
-            <span class="str">DATABASE_URL="postgresql://flowuniverse_mcp:<strong>CHANGE_ME</strong>@localhost:5435/tasktime?schema=public"</span>
-          </div>
+          <p>Заменить <strong>МОЙ_ТОКЕН</strong> на токен полученный от администратора.</p>
         </div>
       </div>
 
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-body">
-          <h3>Установить зависимости backend</h3>
+          <h3>Перезапустить Claude Code и проверить</h3>
+          <p>После добавления конфига — перезапустить Claude Code. Затем выполнить:</p>
           <div class="code-block">
-            <span class="code-lang">bash</span>
-            <span class="cmd">cd backend && npm install</span>
+            <span class="code-lang">claude</span>
+            <span class="cmd">/mcp</span>
           </div>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-body">
-          <h3>Открыть SSH-туннель (держать терминал открытым)</h3>
-          <div class="code-block">
-            <span class="code-lang">bash</span>
-            <span class="comment"># Staging (пробросит localhost:5434 → 5.129.242.171:5432)</span><br>
-            <span class="cmd">ssh -L 5434:localhost:5432 root@5.129.242.171 -N</span><br><br>
-            <span class="comment"># Production (пробросит localhost:5435 → 72.56.7.218:5432)</span><br>
-            <span class="cmd">ssh -L 5435:localhost:5432 root@72.56.7.218 -N</span>
-          </div>
-          <p>Флаг <code style="font-family: monospace; color: var(--accent2); font-size: 13px">-N</code> означает «только туннель, без команды». Терминал будет висеть — это нормально.</p>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-body">
-          <h3>Запустить MCP Inspector и проверить</h3>
-          <div class="code-block">
-            <span class="code-lang">bash</span>
-            <span class="cmd">cd backend && npx @modelcontextprotocol/inspector npm run mcp</span>
-          </div>
-          <p>Откроется <strong>http://localhost:6274</strong>. В поле:</p>
-          <ul style="color: var(--muted); font-size: 14px; padding-left: 20px; margin-bottom: 8px">
-            <li><strong style="color: var(--text)">Command:</strong> npm</li>
-            <li><strong style="color: var(--text)">Arguments:</strong> run mcp</li>
-          </ul>
-          <p>Нажать Connect → List Tools → должны появиться 14 инструментов.</p>
-          <p>Проверить: <code style="font-family: monospace; color: var(--accent2); font-size: 13px">get_issue { "key": "TTMP-1" }</code> → задача из системы.</p>
+          <p>В списке должен появиться <strong>flow-universe-prod</strong> с 14 инструментами.</p>
+          <p>Проверить: попросить Claude «покажи задачу TTMP-1» — должна вернуться карточка задачи из системы.</p>
           <div class="callout">
             <span class="callout-icon">💡</span>
-            <div>
-              Для production нужно передать переменную окружения:<br>
-              <code style="font-family: monospace; color: var(--accent2); font-size: 12px">MCP_ENV=production npm run mcp</code>
-            </div>
+            <div>Никакого туннеля, никакого локального бэкенда, никаких env-файлов. Только токен в конфиге.</div>
           </div>
         </div>
       </div>
