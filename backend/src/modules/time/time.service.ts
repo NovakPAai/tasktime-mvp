@@ -3,6 +3,7 @@ import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { ManualTimeDto } from './time.dto.js';
 import { buildUserTimeSummary } from './time.domain.js';
+import { getCachedJson, setCachedJson } from '../../shared/redis.js';
 
 export async function startTimer(issueId: string, userId: string) {
   const issue = await prisma.issue.findUnique({ where: { id: issueId } });
@@ -86,29 +87,34 @@ export async function getUserLogs(userId: string) {
 }
 
 export async function getUserTimeSummary(userId: string) {
-  const groupedHours = await prisma.timeLog.groupBy({
-    by: ['source'],
-    where: { userId },
-    _sum: {
-      hours: true,
-    },
-  });
+  const cacheKey = `time:summary:${userId}`;
+  type TimeSummary = ReturnType<typeof buildUserTimeSummary>;
+  const cached = await getCachedJson<TimeSummary>(cacheKey);
+  if (cached) return cached;
 
-  const agentTotals = await prisma.timeLog.aggregate({
-    where: { userId, source: 'AGENT' },
-    _sum: {
-      costMoney: true,
-    },
-  });
+  const [groupedHours, agentTotals] = await Promise.all([
+    prisma.timeLog.groupBy({
+      by: ['source'],
+      where: { userId },
+      _sum: { hours: true },
+    }),
+    prisma.timeLog.aggregate({
+      where: { userId, source: 'AGENT' },
+      _sum: { costMoney: true },
+    }),
+  ]);
 
   const humanHours = groupedHours.find((group) => group.source === 'HUMAN')?._sum.hours;
   const agentHours = groupedHours.find((group) => group.source === 'AGENT')?._sum.hours;
 
-  return buildUserTimeSummary(userId, {
+  const summary = buildUserTimeSummary(userId, {
     humanHours,
     agentHours,
     agentCost: agentTotals._sum.costMoney,
   });
+
+  await setCachedJson(cacheKey, summary);
+  return summary;
 }
 
 export async function getActiveTimer(userId: string) {

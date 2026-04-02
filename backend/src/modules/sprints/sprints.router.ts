@@ -6,6 +6,7 @@ import { createSprintDto, updateSprintDto, moveIssuesToSprintDto } from './sprin
 import * as sprintsService from './sprints.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
+import { parsePagination } from '../../shared/utils/params.js';
 
 const router = Router();
 router.use(authenticate);
@@ -13,17 +14,18 @@ router.use(authenticate);
 // Global list of sprints with optional filters
 router.get('/sprints', async (req, res, next) => {
   try {
-    const { state, projectId, teamId } = req.query as {
+    const { state, projectId, teamId, page, limit } = req.query as {
       state?: string;
       projectId?: string;
       teamId?: string;
+      page?: string;
+      limit?: string;
     };
 
-    const sprints = await sprintsService.listAllSprints({
-      state,
-      projectId,
-      teamId,
-    });
+    const sprints = await sprintsService.listAllSprints(
+      { state, projectId, teamId },
+      parsePagination({ page, limit }),
+    );
     res.json(sprints);
   } catch (err) {
     next(err);
@@ -33,7 +35,11 @@ router.get('/sprints', async (req, res, next) => {
 // List sprints
 router.get('/projects/:projectId/sprints', async (req, res, next) => {
   try {
-    const sprints = await sprintsService.listSprints(req.params.projectId as string);
+    const { page, limit } = req.query as { page?: string; limit?: string };
+    const sprints = await sprintsService.listSprints(
+      req.params.projectId as string,
+      parsePagination({ page, limit }),
+    );
     res.json(sprints);
   } catch (err) { next(err); }
 });
@@ -48,7 +54,11 @@ router.get('/sprints/:id/issues', async (req, res, next) => {
 // Backlog (issues without sprint)
 router.get('/projects/:projectId/backlog', async (req, res, next) => {
   try {
-    const issues = await sprintsService.getBacklog(req.params.projectId as string);
+    const { page, limit } = req.query as { page?: string; limit?: string };
+    const issues = await sprintsService.getBacklog(
+      req.params.projectId as string,
+      parsePagination({ page, limit }),
+    );
     res.json(issues);
   } catch (err) { next(err); }
 });

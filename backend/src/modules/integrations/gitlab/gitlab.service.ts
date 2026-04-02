@@ -59,35 +59,64 @@ async function handleMergeRequest(payload: Record<string, unknown>): Promise<voi
 }
 
 async function updateIssuesByKeys(keys: string[], status: IssueStatus): Promise<void> {
-  for (const key of keys) {
+  // Parse all keys upfront, skip malformed ones
+  const parsed = keys.flatMap((key) => {
     const dashIdx = key.lastIndexOf('-');
-    if (dashIdx < 0) continue;
+    if (dashIdx < 0) return [];
     const projectKey = key.slice(0, dashIdx);
     const number = parseInt(key.slice(dashIdx + 1), 10);
-    if (Number.isNaN(number)) continue;
+    if (Number.isNaN(number)) return [];
+    return [{ key, projectKey, number }];
+  });
 
-    const issues = await prisma.issue.findMany({
-      where: {
+  if (parsed.length === 0) return;
+
+  // 1 query: fetch all matching issues across all keys
+  const issues = await prisma.issue.findMany({
+    where: {
+      status: { notIn: ['DONE', 'CANCELLED'] },
+      OR: parsed.map(({ projectKey, number }) => ({
         number,
         project: { key: projectKey },
-        status: { notIn: ['DONE', 'CANCELLED'] },
-      },
-      select: { id: true },
-    });
+      })),
+    },
+    select: {
+      id: true,
+      number: true,
+      project: { select: { key: true } },
+    },
+  });
 
-    for (const issue of issues) {
-      await prisma.issue.update({ where: { id: issue.id }, data: { status } });
-      await prisma.auditLog.create({
-        data: {
-          action: 'issue.status_changed',
-          entityType: 'issue',
-          entityId: issue.id,
-          userId: null,
-          details: { source: 'GITLAB', status, issueKey: key } as object,
-          ipAddress: null,
-          userAgent: null,
-        },
-      });
-    }
-  }
+  if (issues.length === 0) return;
+
+  const issueIds = issues.map((i) => i.id);
+
+  // Build issueId → original issue key mapping for audit log details
+  const keyByIssueId = new Map<string, string>(
+    issues.map((i) => {
+      const match = parsed.find(
+        (p) => p.number === i.number && p.projectKey === i.project.key,
+      );
+      return [i.id, match?.key ?? `${i.project.key}-${i.number}`];
+    }),
+  );
+
+  // 1 query: batch update all matched issues
+  await prisma.issue.updateMany({
+    where: { id: { in: issueIds } },
+    data: { status },
+  });
+
+  // 1 query: batch create all audit log entries
+  await prisma.auditLog.createMany({
+    data: issueIds.map((id) => ({
+      action: 'issue.status_changed',
+      entityType: 'issue',
+      entityId: id,
+      userId: null,
+      details: { source: 'GITLAB', status, issueKey: keyByIssueId.get(id) } as object,
+      ipAddress: null,
+      userAgent: null,
+    })),
+  });
 }

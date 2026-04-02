@@ -14,6 +14,7 @@ import {
 import * as issuesService from './issues.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
+import { parsePagination } from '../../shared/utils/params.js';
 
 const router = Router();
 
@@ -22,30 +23,37 @@ router.use(authenticate);
 // List issues for a project with filters
 router.get('/projects/:projectId/issues', async (req, res, next) => {
   try {
-    const { status, type, priority, assigneeId, sprintId, from, to, search } = req.query as {
-      status?: string | string[];
-      type?: string | string[];
-      priority?: string | string[];
-      assigneeId?: string;
-      sprintId?: string;
-      from?: string;
-      to?: string;
-      search?: string;
-    };
+    const { status, type, priority, assigneeId, sprintId, from, to, search, page, limit } =
+      req.query as {
+        status?: string | string[];
+        type?: string | string[];
+        priority?: string | string[];
+        assigneeId?: string;
+        sprintId?: string;
+        from?: string;
+        to?: string;
+        search?: string;
+        page?: string;
+        limit?: string;
+      };
 
     const toArray = (value?: string | string[]) =>
       typeof value === 'string' ? value.split(',').filter(Boolean) : value;
 
-    const issues = await issuesService.listIssues(req.params.projectId as string, {
-      status: toArray(status) as IssueStatus[] | undefined,
-      type: toArray(type) as IssueType[] | undefined,
-      priority: toArray(priority) as IssuePriority[] | undefined,
-      assigneeId,
-      sprintId,
-      from,
-      to,
-      search,
-    });
+    const issues = await issuesService.listIssues(
+      req.params.projectId as string,
+      {
+        status: toArray(status) as IssueStatus[] | undefined,
+        type: toArray(type) as IssueType[] | undefined,
+        priority: toArray(priority) as IssuePriority[] | undefined,
+        assigneeId,
+        sprintId,
+        from,
+        to,
+        search,
+      },
+      parsePagination({ page, limit }),
+    );
     res.json(issues);
   } catch (err) {
     next(err);

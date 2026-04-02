@@ -3,6 +3,7 @@ import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import * as adminService from './admin.service.js';
 import type { UatRole } from './uat-tests.data.js';
+import { parsePagination } from '../../shared/utils/params.js';
 
 const router = Router();
 
@@ -17,9 +18,10 @@ router.get('/admin/stats', requireRole('ADMIN', 'MANAGER', 'VIEWER'), async (_re
   }
 });
 
-router.get('/admin/users', requireRole('ADMIN'), async (_req, res, next) => {
+router.get('/admin/users', requireRole('ADMIN'), async (req, res, next) => {
   try {
-    const users = await adminService.listUsersWithMeta();
+    const pagination = parsePagination(req.query as { page?: string; limit?: string });
+    const users = await adminService.listUsersWithMeta(pagination);
     res.json(users);
   } catch (err) {
     next(err);

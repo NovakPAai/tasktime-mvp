@@ -1,4 +1,5 @@
 import api from './client';
+import type { PaginatedResponse } from '../types';
 
 export interface AdminStats {
   counts: {
@@ -25,19 +26,19 @@ export async function getStats(): Promise<AdminStats> {
   return data;
 }
 
-export async function listAdminUsers() {
-  const { data } = await api.get<
-    {
-      id: string;
-      email: string;
-      name: string;
-      role: string;
-      isActive: boolean;
-      createdAt: string;
-      _count: { createdIssues: number; assignedIssues: number; timeLogs: number };
-    }[]
-  >('/admin/users');
-  return data;
+type AdminUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+  _count: { createdIssues: number; assignedIssues: number; timeLogs: number };
+};
+
+export async function listAdminUsers(): Promise<AdminUser[]> {
+  const { data } = await api.get<PaginatedResponse<AdminUser>>('/admin/users');
+  return data.data;
 }
 
 export async function getIssuesByStatusReport(params: {

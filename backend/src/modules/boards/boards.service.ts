@@ -15,6 +15,7 @@ export async function getBoard(projectId: string, sprintId?: string) {
       _count: { select: { children: true, comments: true } },
     },
     orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
+    take: 500,
   });
 
   const columns: Record<string, typeof issues> = {

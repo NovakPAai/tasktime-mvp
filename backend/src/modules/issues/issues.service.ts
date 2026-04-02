@@ -7,6 +7,12 @@ import type {
 } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import {
+  type PaginationParams,
+  paginationToSkipTake,
+  buildPaginatedResponse,
+} from '../../shared/utils/params.js';
 import type {
   CreateIssueDto,
   UpdateIssueDto,
@@ -65,7 +71,11 @@ type ListIssuesFilters = {
   search?: string;
 };
 
-export async function listIssues(projectId: string, filters?: ListIssuesFilters) {
+export async function listIssues(
+  projectId: string,
+  filters?: ListIssuesFilters,
+  pagination?: PaginationParams,
+) {
   const where: Prisma.IssueWhereInput = { projectId };
 
   if (filters?.status && filters.status.length > 0) {
@@ -96,15 +106,48 @@ export async function listIssues(projectId: string, filters?: ListIssuesFilters)
     ];
   }
 
-  return prisma.issue.findMany({
-    where,
+  const p = pagination ?? { page: 1, limit: 100 };
+  const { skip, take } = paginationToSkipTake(p);
+
+  const sortedStatus = [...(filters?.status ?? [])].sort().join(',');
+  const sortedType = [...(filters?.type ?? [])].sort().join(',');
+  const sortedPriority = [...(filters?.priority ?? [])].sort().join(',');
+  const cacheKey =
+    `issues:list:${projectId}` +
+    `:s=${sortedStatus}:t=${sortedType}:pr=${sortedPriority}` +
+    `:a=${filters?.assigneeId ?? ''}:sp=${filters?.sprintId ?? ''}` +
+    `:fr=${filters?.from ?? ''}:to=${filters?.to ?? ''}:q=${filters?.search ?? ''}` +
+    `:pg=${p.page}:lm=${p.limit}`;
+
+  type IssueListItem = Awaited<ReturnType<typeof prisma.issue.findMany<{
     include: {
-      assignee: { select: { id: true, name: true, email: true } },
-      creator: { select: { id: true, name: true } },
-      _count: { select: { children: true } },
-    },
-    orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
-  });
+      assignee: { select: { id: true; name: true; email: true } };
+      creator: { select: { id: true; name: true } };
+      _count: { select: { children: true } };
+    };
+  }>>>[number];
+
+  const cached = await getCachedJson<ReturnType<typeof buildPaginatedResponse<IssueListItem>>>(cacheKey);
+  if (cached) return cached;
+
+  const [items, total] = await Promise.all([
+    prisma.issue.findMany({
+      where,
+      include: {
+        assignee: { select: { id: true, name: true, email: true } },
+        creator: { select: { id: true, name: true } },
+        _count: { select: { children: true } },
+      },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+      skip,
+      take,
+    }),
+    prisma.issue.count({ where }),
+  ]);
+
+  const result = buildPaginatedResponse(items, total, p);
+  await setCachedJson(cacheKey, result);
+  return result;
 }
 
 type MvpLivecodeFilters = {

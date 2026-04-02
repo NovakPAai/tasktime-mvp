@@ -1,9 +1,9 @@
 import api from './client';
-import type { Sprint, Issue, SprintState, SprintDetailsResponse } from '../types';
+import type { Sprint, Issue, SprintState, SprintDetailsResponse, PaginatedResponse } from '../types';
 
 export async function listSprints(projectId: string): Promise<Sprint[]> {
-  const { data } = await api.get<Sprint[]>(`/projects/${projectId}/sprints`);
-  return data;
+  const { data } = await api.get<PaginatedResponse<Sprint>>(`/projects/${projectId}/sprints`);
+  return data.data;
 }
 
 interface CreateOrUpdateSprintBody {
@@ -44,8 +44,8 @@ export async function moveIssuesToSprint(sprintId: string, issueIds: string[]) {
 }
 
 export async function getBacklog(projectId: string): Promise<Issue[]> {
-  const { data } = await api.get<Issue[]>(`/projects/${projectId}/backlog`);
-  return data;
+  const { data } = await api.get<PaginatedResponse<Issue>>(`/projects/${projectId}/backlog`);
+  return data.data;
 }
 
 export async function moveIssuesToBacklog(projectId: string, issueIds: string[]) {
@@ -53,8 +53,8 @@ export async function moveIssuesToBacklog(projectId: string, issueIds: string[])
 }
 
 export async function listAllSprints(params?: { state?: SprintState | 'ALL'; projectId?: string; teamId?: string }): Promise<Sprint[]> {
-  const { data } = await api.get<Sprint[]>('/sprints', { params });
-  return data;
+  const { data } = await api.get<PaginatedResponse<Sprint>>('/sprints', { params });
+  return data.data;
 }
 
 export async function getSprintIssues(id: string): Promise<SprintDetailsResponse> {
