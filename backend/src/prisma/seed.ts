@@ -65,7 +65,7 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
       email: 'agent@flow-universe.internal',
       name: 'Flow Universe Agent',
       passwordHash: agentPasswordHash,
-      role: 'USER',
+      role: 'MANAGER',
       isActive: true,
     },
     update: { passwordHash: agentPasswordHash },
