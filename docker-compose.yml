@@ -45,7 +45,7 @@ services:
       retries: 5
 
   # MCP HTTP-сервер Flow Universe (нативный, прямой доступ к БД)
-  # Запуск: MCP_SERVICE_TOKEN=<token> docker compose --profile mcp up -d mcp-flow-universe
+  # Запуск: MCP_SERVICE_TOKEN=<token> MCP_AGENT_PASSWORD=<pwd> docker compose --profile mcp up -d mcp-flow-universe
   # .mcp.json коллеги: { "type": "streamable-http", "url": "http://<host>:3002/mcp",
   #                      "headers": { "Authorization": "Bearer <token>" } }
   mcp-flow-universe:
@@ -60,8 +60,17 @@ services:
       MCP_ENV: ${MCP_ENV:-production}
       DATABASE_URL: postgresql://tasktime:${POSTGRES_PASSWORD:-tasktime}@postgres:5432/tasktime?schema=public
       MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:?MCP_SERVICE_TOKEN is required}
+      # Write operations route through the backend API (workflow engine + RBAC).
+      # BACKEND_INTERNAL_URL must point to the running backend:
+      #   - on the same host: http://localhost:3000 (default)
+      #   - in a Docker network with a backend service: http://backend:3000
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://localhost:3000}
+      MCP_AGENT_EMAIL: ${MCP_AGENT_EMAIL:-agent@flow-universe.internal}
+      MCP_AGENT_PASSWORD: ${MCP_AGENT_PASSWORD:?MCP_AGENT_PASSWORD is required for write operations}
     ports:
       - "3002:3002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

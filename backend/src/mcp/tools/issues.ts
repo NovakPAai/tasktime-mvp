@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { prisma, resolveKey, getAgentUserId, text, errText } from '../context.js';
+import { prisma, resolveKey, text, errText } from '../context.js';
+import { api } from '../api-client.js';
 
 export function registerIssueTools(server: McpServer) {
   // ── get_issue ────────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ export function registerIssueTools(server: McpServer) {
   // ── update_status ─────────────────────────────────────────────────────────────
   server.tool(
     'update_status',
-    'Change the status of an issue',
+    'Change the status of an issue (routes through the workflow engine)',
     {
       key: z.string().describe('Issue key, e.g. TTMP-95'),
       status: z.enum(['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED']),
@@ -142,16 +143,9 @@ export function registerIssueTools(server: McpServer) {
         const resolved = await resolveKey(key);
         const old = resolved.status;
 
-        await prisma.issue.update({ where: { id: resolved.id }, data: { status } });
-
-        await prisma.auditLog.create({
-          data: {
-            action: 'UPDATE',
-            entityType: 'Issue',
-            entityId: resolved.id,
-            details: { field: 'status', from: old, to: status },
-          },
-        });
+        // Route through backend API so the workflow engine, validators,
+        // and post-functions execute (e.g. required fields check before DONE).
+        await api.patch(`/api/issues/${resolved.id}/status`, { status });
 
         return text(`${resolved.key}: ${old} → ${status} ✓`);
       } catch (err) {
@@ -173,31 +167,19 @@ export function registerIssueTools(server: McpServer) {
     async ({ parentKey, title, description, priority }) => {
       try {
         const parent = await resolveKey(parentKey);
-        const agentUserId = await getAgentUserId();
 
-        const [parentIssue, subtaskConfig, last] = await Promise.all([
-          prisma.issue.findUniqueOrThrow({ where: { id: parent.id }, select: { sprintId: true } }),
-          prisma.issueTypeConfig.findFirst({ where: { isSubtask: true }, select: { id: true } }),
-          prisma.issue.findFirst({ where: { projectId: parent.projectId }, orderBy: { number: 'desc' }, select: { number: true } }),
-        ]);
-        if (!subtaskConfig) return errText('No subtask issue type configured in this project');
-        const number = (last?.number ?? 0) + 1;
-
-        const child = await prisma.issue.create({
-          data: {
-            projectId: parent.projectId,
-            number,
+        // Route through API so RBAC, hierarchy validation, and numbering
+        // are handled by the service layer.
+        const child = await api.post<{ number: number; project: { key: string } }>(
+          `/api/projects/${parent.projectId}/issues`,
+          {
             title,
             description,
-            issueTypeConfigId: subtaskConfig.id,
+            type: 'SUBTASK',
             priority,
-            status: 'OPEN',
             parentId: parent.id,
-            sprintId: parentIssue.sprintId,
-            creatorId: agentUserId,
           },
-          include: { project: { select: { key: true } } },
-        });
+        );
 
         const childKey = `${child.project.key}-${child.number}`;
         return text(`Created ${childKey}: "${title}" (SUBTASK → ${parentKey}) ✓`);
