@@ -38,7 +38,7 @@ export default function AdminPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [statsData, adminUsers, allUsers, allProjects] = await Promise.all([
+        const [statsData, adminUsersPage, allUsers, allProjects] = await Promise.all([
           adminApi.getStats(),
           adminApi.listAdminUsers(),
           authApi.listUsers(),
@@ -51,7 +51,7 @@ export default function AdminPage() {
         });
         setUsersMap(userMap);
         setUsers(
-          adminUsers.map((u) => ({
+          adminUsersPage.data.map((u) => ({
             id: u.id,
             email: u.email,
             name: u.name,
@@ -118,10 +118,10 @@ export default function AdminPage() {
         setSelectedSprintId(undefined);
         return;
       }
-      const data = await sprintsApi.listSprints(selectedProjectId);
-      setSprints(data);
-      if (!selectedSprintId && data.length > 0) {
-        setSelectedSprintId(data[0].id);
+      const page = await sprintsApi.listSprints(selectedProjectId);
+      setSprints(page.data);
+      if (!selectedSprintId && page.data.length > 0) {
+        setSelectedSprintId(page.data[0].id);
       }
     };
     void loadSprints();

@@ -54,7 +54,7 @@ export default function BoardPage() {
   }, [projectId, selectedSprint]);
 
   useEffect(() => {
-    if (projectId) sprintsApi.listSprints(projectId).then(setSprints);
+    if (projectId) sprintsApi.listSprints(projectId).then((page) => setSprints(page.data));
   }, [projectId]);
 
   useEffect(() => { load(); }, [load]);

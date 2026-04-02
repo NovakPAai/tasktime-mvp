@@ -70,6 +70,40 @@ export async function setCachedJson<T>(key: string, value: T, ttlSeconds = confi
   }
 }
 
+/** Delete a single cache key. */
+export async function delCachedJson(key: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    await redis.del(key);
+  } catch (err) {
+    console.error('Failed to delete from Redis cache:', err);
+  }
+}
+
+/**
+ * Delete all keys whose name starts with `prefix`.
+ * Uses SCAN to avoid blocking the server; safe on large keyspaces.
+ */
+export async function delCacheByPrefix(prefix: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    let cursor = 0;
+    do {
+      const reply = await redis.scan(cursor, { MATCH: `${prefix}*`, COUNT: 100 });
+      cursor = reply.cursor;
+      if (reply.keys.length > 0) {
+        await redis.del(reply.keys);
+      }
+    } while (cursor !== 0);
+  } catch (err) {
+    console.error('Failed to delete cache by prefix:', err);
+  }
+}
+
 export type UserSession = {
   userId: string;
   email: string;

@@ -371,8 +371,8 @@
     <h1>Чеклист верификации после деплоя</h1>
     <p class="subtitle">
       Ветка: <strong>NovakPA/vibrant-leavitt</strong> &nbsp;·&nbsp;
-      Staging: <strong>5.129.242.171</strong> &nbsp;·&nbsp;
-      Production: <strong>72.56.7.218</strong>
+      Staging: <strong>${STAGING_HOST}</strong> &nbsp;·&nbsp;
+      Production: <strong>${PROD_HOST}</strong>
     </p>
   </div>
 
@@ -420,7 +420,7 @@ gh run view &lt;RUN_ID&gt;</pre>
         <div class="check-body">
           <p class="check-desc">Подключиться к БД на staging и проверить таблицу истории миграций Prisma.</p>
           <pre><span class="comment"># SSH на staging</span>
-ssh user@5.129.242.171
+ssh user@${STAGING_HOST}
 
 <span class="comment"># Подключиться к PostgreSQL</span>
 docker exec -it tasktime-postgres psql -U tasktime -d tasktime
@@ -535,7 +535,7 @@ docker exec -it tasktime-postgres psql -U tasktime -d tasktime
 
     <div class="warning-box">
       <span class="warning-icon">⚠</span>
-      <div>Получить JWT-токен перед тестами: <code>POST /api/auth/login</code> с <code>admin@tasktime.ru / password123</code><br>
+      <div>Получить JWT-токен перед тестами: <code>POST /api/auth/login</code> с <code>${ADMIN_EMAIL} / ${ADMIN_PASSWORD}</code><br>
       Подставить в переменную <code>TOKEN</code> во всех запросах ниже.</div>
     </div>
 
@@ -549,15 +549,15 @@ docker exec -it tasktime-postgres psql -U tasktime -d tasktime
         </div>
         <div class="check-body">
           <pre><span class="comment"># Получить токен</span>
-TOKEN=$(curl -s -X POST http://5.129.242.171/api/auth/login \
+TOKEN=$(curl -s -X POST http://${STAGING_HOST}/api/auth/login \
   -H <span class="string">"Content-Type: application/json"</span> \
-  -d <span class="string">'{"email":"admin@tasktime.ru","password":"password123"}'</span> \
+  -d <span class="string">'{"email":"${ADMIN_EMAIL}","password":"${ADMIN_PASSWORD}"}'</span> \
   | <span class="fn">jq</span> -r .accessToken)
 
 echo <span class="string">"Token: $TOKEN"</span>
 
 <span class="comment"># Получить ID проекта</span>
-PROJECT_ID=$(curl -s http://5.129.242.171/api/projects \
+PROJECT_ID=$(curl -s http://${STAGING_HOST}/api/projects \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
   | <span class="fn">jq</span> -r <span class="string">'.[0].id'</span>)
 
@@ -573,7 +573,7 @@ echo <span class="string">"Project: $PROJECT_ID"</span></pre>
         </div>
         <div class="check-body">
           <pre><span class="comment"># Первая страница, 10 записей</span>
-curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> <span class="string">'{data_length: (.data | length), meta}'</span></pre>
           <div class="expected-label">Ожидаемый результат</div>
           <div class="expected">{
@@ -599,7 +599,7 @@ curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=1
           <span class="check-badge badge-high">High</span>
         </div>
         <div class="check-body">
-          <pre>curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/sprints?page=1&amp;limit=5" \
+          <pre>curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/sprints?page=1&amp;limit=5" \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> .meta</pre>
           <div class="expected-label">Ожидаемый результат</div>
           <div class="expected">{ "page": 1, "limit": 5, "total": &lt;N&gt;, "totalPages": &lt;K&gt; }</div>
@@ -613,7 +613,7 @@ curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=1
           <span class="check-badge badge-high">High</span>
         </div>
         <div class="check-body">
-          <pre>curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/backlog?limit=10" \
+          <pre>curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/backlog?limit=10" \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> .meta</pre>
           <div class="expected-label">Ожидаемый результат</div>
           <div class="expected">{ "page": 1, "limit": 10, "total": &lt;N&gt;, "totalPages": &lt;K&gt; }</div>
@@ -627,7 +627,7 @@ curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=1
           <span class="check-badge badge-medium">Medium</span>
         </div>
         <div class="check-body">
-          <pre>curl -s "http://5.129.242.171/api/admin/users?limit=5" \
+          <pre>curl -s "http://${STAGING_HOST}/api/admin/users?limit=5" \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> .meta</pre>
           <div class="expected-label">Ожидаемый результат</div>
           <div class="expected">{ "page": 1, "limit": 5, "total": &lt;N&gt;, "totalPages": &lt;K&gt; }</div>
@@ -663,7 +663,7 @@ docker exec -it tasktime-backend sh
 <span class="comment"># DEBUG=prisma:query</span></pre>
 
           <pre><span class="comment"># 2. Отправить тестовый webhook с 3 issue-ключами</span>
-curl -s -X POST http://5.129.242.171/api/webhooks/gitlab \
+curl -s -X POST http://${STAGING_HOST}/api/webhooks/gitlab \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{
     "object_kind": "push",
@@ -710,7 +710,7 @@ Query 3: INSERT INTO "audit_logs" ...</div>
         </div>
         <div class="check-body">
           <pre><span class="comment"># 1. Сделать первый запрос (заполнить кеш)</span>
-curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
 
 <span class="comment"># 2. Проверить ключи в Redis</span>
@@ -729,11 +729,11 @@ docker exec -it tasktime-redis redis-cli KEYS "issues:list:*"</pre>
         <div class="check-body">
           <pre><span class="comment"># Измерить время двух последовательных запросов</span>
 echo <span class="string">"=== Запрос 1 (промах кеша) ==="</span>
-time curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50" \
+time curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50" \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
 
 echo <span class="string">"=== Запрос 2 (попадание в кеш) ==="</span>
-time curl -s "http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50" \
+time curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50" \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null</pre>
           <div class="expected-label">Ожидаемый результат</div>
           <div class="expected">Запрос 1: ~50–200 ms (идёт в БД)
@@ -788,7 +788,7 @@ docker exec tasktime-redis redis-cli --scan --pattern "issues:*" \
         <div class="check-body">
           <p class="check-desc">Открыть проект → убедиться, что список задач не пустой, нет ошибок в консоли.</p>
           <pre><span class="comment"># Адрес staging</span>
-http://5.129.242.171/projects/&lt;PROJECT_ID&gt;</pre>
+http://${STAGING_HOST}/projects/&lt;PROJECT_ID&gt;</pre>
           <div class="expected-label">Проверить</div>
           <div class="expected">✓  Задачи отображаются списком
 ✓  Нет ошибок "Cannot read properties of undefined"
@@ -803,7 +803,7 @@ http://5.129.242.171/projects/&lt;PROJECT_ID&gt;</pre>
           <span class="check-badge badge-critical">Critical</span>
         </div>
         <div class="check-body">
-          <pre>http://5.129.242.171/projects/&lt;PROJECT_ID&gt;/board</pre>
+          <pre>http://${STAGING_HOST}/projects/&lt;PROJECT_ID&gt;/board</pre>
           <div class="expected-label">Проверить</div>
           <div class="expected">✓  Колонки OPEN / IN_PROGRESS / REVIEW / DONE заполнены
 ✓  Drag-and-drop не сломан</div>
@@ -817,7 +817,7 @@ http://5.129.242.171/projects/&lt;PROJECT_ID&gt;</pre>
           <span class="check-badge badge-high">High</span>
         </div>
         <div class="check-body">
-          <pre>http://5.129.242.171/projects/&lt;PROJECT_ID&gt;/sprints</pre>
+          <pre>http://${STAGING_HOST}/projects/&lt;PROJECT_ID&gt;/sprints</pre>
           <div class="expected-label">Проверить</div>
           <div class="expected">✓  Спринты отображаются
 ✓  Backlog-задачи видны</div>
@@ -831,7 +831,7 @@ http://5.129.242.171/projects/&lt;PROJECT_ID&gt;</pre>
           <span class="check-badge badge-medium">Medium</span>
         </div>
         <div class="check-body">
-          <pre>http://5.129.242.171/admin  <span class="comment">(вкладка Users)</span></pre>
+          <pre>http://${STAGING_HOST}/admin  <span class="comment">(вкладка Users)</span></pre>
           <div class="expected-label">Проверить</div>
           <div class="expected">✓  Пользователи отображаются с метриками (_count)</div>
         </div>
@@ -860,7 +860,7 @@ http://5.129.242.171/projects/&lt;PROJECT_ID&gt;</pre>
       <div class="section-num">7</div>
       <div>
         <h2>Замер производительности</h2>
-        <div class="section-desc">Убедиться, что p95 latency < 200ms (NFR)</div>
+        <div class="section-desc">Убедиться, что p95 latency &lt; 200ms (NFR)</div>
       </div>
     </div>
     <div class="checks">
@@ -876,7 +876,7 @@ http://5.129.242.171/projects/&lt;PROJECT_ID&gt;</pre>
 for i in $(seq 1 20); do
   curl -o /dev/null -s -w <span class="string">"%{time_total}\n"</span> \
     -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
-    <span class="string">"http://5.129.242.171/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50"</span>
+    <span class="string">"http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50"</span>
 done | sort -n | awk <span class="string">'
   NR==1  {min=$0}
   NR==19 {p95=$0}
@@ -895,11 +895,11 @@ done | sort -n | awk <span class="string">'
         </div>
         <div class="check-body">
           <pre><span class="comment"># Первый запрос (холодный кеш)</span>
-time curl -s http://5.129.242.171/api/admin/stats \
+time curl -s http://${STAGING_HOST}/api/admin/stats \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
 
 <span class="comment"># Второй запрос (горячий кеш)</span>
-time curl -s http://5.129.242.171/api/admin/stats \
+time curl -s http://${STAGING_HOST}/api/admin/stats \
   -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null</pre>
           <div class="expected-label">Ожидаемый результат</div>
           <div class="expected">1-й запрос: ~100–500 ms

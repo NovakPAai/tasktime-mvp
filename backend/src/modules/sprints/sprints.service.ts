@@ -2,7 +2,7 @@ import type { Prisma, SprintState } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateSprintDto, UpdateSprintDto } from './sprints.dto.js';
-import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { getCachedJson, setCachedJson, delCacheByPrefix, delCachedJson } from '../../shared/redis.js';
 import {
   type PaginationParams,
   paginationToSkipTake,
@@ -123,11 +123,20 @@ export async function getSprintIssues(id: string) {
   return result;
 }
 
+/** Invalidate all sprint-related caches for a project. */
+async function invalidateSprintCaches(projectId: string, sprintId?: string): Promise<void> {
+  await Promise.all([
+    delCacheByPrefix(`sprints:project:${projectId}:`),
+    delCacheByPrefix('sprints:all:'),
+    ...(sprintId ? [delCachedJson(`sprint:issues:${sprintId}`)] : []),
+  ]);
+}
+
 export async function createSprint(projectId: string, dto: CreateSprintDto) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  return prisma.sprint.create({
+  const sprint = await prisma.sprint.create({
     data: {
       projectId,
       name: dto.name,
@@ -139,13 +148,16 @@ export async function createSprint(projectId: string, dto: CreateSprintDto) {
       flowTeamId: dto.flowTeamId,
     },
   });
+
+  await invalidateSprintCaches(projectId);
+  return sprint;
 }
 
 export async function updateSprint(id: string, dto: UpdateSprintDto) {
   const sprint = await prisma.sprint.findUnique({ where: { id } });
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
-  return prisma.sprint.update({
+  const updated = await prisma.sprint.update({
     where: { id },
     data: {
       ...(dto.name !== undefined && { name: dto.name }),
@@ -157,6 +169,9 @@ export async function updateSprint(id: string, dto: UpdateSprintDto) {
       ...(dto.flowTeamId !== undefined && { flowTeamId: dto.flowTeamId }),
     },
   });
+
+  await invalidateSprintCaches(sprint.projectId, id);
+  return updated;
 }
 
 export async function startSprint(id: string) {
@@ -166,10 +181,13 @@ export async function startSprint(id: string) {
 
   // Multiple active sprints per project are allowed (parallel sprints)
 
-  return prisma.sprint.update({
+  const updated = await prisma.sprint.update({
     where: { id },
     data: { state: 'ACTIVE', startDate: sprint.startDate ?? new Date() },
   });
+
+  await invalidateSprintCaches(sprint.projectId, id);
+  return updated;
 }
 
 export async function closeSprint(id: string) {
@@ -183,17 +201,36 @@ export async function closeSprint(id: string) {
     data: { sprintId: null },
   });
 
-  return prisma.sprint.update({
+  const updated = await prisma.sprint.update({
     where: { id },
     data: { state: 'CLOSED', endDate: sprint.endDate ?? new Date() },
   });
+
+  // Invalidate sprint caches and backlog (issues moved back to backlog)
+  await Promise.all([
+    invalidateSprintCaches(sprint.projectId, id),
+    delCacheByPrefix(`backlog:${sprint.projectId}:`),
+  ]);
+  return updated;
 }
 
 export async function moveIssuesToSprint(sprintId: string | null, issueIds: string[]) {
+  // Need projectId for backlog cache invalidation — fetch one of the issues
+  const sample = issueIds.length > 0
+    ? await prisma.issue.findUnique({ where: { id: issueIds[0] }, select: { projectId: true } })
+    : null;
+
   await prisma.issue.updateMany({
     where: { id: { in: issueIds } },
     data: { sprintId },
   });
+
+  if (sample) {
+    await Promise.all([
+      delCacheByPrefix(`backlog:${sample.projectId}:`),
+      ...(sprintId ? [delCachedJson(`sprint:issues:${sprintId}`)] : []),
+    ]);
+  }
 }
 
 export async function getBacklog(projectId: string, pagination?: PaginationParams) {

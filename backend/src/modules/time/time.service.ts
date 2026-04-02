@@ -3,7 +3,7 @@ import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { ManualTimeDto } from './time.dto.js';
 import { buildUserTimeSummary } from './time.domain.js';
-import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
 
 export async function startTimer(issueId: string, userId: string) {
   const issue = await prisma.issue.findUnique({ where: { id: issueId } });
@@ -15,7 +15,7 @@ export async function startTimer(issueId: string, userId: string) {
   });
   if (running) throw new AppError(400, 'Timer already running. Stop it first.');
 
-  return prisma.timeLog.create({
+  const log = await prisma.timeLog.create({
     data: {
       issueId,
       userId,
@@ -24,6 +24,9 @@ export async function startTimer(issueId: string, userId: string) {
       source: 'HUMAN',
     },
   });
+
+  await delCachedJson(`time:summary:${userId}`);
+  return log;
 }
 
 export async function stopTimer(issueId: string, userId: string) {
@@ -35,7 +38,7 @@ export async function stopTimer(issueId: string, userId: string) {
   const now = new Date();
   const hours = (now.getTime() - running.startedAt!.getTime()) / 3600000;
 
-  return prisma.timeLog.update({
+  const log = await prisma.timeLog.update({
     where: { id: running.id },
     data: {
       stoppedAt: now,
@@ -43,13 +46,16 @@ export async function stopTimer(issueId: string, userId: string) {
       source: 'HUMAN',
     },
   });
+
+  await delCachedJson(`time:summary:${userId}`);
+  return log;
 }
 
 export async function logManual(issueId: string, userId: string, dto: ManualTimeDto) {
   const issue = await prisma.issue.findUnique({ where: { id: issueId } });
   if (!issue) throw new AppError(404, 'Issue not found');
 
-  return prisma.timeLog.create({
+  const log = await prisma.timeLog.create({
     data: {
       issueId,
       userId,
@@ -59,6 +65,9 @@ export async function logManual(issueId: string, userId: string, dto: ManualTime
       source: 'HUMAN',
     },
   });
+
+  await delCachedJson(`time:summary:${userId}`);
+  return log;
 }
 
 export async function getIssueLogs(issueId: string) {

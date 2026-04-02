@@ -89,8 +89,6 @@ async function updateIssuesByKeys(keys: string[], status: IssueStatus): Promise<
 
   if (issues.length === 0) return;
 
-  const issueIds = issues.map((i) => i.id);
-
   // Build issueId → original issue key mapping for audit log details
   const keyByIssueId = new Map<string, string>(
     issues.map((i) => {
@@ -101,22 +99,38 @@ async function updateIssuesByKeys(keys: string[], status: IssueStatus): Promise<
     }),
   );
 
-  // 1 query: batch update all matched issues
-  await prisma.issue.updateMany({
-    where: { id: { in: issueIds } },
-    data: { status },
-  });
+  const issueIds = issues.map((i) => i.id);
 
-  // 1 query: batch create all audit log entries
-  await prisma.auditLog.createMany({
-    data: issueIds.map((id) => ({
-      action: 'issue.status_changed',
-      entityType: 'issue',
-      entityId: id,
-      userId: null,
-      details: { source: 'GITLAB', status, issueKey: keyByIssueId.get(id) } as object,
-      ipAddress: null,
-      userAgent: null,
-    })),
+  // Wrap in a transaction to eliminate TOCTOU: between findMany above and the
+  // write below another request could close one of these issues. Re-applying the
+  // terminal-state guard inside the transaction ensures we only update (and audit)
+  // issues that are still non-terminal at write time.
+  await prisma.$transaction(async (tx) => {
+    const updatable = await tx.issue.findMany({
+      where: { id: { in: issueIds }, status: { notIn: ['DONE', 'CANCELLED'] } },
+      select: { id: true },
+    });
+
+    const updatableIds = updatable.map((i) => i.id);
+    if (updatableIds.length === 0) return;
+
+    // batch update — only non-terminal issues
+    await tx.issue.updateMany({
+      where: { id: { in: updatableIds } },
+      data: { status },
+    });
+
+    // batch audit — only for records that were actually changed
+    await tx.auditLog.createMany({
+      data: updatableIds.map((id) => ({
+        action: 'issue.status_changed',
+        entityType: 'issue',
+        entityId: id,
+        userId: null,
+        details: { source: 'GITLAB', status, issueKey: keyByIssueId.get(id) } as object,
+        ipAddress: null,
+        userAgent: null,
+      })),
+    });
   });
 }

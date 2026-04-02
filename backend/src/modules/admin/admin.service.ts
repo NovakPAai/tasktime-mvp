@@ -43,22 +43,31 @@ export async function getStats() {
     _count: { _all: true },
   });
 
-  // Single query: users with assigned issues count — replaces groupBy + separate findMany + JS map
-  const usersWithIssues = await prisma.user.findMany({
-    where: { assignedIssues: { some: {} } },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      _count: { select: { assignedIssues: true } },
-    },
-  });
+  // Single query: users with assigned issues count — replaces groupBy + separate findMany + JS map.
+  // Fetch unassigned count in parallel to preserve the null-assignee bucket in stats.
+  const [usersWithIssues, unassignedCount] = await Promise.all([
+    prisma.user.findMany({
+      where: { assignedIssues: { some: {} } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        _count: { select: { assignedIssues: true } },
+      },
+    }),
+    prisma.issue.count({ where: { assigneeId: null } }),
+  ]);
 
-  const issuesByAssignee = usersWithIssues.map((u) => ({
-    assigneeId: u.id,
-    assigneeName: u.name || u.email,
-    _count: { _all: u._count.assignedIssues },
-  }));
+  const issuesByAssignee: AdminStats['issuesByAssignee'] = [
+    ...usersWithIssues.map((u) => ({
+      assigneeId: u.id,
+      assigneeName: u.name || u.email,
+      _count: { _all: u._count.assignedIssues },
+    })),
+    ...(unassignedCount > 0
+      ? [{ assigneeId: null, assigneeName: 'Без исполнителя', _count: { _all: unassignedCount } }]
+      : []),
+  ];
 
   const recentActivity = await getActivity();
 

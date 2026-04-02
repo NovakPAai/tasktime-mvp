@@ -26,7 +26,7 @@ export async function getStats(): Promise<AdminStats> {
   return data;
 }
 
-type AdminUser = {
+export type AdminUser = {
   id: string;
   email: string;
   name: string;
@@ -36,9 +36,13 @@ type AdminUser = {
   _count: { createdIssues: number; assignedIssues: number; timeLogs: number };
 };
 
-export async function listAdminUsers(): Promise<AdminUser[]> {
-  const { data } = await api.get<PaginatedResponse<AdminUser>>('/admin/users');
-  return data.data;
+export async function listAdminUsers(
+  pagination?: { page?: number; limit?: number },
+): Promise<PaginatedResponse<AdminUser>> {
+  const { data } = await api.get<PaginatedResponse<AdminUser>>('/admin/users', {
+    params: pagination,
+  });
+  return data;
 }
 
 export async function getIssuesByStatusReport(params: {

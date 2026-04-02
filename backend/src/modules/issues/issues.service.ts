@@ -7,7 +7,7 @@ import type {
 } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { getCachedJson, setCachedJson, delCacheByPrefix } from '../../shared/redis.js';
 import {
   type PaginationParams,
   paginationToSkipTake,
@@ -220,6 +220,7 @@ export async function bulkUpdateIssues(projectId: string, params: {
     data,
   });
 
+  await delCacheByPrefix(`issues:list:${projectId}:`);
   return { updatedCount: params.issueIds.length };
 }
 
@@ -288,7 +289,7 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
 
   const number = await getNextNumber(projectId);
 
-  return prisma.issue.create({
+  const issue = await prisma.issue.create({
     data: {
       projectId,
       number,
@@ -306,6 +307,9 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
       project: { select: { key: true } },
     },
   });
+
+  await delCacheByPrefix(`issues:list:${projectId}:`);
+  return issue;
 }
 
 export async function updateIssue(id: string, dto: UpdateIssueDto) {
@@ -316,7 +320,7 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
     await validateHierarchy(issue.type, dto.parentId);
   }
 
-  return prisma.issue.update({
+  const updated = await prisma.issue.update({
     where: { id },
     data: dto,
     include: {
@@ -324,16 +328,22 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
       creator: { select: { id: true, name: true } },
     },
   });
+
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  return updated;
 }
 
 export async function updateStatus(id: string, dto: UpdateStatusDto) {
   const issue = await prisma.issue.findUnique({ where: { id } });
   if (!issue) throw new AppError(404, 'Issue not found');
 
-  return prisma.issue.update({
+  const updated = await prisma.issue.update({
     where: { id },
     data: { status: dto.status },
   });
+
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  return updated;
 }
 
 export async function assignIssue(id: string, dto: AssignDto) {
@@ -345,11 +355,14 @@ export async function assignIssue(id: string, dto: AssignDto) {
     if (!user) throw new AppError(404, 'Assignee not found');
   }
 
-  return prisma.issue.update({
+  const updated = await prisma.issue.update({
     where: { id },
     data: { assigneeId: dto.assigneeId },
     include: { assignee: { select: { id: true, name: true } } },
   });
+
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  return updated;
 }
 
 export async function updateAiFlags(id: string, dto: UpdateAiFlagsDto) {
@@ -390,6 +403,7 @@ export async function deleteIssue(id: string) {
   if (!issue) throw new AppError(404, 'Issue not found');
 
   await prisma.issue.delete({ where: { id } });
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
 }
 
 export async function getHistory(id: string) {
