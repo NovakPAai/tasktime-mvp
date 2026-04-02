@@ -27,7 +27,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ --ext .ts",
     "format": "prettier --write 'src/**/*.ts'",
-    "mcp": "tsx src/mcp/server.ts"
+    "mcp": "tsx src/mcp/server.ts",
+    "mcp:http": "MCP_TRANSPORT=http tsx src/mcp/server.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

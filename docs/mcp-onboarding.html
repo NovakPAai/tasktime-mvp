@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow Universe MCP — Онбординг</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #03050F;
+    --surface:   #0F1320;
+    --surface2:  #151929;
+    --border:    rgba(79,110,247,0.18);
+    --accent:    #4F6EF7;
+    --accent2:   #7B8FF9;
+    --green:     #34D399;
+    --yellow:    #FBBF24;
+    --red:       #F87171;
+    --text:      #E2E8F8;
+    --muted:     #7B8BB2;
+    --code-bg:   #0A0D1A;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ─────────────────────────────────── */
+  .page { max-width: 860px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* ── Nav ─────────────────────────────────────── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(3,5,15,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  .nav-inner {
+    max-width: 860px; margin: 0 auto;
+    display: flex; align-items: center; gap: 8px;
+    height: 52px;
+  }
+  .nav-logo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700; font-size: 15px;
+    color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+    text-decoration: none; margin-right: auto;
+  }
+  .nav-logo .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .nav-link {
+    font-size: 13px; color: var(--muted);
+    text-decoration: none; padding: 4px 8px;
+    border-radius: 6px; transition: color .15s;
+  }
+  .nav-link:hover { color: var(--text); }
+
+  /* ── Hero ────────────────────────────────────── */
+  .hero {
+    padding: 72px 0 56px;
+    position: relative;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(79,110,247,0.12);
+    border: 1px solid rgba(79,110,247,0.3);
+    border-radius: 100px;
+    padding: 4px 12px; font-size: 12px;
+    color: var(--accent2); font-weight: 500;
+    margin-bottom: 24px;
+  }
+  .hero-badge::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: .4; }
+  }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700; line-height: 1.15;
+    letter-spacing: -0.5px;
+    margin-bottom: 16px;
+  }
+  h1 span { color: var(--accent); }
+  .hero-sub {
+    font-size: 17px; color: var(--muted);
+    max-width: 560px; line-height: 1.6;
+    margin-bottom: 32px;
+  }
+  .hero-meta {
+    display: flex; gap: 24px; flex-wrap: wrap;
+  }
+  .meta-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--muted);
+  }
+  .meta-item strong { color: var(--text); }
+
+  /* ── Section ─────────────────────────────────── */
+  section { margin-top: 64px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--accent);
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(20px, 3vw, 26px);
+    font-weight: 700; letter-spacing: -0.3px;
+    margin-bottom: 24px;
+  }
+  h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px; font-weight: 600;
+    margin-bottom: 8px;
+  }
+  p { color: var(--muted); margin-bottom: 12px; }
+  p strong { color: var(--text); }
+
+  /* ── Cards ───────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .card + .card { margin-top: 12px; }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  /* ── What appeared ───────────────────────────── */
+  .what-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .what-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .what-icon {
+    font-size: 24px; margin-bottom: 10px; display: block;
+  }
+  .what-card h3 { font-size: 14px; margin-bottom: 4px; }
+  .what-card p { font-size: 13px; margin: 0; }
+
+  /* ── Architecture diagram ────────────────────── */
+  .arch {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 2;
+    color: var(--muted);
+    overflow-x: auto;
+  }
+  .arch .hl { color: var(--accent2); }
+  .arch .gr { color: var(--green); }
+  .arch .ye { color: var(--yellow); }
+  .arch .re { color: var(--red); }
+
+  /* ── Steps ───────────────────────────────────── */
+  .steps { counter-reset: step; display: flex; flex-direction: column; gap: 0; }
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 0 20px;
+    position: relative;
+  }
+  .step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 19px; top: 40px; bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--border), transparent);
+  }
+  .step-num {
+    counter-increment: step;
+    width: 40px; height: 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px; font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    position: relative; z-index: 1;
+  }
+  .step-body { padding: 8px 0 32px; }
+  .step-body h3 { font-size: 15px; margin-bottom: 6px; }
+  .step-body p { font-size: 14px; margin-bottom: 8px; }
+
+  /* ── Code block ──────────────────────────────── */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    overflow-x: auto;
+    position: relative;
+    margin: 8px 0;
+  }
+  .code-block .comment { color: var(--muted); }
+  .code-block .cmd { color: var(--green); }
+  .code-block .str { color: var(--yellow); }
+  .code-lang {
+    position: absolute; top: 10px; right: 12px;
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .8px;
+  }
+
+  /* ── Tools grid ──────────────────────────────── */
+  .tool-group { margin-bottom: 28px; }
+  .tool-group-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tool-group-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+  .tools-list { display: flex; flex-direction: column; gap: 6px; }
+  .tool-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    gap: 12px;
+    align-items: center;
+  }
+  .tool-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: var(--accent2);
+    font-weight: 500;
+  }
+  .tool-desc { font-size: 13px; color: var(--muted); }
+  .tool-badge {
+    font-size: 10px; font-weight: 600; letter-spacing: .5px;
+    padding: 3px 8px; border-radius: 4px;
+    white-space: nowrap;
+  }
+  .badge-read { background: rgba(79,110,247,0.12); color: var(--accent2); }
+  .badge-write { background: rgba(52,211,153,0.1); color: var(--green); }
+  .badge-agent { background: rgba(251,191,36,0.1); color: var(--yellow); }
+
+  /* ── Example chat ────────────────────────────── */
+  .chat { display: flex; flex-direction: column; gap: 10px; }
+  .msg {
+    max-width: 80%;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .msg-user {
+    align-self: flex-end;
+    background: rgba(79,110,247,0.15);
+    border: 1px solid rgba(79,110,247,0.25);
+    color: var(--text);
+    border-bottom-right-radius: 4px;
+  }
+  .msg-ai {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+  .msg-ai .tool-call {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(79,110,247,0.08);
+    border: 1px solid rgba(79,110,247,0.2);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--accent2);
+    margin: 2px;
+  }
+  .msg-ai .tool-call::before { content: '⚡'; font-size: 10px; }
+
+  /* ── Security table ──────────────────────────── */
+  .perm-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .perm-table th {
+    text-align: left; padding: 10px 16px;
+    font-size: 11px; font-weight: 600; letter-spacing: .8px;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .perm-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+  }
+  .perm-table tr:last-child td { border-bottom: none; }
+  .perm-ok { color: var(--green); font-weight: 600; }
+  .perm-no { color: var(--red); font-weight: 600; }
+  .perm-table td:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--accent2);
+  }
+
+  /* ── Callout ─────────────────────────────────── */
+  .callout {
+    display: flex; gap: 12px;
+    background: rgba(79,110,247,0.07);
+    border: 1px solid rgba(79,110,247,0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--muted);
+    margin: 16px 0;
+  }
+  .callout-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+  .callout.warn {
+    background: rgba(251,191,36,0.06);
+    border-color: rgba(251,191,36,0.2);
+  }
+
+  /* ── Divider ─────────────────────────────────── */
+  .divider {
+    height: 1px; background: var(--border);
+    margin: 48px 0;
+  }
+
+  /* ── Footer ──────────────────────────────────── */
+  footer {
+    text-align: center; padding: 32px 0 0;
+    color: var(--muted); font-size: 13px;
+  }
+  footer a { color: var(--accent2); text-decoration: none; }
+
+  @media (max-width: 600px) {
+    .tool-item { grid-template-columns: 1fr; }
+    .hero-meta { flex-direction: column; gap: 8px; }
+    .arch { font-size: 11px; padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="#">
+      <span class="dot"></span>
+      Flow Universe MCP
+    </a>
+    <a class="nav-link" href="#what">Что появилось</a>
+    <a class="nav-link" href="#setup">Настройка</a>
+    <a class="nav-link" href="#tools">Инструменты</a>
+    <a class="nav-link" href="#examples">Примеры</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge">Новая возможность · Апрель 2026</div>
+    <h1>Flow Universe<br><span>MCP Server</span></h1>
+    <p class="hero-sub">
+      AI-агенты (Claude Code, Cursor) теперь могут работать с задачами напрямую — читать спринты, менять статусы, логировать время и создавать подзадачи. Без копипаста, без переключения контекста.
+    </p>
+    <div class="hero-meta">
+      <div class="meta-item">📦 <strong>14 инструментов</strong></div>
+      <div class="meta-item">🔐 <strong>Техническая УЗ с ограниченными правами</strong></div>
+      <div class="meta-item">🌍 <strong>Staging + Production</strong></div>
+      <div class="meta-item">⚡ <strong>Прямой доступ к БД через SSH-туннель</strong></div>
+    </div>
+  </div>
+
+  <!-- WHAT APPEARED -->
+  <section id="what">
+    <div class="section-label">Что появилось</div>
+    <h2>Четыре новых компонента</h2>
+
+    <div class="what-grid">
+      <div class="what-card">
+        <span class="what-icon">🖥️</span>
+        <h3>MCP-сервер</h3>
+        <p>backend/src/mcp/ — работает через stdio, Prisma напрямую к PostgreSQL</p>
+      </div>
+      <div class="what-card">
+        <span class="what-icon">🔑</span>
+        <h3>Техническая УЗ</h3>
+        <p>flowuniverse_mcp — Postgres-пользователь с минимальными привилегиями</p>
+      </div>
+      <div class="what-card">
+        <span class="what-icon">⚙️</span>
+        <h3>.mcp.json</h3>
+        <p>Три окружения: development, staging, production — выбираешь в инспекторе</p>
+      </div>
+      <div class="what-card">
+        <span class="what-icon">📋</span>
+        <h3>SQL-скрипт</h3>
+        <p>scripts/mcp-db-user.sql — создание техпользователя на любом сервере</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="callout-icon">💡</span>
+      <div>
+        <strong style="color: var(--text)">Зачем это нужно?</strong><br>
+        Раньше нужно было открыть систему → найти задачу → скопировать описание → вставить в чат с AI → вернуться → вручную обновить статус. Теперь AI сам читает задачу из системы, работает по ней и записывает результат обратно.
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section>
+    <div class="section-label">Как это работает</div>
+    <h2>Архитектура</h2>
+
+    <div class="arch">
+<span class="hl">Claude Code / Cursor</span>  (твой ноутбук)
+    │
+    │  stdio  (JSON-RPC 2.0, защищённый канал)
+    ▼
+<span class="hl">flow-universe MCP сервер</span>  (tsx process, локально)
+    │  DATABASE_URL из .env.production
+    │
+    │  TCP через SSH-туннель
+    ▼
+<span class="gr">localhost:5435</span>  ←─── <span class="gr">ssh -L 5435:localhost:5432 root@72.56.7.218 -N</span>
+    │
+    ▼
+<span class="ye">PostgreSQL на 72.56.7.218</span>
+    └─ пользователь: <span class="ye">flowuniverse_mcp</span>
+       ├─ <span class="gr">SELECT</span>   — все таблицы
+       ├─ <span class="gr">INSERT</span>   — issues, comments, time_logs, ai_sessions, audit_logs
+       ├─ <span class="gr">UPDATE</span>   — issues (только статус и AI-флаги)
+       └─ <span class="re">DELETE/DDL — запрещено</span>
+    </div>
+
+    <p style="margin-top: 16px">
+      Туннель нужен потому что Postgres на сервере слушает только <code style="font-family: monospace; color: var(--accent2); font-size: 13px">localhost</code> — снаружи недоступен. SSH-туннель пробрасывает его к тебе на ноутбук безопасно, внутри зашифрованного канала.
+    </p>
+  </section>
+
+  <!-- SETUP -->
+  <section id="setup">
+    <div class="section-label">Настройка</div>
+    <h2>Запуск за 5 шагов</h2>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Создать техпользователя в PostgreSQL (один раз)</h3>
+          <p>На каждом сервере (staging и production) выполнить SQL-скрипт. Сначала придумать пароль для flowuniverse_mcp и вставить вместо CHANGE_ME.</p>
+          <div class="code-block">
+            <span class="code-lang">bash</span>
+            <span class="comment"># Подключиться к серверу</span><br>
+            <span class="cmd">ssh root@72.56.7.218</span><br><br>
+            <span class="comment"># Создать пользователя (заменить CHANGE_ME на реальный пароль)</span><br>
+            <span class="cmd">sed 's/CHANGE_ME_STRONG_PASSWORD/МОЙ_ПАРОЛЬ/' \<br>
+  &nbsp;&nbsp;/opt/tasktime/backend/scripts/mcp-db-user.sql \<br>
+  &nbsp;&nbsp;| docker exec -i tasktime-postgres-1 psql -U postgres -d tasktime</span>
+          </div>
+          <div class="callout warn">
+            <span class="callout-icon">⚠️</span>
+            <div>Пароль сохранить в надёжном месте (1Password / командный Vault). В репо не коммитить.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Создать локальные env-файлы</h3>
+          <p>Скопировать примеры и вставить реальный пароль от flowuniverse_mcp.</p>
+          <div class="code-block">
+            <span class="code-lang">bash</span>
+            <span class="cmd">cd /путь/к/tasktime-mvp/backend</span><br><br>
+            <span class="comment"># Для staging</span><br>
+            <span class="cmd">cp .env.staging.example .env.staging</span><br>
+            <span class="comment"># Открыть .env.staging, вписать пароль в DATABASE_URL</span><br><br>
+            <span class="comment"># Для production</span><br>
+            <span class="cmd">cp .env.production.example .env.production</span><br>
+            <span class="comment"># Открыть .env.production, вписать пароль в DATABASE_URL</span>
+          </div>
+          <p>Строка которую нужно заменить:</p>
+          <div class="code-block">
+            <span class="str">DATABASE_URL="postgresql://flowuniverse_mcp:<strong>CHANGE_ME</strong>@localhost:5435/tasktime?schema=public"</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Установить зависимости backend</h3>
+          <div class="code-block">
+            <span class="code-lang">bash</span>
+            <span class="cmd">cd backend && npm install</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Открыть SSH-туннель (держать терминал открытым)</h3>
+          <div class="code-block">
+            <span class="code-lang">bash</span>
+            <span class="comment"># Staging (пробросит localhost:5434 → 5.129.242.171:5432)</span><br>
+            <span class="cmd">ssh -L 5434:localhost:5432 root@5.129.242.171 -N</span><br><br>
+            <span class="comment"># Production (пробросит localhost:5435 → 72.56.7.218:5432)</span><br>
+            <span class="cmd">ssh -L 5435:localhost:5432 root@72.56.7.218 -N</span>
+          </div>
+          <p>Флаг <code style="font-family: monospace; color: var(--accent2); font-size: 13px">-N</code> означает «только туннель, без команды». Терминал будет висеть — это нормально.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>Запустить MCP Inspector и проверить</h3>
+          <div class="code-block">
+            <span class="code-lang">bash</span>
+            <span class="cmd">cd backend && npx @modelcontextprotocol/inspector npm run mcp</span>
+          </div>
+          <p>Откроется <strong>http://localhost:6274</strong>. В поле:</p>
+          <ul style="color: var(--muted); font-size: 14px; padding-left: 20px; margin-bottom: 8px">
+            <li><strong style="color: var(--text)">Command:</strong> npm</li>
+            <li><strong style="color: var(--text)">Arguments:</strong> run mcp</li>
+          </ul>
+          <p>Нажать Connect → List Tools → должны появиться 14 инструментов.</p>
+          <p>Проверить: <code style="font-family: monospace; color: var(--accent2); font-size: 13px">get_issue { "key": "TTMP-1" }</code> → задача из системы.</p>
+          <div class="callout">
+            <span class="callout-icon">💡</span>
+            <div>
+              Для production нужно передать переменную окружения:<br>
+              <code style="font-family: monospace; color: var(--accent2); font-size: 12px">MCP_ENV=production npm run mcp</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- TOOLS -->
+  <section id="tools">
+    <div class="section-label">Функционал</div>
+    <h2>14 инструментов</h2>
+
+    <!-- Issues -->
+    <div class="tool-group">
+      <div class="tool-group-label">📋 Задачи</div>
+      <div class="tools-list">
+        <div class="tool-item">
+          <span class="tool-name">get_issue</span>
+          <span class="tool-desc">Полная карточка задачи по ключу (TTMP-95) или UUID</span>
+          <span class="tool-badge badge-read">READ</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">list_issues</span>
+          <span class="tool-desc">Список задач с фильтрами: проект, спринт, статус, AI-eligible</span>
+          <span class="tool-badge badge-read">READ</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">update_status</span>
+          <span class="tool-desc">Изменить статус задачи (OPEN → IN_PROGRESS → REVIEW → DONE)</span>
+          <span class="tool-badge badge-write">WRITE</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">create_subtask</span>
+          <span class="tool-desc">Создать подзадачу под родительской задачей — реальная декомпозиция</span>
+          <span class="tool-badge badge-write">WRITE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sprints -->
+    <div class="tool-group">
+      <div class="tool-group-label">🏃 Спринты</div>
+      <div class="tools-list">
+        <div class="tool-item">
+          <span class="tool-name">get_sprint_context</span>
+          <span class="tool-desc">Активный спринт: статистика, разбивка по AI-eligible задачам</span>
+          <span class="tool-badge badge-read">READ</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">get_backlog</span>
+          <span class="tool-desc">Задачи в бэклоге (не привязаны к спринту)</span>
+          <span class="tool-badge badge-read">READ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Time -->
+    <div class="tool-group">
+      <div class="tool-group-label">⏱️ Время и сессии</div>
+      <div class="tools-list">
+        <div class="tool-item">
+          <span class="tool-name">log_time</span>
+          <span class="tool-desc">Залогировать часы на задачу (source=AGENT, видно в отчётах)</span>
+          <span class="tool-badge badge-write">WRITE</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">register_ai_session</span>
+          <span class="tool-desc">Записать метрики сессии: токены, стоимость, распределение по задачам</span>
+          <span class="tool-badge badge-write">WRITE</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">get_time_summary</span>
+          <span class="tool-desc">Разбивка времени на задаче: человек vs агент</span>
+          <span class="tool-badge badge-read">READ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <div class="tool-group">
+      <div class="tool-group-label">💬 Комментарии</div>
+      <div class="tools-list">
+        <div class="tool-item">
+          <span class="tool-name">add_comment</span>
+          <span class="tool-desc">Добавить комментарий к задаче от имени Flow Universe Agent</span>
+          <span class="tool-badge badge-write">WRITE</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">get_comments</span>
+          <span class="tool-desc">Получить последние комментарии к задаче</span>
+          <span class="tool-badge badge-read">READ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Loop -->
+    <div class="tool-group">
+      <div class="tool-group-label">🤖 Агентский цикл</div>
+      <div class="tools-list">
+        <div class="tool-item">
+          <span class="tool-name">get_eligible_issues</span>
+          <span class="tool-desc">Очередь AI-eligible задач ещё не взятых в работу</span>
+          <span class="tool-badge badge-agent">AGENT</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">claim_issue</span>
+          <span class="tool-desc">Атомарно взять задачу: IN_PROGRESS + AGENT (без гонки состояний)</span>
+          <span class="tool-badge badge-agent">AGENT</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">complete_issue</span>
+          <span class="tool-desc">Завершить: статус → REVIEW, добавить саммари комментарий</span>
+          <span class="tool-badge badge-agent">AGENT</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-name">fail_issue</span>
+          <span class="tool-desc">Эскалация: не смог выполнить, вернуть в OPEN с причиной</span>
+          <span class="tool-badge badge-agent">AGENT</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXAMPLES -->
+  <section id="examples">
+    <div class="section-label">Примеры</div>
+    <h2>Как это выглядит в диалоге</h2>
+
+    <div class="card" style="margin-bottom: 20px">
+      <h3 style="margin-bottom: 16px; color: var(--muted); font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: .8px">Сценарий 1 — Начало рабочего дня</h3>
+      <div class="chat">
+        <div class="msg msg-user">Что у меня в активном спринте? Какие задачи можно взять в работу?</div>
+        <div class="msg msg-ai">
+          <span class="tool-call">get_sprint_context TTMP</span>
+          <span class="tool-call">list_issues project=TTMP sprint=active aiEligible=true</span>
+          <br><br>
+          Активный спринт «Sprint 12» — 18 задач, из них 5 AI-eligible:<br>
+          • TTMP-152 — GitHub webhook: Smart Commits (OPEN, MEDIUM)<br>
+          • TTMP-148 — Экспорт задач в CSV (OPEN, LOW)<br>
+          • TTMP-143 — Уведомления Telegram (OPEN, HIGH)<br>
+          ...
+        </div>
+        <div class="msg msg-user">Возьми TTMP-152</div>
+        <div class="msg msg-ai">
+          <span class="tool-call">get_issue TTMP-152</span>
+          <span class="tool-call">claim_issue TTMP-152</span>
+          <br><br>
+          Взял TTMP-152 в работу. Статус → IN_PROGRESS, задача закреплена за агентом.
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px">
+      <h3 style="margin-bottom: 16px; color: var(--muted); font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: .8px">Сценарий 2 — Декомпозиция задачи</h3>
+      <div class="chat">
+        <div class="msg msg-user">Декомпозируй TTMP-152 на подзадачи</div>
+        <div class="msg msg-ai">
+          <span class="tool-call">get_issue TTMP-152</span>
+          <br><br>
+          Создаю подзадачи по описанию...<br><br>
+          <span class="tool-call">create_subtask TTMP-152 "Парсинг issue key из commit message"</span>
+          <span class="tool-call">create_subtask TTMP-152 "HMAC-верификация X-Hub-Signature-256"</span>
+          <span class="tool-call">create_subtask TTMP-152 "Маппинг событий GitHub → статусы"</span>
+          <br><br>
+          Создал 3 подзадачи: TTMP-153, TTMP-154, TTMP-155. Можешь видеть их в системе.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom: 16px; color: var(--muted); font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: .8px">Сценарий 3 — Завершение и учёт времени</h3>
+      <div class="chat">
+        <div class="msg msg-user">Готово. Залогируй сессию: 1.5 часа, $0.80</div>
+        <div class="msg msg-ai">
+          <span class="tool-call">register_ai_session model=claude-sonnet-4-6 issues=[{TTMP-152,1.0}] costUSD=0.80</span>
+          <span class="tool-call">complete_issue TTMP-152 "Реализован GitHub webhook..."</span>
+          <br><br>
+          Залогировал: 1.5ч, $0.80. Задача TTMP-152 → REVIEW.<br>
+          Добавил комментарий с саммари. Ждёт твоего аппрува.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECURITY -->
+  <section>
+    <div class="section-label">Безопасность</div>
+    <h2>Что агент может и не может</h2>
+
+    <div class="card">
+      <table class="perm-table">
+        <thead>
+          <tr>
+            <th>Операция</th>
+            <th>Разрешено</th>
+            <th>Комментарий</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SELECT * FROM issues</td>
+            <td class="perm-ok">✓ Да</td>
+            <td style="color: var(--muted); font-size: 13px">Читать все таблицы</td>
+          </tr>
+          <tr>
+            <td>INSERT INTO issues</td>
+            <td class="perm-ok">✓ Да</td>
+            <td style="color: var(--muted); font-size: 13px">Создавать подзадачи</td>
+          </tr>
+          <tr>
+            <td>UPDATE issues SET status</td>
+            <td class="perm-ok">✓ Да</td>
+            <td style="color: var(--muted); font-size: 13px">Только поля задач</td>
+          </tr>
+          <tr>
+            <td>DELETE FROM issues</td>
+            <td class="perm-no">✗ Нет</td>
+            <td style="color: var(--muted); font-size: 13px">Явно запрещено</td>
+          </tr>
+          <tr>
+            <td>UPDATE users SET password</td>
+            <td class="perm-no">✗ Нет</td>
+            <td style="color: var(--muted); font-size: 13px">UPDATE выдан только на issues</td>
+          </tr>
+          <tr>
+            <td>DROP TABLE / ALTER TABLE</td>
+            <td class="perm-no">✗ Нет</td>
+            <td style="color: var(--muted); font-size: 13px">DDL недоступен, не owner</td>
+          </tr>
+          <tr>
+            <td>TRUNCATE</td>
+            <td class="perm-no">✗ Нет</td>
+            <td style="color: var(--muted); font-size: 13px">Явно отозвано</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout" style="margin-top: 16px">
+      <span class="callout-icon">🛡️</span>
+      <div>
+        <strong style="color: var(--text)">Максимум что может случиться</strong> — агент создаст лишние подзадачи или поставит неправильный статус. Это исправляется руками за минуту. Структура базы, пользователи и настройки системы неприкосновенны.
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <footer>
+    Flow Universe · MCP Server v1.0 · <a href="https://github.com/NovakPAai/tasktime-mvp/pull/10">PR #10</a> · Апрель 2026
+  </footer>
+
+</div>
+
+</body>
+</html>

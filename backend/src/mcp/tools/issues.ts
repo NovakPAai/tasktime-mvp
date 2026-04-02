@@ -17,6 +17,7 @@ export function registerIssueTools(server: McpServer) {
           include: {
             assignee: { select: { name: true, email: true } },
             creator: { select: { name: true } },
+            issueTypeConfig: { select: { name: true } },
             parent: { select: { title: true, number: true, issueTypeConfig: { select: { name: true } }, project: { select: { key: true } } } },
             children: {
               select: { title: true, status: true, number: true, issueTypeConfig: { select: { name: true } }, project: { select: { key: true } } },

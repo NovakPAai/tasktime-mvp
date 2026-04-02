@@ -10,21 +10,17 @@
       }
     },
     "flow-universe-staging": {
-      "command": "npm",
-      "args": ["run", "mcp"],
-      "cwd": "backend",
-      "env": {
-        "MCP_ENV": "staging",
-        "AI_HOURLY_RATE": "50"
+      "type": "streamable-http",
+      "url": "http://5.129.242.171:3002/mcp",
+      "headers": {
+        "Authorization": "Bearer REPLACE_WITH_MCP_SERVICE_TOKEN"
       }
     },
     "flow-universe-prod": {
-      "command": "npm",
-      "args": ["run", "mcp"],
-      "cwd": "backend",
-      "env": {
-        "MCP_ENV": "production",
-        "AI_HOURLY_RATE": "50"
+      "type": "streamable-http",
+      "url": "http://72.56.7.218:3002/mcp",
+      "headers": {
+        "Authorization": "Bearer REPLACE_WITH_MCP_SERVICE_TOKEN"
       }
     }
   }
