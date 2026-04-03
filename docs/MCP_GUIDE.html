@@ -288,7 +288,7 @@
     <div class="card">
       <div class="card-icon">⚡</div>
       <div class="card-title">С MCP</div>
-      <div class="card-desc">«Взяй TTMP-152, реализуй и закрой» → Claude сам читает задачу, пишет код, логирует время, меняет статус</div>
+      <div class="card-desc">«Возьми PROJ-42, реализуй и закрой» → Claude сам читает задачу, пишет код, логирует время, меняет статус</div>
     </div>
   </div>
 
@@ -344,7 +344,7 @@
     <div class="card">
       <div class="card-icon">📊</div>
       <div class="card-title">Руководитель</div>
-      <div class="card-desc">«Сколько AI-часов потрачено на TTMP-152? Какова стоимость?» — MCP возвращает точные данные из базы.</div>
+      <div class="card-desc">«Сколько AI-часов потрачено на PROJ-42? Какова стоимость?» — MCP возвращает точные данные из базы.</div>
     </div>
   </div>
 
@@ -593,11 +593,11 @@
   </table>
 
   <h3>Пример: регистрация AI-сессии</h3>
-  <pre><code><span class="comment">// Агент потратил на 2 задачи: 70% на TTMP-152, 30% на TTMP-153</span>
+  <pre><code><span class="comment">// Агент потратил на 2 задачи: 70% на PROJ-42, 30% на PROJ-43</span>
 register_ai_session({
   issues: [
-    { key: <span class="string">"TTMP-152"</span>, ratio: <span class="string">0.7</span> },
-    { key: <span class="string">"TTMP-153"</span>, ratio: <span class="string">0.3</span> }
+    { key: <span class="string">"PROJ-42"</span>, ratio: <span class="string">0.7</span> },
+    { key: <span class="string">"PROJ-43"</span>, ratio: <span class="string">0.3</span> }
   ],
   model: <span class="string">"claude-sonnet-4-6"</span>,
   tokensInput: <span class="string">45000</span>,
@@ -611,22 +611,22 @@ register_ai_session({
   <h2 id="examples"><span class="icon">💬</span>Примеры запросов к AI</h2>
 
   <h3>Получить информацию о задаче</h3>
-  <pre><code>Покажи задачу TTMP-152</code></pre>
+  <pre><code>Покажи задачу PROJ-42</code></pre>
 
   <h3>Взять задачу в работу</h3>
-  <pre><code>Возьми TTMP-152 в работу и реализуй согласно описанию</code></pre>
+  <pre><code>Возьми PROJ-42 в работу и реализуй согласно описанию</code></pre>
 
   <h3>Посмотреть текущий спринт</h3>
   <pre><code>Что сейчас в активном спринте проекта TTMP? Покажи статусы задач</code></pre>
 
   <h3>Статистика AI-работы</h3>
-  <pre><code>Сколько AI-времени и денег потрачено на TTMP-152?</code></pre>
+  <pre><code>Сколько AI-времени и денег потрачено на PROJ-42?</code></pre>
 
   <h3>Создать подзадачи</h3>
-  <pre><code>Декомпозируй TTMP-152 на подзадачи и создай их в системе</code></pre>
+  <pre><code>Декомпозируй PROJ-42 на подзадачи и создай их в системе</code></pre>
 
   <h3>Добавить комментарий</h3>
-  <pre><code>Добавь в TTMP-152 комментарий с кратким итогом реализации</code></pre>
+  <pre><code>Добавь в PROJ-42 комментарий с кратким итогом реализации</code></pre>
 
   <hr class="divider" />
 
