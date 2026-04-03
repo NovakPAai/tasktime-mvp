@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { prisma, resolveKey, getAgentUserId, text, errText } from '../context.js';
+import { prisma, resolveKey, text, errText } from '../context.js';
+import { api } from '../api-client.js';
 
 export function registerCommentTools(server: McpServer) {
   // ── add_comment ───────────────────────────────────────────────────────────────
@@ -15,15 +16,8 @@ export function registerCommentTools(server: McpServer) {
     async ({ key, body }) => {
       try {
         const issue = await resolveKey(key);
-        const agentUserId = await getAgentUserId();
 
-        const comment = await prisma.comment.create({
-          data: {
-            issueId: issue.id,
-            authorId: agentUserId,
-            body,
-          },
-        });
+        const comment = await api.post<{ id: string }>(`/api/issues/${issue.id}/comments`, { body });
 
         return text(`Comment added to ${key} (id: ${comment.id}) ✓`);
       } catch (err) {
