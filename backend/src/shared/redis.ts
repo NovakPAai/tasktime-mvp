@@ -91,14 +91,14 @@ export async function delCacheByPrefix(prefix: string): Promise<void> {
   if (!redis) return;
 
   try {
-    let cursor = 0;
+    let cursor = '0';
     do {
       const reply = await redis.scan(cursor, { MATCH: `${prefix}*`, COUNT: 100 });
       cursor = reply.cursor;
       if (reply.keys.length > 0) {
         await redis.del(reply.keys);
       }
-    } while (cursor !== 0);
+    } while (cursor !== '0');
   } catch (err) {
     console.error('Failed to delete cache by prefix:', err);
   }
