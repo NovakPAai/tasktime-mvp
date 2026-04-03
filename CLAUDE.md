@@ -371,29 +371,56 @@ PO выбрал:
 - Старый прототип полностью удалён
 - **Следующий шаг:** Sprint 5 (AI Dev Loop) — в работе
 
-## MCP-прокси для Claude Desktop (Sprint 5)
+## MCP — Flow Universe AI Tools
 
-**Запуск MCP:**
-```bash
-MCP_SERVICE_TOKEN=<jwt> docker compose --profile mcp up -d mcp-tasktime
-```
+MCP-сервер реализован на StreamableHTTP транспорте. Работает на порту 3002 на staging и production.
 
-**Подключить Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+**14 инструментов:** чтение задач/спринтов/проектов, смена статусов (через workflow engine), комментарии, создание подзадач, учёт AI-времени и стоимости токенов.
+
+**Подключение (`.mcp.json` в корне проекта):**
 ```json
 {
   "mcpServers": {
-    "tasktime": {
-      "url": "http://localhost:3002/mcp",
-      "transport": "http"
+    "flow-universe": {
+      "command": "npm", "args": ["run", "mcp"], "cwd": "backend",
+      "env": { "MCP_ENV": "development" }
+    },
+    "flow-universe-staging": {
+      "type": "streamable-http",
+      "url": "http://5.129.242.171:3002/mcp",
+      "headers": { "Authorization": "Bearer <STAGING_TOKEN>" }
+    },
+    "flow-universe-prod": {
+      "type": "streamable-http",
+      "url": "http://72.56.7.218:3002/mcp",
+      "headers": { "Authorization": "Bearer <PROD_TOKEN>" }
     }
   }
 }
 ```
 
-После подключения Claude Desktop видит инструменты Flow Universe и может управлять задачами через natural language.
+Токены запрашивать у администратора. **Не коммитить `.mcp.json` с реальными токенами** (репо публичный).
+
+**Полная документация:** `docs/MCP_GUIDE.html`
+
+**Архитектура write-операций:** статусы/комментарии/задачи → Backend API (workflow engine + RBAC). Read + time logging → прямой Prisma.
+
+**Системный агент:** `agent@flow-universe.internal`, роль MANAGER. Создаётся через seed или SQL при деплое на новую БД.
+
+**Docker (production/staging):**
+```bash
+docker run -d --name mcp-flow-universe \
+  --network tasktime-production_default -p 3002:3002 \
+  -e MCP_TRANSPORT=http -e MCP_HTTP_PORT=3002 \
+  -e MCP_SERVICE_TOKEN="<token>" \
+  -e DATABASE_URL="postgresql://..." \
+  -e BACKEND_INTERNAL_URL="http://backend:3000" \
+  -e MCP_AGENT_EMAIL="agent@flow-universe.internal" \
+  -e MCP_AGENT_PASSWORD="<password>" \
+  ghcr.io/novakpaai/tasktime-backend:<SHA> node dist/mcp/server.js
+```
 
 **Swagger UI:** `GET /api/docs` — интерактивная документация API.
-**OpenAPI JSON:** `GET /api/docs/json` — для openapi-to-mcp и других клиентов.
 
 ## Экономия токенов (Token Economy)
 

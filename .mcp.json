@@ -13,14 +13,14 @@
       "type": "streamable-http",
       "url": "http://5.129.242.171:3002/mcp",
       "headers": {
-        "Authorization": "Bearer REPLACE_WITH_MCP_SERVICE_TOKEN"
+        "Authorization": "Bearer STAGING_MCP_TOKEN"
       }
     },
     "flow-universe-prod": {
       "type": "streamable-http",
       "url": "http://72.56.7.218:3002/mcp",
       "headers": {
-        "Authorization": "Bearer REPLACE_WITH_MCP_SERVICE_TOKEN"
+        "Authorization": "Bearer PROD_MCP_TOKEN"
       }
     }
   }
