@@ -111,7 +111,7 @@ export function registerTimeTools(server: McpServer) {
           await prisma.timeLog.createMany({ data: logsData });
         }
 
-        const splitLines = issues.map((s, i) => {
+        const splitLines = issues.map((s) => {
           const h = Math.round((totalHours * (s.ratio / safeTotalRatio)) * 100) / 100;
           return `  ${s.key} (${Math.round(s.ratio * 100)}% = ${h}h)`;
         });
