@@ -159,6 +159,18 @@ export async function deleteUserSession(userId: string): Promise<void> {
   }
 }
 
+export async function deleteCachedByPattern(pattern: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    const keys = await redis.keys(pattern);
+    if (keys.length > 0) await redis.del(keys);
+  } catch (err) {
+    console.error('Failed to delete cached keys by pattern:', err);
+  }
+}
+
 export async function isRedisReady(): Promise<boolean> {
   const redis = await getRedisClientInternal();
   if (!redis) return false;

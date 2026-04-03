@@ -1,12 +1,13 @@
-import type { IssueStatus } from '@prisma/client';
+import type { UserRole } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import type { GitLabMergeRequestPayload, GitLabPushPayload, GitLabPipelinePayload } from './webhooks.dto.js';
 import { parseIssueKeys } from './webhooks.dto.js';
+import { resolveWorkflowForIssue, executeTransition } from '../workflow-engine/workflow-engine.service.js';
 
 const ISSUE_KEY_FULL_REGEX = /^([A-Z][A-Z0-9]*)-(\d+)$/;
 
-/** Resolve issue by key (e.g. DEMO-42). Returns issue id or null. */
-export async function findIssueIdByKey(issueKey: string): Promise<string | null> {
+/** Resolve issue by key (e.g. DEMO-42). Returns full issue object or null. */
+async function findIssueByKey(issueKey: string) {
   const m = issueKey.match(ISSUE_KEY_FULL_REGEX);
   if (!m) return null;
   const [, projectKey, numStr] = m;
@@ -16,10 +17,15 @@ export async function findIssueIdByKey(issueKey: string): Promise<string | null>
   const project = await prisma.project.findUnique({ where: { key: projectKey }, select: { id: true } });
   if (!project) return null;
 
-  const issue = await prisma.issue.findFirst({
+  return prisma.issue.findFirst({
     where: { projectId: project.id, number },
-    select: { id: true },
+    select: { id: true, projectId: true, workflowStatusId: true, issueTypeConfigId: true, assigneeId: true, creatorId: true },
   });
+}
+
+/** Resolve issue id by key — kept for backward compat with pipeline handler. */
+export async function findIssueIdByKey(issueKey: string): Promise<string | null> {
+  const issue = await findIssueByKey(issueKey);
   return issue?.id ?? null;
 }
 
@@ -31,21 +37,84 @@ async function logGitLabAudit(action: string, entityType: string, entityId: stri
       entityType,
       entityId,
       userId: null,
-      details: { source: 'GITLAB', ...details } as object,
+      details: { source: 'gitlab_webhook', ...details } as object,
       ipAddress: null,
       userAgent: null,
     },
   });
 }
 
-/** Update issue status and write audit log. */
-async function setIssueStatus(issueId: string, status: string, reason: string, payloadDetails: Record<string, unknown>) {
-  await prisma.issue.update({ where: { id: issueId }, data: { status: status as IssueStatus } });
-  await logGitLabAudit('issue.status_changed', 'issue', issueId, {
-    status,
+/** Get system actor for GitLab webhook transitions.
+ *  Tries GITLAB_SYSTEM_USER_ID env var first, falls back to any ADMIN user. */
+async function getSystemActor(): Promise<{ id: string; role: UserRole } | null> {
+  const envId = process.env.GITLAB_SYSTEM_USER_ID;
+  if (envId) {
+    const user = await prisma.user.findUnique({ where: { id: envId }, select: { id: true, role: true } });
+    if (user) return user;
+  }
+  return prisma.user.findFirst({ where: { role: 'ADMIN' }, select: { id: true, role: true } });
+}
+
+/** Transition issue to the workflow status matching targetSystemKey via workflow engine.
+ *  Uses bypassConditions=true since GitLab webhook is a trusted system source.
+ *  Returns issueId on success, null if transition unavailable or actor not found. */
+async function transitionIssueBySystemKey(
+  issue: { id: string; projectId: string; workflowStatusId: string | null; issueTypeConfigId: string | null },
+  targetSystemKey: string,
+  reason: string,
+  payloadDetails: Record<string, unknown>,
+): Promise<string | null> {
+  let workflow;
+  try {
+    workflow = await resolveWorkflowForIssue(issue);
+  } catch {
+    await logGitLabAudit('issue.gitlab_transition_unavailable', 'issue', issue.id, {
+      reason: 'workflow_not_configured',
+      targetSystemKey,
+      ...payloadDetails,
+    });
+    return null;
+  }
+
+  const transition = workflow.transitions.find(
+    (t) =>
+      t.toStatus.systemKey === targetSystemKey &&
+      (t.isGlobal || t.fromStatusId === issue.workflowStatusId),
+  );
+
+  if (!transition) {
+    await logGitLabAudit('issue.gitlab_transition_unavailable', 'issue', issue.id, {
+      reason: 'no_matching_transition',
+      targetSystemKey,
+      currentWorkflowStatusId: issue.workflowStatusId,
+      ...payloadDetails,
+    });
+    return null;
+  }
+
+  const actor = await getSystemActor();
+  if (!actor) {
+    await logGitLabAudit('issue.gitlab_transition_skipped', 'issue', issue.id, {
+      reason: 'no_system_actor',
+      targetSystemKey,
+      transitionId: transition.id,
+      ...payloadDetails,
+    });
+    return null;
+  }
+
+  await executeTransition(issue.id, transition.id, actor.id, actor.role, undefined, true);
+
+  await logGitLabAudit('issue.gitlab_webhook_transition', 'issue', issue.id, {
+    transitionId: transition.id,
+    transitionName: transition.name,
+    targetSystemKey,
+    actorId: actor.id,
     reason,
     ...payloadDetails,
   });
+
+  return issue.id;
 }
 
 /** Handle merge_request: opened -> REVIEW, merged -> DONE. */
@@ -59,21 +128,20 @@ export async function handleMergeRequest(body: GitLabMergeRequestPayload): Promi
   const keys = [...parseIssueKeys(title), ...parseIssueKeys(sourceBranch)];
   const uniqueKeys = Array.from(new Set(keys));
 
-  let newStatus: string | null = null;
-  if (state === 'merged') newStatus = 'DONE';
-  else if (action === 'open' || state === 'opened') newStatus = 'REVIEW';
+  let targetSystemKey: string | null = null;
+  if (state === 'merged') targetSystemKey = 'DONE';
+  else if (action === 'open' || state === 'opened') targetSystemKey = 'REVIEW';
 
-  if (!newStatus || uniqueKeys.length === 0) return { updated };
+  if (!targetSystemKey || uniqueKeys.length === 0) return { updated };
+
+  const payloadDetails = { gitlab_state: state, gitlab_action: action };
+  const reason = `merge_request ${state ?? action}`;
 
   for (const key of uniqueKeys) {
-    const issueId = await findIssueIdByKey(key);
-    if (!issueId) continue;
-    await setIssueStatus(issueId, newStatus, `merge_request ${state ?? action}`, {
-      issueKey: key,
-      gitlab_state: state,
-      gitlab_action: action,
-    });
-    updated.push(issueId);
+    const issue = await findIssueByKey(key);
+    if (!issue) continue;
+    const result = await transitionIssueBySystemKey(issue, targetSystemKey, reason, { issueKey: key, ...payloadDetails });
+    if (result) updated.push(result);
   }
   return { updated };
 }
@@ -92,14 +160,14 @@ export async function handlePush(body: GitLabPushPayload): Promise<{ updated: st
   if (uniqueKeys.length === 0) return { updated };
 
   for (const key of uniqueKeys) {
-    const issueId = await findIssueIdByKey(key);
-    if (!issueId) continue;
-    await setIssueStatus(issueId, 'IN_PROGRESS', 'push to branch with issue key', {
+    const issue = await findIssueByKey(key);
+    if (!issue) continue;
+    const result = await transitionIssueBySystemKey(issue, 'IN_PROGRESS', 'push to branch with issue key', {
       issueKey: key,
       ref,
       branch: branchName,
     });
-    updated.push(issueId);
+    if (result) updated.push(result);
   }
   return { updated };
 }

@@ -51,6 +51,7 @@ export default function UatTestsPage() {
       }
     };
     void load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role]);
 
   useEffect(() => {
@@ -132,7 +133,7 @@ export default function UatTestsPage() {
         <div>
           <h1 className="tt-page-title">UAT чек-листы</h1>
           <p className="tt-page-subtitle">
-            Приёмочные сценарии для TaskTime в формате онбординга по ролям.
+            Приёмочные сценарии для Flow Universe в формате онбординга по ролям.
           </p>
         </div>
       </div>

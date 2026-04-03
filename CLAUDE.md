@@ -1,15 +1,148 @@
-# TaskTime MVP — Контекст проекта
+# Flow Universe MVP — Контекст проекта
+
+---
+
+## 🚨 КРИТИЧНО: UI Kit 2.0 — Paper rebuild (читать перед любой правкой frontend)
+
+**Текущая фаза:** пересборка всех страниц по артбордам Paper. Единственный источник правды — Paper MCP.
+
+### ЗАПРЕЩЕНО в Page-файлах:
+- ❌ CSS-классы (`className="..."`) — ни одного
+- ❌ `import styles from '...'` — не использовать
+- ❌ `<Layout>`, `<Sider>`, `<Content>` из Ant Design
+- ❌ смешивать старые CSS-переменные (`var(--acc)`) с inline-стилями
+- ❌ изменять логику API-вызовов, стейт, роутинг — только визуал
+
+### ОБЯЗАТЕЛЬНО:
+- ✅ Только `style={{ ... }}` — чистые React inline-styles
+- ✅ Цвета/отступы/шрифты — только из `get_jsx(nodeId, format:"inline-styles")` Paper
+- ✅ Два токен-объекта на уровне модуля: `const DARK_C = {...}` и `const LIGHT_C = {...}`
+- ✅ Внутри компонента: `const C = mode === 'light' ? LIGHT_C : DARK_C`
+- ✅ `const { mode } = useThemeStore()` для переключения темы
+- ✅ Theme-aware конфиги (STATUS, PRIORITY и т.п.) — **внутри** компонента, не на уровне модуля
+- ✅ Ant Design допустим только для Modal/Form/Input/Table/Tooltip/Dropdown (не для layout)
+
+### Эталонные файлы (смотреть перед началом):
+- `frontend/src/pages/DashboardPage.tsx` — образец dual-theme, структуры токенов, helpers
+- `frontend/src/pages/ProjectsPage.tsx` — образец карточек, аватаров, статус-бейджей
+
+### Статус страниц:
+
+| Страница | Артборд Dark | Артборд Light | Статус |
+|---------|-------------|--------------|--------|
+| Sidebar + AppLayout | `1HD-0` | — | ✅ DONE |
+| DashboardPage | `1KQ-0` | `1R5-0` | ✅ DONE |
+| ProjectsPage | `1-0` | `81-0` | ✅ DONE |
+| SprintsPage | `28O-0` | `2D3-0` | ✅ DONE |
+| LoginPage | `4O8-0` | `4Q9-0` | ⏳ TODO |
+| ProjectDetailPage | `FW-0` | `QK-0` | ⏳ TODO |
+| BoardPage | `1XE-0` | `23C-0` | ⏳ TODO (DnD — не трогать логику) |
+| GlobalSprintsPage | `2HH-0` | `2MD-0` | ⏳ TODO |
+| TimePage | `2RY-0` | `2WD-0` | ⏳ TODO |
+| IssueDetailPage | `30S-0` | `354-0` | ⏳ TODO (высокий риск) |
+| TeamsPage | `39G-0` | `3DX-0` | ⏳ TODO |
+| BusinessTeamsPage | `3IE-0` | `3ME-0` | ⏳ TODO |
+| FlowTeamsPage | `3QE-0` | `3VO-0` | ⏳ TODO |
+| ReleasesPage | `4EO-0` | `4JG-0` | ⏳ TODO |
+| SettingsPage | `4S8-0` | `4YJ-0` | ⏳ TODO |
+| AdminPage | `40Y-0` | `47T-0` | ⏳ TODO |
+
+> Полный план сессий: `docs/plans/2026-03-25-paper-ui-rebuild-plan.md`
+
+---
+
+## Участники и совместная работа
+
+### Команда
+
+| GitHub | Роль | Инструменты | Префикс веток |
+|--------|------|-------------|---------------|
+| jackrescuer-gif | PO / Lead | Claude Code + Cursor | `claude/jack-*`, `cursor/jack-*` |
+| St1tcher86 | Contributor | Claude Code + Cursor | `claude/alex-*`, `cursor/alex-*` |
+
+### Флоу работы
+
+```
+main (защищена: CI + 1 аппрув)
+  ↑
+  ├── claude/jack-<описание>   ← jackrescuer-gif через Claude Code
+  ├── cursor/jack-<описание>   ← jackrescuer-gif через Cursor
+  ├── claude/alex-<описание>   ← St1tcher86 через Claude Code
+  └── cursor/alex-<описание>   ← St1tcher86 через Cursor
+```
+
+**Жизненный цикл ветки:**
+1. `git fetch origin && git rebase origin/main` — синхронизация перед началом
+2. Создать ветку от `main` с нужным префиксом
+3. Коммиты по логическим единицам (feat/fix/chore/docs/refactor/test)
+4. `git push -u origin <ветка>`
+5. `gh pr create` → CI зелёный → аппрув второго участника → `gh pr merge --squash`
+
+### Правила мёрджа
+
+- Стратегия: **squash merge** (один коммит в main на PR)
+- Ветку после мёрджа удалять (`--delete-branch`)
+- Rebase перед PR если main ушёл вперёд: `git rebase origin/main`
+- Прямой push в `main` — **запрещён**
+
+### Trunk Based Development (TBD) + Batch Release
+
+**Модель:** TBD — все мёрджат в `main` через короткоживущие ветки. Релиз собирается в батч вручную через Pipeline Dashboard.
+
+**Pipeline:**
+```text
+PR → CI → merge в main → auto-publish images → auto-deploy staging
+                                                      ↓
+                                    Pipeline Dashboard (порт 3100):
+                                    создать батч → добавить PRs
+                                    → DEPLOYING → TESTING → PASSED → RELEASED (prod)
+```
+
+**Батч-флоу:**
+- `COLLECTING` — собираем PRs в батч
+- `DEPLOYING` → `TESTING` → `PASSED` → `RELEASED`
+- `FAILED` → `COLLECTING` — откат, исправляем
+
+**Защита деплоя:**
+1. **Concurrency group** — `deploy-staging` в GitHub Actions, `cancel-in-progress: false`
+2. **flock** — серверный lock (`/tmp/deploy-{env}.lock`)
+3. **SHA verification** — `deploy.sh` проверяет `/api/health` на ожидаемый `version`
+4. **Deploy history** — `deploy/history/{env}.log`
+
+**Правила для веток:**
+- Ветка живёт ≤ 2 дней, PR ≤ 400 строк diff
+- Rebase на main перед PR
+- Откат = `git revert <sha>` + новый PR
+
+**Версионирование:**
+- `/api/health` возвращает `{ version: "<git-sha>", buildTime: "<timestamp>" }`
+- Docker образы тегируются SHA коммита + `main`
+- Deploy history: `deploy/history/{env}.log`
+
+### Координация (предотвращение конфликтов)
+
+- Перед началом работы над модулем — сообщить в командный чат: «беру backend/issues»
+- Не держать ветку открытой > 2 дней
+- Короткие PR (< 400 строк diff) — легче ревьюить
+
+### Code review
+
+- Автор PR **не мёрджит сам** без аппрува
+- Ревьюер проверяет: логику, типы, тесты, CI
+- Если аппрув некому дать (оба заняты одновременно) — допустим self-merge после явного согласования в чате
+
+---
 
 ## Что это
 
-TaskTime — импортозамещение Jira для российского финансового сектора.
+Flow Universe — импортозамещение Jira для российского финансового сектора.
 Конкуренты: Т1 Сфера, EVA, Diasoft.
 
 ## Текущее состояние (2026-03-11)
 
 **Фаза:** Пересборка с нуля (v2). Старый прототип удалён.
 **План:** утверждён в `docs/RU/REBUILD_PLAN_V2.md`
-**Статус:** Sprints 1–3 ЗАВЕРШЕНЫ. В работе Sprint 4.
+**Статус:** Sprints 1–4 ЗАВЕРШЕНЫ. Sprint 5 в работе (claude/agitated-hugle).
 
 ### Sprint 1 — DONE (2026-03-10)
 
@@ -32,6 +165,7 @@ TaskTime — импортозамещение Jira для российского
 - Makefile: setup, dev, backend, frontend
 
 **Запуск:** `make setup && make dev` → http://localhost:5173
+**Прод:** http://5.129.242.171:8080/
 **Аккаунты:** admin/manager/dev/viewer @tasktime.ru, пароль: password123
 
 ### Sprint 2 — DONE (2026-03-10)
@@ -235,7 +369,31 @@ PO выбрал:
 - Sprints 1–3 ЗАВЕРШЕНЫ и работают.
 - Ветка: `claude/mvp-project-management-hdAvd`
 - Старый прототип полностью удалён
-- **Следующий шаг:** Sprint 4 (AI + интеграции + polish)
+- **Следующий шаг:** Sprint 5 (AI Dev Loop) — в работе
+
+## MCP-прокси для Claude Desktop (Sprint 5)
+
+**Запуск MCP:**
+```bash
+MCP_SERVICE_TOKEN=<jwt> docker compose --profile mcp up -d mcp-tasktime
+```
+
+**Подключить Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "tasktime": {
+      "url": "http://localhost:3002/mcp",
+      "transport": "http"
+    }
+  }
+}
+```
+
+После подключения Claude Desktop видит инструменты Flow Universe и может управлять задачами через natural language.
+
+**Swagger UI:** `GET /api/docs` — интерактивная документация API.
+**OpenAPI JSON:** `GET /api/docs/json` — для openapi-to-mcp и других клиентов.
 
 ## Экономия токенов (Token Economy)
 
@@ -274,6 +432,13 @@ PO выбрал:
 - `corporate-architect`, `infosec` → **Opus**
 - `deploy-tasktime`, `docs-tasktime`, `tasktime-inbox` → **Haiku**
 
+## Battle (боевой сервер)
+
+- **URL:** http://5.129.242.171
+- **Логин:** Claude@tasktime.ru / Pa88W0rd89765123
+- **Sync-скрипт:** `backend/scripts/sync-issue-with-battle.mjs`
+- **Пример pull:** `TASKTIME_BASE_URL=http://5.129.242.171 TASKTIME_ACCESS_TOKEN=<token> node scripts/sync-issue-with-battle.mjs pull TTMP-82 TTMP-83 TTMP-84 --set-in-progress`
+
 ## CI/CD Pipeline (2026-03-13)
 
 ### Архитектура
@@ -306,3 +471,153 @@ CI (push/PR) → Build & Publish (workflow_run, main only) → Deploy Staging (a
 2. Health-check возвращал 200 на пустую БД (проверял `SELECT 1` вместо наличия таблиц) — фикс `20970f0`
 3. Bootstrap-скрипт не вызывался при деплое — фикс `20970f0`
 4. Секреты production environment не были настроены при первом деплое — фикс вручную в GitHub Settings
+5. Дрейф schema/migrations: `schema.prisma` редактировался без создания migration-файла → `prisma migrate deploy` не применял изменения → seed/runtime падал на несуществующих колонках — фикс: добавлен `prisma migrate diff --exit-code` в CI (шаг после `db:migrate:deploy`)
+
+## Version History (обязательно)
+
+**Все значимые изменения в пулреквестах должны фиксироваться в файле `version_history.md`** — в корне репозитория.
+
+### Версионирование
+
+В начале `version_history.md` всегда находится строка:
+
+```
+**Last version: X.Y**
+```
+
+**Алгоритм при добавлении новой записи:**
+1. Прочитать `Last version` из начала файла
+2. Вычислить следующую версию (patch: `X.Y` → `X.Y+1`; minor по договорённости с PO)
+3. Добавить новую запись с этой версией вверху списка (после строки `Last version`)
+4. Обновить `Last version` на новую версию
+
+### Формат записи
+
+```markdown
+## [X.Y] [YYYY-MM-DD] <тип>(<scope>): <краткое описание>
+
+**Задача:** [KEY-N](ссылка) — если есть; иначе пропустить
+**PR:** [#N](https://github.com/jackrescuer-gif/tasktime-mvp/pull/N)
+**Ветка:** `ветка`
+
+### Что изменилось
+- ...
+```
+
+### Правила
+- Запись добавляется при мёрдже PR в `main`
+- Если задачи нет — всё равно добавлять запись без поля «Задача»
+- Записи в обратном хронологическом порядке (новые — вверху)
+- Указывать конкретные файлы, эндпоинты, эффект изменения
+- `Last version` в начале файла всегда = версия самой свежей записи
+
+---
+
+## Workflow Engine (обязательно читать при работе с workflow)
+
+### Архитектура
+
+```
+WorkflowScheme → WorkflowSchemeItem (workflowId + issueTypeConfigId)
+WorkflowSchemeProject (schemeId + projectId — 1:1 per project)
+Workflow → WorkflowStep (isInitial, statusId) + WorkflowTransition (fromStatusId, toStatusId, conditions, validators, postFunctions)
+```
+
+**Основные файлы:**
+- `backend/src/modules/workflow-engine/workflow-engine.service.ts` — resolveWorkflowForIssue, getAvailableTransitions, executeTransition, invalidateWorkflowCache
+- `backend/src/modules/workflows/workflows.service.ts` — CRUD, validateWorkflow, ensureWorkflowEditable
+- `backend/src/modules/workflow-schemes/workflow-schemes.service.ts` — CRUD, replaceItems, attachProject
+
+### Redis-кэш workflow resolution
+
+`resolveWorkflowForIssue` кэшируется в Redis по ключу `wf:{projectId}:{typeId|'default'}` с TTL=300 секунд.
+
+**Обязательно** вызывать `invalidateWorkflowCache(projectId)` или `invalidateWorkflowCacheByWorkflowId(workflowId)` из **service-функций** (не роутеров) при:
+- Изменении `WorkflowSchemeItem` (replaceItems) → уже реализовано
+- Привязке/отвязке проекта к схеме (attachProject, detachProject) → уже реализовано
+- Изменении шагов и переходов Workflow (addStep, updateStep, deleteStep, createTransition, updateTransition, deleteTransition) → уже реализовано
+
+### Copy-on-Write для активных Workflow
+
+При попытке изменить шаг или переход workflow, который уже используется в схемах (`WorkflowSchemeItem.count > 0`), автоматически создаётся draft-копия.
+
+- API возвращает заголовок `X-Draft-Workflow-Id: <newId>` и поля `_isDraft: true`, `_draftWorkflowId: <id>`
+- Frontend должен показать уведомление и предложить привязать draft к схеме
+
+### Как добавить новый тип Condition / Validator / PostFunction
+
+1. **Condition** — добавить case в `backend/src/modules/workflow-engine/conditions/index.ts` + тип в `types.ts`
+2. **Validator** — создать файл в `validators/`, добавить case в `validators/index.ts` + тип в `types.ts`
+3. **PostFunction** — создать файл в `post-functions/`, добавить case в `post-functions/index.ts` + тип в `types.ts`
+
+### Валидация графа
+
+`GET /api/admin/workflows/:id/validate` возвращает `WorkflowValidationReport`:
+- **Errors (isValid=false):** `NO_INITIAL_STATUS`, `NO_DONE_STATUS`
+- **Warnings:** `DEAD_END_STATUS`, `UNREACHABLE_STATUS`, `UNUSED_STATUS`
+
+Привязка невалидного workflow к схеме через `PUT /api/admin/workflow-schemes/:id/items` → 422 `WORKFLOW_INVALID`.
+
+### Prisma-правило для workflow
+
+Изменение `workflow_transitions` или `workflow_scheme_items` → `prisma migrate dev --name <описание>`.
+
+---
+
+## Правила работы с Prisma (обязательно)
+
+> **Нарушение любого из этих правил = падение деплоя.**
+
+### Изменения схемы БД
+
+**ЗАПРЕЩЕНО** редактировать `schema.prisma` без создания migration-файла:
+
+```bash
+# НЕВЕРНО — изменяет только локальную БД, migration-файл не создаётся:
+npx prisma db push
+
+# ВЕРНО — создаёт migration-файл, который применится в CI и на проде:
+npx prisma migrate dev --name <описание-изменения>
+```
+
+**Обязательный порядок при изменении схемы:**
+1. Отредактировать `schema.prisma`
+2. `cd backend && npx prisma migrate dev --name <описание>` — создаёт файл в `src/prisma/migrations/`
+3. Закоммитить `schema.prisma` + новый migration-файл вместе
+4. `npm run db:generate` — регенерировать Prisma-клиент
+5. Убедиться, что TypeScript компилируется: `npm run typecheck`
+
+### Проверка дрейфа перед коммитом
+
+Если есть сомнения, что миграция создана — проверить вручную:
+
+```bash
+cd backend && npx prisma migrate diff \
+  --from-schema-datasource src/prisma/schema.prisma \
+  --to-schema-datamodel src/prisma/schema.prisma \
+  --exit-code
+# exit 0 = OK, exit 1 = в schema.prisma есть изменения без migration-файла
+```
+
+CI автоматически выполняет эту проверку после `db:migrate:deploy` и падает если есть дрейф.
+
+### TTMP_ONLY seed
+
+`npm run db:seed:ttmp` работает только на БД с уже существующими bootstrap-пользователями. На чистой БД сначала выполнить:
+
+```bash
+# В backend.*.env: BOOTSTRAP_ENABLED=true, BOOTSTRAP_DEFAULT_PASSWORD=...
+npm run db:bootstrap
+# Затем:
+npm run db:seed:ttmp
+```
+
+### ALTER TYPE в миграциях
+
+При добавлении значения в PostgreSQL enum использовать `IF NOT EXISTS`:
+
+```sql
+ALTER TYPE "MyEnum" ADD VALUE IF NOT EXISTS 'NEW_VALUE';
+```
+
+На PostgreSQL 16 это допустимо внутри транзакции. На PG < 12 нужно добавить `-- no transaction` первой строкой файла.

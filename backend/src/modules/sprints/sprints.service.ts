@@ -74,10 +74,11 @@ export async function getSprintIssues(id: string) {
     sprint: ReturnType<typeof mapSprintWithStats>;
     issues: Array<{
       id: string; projectId: string; number: number; title: string;
-      estimatedHours: Prisma.Decimal | null; type: string; status: string;
+      estimatedHours: Prisma.Decimal | null; type: string | null; status: string;
       priority: string; updatedAt: Date;
       assignee: { id: string; name: string } | null;
       project: { id: string; name: string; key: string };
+      issueTypeConfig: { id: string; name: string; systemKey: string | null; iconName: string | null; iconColor: string | null } | null;
     }>;
   };
 
@@ -95,7 +96,7 @@ export async function getSprintIssues(id: string) {
           number: true,
           title: true,
           estimatedHours: true,
-          type: true,
+          issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconName: true, iconColor: true } },
           status: true,
           priority: true,
           updatedAt: true,
@@ -116,7 +117,10 @@ export async function getSprintIssues(id: string) {
 
   const result = {
     sprint: mapSprintWithStats(sprint),
-    issues: sprint.issues,
+    issues: sprint.issues.map((issue) => ({
+      ...issue,
+      type: issue.issueTypeConfig?.systemKey ?? null,
+    })),
   };
 
   await setCachedJson(cacheKey, result);
@@ -239,7 +243,11 @@ export async function getBacklog(projectId: string, pagination?: PaginationParam
   const cacheKey = `backlog:${projectId}:pg=${p.page}:lm=${p.limit}`;
 
   type BacklogItem = Awaited<ReturnType<typeof prisma.issue.findMany<{
-    include: { assignee: { select: { id: true; name: true } }; _count: { select: { children: true } } };
+    include: {
+      assignee: { select: { id: true; name: true } };
+      issueTypeConfig: true;
+      _count: { select: { children: true } };
+    };
   }>>>[number];
 
   const cached = await getCachedJson<ReturnType<typeof buildPaginatedResponse<BacklogItem>>>(cacheKey);
@@ -251,6 +259,7 @@ export async function getBacklog(projectId: string, pagination?: PaginationParam
       where,
       include: {
         assignee: { select: { id: true, name: true } },
+        issueTypeConfig: true,
         _count: { select: { children: true } },
       },
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],

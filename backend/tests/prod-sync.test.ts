@@ -23,7 +23,7 @@ describe('buildProdSyncPlan', () => {
       projectKey: 'TTMP',
       source: {
         projects: [
-          { key: 'TTMP', name: 'TaskTime MVP', description: 'Fresh production snapshot' },
+          { key: 'TTMP', name: 'Flow Universe MVP', description: 'Fresh production snapshot' },
           { key: 'DEMO', name: 'Ignore me', description: 'Non-TTMP data must stay untouched' },
         ],
         users: [
@@ -155,7 +155,7 @@ describe('buildProdSyncPlan', () => {
         ],
       },
       target: {
-        projects: [{ key: 'TTMP', name: 'TaskTime MVP', description: 'Old local copy' }],
+        projects: [{ key: 'TTMP', name: 'Flow Universe MVP', description: 'Old local copy' }],
         users: [
           { email: 'manager@tasktime.ru', name: 'Manager', role: 'MANAGER', isActive: true },
           { email: 'dev@tasktime.ru', name: 'Developer', role: 'USER', isActive: true },

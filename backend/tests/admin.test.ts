@@ -25,7 +25,7 @@ beforeEach(async () => {
   const superAdmin = await createSuperAdminUser();
   superAdminToken = superAdmin.accessToken;
 
-  const user = await createTestUser('viewer-of-admin@test.com', 'password123', 'Regular User');
+  const user = await createTestUser('viewer-of-admin@test.com', 'Password123', 'Regular User');
   userToken = user.accessToken;
 });
 

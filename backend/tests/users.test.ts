@@ -23,10 +23,10 @@ beforeEach(async () => {
   const superAdmin = await createSuperAdminUser();
   superAdminToken = superAdmin.accessToken;
 
-  const regularUser = await createTestUser('regular-user@test.com', 'password123', 'Regular User');
+  const regularUser = await createTestUser('regular-user@test.com', 'Password123', 'Regular User');
   regularUserId = regularUser.user.id;
 
-  const adminTarget = await createTestUser('target-admin@test.com', 'password123', 'Target Admin');
+  const adminTarget = await createTestUser('target-admin@test.com', 'Password123', 'Target Admin');
   await prisma.user.update({ where: { id: adminTarget.user.id }, data: { role: 'ADMIN' } });
   adminTargetId = adminTarget.user.id;
 });

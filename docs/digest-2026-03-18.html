@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flow Universe — Дайджест 18 марта 2026</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080c1a;
+      --surface:   rgba(255,255,255,0.04);
+      --border:    rgba(255,255,255,0.08);
+      --accent:    #7c5cfc;
+      --accent2:   #a78bfa;
+      --green:     #22c55e;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --tag-bg:    rgba(124,92,252,0.18);
+      --tag-border:rgba(124,92,252,0.35);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11.5px;
+      line-height: 1.4;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 8%  15%, rgba(255,255,255,0.5)  0%, transparent 100%),
+        radial-gradient(1px 1px at 22% 50%, rgba(255,255,255,0.3)  0%, transparent 100%),
+        radial-gradient(1px 1px at 38%  8%, rgba(255,255,255,0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 55% 70%, rgba(255,255,255,0.25) 0%, transparent 100%),
+        radial-gradient(1px 1px at 72% 25%, rgba(255,255,255,0.5)  0%, transparent 100%),
+        radial-gradient(1px 1px at 83% 55%, rgba(255,255,255,0.3)  0%, transparent 100%),
+        radial-gradient(1px 1px at 91% 12%, rgba(255,255,255,0.4)  0%, transparent 100%),
+        radial-gradient(1px 1px at 4%  82%, rgba(255,255,255,0.22) 0%, transparent 100%),
+        radial-gradient(1px 1px at 47% 40%, rgba(255,255,255,0.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 30% 87%, rgba(255,255,255,0.32) 0%, transparent 100%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .page {
+      position: relative; z-index: 1;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 16px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    /* TOPBAR */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { display: flex; align-items: center; gap: 7px; }
+    .brand-icon {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .brand-name { font-size: 13px; font-weight: 800; color: #fff; letter-spacing: -0.3px; line-height: 1.2; }
+    .brand-sub  { font-size: 8.5px; font-weight: 600; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
+    .date-badge {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px; font-weight: 600; color: var(--text);
+    }
+
+    /* HERO */
+    .hero {
+      background: linear-gradient(135deg, rgba(124,92,252,0.18) 0%, rgba(34,211,238,0.06) 100%);
+      border: 1px solid rgba(124,92,252,0.3);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .hero-top {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+    }
+    .hero-left { flex: 1; min-width: 0; }
+    .sprint-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(124,92,252,0.2);
+      border: 1px solid rgba(124,92,252,0.4);
+      border-radius: 20px;
+      padding: 2px 9px;
+      font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--accent2); text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .sprint-badge::before { content: '●'; font-size: 6px; }
+    .hero-title {
+      font-size: 17px; font-weight: 900;
+      color: #fff; letter-spacing: -0.4px; line-height: 1.2;
+      margin-bottom: 4px;
+    }
+    .hero-title span { color: var(--accent2); }
+    .hero-sub { font-size: 10.5px; color: var(--muted); line-height: 1.4; }
+    .hero-stats {
+      display: flex; gap: 6px; flex-shrink: 0;
+      align-items: flex-start;
+    }
+    .stat-box {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      text-align: center; min-width: 52px;
+    }
+    .stat-num   { font-size: 20px; font-weight: 900; color: #fff; line-height: 1; }
+    .stat-label { font-size: 8px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
+
+    /* PIPELINE */
+    .pipeline {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 8px 13px;
+      display: flex; align-items: center; gap: 5px; flex-wrap: nowrap;
+      overflow: hidden;
+    }
+    .pipeline-label {
+      font-size: 8.5px; font-weight: 700; letter-spacing: 0.13em;
+      color: var(--muted); text-transform: uppercase; margin-right: 2px; white-space: nowrap;
+    }
+    .pip-item {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 6px;
+      font-size: 9.5px; font-weight: 600; color: var(--text); white-space: nowrap;
+    }
+    .pip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .pip-arrow { color: var(--muted); font-size: 10px; }
+    .pip-time  { font-size: 9px; color: var(--muted); font-weight: 400; }
+
+    /* CARDS */
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 12px 13px 10px;
+    }
+    .card-header {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em;
+      color: var(--muted); text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+    .card-icon { font-size: 11px; }
+    .item {
+      display: flex; align-items: flex-start; gap: 5px;
+      padding: 3.5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.035);
+      font-size: 11px; color: var(--text);
+    }
+    .item:last-child { border-bottom: none; padding-bottom: 0; }
+    .item::before {
+      content: '●'; color: var(--accent2);
+      font-size: 5px; margin-top: 4px; flex-shrink: 0;
+    }
+    .item-text { flex: 1; min-width: 0; line-height: 1.4; }
+    .tag {
+      display: inline-flex; align-items: center;
+      background: var(--tag-bg);
+      border: 1px solid var(--tag-border);
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 9px; font-weight: 700; color: var(--accent2);
+      white-space: nowrap; margin-left: 2px; vertical-align: middle;
+    }
+    .tag.green  { background: rgba(34,197,94,0.12);  border-color: rgba(34,197,94,0.3);  color: #4ade80; }
+    .tag.cyan   { background: rgba(34,211,238,0.12); border-color: rgba(34,211,238,0.3); color: #67e8f9; }
+    .tag.gray   { background: rgba(255,255,255,0.07);border-color: var(--border);        color: var(--muted); }
+    .mono {
+      font-size: 10px; background: rgba(255,255,255,0.07);
+      border-radius: 3px; padding: 0 3px;
+    }
+
+    /* FIXES 2-col */
+    .fixes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 10px;
+    }
+
+    /* FOOTER */
+    .footer {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 8px 13px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    }
+    .footer-left { font-size: 10px; color: var(--muted); }
+    .footer-left b { color: var(--text); }
+    .footer-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fbadge {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 10px; font-weight: 500; color: var(--text); white-space: nowrap;
+    }
+    .fdot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">✦</div>
+      <div>
+        <div class="brand-name">Flow Universe</div>
+        <div class="brand-sub">Дайджест изменений</div>
+      </div>
+    </div>
+    <div class="date-badge">18 марта 2026</div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-top">
+      <div class="hero-left">
+        <div class="sprint-badge">Спринт 6 — смёрджен в main</div>
+        <div class="hero-title">
+          Ребрендинг Flow Universe<br>
+          <span>+ AI-апгрейды + Новый UI</span>
+        </div>
+        <div class="hero-sub">Полный ребрендинг, AI-фоллбэк, suggest-assignee, редизайн страниц</div>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-box">
+          <div class="stat-num">5</div>
+          <div class="stat-label">Фичей</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num">7</div>
+          <div class="stat-label">Фиксов</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num">14</div>
+          <div class="stat-label">Коммитов</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIPELINE -->
+  <div class="pipeline">
+    <div class="pipeline-label">🚀 Пайплайн</div>
+    <div class="pip-item"><div class="pip-dot dot-green"></div>CI&nbsp;<span class="pip-time">#46 &nbsp;11:32</span></div>
+    <div class="pip-arrow">›</div>
+    <div class="pip-item"><div class="pip-dot dot-green"></div>Build&nbsp;<span class="pip-time">11:38</span></div>
+    <div class="pip-arrow">›</div>
+    <div class="pip-item"><div class="pip-dot dot-green"></div><b>Production</b>&nbsp;<span class="pip-time">21:50 ✓</span></div>
+    <div class="pip-arrow">›</div>
+    <div class="pip-item"><div class="pip-dot dot-green"></div>Staging&nbsp;<span class="pip-time">21:48</span></div>
+  </div>
+
+  <!-- 2-COL GRID -->
+  <div class="grid2">
+
+    <!-- AI MODULE -->
+    <div class="card">
+      <div class="card-header"><span class="card-icon">🤖</span>AI-Модуль</div>
+      <div class="item"><div class="item-text">Фоллбэк на эвристику при ошибке Anthropic API — вместо 500 <span class="tag">#42</span></div></div>
+      <div class="item"><div class="item-text">Поле <span class="mono">aiReasoning</span> в БД — сохраняем объяснение оценки трудозатрат <span class="tag">#42</span></div></div>
+      <div class="item"><div class="item-text"><b>POST /ai/suggest-assignee</b> — исполнитель с минимальной нагрузкой в спринте <span class="tag">#42</span></div></div>
+      <div class="item"><div class="item-text">Inject <b>AI_PROVIDER + API_KEY</b> из GitHub Secrets при деплое <span class="tag">#38</span></div></div>
+      <div class="item"><div class="item-text">Фикс: стрипаем <span class="mono">```json</span> из ответа Anthropic перед парсингом <span class="tag gray">#39</span></div></div>
+    </div>
+
+    <!-- UI -->
+    <div class="card">
+      <div class="card-header"><span class="card-icon">✨</span>Интерфейс</div>
+      <div class="item"><div class="item-text"><b>Ребрендинг → Flow Universe</b> системно: frontend, backend, docs, новый логотип <span class="tag green">Бренд</span></div></div>
+      <div class="item"><div class="item-text">Страница проектов — карточная сетка, градиентные аватары, прогресс-бар, скелетон <span class="tag">#45</span></div></div>
+      <div class="item"><div class="item-text">ProjectDetail — компактный stats-strip, тулбар с фильтрами в одну строку <span class="tag">#46</span></div></div>
+      <div class="item"><div class="item-text">Анимированная кнопка темы: ☀/🌙, вращение 180° + масштаб при клике <span class="tag cyan">UI</span></div></div>
+      <div class="item"><div class="item-text">Мобильный лейаут: сайдбар-оверлей, гамбургер, адаптивные таблицы <span class="tag">#40 #43</span></div></div>
+    </div>
+
+  </div>
+
+  <!-- FIXES -->
+  <div class="card">
+    <div class="card-header"><span class="card-icon">🔧</span>Фиксы и инфраструктура</div>
+    <div class="fixes-grid">
+      <div class="item"><div class="item-text">SprintDrawer: <span class="mono">push={false}</span> — дроер спринта не смещается при открытии задачи <span class="tag gray">TTMP-104</span></div></div>
+      <div class="item"><div class="item-text">IssuePreviewDrawer — скруглённые углы + вплотную к дроеру спринта <span class="tag gray">TTMP-111</span></div></div>
+      <div class="item"><div class="item-text">CI: base64-encode SSH-аргументов — bcrypt-хэш с <span class="mono">$</span> не ломает shell <span class="tag gray">CI</span></div></div>
+      <div class="item"><div class="item-text">Force-recreate контейнеров при деплое — env подхватываются сразу <span class="tag gray">Deploy</span></div></div>
+      <div class="item"><div class="item-text">Тёмные дропдауны: CSS-переопределение <span class="mono">colorBgElevated</span> <span class="tag cyan">UI</span></div></div>
+      <div class="item"><div class="item-text">Удалён неиспользуемый импорт Switch — TypeScript-предупреждение <span class="tag gray">Chore</span></div></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">Flow Universe · <b>v0.6.0</b> · main ← claude/agitated-hodgkin&nbsp;(PR #38–#46)</div>
+    <div class="footer-badges">
+      <div class="fbadge"><div class="fdot" style="background:#22c55e;box-shadow:0 0 4px #22c55e"></div>Production: live 21:50</div>
+      <div class="fbadge"><div class="fdot" style="background:#22c55e;box-shadow:0 0 4px #22c55e"></div>Staging: live 21:48</div>
+      <div class="fbadge"><div class="fdot" style="background:#a78bfa;box-shadow:0 0 4px #a78bfa"></div>Спринт 6 → план</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

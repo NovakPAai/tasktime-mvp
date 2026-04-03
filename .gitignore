@@ -4,6 +4,7 @@ node_modules/
 # Build
 dist/
 build/
+frontend/storybook-static/
 
 # Environment
 .env
@@ -40,3 +41,4 @@ deploy/env/.env.production
 deploy/env/backend.staging.env
 deploy/env/backend.production.env
 deploy/backups/
+*.tsbuildinfo

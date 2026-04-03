@@ -8,6 +8,7 @@ type BootstrapUser = {
   email: string;
   name: string;
   role: UserRole;
+  isSystem?: boolean;
 };
 
 type BootstrapEnv = Partial<Record<
@@ -15,18 +16,46 @@ type BootstrapEnv = Partial<Record<
   string | undefined
 >>;
 
+export const AI_DEVELOPER_EMAIL = 'ai-developer@tasktime.ru';
+
 export const BOOTSTRAP_USERS: ReadonlyArray<{
   email: string;
   name: string;
   role: UserRole;
+  isSystem?: boolean;
 }> = [
   { email: 'admin@tasktime.ru', name: 'Admin User', role: 'ADMIN' },
   { email: 'manager@tasktime.ru', name: 'Project Manager', role: 'MANAGER' },
   { email: 'dev@tasktime.ru', name: 'Developer', role: 'USER' },
   { email: 'viewer@tasktime.ru', name: 'CIO Viewer', role: 'VIEWER' },
+  { email: 'georgi.dubovik@tasktime.ru', name: 'Георгий Дубовик', role: 'SUPER_ADMIN' },
+  { email: AI_DEVELOPER_EMAIL, name: 'AI Developer', role: 'USER', isSystem: true },
 ];
 
-type BootstrapPrismaClient = Pick<PrismaClient, 'user'>;
+type BootstrapPrismaClient = Pick<PrismaClient, 'user' | 'issueLinkType'>;
+
+const SYSTEM_LINK_TYPES: ReadonlyArray<{
+  name: string;
+  outboundName: string;
+  inboundName: string;
+}> = [
+  { name: 'Блокирует',  outboundName: 'Блокирует',  inboundName: 'Заблокировано' },
+  { name: 'Связана с',  outboundName: 'Связана с',  inboundName: 'Связана с' },
+  { name: 'Дублирует',  outboundName: 'Дублирует',  inboundName: 'Является дубликатом' },
+  { name: 'Зависит от', outboundName: 'Зависит от', inboundName: 'Требуется для' },
+];
+
+export async function bootstrapSystemLinkTypes(
+  prisma: BootstrapPrismaClient,
+): Promise<void> {
+  for (const type of SYSTEM_LINK_TYPES) {
+    await prisma.issueLinkType.upsert({
+      where: { name: type.name },
+      update: {},
+      create: { ...type, isActive: true, isSystem: true },
+    });
+  }
+}
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -83,6 +112,7 @@ export async function bootstrapDefaultUsers(
         name: user.name,
         role: user.role,
         passwordHash,
+        isSystem: user.isSystem ?? false,
       },
     });
   }
@@ -106,6 +136,8 @@ async function main() {
   try {
     await bootstrapDefaultUsers(prisma, password, users);
     console.log(`Bootstrapped ${users.length} default users.`);
+    await bootstrapSystemLinkTypes(prisma);
+    console.log('Bootstrapped system link types.');
   } finally {
     await prisma.$disconnect();
   }

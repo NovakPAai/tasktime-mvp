@@ -11,7 +11,14 @@ const router = Router();
 /** Verify GitLab webhook secret (X-Gitlab-Token header). */
 function verifyGitLabSecret(req: { headers: Record<string, string | undefined> }): boolean {
   const secret = process.env.GITLAB_WEBHOOK_SECRET;
-  if (!secret) return true; // if not configured, accept (dev); in prod set the secret
+  if (!secret) {
+    // CVE-02: fail-closed in production, fail-open only in dev/test
+    if (process.env.NODE_ENV === 'production') {
+      console.error('GITLAB_WEBHOOK_SECRET not set in production — rejecting all webhooks');
+      return false;
+    }
+    return true;
+  }
   const token = req.headers['x-gitlab-token'];
   return token === secret;
 }

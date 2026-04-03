@@ -1,4 +1,4 @@
-# TaskTime Deployment Guide
+# Flow Universe Deployment Guide
 
 ## Production URL (боевой стенд)
 
@@ -10,7 +10,7 @@
 
 ## Overview
 
-TaskTime deploys to a single Linux/VPS host with Docker Compose:
+Flow Universe deploys to a single Linux/VPS host with Docker Compose:
 
 - `web` container: Nginx serves the frontend build and proxies `/api` to backend
 - `backend` container: Node.js API

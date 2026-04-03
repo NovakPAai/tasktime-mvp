@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== Enums =====
+
+enum PipelineSource {
+  GITHUB
+  GITLAB
+}
+
+enum PullRequestCiStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILURE
+  CANCELLED
+}
+
+enum PullRequestReviewStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum StagingBatchState {
+  COLLECTING
+  MERGING
+  DEPLOYING
+  TESTING
+  PASSED
+  FAILED
+  RELEASED
+}
+
+enum DeployTarget {
+  STAGING
+  PRODUCTION
+}
+
+enum DeployEventStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILURE
+  ROLLED_BACK
+}
+
+// ===== Models =====
+
+model PullRequestSnapshot {
+  id             String                  @id @default(uuid())
+  externalId     Int                     @map("external_id")
+  source         PipelineSource          @default(GITHUB)
+  repo           String
+  title          String
+  author         String
+  branch         String
+  baseBranch     String                  @map("base_branch")
+  hasConflicts   Boolean                 @default(false) @map("has_conflicts")
+  ciStatus       PullRequestCiStatus     @default(PENDING) @map("ci_status")
+  ciMessage      String?                 @map("ci_message")
+  reviewStatus   PullRequestReviewStatus @default(PENDING) @map("review_status")
+  htmlUrl        String                  @map("html_url")
+  lastSyncedAt   DateTime                @map("last_synced_at")
+  rawPayload     Json?                   @map("raw_payload")
+  linkedIssueIds String[]                @map("linked_issue_ids")
+
+  // TBD: merge queue tracking
+  mergeQueuePosition Int?                @map("merge_queue_position")
+  mergedAt           DateTime?           @map("merged_at")
+  mergedSha          String?             @map("merged_sha")
+
+  // Optional batch (TBD: usually null, batches are opt-in)
+  stagingBatchId String?                 @map("staging_batch_id")
+  stagingBatch   StagingBatch?           @relation(fields: [stagingBatchId], references: [id])
+
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  @@unique([source, repo, externalId])
+  @@index([stagingBatchId])
+  @@index([ciStatus])
+  @@map("pull_request_snapshots")
+}
+
+model StagingBatch {
+  id                String            @id @default(uuid())
+  name              String
+  state             StagingBatchState @default(COLLECTING)
+  releaseId         String?           @map("release_id")
+  releaseName       String?           @map("release_name")
+  createdById       String            @map("created_by_id")
+  notes             String?
+  healthCheckResult Json?             @map("health_check_result")
+
+  pullRequests      PullRequestSnapshot[]
+  deployEvents      DeployEvent[]
+
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@index([state])
+  @@map("staging_batches")
+}
+
+model DeployEvent {
+  id                String            @id @default(uuid())
+  target            DeployTarget
+  status            DeployEventStatus @default(PENDING)
+  imageTag          String            @map("image_tag")
+  gitSha            String?           @map("git_sha")
+  triggeredById     String            @map("triggered_by_id")
+  stagingBatchId    String?           @map("staging_batch_id")
+  stagingBatch      StagingBatch?     @relation(fields: [stagingBatchId], references: [id])
+  releaseId         String?           @map("release_id")
+
+  workflowRunId     Int?              @map("workflow_run_id")
+  workflowRunUrl    String?           @map("workflow_run_url")
+
+  startedAt         DateTime          @default(now()) @map("started_at")
+  finishedAt        DateTime?         @map("finished_at")
+  durationMs        Int?              @map("duration_ms")
+  healthCheckResult Json?             @map("health_check_result")
+  errorMessage      String?           @map("error_message")
+
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  @@index([target, status])
+  @@index([stagingBatchId])
+  @@map("deploy_events")
+}
+
+model SyncState {
+  id            String   @id @default(uuid())
+  syncType      String   @unique @map("sync_type")
+  lastSyncedAt  DateTime @map("last_synced_at")
+  syncCount     Int      @default(0) @map("sync_count")
+  errorMessage  String?  @map("error_message")
+
+  @@map("sync_states")
+}

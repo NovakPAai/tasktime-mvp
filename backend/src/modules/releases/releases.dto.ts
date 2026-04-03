@@ -18,6 +18,11 @@ export const moveIssuesToReleaseDto = z.object({
   issueIds: z.array(z.string().uuid()).min(1),
 });
 
+export const manageSprintsInReleaseDto = z.object({
+  sprintIds: z.array(z.string().uuid()).min(1),
+});
+
 export type CreateReleaseDto = z.infer<typeof createReleaseDto>;
 export type UpdateReleaseDto = z.infer<typeof updateReleaseDto>;
 export type MoveIssuesToReleaseDto = z.infer<typeof moveIssuesToReleaseDto>;
+export type ManageSprintsInReleaseDto = z.infer<typeof manageSprintsInReleaseDto>;

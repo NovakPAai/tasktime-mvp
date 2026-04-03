@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend infra stop clean seed test lint setup
+.PHONY: dev backend frontend infra stop clean seed test lint setup docs sync pr ship merge branches worktree-clean branch-clean
 
 # --- First time setup ---
 setup:
@@ -37,6 +37,10 @@ db-reset:
 db-studio:
 	cd backend && npx prisma studio
 
+# --- Documentation ---
+docs:
+	node scripts/generate-docs.js
+
 # --- Quality ---
 test:
 	cd backend && npm test
@@ -53,6 +57,24 @@ lint:
 	cd backend && npm run lint
 	cd frontend && npm run lint
 
+# --- Git workflow ---
+sync:
+	@git fetch origin
+	@git rebase origin/main
+	@echo "Synced with origin/main"
+
+pr:
+	@git push -u origin $$(git branch --show-current)
+	@gh pr create --fill
+
+ship: sync lint pr
+
+merge:
+	@gh pr merge --squash --delete-branch
+
+branches:
+	@git branch -a --format='%(refname:short) %(committerdate:relative)' | grep -E 'claude/|cursor/' | sort
+
 # --- Cleanup ---
 stop:
 	docker compose down
@@ -64,3 +86,17 @@ clean: stop
 	docker compose down -v
 	rm -rf backend/node_modules frontend/node_modules
 	@echo "Cleaned up volumes and node_modules"
+
+# --- TBD: Cleanup stale worktrees and merged branches ---
+worktree-clean:
+	@echo "Removing stale git worktrees..."
+	@git worktree prune
+	@git worktree list
+	@echo "Done."
+
+branch-clean:
+	@echo "Removing local branches merged into main..."
+	@git branch --merged main | grep -vE '^\*|main$$' | xargs -r git branch -d
+	@echo "Removing remote-tracking branches that no longer exist..."
+	@git fetch --prune
+	@echo "Done."

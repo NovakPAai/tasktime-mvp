@@ -10,14 +10,16 @@ datasource db {
 // ===== USERS & AUTH =====
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  name         String
-  role         UserRole @default(USER)
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  passwordHash       String   @map("password_hash")
+  name               String
+  role               UserRole @default(USER)
+  isActive           Boolean  @default(true) @map("is_active")
+  isSystem           Boolean  @default(false) @map("is_system")
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   assignedIssues Issue[]        @relation("assignee")
   createdIssues  Issue[]        @relation("creator")
@@ -26,7 +28,11 @@ model User {
   comments       Comment[]
   timeLogs       TimeLog[]
   aiSessions     AiSession[]
-  teamMemberships TeamMember[]
+  teamMemberships    TeamMember[]
+  createdLinks       IssueLink[]
+  ownedProjects      Project[]               @relation("project_owner")
+  projectRoles       UserProjectRole[]
+  customFieldUpdates IssueCustomFieldValue[]
 
   @@map("users")
 }
@@ -52,21 +58,129 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+enum ProjectRole {
+  ADMIN
+  MANAGER
+  USER
+  VIEWER
+}
+
+model UserProjectRole {
+  id        String      @id @default(uuid())
+  userId    String      @map("user_id")
+  projectId String      @map("project_id")
+  role      ProjectRole
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId, role])
+  @@index([userId])
+  @@index([projectId])
+  @@map("user_project_roles")
+}
+
 // ===== PROJECTS =====
+
+model ProjectCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  projects Project[]
+
+  @@map("project_categories")
+}
 
 model Project {
   id          String   @id @default(uuid())
   name        String
   key         String   @unique
   description String?
+  ownerId     String?  @map("owner_id")
+  categoryId  String?  @map("category_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  owner    User?            @relation("project_owner", fields: [ownerId], references: [id], onDelete: SetNull)
+  category ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   issues   Issue[]
   sprints  Sprint[]
   releases Release[]
+  issueTypeScheme     IssueTypeSchemeProject?
+  userRoles           UserProjectRole[]
+  fieldSchemaBindings FieldSchemaBinding[]
+  workflowScheme      WorkflowSchemeProject?
 
   @@map("projects")
+}
+
+// ===== ISSUE TYPE CONFIGS & SCHEMES =====
+
+model IssueTypeConfig {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  iconName    String   @map("icon_name")
+  iconColor   String   @map("icon_color")
+  isSubtask   Boolean  @default(false) @map("is_subtask")
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  isSystem    Boolean  @default(false) @map("is_system")
+  systemKey   String?  @unique @map("system_key")
+  orderIndex  Int      @default(0) @map("order_index")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  schemeItems         IssueTypeSchemeItem[]
+  issues              Issue[]
+  fieldSchemaBindings FieldSchemaBinding[]
+  workflowSchemeItems WorkflowSchemeItem[]
+
+  @@map("issue_type_configs")
+}
+
+model IssueTypeScheme {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  items    IssueTypeSchemeItem[]
+  projects IssueTypeSchemeProject[]
+
+  @@map("issue_type_schemes")
+}
+
+model IssueTypeSchemeItem {
+  id           String @id @default(uuid())
+  schemeId     String @map("scheme_id")
+  typeConfigId String @map("type_config_id")
+  orderIndex   Int    @default(0) @map("order_index")
+
+  scheme     IssueTypeScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  typeConfig IssueTypeConfig @relation(fields: [typeConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeId, typeConfigId])
+  @@index([schemeId])
+  @@map("issue_type_scheme_items")
+}
+
+model IssueTypeSchemeProject {
+  id        String   @id @default(uuid())
+  schemeId  String   @map("scheme_id")
+  projectId String   @unique @map("project_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scheme  IssueTypeScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([schemeId])
+  @@map("issue_type_scheme_projects")
 }
 
 // ===== ISSUES (TASK HIERARCHY) =====
@@ -77,7 +191,7 @@ model Issue {
   number      Int
   title       String
   description String?
-  type        IssueType     @default(TASK)
+  issueTypeConfigId String? @map("issue_type_config_id")
   status      IssueStatus   @default(OPEN)
   priority    IssuePriority @default(MEDIUM)
   orderIndex  Int           @default(0) @map("order_index")
@@ -100,15 +214,25 @@ model Issue {
   releaseId String? @map("release_id")
   release   Release? @relation(fields: [releaseId], references: [id])
 
-  estimatedHours Decimal? @map("estimated_hours") @db.Decimal(6, 2)
+  estimatedHours      Decimal? @map("estimated_hours") @db.Decimal(6, 2)
+  dueDate             DateTime? @map("due_date") @db.Date
+  acceptanceCriteria  String?  @map("acceptance_criteria")
+  aiReasoning         String?  @map("ai_reasoning")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  comments Comment[]
-  timeLogs TimeLog[]
-  aiSessions AiSession[]
+  workflowStatusId String? @map("workflow_status_id")
+
+  issueTypeConfig  IssueTypeConfig?  @relation(fields: [issueTypeConfigId], references: [id])
+  workflowStatus   WorkflowStatus?   @relation(fields: [workflowStatusId], references: [id])
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments         Comment[]
+  timeLogs         TimeLog[]
+  aiSessions       AiSession[]
+  sourceLinks      IssueLink[]             @relation("linkSource")
+  targetLinks      IssueLink[]             @relation("linkTarget")
+  customFieldValues IssueCustomFieldValue[]
 
   @@unique([projectId, number])
   @@index([projectId, status])
@@ -120,16 +244,12 @@ model Issue {
   @@index([status])
   @@index([createdAt])
   @@index([updatedAt])
+  @@index([issueTypeConfigId])
+  @@index([dueDate])
   @@map("issues")
 }
 
-enum IssueType {
-  EPIC
-  STORY
-  TASK
-  SUBTASK
-  BUG
-}
+
 
 enum IssueStatus {
   OPEN
@@ -172,20 +292,23 @@ model Sprint {
   projectTeamId        String? @map("project_team_id")
   businessTeamId       String? @map("business_team_id")
   flowTeamId           String? @map("flow_team_id")
+  releaseId String? @map("release_id")
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
 
-  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues       Issue[]
-  projectTeam  Team?   @relation("SprintProjectTeam", fields: [projectTeamId], references: [id])
-  businessTeam Team?   @relation("SprintBusinessTeam", fields: [businessTeamId], references: [id])
-  flowTeam     Team?   @relation("SprintFlowTeam", fields: [flowTeamId], references: [id])
+  projectTeam  Team?    @relation("SprintProjectTeam", fields: [projectTeamId], references: [id])
+  businessTeam Team?    @relation("SprintBusinessTeam", fields: [businessTeamId], references: [id])
+  flowTeam     Team?    @relation("SprintFlowTeam", fields: [flowTeamId], references: [id])
+  release      Release? @relation(fields: [releaseId], references: [id])
 
   @@unique([projectId, name], map: "sprints_project_id_name_key")
   @@index([projectId])
   @@index([projectTeamId])
   @@index([businessTeamId])
   @@index([flowTeamId])
+  @@index([releaseId])
   @@map("sprints")
 }
 
@@ -208,8 +331,9 @@ model Release {
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues  Issue[]
+  sprints Sprint[]
 
   @@unique([projectId, name], map: "releases_project_id_name_key")
   @@index([projectId])
@@ -331,6 +455,175 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// ===== ISSUE LINKS =====
+
+model IssueLinkType {
+  id           String      @id @default(uuid())
+  name         String      @unique
+  outboundName String      @map("outbound_name")
+  inboundName  String      @map("inbound_name")
+  isActive     Boolean     @default(true) @map("is_active")
+  isSystem     Boolean     @default(false) @map("is_system")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  links IssueLink[]
+
+  @@map("issue_link_types")
+}
+
+model IssueLink {
+  id            String   @id @default(uuid())
+  sourceIssueId String   @map("source_issue_id")
+  targetIssueId String   @map("target_issue_id")
+  linkTypeId    String   @map("link_type_id")
+  createdById   String   @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  sourceIssue Issue         @relation("linkSource", fields: [sourceIssueId], references: [id], onDelete: Cascade)
+  targetIssue Issue         @relation("linkTarget", fields: [targetIssueId], references: [id], onDelete: Cascade)
+  linkType    IssueLinkType @relation(fields: [linkTypeId], references: [id])
+  createdBy   User          @relation(fields: [createdById], references: [id])
+
+  @@unique([sourceIssueId, targetIssueId, linkTypeId])
+  @@index([sourceIssueId])
+  @@index([targetIssueId])
+  @@map("issue_links")
+}
+
+// ===== CUSTOM FIELDS =====
+
+enum CustomFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DECIMAL
+  DATE
+  DATETIME
+  URL
+  CHECKBOX
+  SELECT
+  MULTI_SELECT
+  USER
+  LABEL
+  REFERENCE
+}
+
+model CustomField {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  fieldType   CustomFieldType @map("field_type")
+  options     Json?
+  isSystem    Boolean         @default(false) @map("is_system")
+  isEnabled   Boolean         @default(true)  @map("is_enabled")
+  orderIndex  Int             @default(0)      @map("order_index")
+  createdAt   DateTime        @default(now())  @map("created_at")
+  updatedAt   DateTime        @updatedAt       @map("updated_at")
+
+  schemaItems          FieldSchemaItem[]
+  values               IssueCustomFieldValue[]
+  transitionScreenItems TransitionScreenItem[]
+
+  @@map("custom_fields")
+}
+
+// ===== ISSUE CUSTOM FIELD VALUES =====
+
+model IssueCustomFieldValue {
+  id            String   @id @default(uuid())
+  issueId       String   @map("issue_id")
+  customFieldId String   @map("custom_field_id")
+  value         Json
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedById   String   @map("updated_by_id")
+
+  issue       Issue       @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  updatedBy   User        @relation(fields: [updatedById], references: [id], onDelete: NoAction, onUpdate: Cascade)
+
+  @@unique([issueId, customFieldId])
+  @@index([issueId])
+  @@map("issue_custom_field_values")
+}
+
+// ===== FIELD SCHEMAS =====
+
+enum FieldSchemaStatus {
+  DRAFT
+  ACTIVE
+}
+
+enum FieldScopeType {
+  GLOBAL
+  PROJECT
+  ISSUE_TYPE
+  PROJECT_ISSUE_TYPE
+}
+
+model FieldSchema {
+  id           String            @id @default(uuid())
+  name         String
+  description  String?
+  status       FieldSchemaStatus @default(DRAFT)
+  isDefault    Boolean           @default(false) @map("is_default")
+  copiedFromId String?           @map("copied_from_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt      @map("updated_at")
+
+  items      FieldSchemaItem[]
+  bindings   FieldSchemaBinding[]
+  copiedFrom FieldSchema?         @relation("SchemaCopies", fields: [copiedFromId], references: [id], onDelete: SetNull)
+  copies     FieldSchema[]        @relation("SchemaCopies")
+
+  @@map("field_schemas")
+}
+
+model FieldSchemaItem {
+  id            String  @id @default(uuid())
+  schemaId      String  @map("schema_id")
+  customFieldId String  @map("custom_field_id")
+  orderIndex    Int     @default(0)     @map("order_index")
+  isRequired    Boolean @default(false) @map("is_required")
+  showOnKanban  Boolean @default(false) @map("show_on_kanban")
+
+  schema      FieldSchema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([schemaId, customFieldId])
+  @@index([schemaId])
+  @@map("field_schema_items")
+}
+
+model FieldSchemaBinding {
+  id                String         @id @default(uuid())
+  schemaId          String         @map("schema_id")
+  scopeType         FieldScopeType @map("scope_type")
+  projectId         String?        @map("project_id")
+  issueTypeConfigId String?        @map("issue_type_config_id")
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  schema          FieldSchema      @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+  project         Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issueTypeConfig IssueTypeConfig? @relation(fields: [issueTypeConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([schemaId, scopeType, projectId, issueTypeConfigId], map: "field_schema_bindings_schema_id_scope_type_project_id_issue_typ")
+  @@index([schemaId])
+  @@index([projectId])
+  @@index([issueTypeConfigId])
+  @@map("field_schema_bindings")
+}
+
+// ===== SYSTEM SETTINGS =====
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
 // ===== TEAMS =====
 
 model Team {
@@ -363,4 +656,157 @@ model TeamMember {
   @@index([userId])
   @@index([teamId])
   @@map("team_members")
+}
+
+// ===== WORKFLOW ENGINE =====
+
+enum StatusCategory {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model WorkflowStatus {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  category    StatusCategory
+  color       String         @default("#9E9E9E")
+  iconName    String?        @map("icon_name")
+  isSystem    Boolean        @default(false) @map("is_system")
+  systemKey   String?        @unique @map("system_key")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  transitionsFrom WorkflowTransition[] @relation("transitionFrom")
+  transitionsTo   WorkflowTransition[] @relation("transitionTo")
+  workflowSteps   WorkflowStep[]
+  issues          Issue[]
+
+  @@map("workflow_statuses")
+}
+
+model Workflow {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  steps       WorkflowStep[]
+  transitions WorkflowTransition[]
+  schemeItems WorkflowSchemeItem[]
+
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id         String   @id @default(uuid())
+  workflowId String   @map("workflow_id")
+  statusId   String   @map("status_id")
+  isInitial  Boolean  @default(false) @map("is_initial")
+  orderIndex Int      @default(0) @map("order_index")
+
+  workflow Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status   WorkflowStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
+
+  @@unique([workflowId, statusId])
+  @@map("workflow_steps")
+}
+
+model WorkflowTransition {
+  id           String   @id @default(uuid())
+  workflowId   String   @map("workflow_id")
+  name         String
+  fromStatusId String?  @map("from_status_id")
+  toStatusId   String   @map("to_status_id")
+  isGlobal     Boolean  @default(false) @map("is_global")
+  orderIndex   Int      @default(0) @map("order_index")
+  conditions   Json?
+  validators   Json?
+  postFunctions Json?   @map("post_functions")
+  screenId     String?  @map("screen_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  workflow   Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fromStatus WorkflowStatus? @relation("transitionFrom", fields: [fromStatusId], references: [id], onDelete: Restrict)
+  toStatus   WorkflowStatus  @relation("transitionTo", fields: [toStatusId], references: [id], onDelete: Restrict)
+  screen     TransitionScreen? @relation(fields: [screenId], references: [id], onDelete: SetNull)
+
+  @@index([workflowId])
+  @@index([fromStatusId])
+  @@map("workflow_transitions")
+}
+
+model TransitionScreen {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  transitions WorkflowTransition[]
+  items       TransitionScreenItem[]
+
+  @@map("transition_screens")
+}
+
+model TransitionScreenItem {
+  id             String  @id @default(uuid())
+  screenId       String  @map("screen_id")
+  customFieldId  String? @map("custom_field_id")
+  systemFieldKey String? @map("system_field_key")
+  isRequired     Boolean @default(false) @map("is_required")
+  orderIndex     Int     @default(0) @map("order_index")
+
+  screen      TransitionScreen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  customField CustomField?     @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([screenId, customFieldId])
+  @@unique([screenId, systemFieldKey])
+  @@map("transition_screen_items")
+}
+
+model WorkflowScheme {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  items    WorkflowSchemeItem[]
+  projects WorkflowSchemeProject[]
+
+  @@map("workflow_schemes")
+}
+
+model WorkflowSchemeItem {
+  id                String  @id @default(uuid())
+  schemeId          String  @map("scheme_id")
+  workflowId        String  @map("workflow_id")
+  issueTypeConfigId String? @map("issue_type_config_id")
+
+  scheme          WorkflowScheme   @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  workflow        Workflow         @relation(fields: [workflowId], references: [id], onDelete: Restrict)
+  issueTypeConfig IssueTypeConfig? @relation(fields: [issueTypeConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeId, issueTypeConfigId])
+  @@map("workflow_scheme_items")
+}
+
+model WorkflowSchemeProject {
+  id        String   @id @default(uuid())
+  schemeId  String   @map("scheme_id")
+  projectId String   @unique @map("project_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scheme  WorkflowScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([schemeId])
+  @@map("workflow_scheme_projects")
 }

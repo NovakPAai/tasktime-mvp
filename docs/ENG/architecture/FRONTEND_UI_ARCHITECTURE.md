@@ -1,4 +1,4 @@
-# TaskTime — Frontend UI Architecture
+# Flow Universe — Frontend UI Architecture
 
 **Purpose:** Modern developer-focused UI: layout, pages, design system, components, and implementation guidance. Aligned with existing backend API; no backend or API contract changes.  
 **Date:** March 2025

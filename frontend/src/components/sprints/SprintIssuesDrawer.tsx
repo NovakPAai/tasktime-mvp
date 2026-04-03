@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import IssuePreviewDrawer from '../issues/IssuePreviewDrawer';
 import * as sprintsApi from '../../api/sprints';
 import type { Issue, Sprint, SprintDetailsResponse } from '../../types';
+import { IssueStatusTag, IssuePriorityTag, IssueTypeBadge } from '../../lib/issue-kit';
 
 type SprintIssuesDrawerProps = {
   open: boolean;
@@ -19,50 +20,12 @@ const STATE_TONE_CLASS: Record<Sprint['state'], string> = {
   CLOSED: 'closed',
 };
 
-const TYPE_TONE_CLASS: Record<Issue['type'], string> = {
-  EPIC: 'epic',
-  STORY: 'story',
-  TASK: 'task',
-  SUBTASK: 'subtask',
-  BUG: 'bug',
-};
-
-const STATUS_TONE_CLASS: Record<Issue['status'], string> = {
-  OPEN: 'open',
-  IN_PROGRESS: 'in_progress',
-  REVIEW: 'review',
-  DONE: 'done',
-  CANCELLED: 'cancelled',
-};
-
 const STATE_LABEL_RU: Record<Sprint['state'], string> = {
   PLANNED: 'Планируется',
   ACTIVE: 'Активен',
   CLOSED: 'Закрыт',
 };
 
-const STATUS_LABEL_RU: Record<Issue['status'], string> = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'Ревью',
-  DONE: 'Готово',
-  CANCELLED: 'Отменена',
-};
-
-const TYPE_LABEL_RU: Record<Issue['type'], string> = {
-  EPIC: 'Эпик',
-  STORY: 'История',
-  TASK: 'Задача',
-  SUBTASK: 'Подзадача',
-  BUG: 'Ошибка',
-};
-
-const PRIORITY_LABEL_RU: Record<Issue['priority'], string> = {
-  CRITICAL: 'Критичный',
-  HIGH: 'Высокий',
-  MEDIUM: 'Средний',
-  LOW: 'Низкий',
-};
 
 function formatIssueKey(issue: Issue) {
   const projectKey = issue.project?.key;
@@ -167,32 +130,19 @@ export default function SprintIssuesDrawer({ open, sprintId, onClose }: SprintIs
       title: 'Тип',
       dataIndex: 'type',
       width: 110,
-      render: (value: Issue['type']) => (
-        <span className={`tt-issue-tag tt-sprint-drawer-type-pill tt-sprint-drawer-type-${TYPE_TONE_CLASS[value]}`}>
-          {TYPE_LABEL_RU[value]}
-        </span>
-      ),
+      render: (_: unknown, record: Issue) => <IssueTypeBadge typeConfig={record.issueTypeConfig} showLabel />,
     },
     {
       title: 'Статус',
       dataIndex: 'status',
       width: 140,
-      render: (value: Issue['status']) => (
-        <span className={`tt-sprint-drawer-status-pill tt-sprint-drawer-status-pill-${STATUS_TONE_CLASS[value]}`}>
-          {STATUS_LABEL_RU[value]}
-        </span>
-      ),
+      render: (value: Issue['status']) => <IssueStatusTag status={value} size="small" />,
     },
     {
       title: 'Приоритет',
       dataIndex: 'priority',
       width: 120,
-      render: (value: Issue['priority']) => (
-        <span className={`tt-priority-pill tt-priority-${value.toLowerCase()}`}>
-          <span className="tt-priority-dot" />
-          <span>{PRIORITY_LABEL_RU[value]}</span>
-        </span>
-      ),
+      render: (value: Issue['priority']) => <IssuePriorityTag priority={value} size="small" />,
     },
     {
       title: 'Исполнитель',
@@ -228,6 +178,7 @@ export default function SprintIssuesDrawer({ open, sprintId, onClose }: SprintIs
       }}
       placement="right"
       width={900}
+      push={false}
       destroyOnClose={false}
     >
       {loading ? (

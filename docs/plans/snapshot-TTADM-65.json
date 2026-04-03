@@ -1,0 +1,11 @@
+{
+  "TTADM-65": {
+    "id": "d5f481ce-e833-4775-bc54-cb84edc084ac",
+    "number": 65,
+    "title": "6 Интеграционные тесты workflow-движка (Vitest + Supertest)",
+    "description": "Покрыть workflow engine интеграционными тестами для обеспечения надёжности перед production-деплоем.\n\n**Тест-кейсы:**\n- CRUD для статусов, workflow, схем\n- Выполнение transition: happy path + все типы ошибок\n- Conditions: проверка прав роли, проверка обязательных полей\n- Validators: задача без required поля не проходит transition\n- Post-functions: автоматическое назначение assignee, смена приоритета\n- Workflow scheme assignment: разные схемы для разных типов задач в одном проекте\n- Защита от циклов в графе (graph validation)\n- Redis cache invalidation при изменении workflow\n- Backward compatibility маппинг строковых алиасов\n\n**Критерий готовности:** Coverage workflow-модулей более 80%, все тест-кейсы зелёные в CI.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTADM"
+  }
+}

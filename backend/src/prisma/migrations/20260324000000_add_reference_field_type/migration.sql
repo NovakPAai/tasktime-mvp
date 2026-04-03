@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "CustomFieldType" ADD VALUE IF NOT EXISTS 'REFERENCE';

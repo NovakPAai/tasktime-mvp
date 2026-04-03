@@ -17,6 +17,8 @@ services:
 
   redis:
     image: redis:7-alpine
+    # CVE-07: In production, use 'command' with --requirepass and remove port binding
+    # command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
     ports:
       - "6379:6379"
     healthcheck:
@@ -25,5 +27,55 @@ services:
       timeout: 3s
       retries: 5
 
+  # --- Pipeline Service DB ---
+  pipeline-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pipeline
+      POSTGRES_PASSWORD: pipeline
+      POSTGRES_DB: pipeline
+    ports:
+      - "5433:5432"
+    volumes:
+      - pipeline-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pipeline"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # MCP HTTP-сервер Flow Universe (нативный, прямой доступ к БД)
+  # Запуск: MCP_SERVICE_TOKEN=<token> MCP_AGENT_PASSWORD=<pwd> docker compose --profile mcp up -d mcp-flow-universe
+  # .mcp.json коллеги: { "type": "streamable-http", "url": "http://<host>:3002/mcp",
+  #                      "headers": { "Authorization": "Bearer <token>" } }
+  mcp-flow-universe:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    profiles: ["mcp"]
+    command: ["node", "dist/mcp/server.js"]
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HTTP_PORT: "3002"
+      MCP_ENV: ${MCP_ENV:-production}
+      DATABASE_URL: postgresql://tasktime:${POSTGRES_PASSWORD:-tasktime}@postgres:5432/tasktime?schema=public
+      MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:?MCP_SERVICE_TOKEN is required}
+      # Write operations route through the backend API (workflow engine + RBAC).
+      # BACKEND_INTERNAL_URL must point to the running backend:
+      #   - on the same host: http://localhost:3000 (default)
+      #   - in a Docker network with a backend service: http://backend:3000
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://localhost:3000}
+      MCP_AGENT_EMAIL: ${MCP_AGENT_EMAIL:-agent@flow-universe.internal}
+      MCP_AGENT_PASSWORD: ${MCP_AGENT_PASSWORD:?MCP_AGENT_PASSWORD is required for write operations}
+    ports:
+      - "3002:3002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  pipeline-pgdata:

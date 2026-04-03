@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import type { Issue, IssueStatus, IssueType, IssuePriority } from '../types';
+import type { Issue, IssueStatus, IssuePriority } from '../types';
 import * as issuesApi from '../api/issues';
 
 interface IssuesFilters {
   status: IssueStatus[];
-  type: IssueType[];
+  issueTypeConfigId: string[];
   priority: IssuePriority[];
   assigneeId?: string;
   search?: string;
@@ -21,7 +21,7 @@ interface IssuesState {
 
 const initialFilters: IssuesFilters = {
   status: [],
-  type: [],
+  issueTypeConfigId: [],
   priority: [],
 };
 
@@ -49,7 +49,7 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
       const { filters } = get();
       const issues = await issuesApi.listIssues(projectId, {
         status: filters.status,
-        type: filters.type,
+        issueTypeConfigId: filters.issueTypeConfigId,
         priority: filters.priority,
         assigneeId: filters.assigneeId,
         search: filters.search,

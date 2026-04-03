@@ -2,11 +2,9 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { getCachedJson, setCachedJson } from '../../shared/redis.js';
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
-import {
-  type PaginationParams,
-  paginationToSkipTake,
-  buildPaginatedResponse,
-} from '../../shared/utils/params.js';
+import { hashPassword } from '../../shared/utils/password.js';
+import { AppError } from '../../shared/middleware/error-handler.js';
+import type { CreateUserDto, UpdateUserAdminDto, AssignProjectRoleDto } from './admin.dto.js';
 
 type AdminStats = {
   counts: {
@@ -83,52 +81,296 @@ export async function getStats() {
   return stats;
 }
 
-export async function listUsersWithMeta(pagination: PaginationParams) {
-  const cacheKey = `admin:users:pg=${pagination.page}:lm=${pagination.limit}`;
-  const SelectShape = {
-    id: true,
-    email: true,
-    name: true,
-    role: true,
-    isActive: true,
-    createdAt: true,
-    _count: {
-      select: {
-        createdIssues: true,
-        assignedIssues: true,
-        timeLogs: true,
-      },
-    },
-  } as const;
+export async function listUsersWithMeta(params?: { search?: string; isActive?: boolean; page?: number; pageSize?: number }) {
+  const { search, isActive, page = 1, pageSize = 50 } = params ?? {};
 
-  type UserWithMeta = {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-    isActive: boolean;
-    createdAt: Date;
-    _count: { createdIssues: number; assignedIssues: number; timeLogs: number };
-  };
-
-  const cached = await getCachedJson<ReturnType<typeof buildPaginatedResponse<UserWithMeta>>>(cacheKey);
-  if (cached) return cached;
-
-  const { skip, take } = paginationToSkipTake(pagination);
+  const where: Prisma.UserWhereInput = {};
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+  if (isActive !== undefined) {
+    where.isActive = isActive;
+  }
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
-      select: SelectShape,
-      skip,
-      take,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        isSystem: true,
+        mustChangePassword: true,
+        createdAt: true,
+        _count: {
+          select: {
+            createdIssues: true,
+            assignedIssues: true,
+            timeLogs: true,
+          },
+        },
+        projectRoles: {
+          select: {
+            id: true,
+            role: true,
+            projectId: true,
+            project: { select: { name: true, key: true } },
+          },
+        },
+      },
     }),
-    prisma.user.count(),
+    prisma.user.count({ where }),
   ]);
 
-  const result = buildPaginatedResponse(users as UserWithMeta[], total, pagination);
-  await setCachedJson(cacheKey, result);
-  return result;
+  return { users, total, page, pageSize };
+}
+
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  let pwd = '';
+  for (let i = 0; i < 12; i++) {
+    pwd += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return pwd;
+}
+
+export async function createUser(dto: CreateUserDto) {
+  const email = dto.email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) throw new AppError(409, 'Email already registered');
+
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword);
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      name: dto.name,
+      passwordHash,
+      role: dto.isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
+      mustChangePassword: true,
+    },
+    select: {
+      id: true, email: true, name: true, role: true,
+      isActive: true, mustChangePassword: true, createdAt: true,
+    },
+  } as const);
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.created',
+      entityType: 'user',
+      entityId: user.id,
+      details: { email: dto.email, name: dto.name },
+    },
+  });
+
+  return { user, tempPassword };
+}
+
+async function checkUserDependencies(userId: string) {
+  const [assignedIssues, createdIssues, timeLogs, comments, ownedProjects] = await Promise.all([
+    prisma.issue.count({ where: { assigneeId: userId } }),
+    prisma.issue.count({ where: { creatorId: userId } }),
+    prisma.timeLog.count({ where: { userId } }),
+    prisma.comment.count({ where: { authorId: userId } }),
+    prisma.project.count({ where: { ownerId: userId } }),
+  ]);
+  return { assignedIssues, createdIssues, timeLogs, comments, ownedProjects };
+}
+
+export async function deleteUser(actorId: string, userId: string) {
+  if (actorId === userId) throw new AppError(400, 'Cannot delete yourself');
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'User not found');
+  if (user.isSystem) throw new AppError(403, 'Cannot delete system users');
+
+  const deps = await checkUserDependencies(userId);
+  const hasData = Object.values(deps).some((v) => v > 0);
+  if (hasData) {
+    throw new AppError(
+      409,
+      'Нельзя удалить пользователя — есть связанные данные. Вы можете отключить пользователя.',
+      { canDeactivate: true, dependencies: deps },
+    );
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.deleted',
+      entityType: 'user',
+      entityId: userId,
+      details: { email: user.email, name: user.name },
+    },
+  });
+
+  await prisma.user.delete({ where: { id: userId } });
+}
+
+const NA_SUFFIX = ' (N/A)';
+
+export async function deactivateUserAdmin(actorId: string, userId: string) {
+  if (actorId === userId) throw new AppError(400, 'Cannot deactivate yourself');
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'User not found');
+  if (user.isSystem) throw new AppError(403, 'Cannot deactivate system users');
+
+  const newName = user.name.endsWith(NA_SUFFIX) ? user.name : user.name + NA_SUFFIX;
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive: false, name: newName },
+    select: {
+      id: true, email: true, name: true, role: true,
+      isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.deactivated',
+      entityType: 'user',
+      entityId: userId,
+      userId: actorId,
+      details: { email: user.email, previousName: user.name, newName },
+    },
+  });
+
+  return updated;
+}
+
+export async function updateUserAdmin(actorId: string, userId: string, dto: UpdateUserAdminDto) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'User not found');
+
+  if (dto.email) {
+    dto.email = dto.email.trim().toLowerCase();
+    if (dto.email !== user.email) {
+      const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+      if (existing) throw new AppError(409, 'Email already in use');
+    }
+  }
+
+  if (dto.isActive === true && !user.isActive && user.name.endsWith(NA_SUFFIX)) {
+    dto.name = user.name.slice(0, -NA_SUFFIX.length);
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: dto,
+    select: {
+      id: true, email: true, name: true, role: true,
+      isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.updated',
+      entityType: 'user',
+      entityId: userId,
+      userId: actorId,
+      details: { changedFields: Object.keys(dto) },
+    },
+  });
+
+  return updated;
+}
+
+export async function resetUserPassword(actorId: string, userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'User not found');
+
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, mustChangePassword: true },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.password_reset',
+      entityType: 'user',
+      entityId: userId,
+      userId: actorId,
+      details: {},
+    },
+  });
+
+  return { tempPassword };
+}
+
+export async function getUserProjectRoles(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'User not found');
+
+  return prisma.userProjectRole.findMany({
+    where: { userId },
+    include: { project: { select: { id: true, name: true, key: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+export async function assignProjectRole(actorId: string, userId: string, dto: AssignProjectRoleDto) {
+  const [user, project] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    prisma.project.findUnique({ where: { id: dto.projectId } }),
+  ]);
+  if (!user) throw new AppError(404, 'User not found');
+  if (!project) throw new AppError(404, 'Project not found');
+
+  const existing = await prisma.userProjectRole.findFirst({
+    where: { userId, projectId: dto.projectId, role: dto.role },
+  });
+  if (existing) throw new AppError(409, 'Role already assigned');
+
+  const roleEntry = await prisma.userProjectRole.create({
+    data: { userId, projectId: dto.projectId, role: dto.role },
+    include: { project: { select: { id: true, name: true, key: true } } },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.role_assigned',
+      entityType: 'user',
+      entityId: userId,
+      userId: actorId,
+      details: { projectId: dto.projectId, role: dto.role },
+    },
+  });
+
+  return roleEntry;
+}
+
+export async function removeProjectRole(actorId: string, userId: string, roleId: string) {
+  const roleEntry = await prisma.userProjectRole.findFirst({
+    where: { id: roleId, userId },
+  });
+  if (!roleEntry) throw new AppError(404, 'Role assignment not found');
+
+  await prisma.userProjectRole.delete({ where: { id: roleId } });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.role_removed',
+      entityType: 'user',
+      entityId: userId,
+      userId: actorId,
+      details: { projectId: roleEntry.projectId, role: roleEntry.role },
+    },
+  });
 }
 
 export async function getActivity() {
@@ -219,6 +461,36 @@ export async function listUatTests(params: { role?: UatRole }): Promise<UatTest[
     return UAT_TESTS;
   }
   return UAT_TESTS.filter((test) => test.role === role);
+}
+
+// ===== SYSTEM SETTINGS =====
+
+const REGISTRATION_KEY = 'registration_enabled';
+
+export async function getRegistrationSetting(): Promise<boolean> {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: REGISTRATION_KEY } });
+  if (!setting) return true; // default: enabled
+  return setting.value !== 'false';
+}
+
+export async function setRegistrationSetting(actorId: string, enabled: boolean): Promise<boolean> {
+  await prisma.systemSetting.upsert({
+    where: { key: REGISTRATION_KEY },
+    create: { key: REGISTRATION_KEY, value: String(enabled) },
+    update: { value: String(enabled) },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'system.registration_toggled',
+      entityType: 'system',
+      entityId: REGISTRATION_KEY,
+      userId: actorId,
+      details: { enabled },
+    },
+  });
+
+  return enabled;
 }
 
 

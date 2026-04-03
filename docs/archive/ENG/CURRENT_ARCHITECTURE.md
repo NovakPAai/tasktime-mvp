@@ -1,4 +1,4 @@
-# TaskTime MVP — Current Architecture
+# Flow Universe MVP — Current Architecture
 
 **Document purpose:** Snapshot of the existing codebase for migration and architecture proposal.  
 **Date:** March 2025

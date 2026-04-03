@@ -1,0 +1,12 @@
+{
+  "TTADM-15": {
+    "id": "b16fa3a2-4e54-4eaf-958f-6d0f0e46c7ea",
+    "number": 15,
+    "title": "Типы задач не адаптированы под конфигурируемые типы в 11 местах фронтенда",
+    "description": "## Описание\n\nАудит кодовой базы фронтенда выявил 11 мест, где типы задач используются без учёта конфигурируемых типов из `IssueTypeConfig`. Кастомные (не системные) типы задач отображаются некорректно или не появляются в выпадающих списках.\n\n---\n\n## P1 — Отображение (IssueTypeBadge без typeConfig)\n\n| Файл | Строка | Проблема |\n|------|--------|----------|\n| `IssuePreviewDrawer.tsx` | ~117, 179, 205 | `<IssueTypeBadge>` без `typeConfig` (3 раза) |\n| `BoardPage.tsx` | ~217 | `<IssueTypeBadge>` без `typeConfig` |\n| `SprintIssuesDrawer.tsx` | ~133 | Колонка таблицы: render-функция получает только `value` (тип), не `record` → нет доступа к `issueTypeConfig` |\n\n## P2 — Select-опции захардкожены как EPIC/STORY/TASK/SUBTASK/BUG\n\n| Файл | Строка | Контекст |\n|------|--------|----------|\n| `IssueDetailPage.tsx` | ~689 | Modal редактирования задачи |\n| `BoardPage.tsx` | ~273 | Modal создания задачи на Kanban |\n| `ProjectDetailPage.tsx` | ~378 | Фильтр в toolbar таблицы задач |\n\n## P2 — Логика захардкожена (фильтры родительских типов, условие декомпозиции)\n\n| Файл | Строка | Проблема |\n|------|--------|----------|\n| `IssueDetailPage.tsx` | ~584 | `![\"EPIC\",\"STORY\",\"TASK\"].includes(issue.type)` — условие для кнопки AI-декомпозиции |\n| `BoardPage.tsx` | ~298 | Фильтр `[\"EPIC\",\"STORY\",\"TASK\"]` для выбора родительской задачи |\n| `ProjectDetailPage.tsx` | ~537 | Миксованный подход: `isSubtask` + hardcoded `[\"EPIC\",\"STORY\",\"TASK\"]` (второе лишнее) |\n\n---\n\n## Критерий готовности\n\n- [ ] Все вызовы `<IssueTypeBadge>` передают `typeConfig`\n- [ ] Select-опции типов загружаются из API (`/api/admin/issue-type-configs`), не захардкожены\n- [ ] Фильтры родительских задач используют `issueTypeConfig.isSubtask` вместо hardcoded списка\n- [ ] Условие AI-декомпозиции использует флаг конфига (например `!issueTypeConfig.isSubtask`)\n- [ ] Кастомные типы корректно отображаются на Kanban, в превью задачи и в спринтах",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "type": "BUG",
+    "projectKey": "TTADM"
+  }
+}

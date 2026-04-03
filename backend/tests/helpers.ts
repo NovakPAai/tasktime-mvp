@@ -7,7 +7,7 @@ export const request = supertest(app);
 
 export async function createTestUser(
   email = 'test@test.com',
-  password = 'password123',
+  password = 'Password123',
   name = 'Test User',
 ) {
   const res = await request.post('/api/auth/register').send({ email, password, name });
@@ -19,7 +19,7 @@ export async function createTestUser(
 }
 
 export async function createAdminUser() {
-  const { user, accessToken } = await createTestUser('admin@test.com', 'password123', 'Admin');
+  const { user, accessToken } = await createTestUser('admin@test.com', 'Password123', 'Admin');
   // Directly update role in DB
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
@@ -27,7 +27,7 @@ export async function createAdminUser() {
   await prisma.$disconnect();
 
   // Re-login to get updated token with ADMIN role
-  const res = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'password123' });
+  const res = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'Password123' });
   return {
     user: res.body.user,
     accessToken: res.body.accessToken as string,
@@ -36,13 +36,13 @@ export async function createAdminUser() {
 }
 
 export async function createManagerUser() {
-  const { user, accessToken } = await createTestUser('manager@test.com', 'password123', 'Manager');
+  const { user, accessToken } = await createTestUser('manager@test.com', 'Password123', 'Manager');
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
   await prisma.user.update({ where: { id: user.id }, data: { role: 'MANAGER' } });
   await prisma.$disconnect();
 
-  const res = await request.post('/api/auth/login').send({ email: 'manager@test.com', password: 'password123' });
+  const res = await request.post('/api/auth/login').send({ email: 'manager@test.com', password: 'Password123' });
   return {
     user: res.body.user,
     accessToken: res.body.accessToken as string,
@@ -51,13 +51,13 @@ export async function createManagerUser() {
 }
 
 export async function createSuperAdminUser() {
-  const { user, accessToken } = await createTestUser('super-admin@test.com', 'password123', 'Super Admin');
+  const { user, accessToken } = await createTestUser('super-admin@test.com', 'Password123', 'Super Admin');
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
   await prisma.$executeRawUnsafe(`UPDATE users SET role = 'SUPER_ADMIN' WHERE id = '${user.id}'`);
   await prisma.$disconnect();
 
-  const res = await request.post('/api/auth/login').send({ email: 'super-admin@test.com', password: 'password123' });
+  const res = await request.post('/api/auth/login').send({ email: 'super-admin@test.com', password: 'Password123' });
   return {
     user: res.body.user,
     accessToken: res.body.accessToken as string,
@@ -71,4 +71,19 @@ export function signSuperAdminToken(user: { id: string; email: string }) {
     email: user.email,
     role: 'SUPER_ADMIN',
   });
+}
+
+/**
+ * Returns the IssueTypeConfig ID for a given systemKey (e.g. 'TASK', 'EPIC').
+ * These configs are seeded by migration and persist across test runs.
+ */
+export async function getIssueTypeConfigId(systemKey: string): Promise<string> {
+  const { PrismaClient } = await import('@prisma/client');
+  const prisma = new PrismaClient();
+  try {
+    const config = await prisma.issueTypeConfig.findUniqueOrThrow({ where: { systemKey } });
+    return config.id;
+  } finally {
+    await prisma.$disconnect();
+  }
 }

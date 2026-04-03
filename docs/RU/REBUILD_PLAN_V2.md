@@ -1,4 +1,4 @@
-# TaskTime MVP — План пересборки с нуля (v2)
+# Flow Universe MVP — План пересборки с нуля (v2)
 
 **Дата:** 2026-03-09
 **Статус:** В работе (Sprint 2 запущен)
@@ -667,6 +667,32 @@ model AuditLog {
 | 4.8 | Deployment scripts (production) |
 | 4.9 | Документация API (Swagger) |
 | 4.10 | User guide обновление |
+
+---
+
+### Sprint 5: AI Dev Loop + OpenAPI → MCP
+
+**Цель:** Замена ручного MCP-сервера на автогенерацию инструментов из OpenAPI-спецификации; подключение Claude Desktop к Flow Universe через MCP-прокси; переключаемый LLM-провайдер.
+
+**Контекст:** Оценка подхода "OpenAPI as MCP replacement" — вместо написания кастомного MCP-сервера генерировать инструменты из существующей OpenAPI-спецификации через `openapi-to-mcp`. Это устраняет дублирование контракта и позволяет автоматически добавлять новые эндпоинты в Claude Desktop без ручной поддержки MCP-слоя.
+
+| # | Задача | TTMP |
+|---|--------|------|
+| 5.1 | Feature flags: FEATURES_AI / MCP / GITLAB / TELEGRAM + AI_PROVIDER env; `GET /api/features` | TTMP-113 |
+| 5.2 | Поле `acceptanceCriteria` в Issue: миграция, DTO, UI (отображение AC в markdown) | TTMP-114 |
+| 5.3 | LLM-провайдер абстракция: интерфейс `LlmProvider`, `HeuristicProvider` (fallback), `AnthropicProvider` (claude-haiku-4-5), фабрика по `AI_PROVIDER` | TTMP-115 |
+| 5.4 | OpenAPI/Swagger спецификация: `shared/openapi.ts`, Swagger UI на `GET /api/docs`, JSON на `GET /api/docs/json`; покрыты auth, projects, issues, sprints, comments, time-logs, ai, system | TTMP-116 |
+| 5.5 | openapi-to-mcp контейнер: сервис `mcp-tasktime` в docker-compose (profile=mcp, порт 3002); Claude Desktop подключается через `http://localhost:3002/mcp` | TTMP-117 |
+
+**Definition of Done Sprint 5:**
+- `GET /api/docs` — Swagger UI с полной спецификацией API
+- `GET /api/docs/json` — OpenAPI JSON для внешних клиентов
+- `docker compose --profile mcp up mcp-tasktime` — MCP-прокси запускается
+- Claude Desktop видит инструменты Flow Universe и может управлять задачами через natural language
+- AI-провайдер переключается через `AI_PROVIDER=anthropic|heuristic` без правки кода
+- Feature flags управляют регистрацией роутеров (AI, GitLab, MCP) при старте
+
+**Статус спринта:** DONE (merged #30, 2026-03-17, ветка `claude/agitated-hugle`).
 
 ---
 
