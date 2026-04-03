@@ -176,12 +176,14 @@ export default function SprintsPage() {
 
   const load = useCallback(async () => {
     if (!projectId) return;
-    const [sp, bl, ts, proj] = await Promise.all([
+    const [spPage, blPage, ts, proj] = await Promise.all([
       sprintsApi.listSprints(projectId),
       sprintsApi.getBacklog(projectId),
       teamsApi.listTeams(),
       projectsApi.getProject(projectId),
     ]);
+    const sp = spPage.data;
+    const bl = blPage.data;
     setSprints(sp);
     setTeams(ts);
     setProject(proj);

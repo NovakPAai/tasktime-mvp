@@ -158,7 +158,7 @@ export default function ReleasesPage() {
   const loadProjectSprints = useCallback(async () => {
     if (!projectId) return;
     const sprints = await sprintsApi.listSprints(projectId);
-    setProjectSprints(sprints);
+    setProjectSprints(sprints.data);
   }, [projectId]);
 
   const loadSelectedRelease = useCallback(async (releaseId: string) => {

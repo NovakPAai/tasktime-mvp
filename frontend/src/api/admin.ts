@@ -1,4 +1,5 @@
 import api from './client';
+import type { PaginatedResponse } from '../types';
 
 export interface ProjectRole {
   id: string;
@@ -91,11 +92,13 @@ export async function getStats(): Promise<AdminStats> {
   return data;
 }
 
-export async function listAdminUsers() {
-  const { data } = await api.get<
-    AdminUsersResponse
-  >('/admin/users');
-  return data.users;
+export async function listAdminUsers(
+  pagination?: { page?: number; limit?: number },
+): Promise<PaginatedResponse<AdminUser>> {
+  const { data } = await api.get<PaginatedResponse<AdminUser>>('/admin/users', {
+    params: pagination,
+  });
+  return data;
 }
 
 export async function getIssuesByStatusReport(params: {
@@ -122,4 +125,3 @@ export async function getIssuesByAssigneeReport(params: {
   );
   return data;
 }
-

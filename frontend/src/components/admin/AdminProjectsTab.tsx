@@ -104,7 +104,7 @@ export default function AdminProjectsTab() {
       ]);
       setProjects(p);
       setCategories(c);
-      setUsers(u);
+      setUsers(u.data);
     } catch {
       void message.error('Ошибка загрузки данных');
     } finally {
@@ -118,7 +118,7 @@ export default function AdminProjectsTab() {
   // made in the Categories tab are reflected without a full page refresh.
   const refreshSelectData = () => {
     Promise.all([categoriesApi.listCategories(), adminApi.listAdminUsers()])
-      .then(([c, u]) => { setCategories(c); setUsers(u); })
+      .then(([c, u]) => { setCategories(c); setUsers(u.data); })
       .catch(() => {});
   };
 

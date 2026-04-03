@@ -2,6 +2,12 @@ import type { Prisma, SprintState } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateSprintDto, UpdateSprintDto } from './sprints.dto.js';
+import { getCachedJson, setCachedJson, delCacheByPrefix, delCachedJson } from '../../shared/redis.js';
+import {
+  type PaginationParams,
+  paginationToSkipTake,
+  buildPaginatedResponse,
+} from '../../shared/utils/params.js';
 
 type SprintStatsIssue = {
   estimatedHours: Prisma.Decimal | number | null;
@@ -30,24 +36,55 @@ function mapSprintWithStats<TSprint extends SprintWithStatsSource>(sprint: TSpri
   };
 }
 
-export async function listSprints(projectId: string) {
-  const sprints = await prisma.sprint.findMany({
-    where: { projectId },
-    include: {
-      _count: { select: { issues: true } },
-      issues: { select: { id: true, estimatedHours: true } },
-      project: { select: { id: true, name: true, key: true } },
-      projectTeam: { select: { id: true, name: true } },
-      businessTeam: { select: { id: true, name: true } },
-      flowTeam: { select: { id: true, name: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+export async function listSprints(projectId: string, pagination?: PaginationParams) {
+  const p = pagination ?? { page: 1, limit: 100 };
+  const { skip, take } = paginationToSkipTake(p);
+  const cacheKey = `sprints:project:${projectId}:pg=${p.page}:lm=${p.limit}`;
 
-  return sprints.map(mapSprintWithStats);
+  type SprintItem = ReturnType<typeof mapSprintWithStats>;
+  const cached = await getCachedJson<ReturnType<typeof buildPaginatedResponse<SprintItem>>>(cacheKey);
+  if (cached) return cached;
+
+  const [sprints, total] = await Promise.all([
+    prisma.sprint.findMany({
+      where: { projectId },
+      include: {
+        _count: { select: { issues: true } },
+        issues: { select: { id: true, estimatedHours: true } },
+        project: { select: { id: true, name: true, key: true } },
+        projectTeam: { select: { id: true, name: true } },
+        businessTeam: { select: { id: true, name: true } },
+        flowTeam: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+    }),
+    prisma.sprint.count({ where: { projectId } }),
+  ]);
+
+  const result = buildPaginatedResponse(sprints.map(mapSprintWithStats), total, p);
+  await setCachedJson(cacheKey, result);
+  return result;
 }
 
 export async function getSprintIssues(id: string) {
+  const cacheKey = `sprint:issues:${id}`;
+  type SprintIssuesResult = {
+    sprint: ReturnType<typeof mapSprintWithStats>;
+    issues: Array<{
+      id: string; projectId: string; number: number; title: string;
+      estimatedHours: Prisma.Decimal | null; type: string | null; status: string;
+      priority: string; updatedAt: Date;
+      assignee: { id: string; name: string } | null;
+      project: { id: string; name: string; key: string };
+      issueTypeConfig: { id: string; name: string; systemKey: string | null; iconName: string | null; iconColor: string | null } | null;
+    }>;
+  };
+
+  const cached = await getCachedJson<SprintIssuesResult>(cacheKey);
+  if (cached) return cached;
+
   const sprint = await prisma.sprint.findUnique({
     where: { id },
     include: {
@@ -67,6 +104,7 @@ export async function getSprintIssues(id: string) {
           project: { select: { id: true, name: true, key: true } },
         },
         orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+        take: 200,
       },
       project: { select: { id: true, name: true, key: true } },
       projectTeam: { select: { id: true, name: true } },
@@ -77,22 +115,32 @@ export async function getSprintIssues(id: string) {
 
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
-  const mappedSprint = mapSprintWithStats(sprint);
-
-  return {
-    sprint: mappedSprint,
+  const result = {
+    sprint: mapSprintWithStats(sprint),
     issues: sprint.issues.map((issue) => ({
       ...issue,
       type: issue.issueTypeConfig?.systemKey ?? null,
     })),
   };
+
+  await setCachedJson(cacheKey, result);
+  return result;
+}
+
+/** Invalidate all sprint-related caches for a project. */
+async function invalidateSprintCaches(projectId: string, sprintId?: string): Promise<void> {
+  await Promise.all([
+    delCacheByPrefix(`sprints:project:${projectId}:`),
+    delCacheByPrefix('sprints:all:'),
+    ...(sprintId ? [delCachedJson(`sprint:issues:${sprintId}`)] : []),
+  ]);
 }
 
 export async function createSprint(projectId: string, dto: CreateSprintDto) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  return prisma.sprint.create({
+  const sprint = await prisma.sprint.create({
     data: {
       projectId,
       name: dto.name,
@@ -104,13 +152,16 @@ export async function createSprint(projectId: string, dto: CreateSprintDto) {
       flowTeamId: dto.flowTeamId,
     },
   });
+
+  await invalidateSprintCaches(projectId);
+  return sprint;
 }
 
 export async function updateSprint(id: string, dto: UpdateSprintDto) {
   const sprint = await prisma.sprint.findUnique({ where: { id } });
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
-  return prisma.sprint.update({
+  const updated = await prisma.sprint.update({
     where: { id },
     data: {
       ...(dto.name !== undefined && { name: dto.name }),
@@ -122,6 +173,9 @@ export async function updateSprint(id: string, dto: UpdateSprintDto) {
       ...(dto.flowTeamId !== undefined && { flowTeamId: dto.flowTeamId }),
     },
   });
+
+  await invalidateSprintCaches(sprint.projectId, id);
+  return updated;
 }
 
 export async function startSprint(id: string) {
@@ -131,10 +185,13 @@ export async function startSprint(id: string) {
 
   // Multiple active sprints per project are allowed (parallel sprints)
 
-  return prisma.sprint.update({
+  const updated = await prisma.sprint.update({
     where: { id },
     data: { state: 'ACTIVE', startDate: sprint.startDate ?? new Date() },
   });
+
+  await invalidateSprintCaches(sprint.projectId, id);
+  return updated;
 }
 
 export async function closeSprint(id: string) {
@@ -148,29 +205,73 @@ export async function closeSprint(id: string) {
     data: { sprintId: null },
   });
 
-  return prisma.sprint.update({
+  const updated = await prisma.sprint.update({
     where: { id },
     data: { state: 'CLOSED', endDate: sprint.endDate ?? new Date() },
   });
+
+  // Invalidate sprint caches and backlog (issues moved back to backlog)
+  await Promise.all([
+    invalidateSprintCaches(sprint.projectId, id),
+    delCacheByPrefix(`backlog:${sprint.projectId}:`),
+  ]);
+  return updated;
 }
 
 export async function moveIssuesToSprint(sprintId: string | null, issueIds: string[]) {
+  // Need projectId for backlog cache invalidation — fetch one of the issues
+  const sample = issueIds.length > 0
+    ? await prisma.issue.findUnique({ where: { id: issueIds[0] }, select: { projectId: true } })
+    : null;
+
   await prisma.issue.updateMany({
     where: { id: { in: issueIds } },
     data: { sprintId },
   });
+
+  if (sample) {
+    await Promise.all([
+      delCacheByPrefix(`backlog:${sample.projectId}:`),
+      ...(sprintId ? [delCachedJson(`sprint:issues:${sprintId}`)] : []),
+    ]);
+  }
 }
 
-export async function getBacklog(projectId: string) {
-  return prisma.issue.findMany({
-    where: { projectId, sprintId: null },
+export async function getBacklog(projectId: string, pagination?: PaginationParams) {
+  const p = pagination ?? { page: 1, limit: 100 };
+  const { skip, take } = paginationToSkipTake(p);
+  const cacheKey = `backlog:${projectId}:pg=${p.page}:lm=${p.limit}`;
+
+  type BacklogItem = Awaited<ReturnType<typeof prisma.issue.findMany<{
     include: {
-      assignee: { select: { id: true, name: true } },
-      issueTypeConfig: true,
-      _count: { select: { children: true } },
-    },
-    orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
-  });
+      assignee: { select: { id: true; name: true } };
+      issueTypeConfig: true;
+      _count: { select: { children: true } };
+    };
+  }>>>[number];
+
+  const cached = await getCachedJson<ReturnType<typeof buildPaginatedResponse<BacklogItem>>>(cacheKey);
+  if (cached) return cached;
+
+  const where = { projectId, sprintId: null };
+  const [items, total] = await Promise.all([
+    prisma.issue.findMany({
+      where,
+      include: {
+        assignee: { select: { id: true, name: true } },
+        issueTypeConfig: true,
+        _count: { select: { children: true } },
+      },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+      skip,
+      take,
+    }),
+    prisma.issue.count({ where }),
+  ]);
+
+  const result = buildPaginatedResponse(items, total, p);
+  await setCachedJson(cacheKey, result);
+  return result;
 }
 
 interface ListAllSprintsFilters {
@@ -179,7 +280,7 @@ interface ListAllSprintsFilters {
   teamId?: string;
 }
 
-export async function listAllSprints(filters: ListAllSprintsFilters) {
+export async function listAllSprints(filters: ListAllSprintsFilters, pagination?: PaginationParams) {
   const where: Prisma.SprintWhereInput = {};
 
   if (filters.state) {
@@ -198,18 +299,35 @@ export async function listAllSprints(filters: ListAllSprintsFilters) {
     ];
   }
 
-  const sprints = await prisma.sprint.findMany({
-    where,
-    include: {
-      _count: { select: { issues: true } },
-      issues: { select: { id: true, estimatedHours: true } },
-      project: { select: { id: true, name: true, key: true } },
-      projectTeam: { select: { id: true, name: true } },
-      businessTeam: { select: { id: true, name: true } },
-      flowTeam: { select: { id: true, name: true } },
-    },
-    orderBy: [{ state: 'asc' }, { createdAt: 'desc' }],
-  });
+  const p = pagination ?? { page: 1, limit: 100 };
+  const { skip, take } = paginationToSkipTake(p);
+  const cacheKey =
+    `sprints:all:st=${filters.state ?? ''}:pr=${filters.projectId ?? ''}` +
+    `:tm=${filters.teamId ?? ''}:pg=${p.page}:lm=${p.limit}`;
 
-  return sprints.map(mapSprintWithStats);
+  type SprintItem = ReturnType<typeof mapSprintWithStats>;
+  const cached = await getCachedJson<ReturnType<typeof buildPaginatedResponse<SprintItem>>>(cacheKey);
+  if (cached) return cached;
+
+  const [sprints, total] = await Promise.all([
+    prisma.sprint.findMany({
+      where,
+      include: {
+        _count: { select: { issues: true } },
+        issues: { select: { id: true, estimatedHours: true } },
+        project: { select: { id: true, name: true, key: true } },
+        projectTeam: { select: { id: true, name: true } },
+        businessTeam: { select: { id: true, name: true } },
+        flowTeam: { select: { id: true, name: true } },
+      },
+      orderBy: [{ state: 'asc' }, { createdAt: 'desc' }],
+      skip,
+      take,
+    }),
+    prisma.sprint.count({ where }),
+  ]);
+
+  const result = buildPaginatedResponse(sprints.map(mapSprintWithStats), total, p);
+  await setCachedJson(cacheKey, result);
+  return result;
 }

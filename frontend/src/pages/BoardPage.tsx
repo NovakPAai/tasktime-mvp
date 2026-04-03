@@ -156,7 +156,7 @@ export default function BoardPage() {
 
   useEffect(() => {
     if (!projectId) return;
-    sprintsApi.listSprints(projectId).then(setSprints);
+    sprintsApi.listSprints(projectId).then(page => setSprints(page.data));
     getProjectIssueTypes(projectId).then(setIssueTypeConfigs).catch(() => {});
   }, [projectId]);
 

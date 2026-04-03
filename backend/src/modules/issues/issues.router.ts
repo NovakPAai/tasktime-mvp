@@ -98,13 +98,13 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
 
     if (includeKanbanFields === 'true') {
       const kanbanMap = await getKanbanFieldsForIssues(
-        issues.map((i) => ({ id: i.id, projectId: i.projectId, issueTypeConfigId: i.issueTypeConfigId ?? null })),
+        issues.data.map((i) => ({ id: i.id, projectId: i.projectId, issueTypeConfigId: i.issueTypeConfigId ?? null })),
       );
-      const issuesWithFields = issues.map((i) => ({
+      const issuesWithFields = issues.data.map((i) => ({
         ...i,
         kanbanFields: kanbanMap.get(i.id) ?? [],
       }));
-      res.json(issuesWithFields);
+      res.json({ data: issuesWithFields, meta: issues.meta });
       return;
     }
 

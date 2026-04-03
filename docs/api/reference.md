@@ -30,6 +30,29 @@
 { "error": "Human-readable message" }
 ```
 
+## Pagination
+
+Endpoints that return lists support optional pagination query parameters:
+
+| Parameter | Type | Default | Max | Description |
+|-----------|------|---------|-----|-------------|
+| `page` | integer | 1 | — | Page number (1-based) |
+| `limit` | integer | 100 | 500 | Items per page |
+
+**Paginated response envelope:**
+
+```json
+{
+  "data": [...],
+  "meta": {
+    "page": 1,
+    "limit": 100,
+    "total": 342,
+    "totalPages": 4
+  }
+}
+```
+
 ---
 
 ## Auth endpoints — `/api/auth`

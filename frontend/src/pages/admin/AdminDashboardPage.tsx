@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
         allUsers.forEach((u) => { userMap[u.id] = u; });
         setUsersMap(userMap);
         setUsers(
-          adminUsers.map((u) => ({
+          adminUsers.data.map((u) => ({
             id: u.id,
             email: u.email,
             name: u.name,
@@ -104,8 +104,8 @@ export default function AdminDashboardPage() {
         return;
       }
       const data = await sprintsApi.listSprints(selectedProjectId);
-      setSprints(data);
-      if (!selectedSprintId && data.length > 0) setSelectedSprintId(data[0].id);
+      setSprints(data.data);
+      if (!selectedSprintId && data.data.length > 0) setSelectedSprintId(data.data[0].id);
     };
     void loadSprints();
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -5,6 +5,7 @@ import type {
   IssueStatus,
   AiAssigneeType,
   AiExecutionStatus,
+  PaginatedResponse,
 } from '../types';
 
 export interface IssueFilters {
@@ -19,7 +20,7 @@ export interface IssueFilters {
 }
 
 export async function listIssues(projectId: string, filters?: IssueFilters): Promise<Issue[]> {
-  const { data } = await api.get<Issue[]>(`/projects/${projectId}/issues`, {
+  const { data } = await api.get<PaginatedResponse<Issue>>(`/projects/${projectId}/issues`, {
     params: {
       ...(filters?.status && { status: filters.status.join(',') }),
       ...(filters?.issueTypeConfigId && filters.issueTypeConfigId.length > 0 && { issueTypeConfigId: filters.issueTypeConfigId.join(',') }),
@@ -31,7 +32,7 @@ export async function listIssues(projectId: string, filters?: IssueFilters): Pro
       ...(filters?.search && { search: filters.search }),
     },
   });
-  return data;
+  return data.data;
 }
 
 export async function listIssuesWithKanbanFields(
