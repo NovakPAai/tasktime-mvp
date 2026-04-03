@@ -8,7 +8,6 @@ import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { rotateUserPassword } from '../users/password-rotation.service.js';
 import type { UatRole } from './uat-tests.data.js';
-import { parsePagination } from '../../shared/utils/params.js';
 
 const router = Router();
 
