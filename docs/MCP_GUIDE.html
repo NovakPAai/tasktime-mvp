@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flow Universe MCP — Руководство</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ── Layout ── */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: 240px; height: 100vh;
+      background: #0d1117;
+      border-right: 1px solid #21262d;
+      overflow-y: auto;
+      padding: 24px 0;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid #21262d;
+      margin-bottom: 16px;
+    }
+    .sidebar-logo .brand { font-size: 13px; font-weight: 700; color: #7c8cf8; letter-spacing: .5px; text-transform: uppercase; }
+    .sidebar-logo .sub { font-size: 11px; color: #8b949e; margin-top: 2px; }
+    .nav-section { padding: 4px 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #484f58; margin-top: 12px; margin-bottom: 4px; }
+    .nav-link { display: block; padding: 6px 20px; font-size: 13px; color: #8b949e; text-decoration: none; border-left: 2px solid transparent; transition: all .15s; }
+    .nav-link:hover { color: #e6edf3; background: #161b22; border-left-color: #7c8cf8; }
+    .nav-link.active { color: #7c8cf8; border-left-color: #7c8cf8; }
+
+    main {
+      margin-left: 240px;
+      max-width: 860px;
+      padding: 48px 56px;
+    }
+
+    /* ── Typography ── */
+    h1 { font-size: 32px; font-weight: 700; color: #f0f6ff; margin-bottom: 8px; }
+    h1 .accent { color: #7c8cf8; }
+    .page-sub { font-size: 16px; color: #8b949e; margin-bottom: 40px; }
+    h2 { font-size: 22px; font-weight: 700; color: #f0f6ff; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+    h2 .icon { margin-right: 8px; }
+    h3 { font-size: 16px; font-weight: 600; color: #e6edf3; margin: 24px 0 10px; }
+    p { color: #8b949e; margin-bottom: 12px; }
+    strong { color: #e6edf3; }
+    a { color: #7c8cf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Code ── */
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: #79c0ff;
+    }
+    pre {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 20px 24px;
+      overflow-x: auto;
+      margin: 12px 0 20px;
+      position: relative;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 13px;
+      color: #e6edf3;
+    }
+    .comment { color: #484f58; }
+    .key { color: #7c8cf8; }
+    .string { color: #a5d6ff; }
+    .label { color: #ffa657; }
+
+    /* ── Callouts ── */
+    .callout {
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      border-left: 3px solid;
+      display: flex;
+      gap: 12px;
+    }
+    .callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .callout-body { flex: 1; }
+    .callout-body p { margin-bottom: 4px; }
+    .callout.info { background: #0d2137; border-color: #388bfd; }
+    .callout.warning { background: #2a1700; border-color: #d29922; }
+    .callout.danger { background: #2d0f0f; border-color: #f85149; }
+    .callout.success { background: #0a1f0f; border-color: #3fb950; }
+
+    /* ── Cards ── */
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+    .card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card-icon { font-size: 28px; margin-bottom: 10px; }
+    .card-title { font-size: 14px; font-weight: 700; color: #e6edf3; margin-bottom: 6px; }
+    .card-desc { font-size: 13px; color: #8b949e; line-height: 1.5; }
+
+    /* ── Tool table ── */
+    .tool-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    .tool-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #484f58;
+      padding: 8px 12px;
+      border-bottom: 1px solid #21262d;
+    }
+    .tool-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #161b22;
+      font-size: 13px;
+      color: #8b949e;
+      vertical-align: top;
+    }
+    .tool-table tr:hover td { background: #161b22; }
+    .tool-name { font-family: 'Cascadia Code','Fira Code',monospace; color: #79c0ff; font-weight: 600; }
+    .tool-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+    .badge-read { background: #0d2137; color: #58a6ff; }
+    .badge-write { background: #1a0a2e; color: #bc8cff; }
+    .badge-time { background: #0a1f0f; color: #3fb950; }
+
+    /* ── Steps ── */
+    .steps { margin: 20px 0; }
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .step-num {
+      width: 32px; height: 32px;
+      background: #7c8cf8;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 15px; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
+
+    /* ── Error table ── */
+    .error-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    .error-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #484f58; padding: 8px 12px; border-bottom: 1px solid #21262d; text-align: left; }
+    .error-table td { padding: 12px; border-bottom: 1px solid #161b22; font-size: 13px; color: #8b949e; vertical-align: top; }
+    .error-table tr:hover td { background: #161b22; }
+    .err-code { font-family: monospace; color: #f85149; font-size: 12px; }
+    .err-fix { color: #3fb950; }
+
+    /* ── Env table ── */
+    .env-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    .env-table td { padding: 8px 12px; border-bottom: 1px solid #161b22; font-size: 13px; vertical-align: top; }
+    .env-key { font-family: monospace; color: #ffa657; }
+    .env-val { color: #8b949e; }
+    .env-req { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    .req-yes { color: #f85149; }
+    .req-no { color: #484f58; }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid #21262d; margin: 40px 0; }
+
+    /* ── Tab-like env blocks ── */
+    .env-block {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 12px 0 20px;
+    }
+    .env-block-header {
+      background: #21262d;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .env-block-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-staging { background: #d29922; }
+    .dot-prod { background: #3fb950; }
+    .dot-dev { background: #58a6ff; }
+    .env-block pre { margin: 0; border: none; border-radius: 0; }
+
+    /* ── Arch diagram ── */
+    .arch {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      padding: 28px;
+      margin: 20px 0;
+      font-family: monospace;
+      font-size: 13px;
+      color: #8b949e;
+      line-height: 2;
+    }
+    .arch .box { color: #7c8cf8; }
+    .arch .arrow { color: #484f58; }
+    .arch .note { color: #3fb950; font-size: 11px; }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid #21262d;
+      font-size: 12px;
+      color: #484f58;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Flow Universe</div>
+    <div class="sub">MCP Guide</div>
+  </div>
+  <div class="nav-section">Введение</div>
+  <a href="#what" class="nav-link">Что такое MCP</a>
+  <a href="#arch" class="nav-link">Как это работает</a>
+  <a href="#benefits" class="nav-link">Польза для команды</a>
+  <div class="nav-section">Настройка</div>
+  <a href="#quickstart" class="nav-link">Быстрый старт</a>
+  <a href="#clients" class="nav-link">Claude Code / Cursor</a>
+  <a href="#envs" class="nav-link">Dev / Staging / Prod</a>
+  <div class="nav-section">Инструменты</div>
+  <a href="#tools-read" class="nav-link">Чтение данных</a>
+  <a href="#tools-write" class="nav-link">Запись и действия</a>
+  <a href="#tools-time" class="nav-link">Учёт времени</a>
+  <a href="#examples" class="nav-link">Примеры запросов</a>
+  <div class="nav-section">Справка</div>
+  <a href="#errors" class="nav-link">Ошибки и решения</a>
+  <a href="#security" class="nav-link">Безопасность</a>
+  <a href="#ops" class="nav-link">Для DevOps</a>
+</nav>
+
+<!-- Content -->
+<main>
+
+  <h1><span class="accent">Flow Universe</span> MCP</h1>
+  <p class="page-sub">Руководство по подключению и использованию MCP-сервера для команды разработки и внедрения</p>
+
+  <!-- ── Что такое MCP ── -->
+  <h2 id="what"><span class="icon">🔌</span>Что такое MCP</h2>
+
+  <p><strong>MCP (Model Context Protocol)</strong> — открытый протокол от Anthropic, который позволяет AI-ассистентам (Claude, Cursor, любому MCP-клиенту) получать контекст из внешних систем и выполнять действия в них.</p>
+
+  <p>Проще говоря: вместо того чтобы копипастить задачи из браузера в чат с AI — AI сам видит и обновляет Flow Universe напрямую.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon">🧠</div>
+      <div class="card-title">Без MCP</div>
+      <div class="card-desc">Копируешь задачу из браузера → вставляешь в Claude → Claude отвечает → вручную применяешь изменения</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">С MCP</div>
+      <div class="card-desc">«Возьми PROJ-42, реализуй и закрой» → Claude сам читает задачу, пишет код, логирует время, меняет статус</div>
+    </div>
+  </div>
+
+  <!-- ── Архитектура ── -->
+  <h2 id="arch"><span class="icon">🏗️</span>Как это работает</h2>
+
+  <div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:32px 28px;margin:20px 0;">
+    <svg viewBox="0 0 660 340" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:660px;display:block;margin:0 auto;" font-family="'Segoe UI',system-ui,sans-serif">
+      <defs>
+        <marker id="arr-gray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#484f58"/>
+        </marker>
+        <marker id="arr-purple" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#bc8cff"/>
+        </marker>
+        <marker id="arr-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+        </marker>
+      </defs>
+
+      <!-- MCP Client -->
+      <rect x="10" y="60" width="168" height="110" rx="8" fill="#0d1117" stroke="#7c8cf8" stroke-width="1.5"/>
+      <text x="94" y="84" text-anchor="middle" fill="#7c8cf8" font-size="12" font-weight="700">MCP-клиент</text>
+      <line x1="30" y1="92" x2="158" y2="92" stroke="#21262d" stroke-width="1"/>
+      <text x="94" y="112" text-anchor="middle" fill="#8b949e" font-size="11">Claude Code</text>
+      <text x="94" y="130" text-anchor="middle" fill="#8b949e" font-size="11">Cursor / IDE</text>
+      <text x="94" y="148" text-anchor="middle" fill="#8b949e" font-size="11">любой MCP-клиент</text>
+
+      <!-- Arrow: client → MCP -->
+      <line x1="178" y1="115" x2="238" y2="115" stroke="#484f58" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+      <text x="208" y="108" text-anchor="middle" fill="#484f58" font-size="10">Bearer Token</text>
+
+      <!-- MCP Server -->
+      <rect x="240" y="30" width="180" height="170" rx="8" fill="#0d1117" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="330" y="56" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="700">Flow Universe MCP</text>
+      <line x1="258" y1="64" x2="402" y2="64" stroke="#21262d" stroke-width="1"/>
+      <rect x="258" y="73" width="144" height="20" rx="4" fill="#0a1f0f"/>
+      <text x="330" y="87" text-anchor="middle" fill="#3fb950" font-size="10">HTTP :3002 · StreamableHTTP</text>
+      <text x="330" y="113" text-anchor="middle" fill="#8b949e" font-size="11">14 инструментов</text>
+      <text x="330" y="131" text-anchor="middle" fill="#8b949e" font-size="11">read / write / time</text>
+      <line x1="258" y1="142" x2="402" y2="142" stroke="#21262d" stroke-width="1"/>
+      <text x="330" y="158" text-anchor="middle" fill="#484f58" font-size="10">agent@flow-universe.internal</text>
+      <text x="330" y="174" text-anchor="middle" fill="#484f58" font-size="10">роль MANAGER</text>
+
+      <!-- Arrow: MCP → Backend (left-down) -->
+      <path d="M 270 200 L 150 250" stroke="#bc8cff" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#arr-purple)"/>
+      <text x="186" y="223" text-anchor="middle" fill="#bc8cff" font-size="10" transform="rotate(-28,186,223)">write ops</text>
+
+      <!-- Arrow: MCP → Postgres (right-down) -->
+      <path d="M 390 200 L 510 250" stroke="#58a6ff" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#arr-blue)"/>
+      <text x="474" y="223" text-anchor="middle" fill="#58a6ff" font-size="10" transform="rotate(28,474,223)">read ops</text>
+
+      <!-- Backend API -->
+      <rect x="10" y="252" width="280" height="80" rx="8" fill="#0d1117" stroke="#bc8cff" stroke-width="1.5"/>
+      <text x="150" y="276" text-anchor="middle" fill="#bc8cff" font-size="12" font-weight="700">Backend API</text>
+      <line x1="28" y1="283" x2="272" y2="283" stroke="#21262d" stroke-width="1"/>
+      <text x="150" y="302" text-anchor="middle" fill="#8b949e" font-size="11">workflow engine · RBAC · валидация</text>
+      <text x="150" y="320" text-anchor="middle" fill="#484f58" font-size="10">статусы · комментарии · создание задач</text>
+
+      <!-- PostgreSQL -->
+      <rect x="370" y="252" width="280" height="80" rx="8" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="510" y="276" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="700">PostgreSQL</text>
+      <line x1="388" y1="283" x2="632" y2="283" stroke="#21262d" stroke-width="1"/>
+      <text x="510" y="302" text-anchor="middle" fill="#8b949e" font-size="11">прямой Prisma (без бизнес-логики)</text>
+      <text x="510" y="320" text-anchor="middle" fill="#484f58" font-size="10">get_issue · log_time · register_ai_session</text>
+    </svg>
+  </div>
+
+
+  <p><strong>Ключевые принципы:</strong></p>
+  <ul style="color:#8b949e; padding-left:20px; margin-bottom:16px;">
+    <li>Операции записи (смена статуса, комментарии, создание задач) идут <strong>через Backend API</strong> — работает workflow engine и проверяется RBAC</li>
+    <li>Операции чтения и учёт времени — напрямую через Prisma (быстрее, нет бизнес-логики)</li>
+    <li>Агент авторизуется как системный пользователь с ролью <strong>MANAGER</strong></li>
+    <li>Каждый запрос к MCP проверяет <strong>Bearer Token</strong> — без токена запрос отклоняется</li>
+  </ul>
+
+  <!-- ── Польза ── -->
+  <h2 id="benefits"><span class="icon">🚀</span>Польза для команды</h2>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon">👨‍💻</div>
+      <div class="card-title">Разработчик</div>
+      <div class="card-desc">AI-агент сам берёт задачу, читает контекст, пишет код и закрывает тикет. Логирует потраченное AI-время и стоимость токенов автоматически.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📋</div>
+      <div class="card-title">PM / аналитик</div>
+      <div class="card-desc">«Покажи все задачи спринта по исполнителям» — AI получает данные из системы и формирует отчёт прямо в чате.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔧</div>
+      <div class="card-title">Команда внедрения</div>
+      <div class="card-desc">Тестирование AI-сценариев с реальными данными без написания скриптов. Подключил MCP — и AI работает с живой системой.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Руководитель</div>
+      <div class="card-desc">«Сколько AI-часов потрачено на PROJ-42? Какова стоимость?» — MCP возвращает точные данные из базы.</div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ── Быстрый старт ── -->
+  <h2 id="quickstart"><span class="icon">⚡</span>Быстрый старт</h2>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Получи токен доступа</div>
+        <p>Запроси Bearer-токен у администратора системы (передаётся через защищённый канал — не в открытом чате).</p>
+        <p>Токены существуют для двух сред: <strong>staging</strong> (тестирование) и <strong>production</strong> (боевые данные).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Создай файл <code>.mcp.json</code> в корне проекта</div>
+        <p>Скопируй шаблон из репозитория (<code>.mcp.json</code> в корне) и замени плейсхолдеры на реальные токены.</p>
+        <pre><code><span class="comment">// .mcp.json</span>
+{
+  <span class="key">"mcpServers"</span>: {
+    <span class="key">"flow-universe-staging"</span>: {
+      <span class="key">"type"</span>: <span class="string">"streamable-http"</span>,
+      <span class="key">"url"</span>: <span class="string">"http://5.129.242.171:3002/mcp"</span>,
+      <span class="key">"headers"</span>: {
+        <span class="key">"Authorization"</span>: <span class="string">"Bearer &lt;STAGING_TOKEN&gt;"</span>
+      }
+    },
+    <span class="key">"flow-universe-prod"</span>: {
+      <span class="key">"type"</span>: <span class="string">"streamable-http"</span>,
+      <span class="key">"url"</span>: <span class="string">"http://72.56.7.218:3002/mcp"</span>,
+      <span class="key">"headers"</span>: {
+        <span class="key">"Authorization"</span>: <span class="string">"Bearer &lt;PROD_TOKEN&gt;"</span>
+      }
+    }
+  }
+}</code></pre>
+        <div class="callout warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body"><p><strong>Важно:</strong> не коммить <code>.mcp.json</code> с реальными токенами в git. Добавь файл в <code>.gitignore</code> у себя локально.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Проверь подключение</div>
+        <p>В Claude Code (или Cursor) спроси:</p>
+        <pre><code>get_issue TTMP-1</code></pre>
+        <p>Если в ответ получаешь карточку задачи — всё работает.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Клиенты ── -->
+  <h2 id="clients"><span class="icon">🖥️</span>Настройка в Claude Code и Cursor</h2>
+
+  <h3>Claude Code (CLI)</h3>
+  <p><code>.mcp.json</code> в корне проекта подхватывается автоматически при запуске <code>claude</code>. Проверить список подключённых серверов: <code>/mcp</code> в интерфейсе.</p>
+
+  <h3>Claude Desktop</h3>
+  <p>Открыть: <strong>Settings → Developer → Edit Config</strong> и добавить серверы в <code>claude_desktop_config.json</code>:</p>
+  <pre><code>{
+  <span class="key">"mcpServers"</span>: {
+    <span class="key">"flow-universe-staging"</span>: {
+      <span class="key">"type"</span>: <span class="string">"streamable-http"</span>,
+      <span class="key">"url"</span>: <span class="string">"http://5.129.242.171:3002/mcp"</span>,
+      <span class="key">"headers"</span>: {
+        <span class="key">"Authorization"</span>: <span class="string">"Bearer &lt;STAGING_TOKEN&gt;"</span>
+      }
+    }
+  }
+}</code></pre>
+
+  <h3>Cursor</h3>
+  <p><strong>Settings → Cursor Settings → MCP</strong> → Add new server → выбрать тип <strong>HTTP</strong>, указать URL и заголовок Authorization.</p>
+
+  <h3>MCP Inspector (отладка)</h3>
+  <p>Для проверки инструментов без IDE:</p>
+  <pre><code>npx @modelcontextprotocol/inspector \
+  --url http://5.129.242.171:3002/mcp \
+  --header "Authorization: Bearer <STAGING_TOKEN>"</code></pre>
+
+  <!-- ── Среды ── -->
+  <h2 id="envs"><span class="icon">🌐</span>Среды: Dev / Staging / Production</h2>
+
+  <table class="tool-table">
+    <thead>
+      <tr>
+        <th>Среда</th>
+        <th>URL</th>
+        <th>Когда использовать</th>
+        <th>Данные</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong style="color:#58a6ff">Development</strong></td>
+        <td><code>stdio</code> (локально)</td>
+        <td>Разработка MCP-инструментов</td>
+        <td>Локальная БД</td>
+      </tr>
+      <tr>
+        <td><strong style="color:#d29922">Staging</strong></td>
+        <td><code>http://5.129.242.171:3002</code></td>
+        <td>Тестирование AI-сценариев</td>
+        <td>Тестовые данные</td>
+      </tr>
+      <tr>
+        <td><strong style="color:#3fb950">Production</strong></td>
+        <td><code>http://72.56.7.218:3002</code></td>
+        <td>Работа с реальными задачами</td>
+        <td>Боевые данные ⚠️</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout danger">
+    <div class="callout-icon">🔴</div>
+    <div class="callout-body">
+      <p><strong>Production — боевые данные.</strong> Любое действие через MCP на prod-сервере изменяет реальные задачи, статусы и комментарии. Тестируй сценарии на staging, затем применяй на prod.</p>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ── Инструменты: Чтение ── -->
+  <h2 id="tools-read"><span class="icon">📖</span>Инструменты: чтение данных</h2>
+
+  <table class="tool-table">
+    <thead>
+      <tr><th>Инструмент</th><th>Что делает</th><th>Параметры</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tool-name">get_issue</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Карточка задачи: статус, тип, спринт, исполнитель, комментарии, время</td>
+        <td><code>key</code>: TTMP-95</td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">list_issues</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Список задач проекта с фильтрацией</td>
+        <td><code>projectKey</code>, <code>status</code>, <code>assigneeId</code>, <code>sprintId</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">get_sprint</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Спринт: задачи, статусы, прогресс</td>
+        <td><code>sprintId</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">list_sprints</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Все спринты проекта</td>
+        <td><code>projectKey</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">get_project</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Информация о проекте</td>
+        <td><code>key</code>: TTMP</td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">list_projects</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Все проекты системы</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">get_time_summary</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Разбивка времени Human vs Agent по задаче, стоимость AI-сессий</td>
+        <td><code>key</code>: TTMP-95</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ── Инструменты: Запись ── -->
+  <h2 id="tools-write"><span class="icon">✏️</span>Инструменты: действия и запись</h2>
+
+  <table class="tool-table">
+    <thead>
+      <tr><th>Инструмент</th><th>Что делает</th><th>Параметры</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tool-name">update_status</span> <span class="tool-badge badge-write">write</span></td>
+        <td>Смена статуса задачи через workflow engine (валидирует допустимые переходы)</td>
+        <td><code>key</code>, <code>status</code>: IN_PROGRESS / REVIEW / DONE / CANCELLED</td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">add_comment</span> <span class="tool-badge badge-write">write</span></td>
+        <td>Добавить комментарий к задаче от имени AI-агента</td>
+        <td><code>key</code>, <code>body</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">create_subtask</span> <span class="tool-badge badge-write">write</span></td>
+        <td>Создать подзадачу (SUBTASK) к существующей задаче</td>
+        <td><code>parentKey</code>, <code>title</code>, <code>description</code>, <code>priority</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">claim_issue</span> <span class="tool-badge badge-write">write</span></td>
+        <td>Взять задачу в работу: присвоить агенту + перевести в IN_PROGRESS</td>
+        <td><code>key</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">complete_issue</span> <span class="tool-badge badge-write">write</span></td>
+        <td>Завершить задачу: статус DONE + итоговый комментарий</td>
+        <td><code>key</code>, <code>summary</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">fail_issue</span> <span class="tool-badge badge-write">write</span></td>
+        <td>Отметить задачу как проваленную агентом: сброс исполнителя + причина</td>
+        <td><code>key</code>, <code>reason</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <div class="callout-icon">ℹ️</div>
+    <div class="callout-body">
+      <p><strong>Workflow engine:</strong> <code>update_status</code> проходит через полный цикл валидации. Если переход недопустим по настроенному workflow — вернётся ошибка с объяснением. Это защита от случайных переходов.</p>
+    </div>
+  </div>
+
+  <!-- ── Инструменты: Время ── -->
+  <h2 id="tools-time"><span class="icon">⏱️</span>Инструменты: учёт AI-времени</h2>
+
+  <table class="tool-table">
+    <thead>
+      <tr><th>Инструмент</th><th>Что делает</th><th>Параметры</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tool-name">log_time</span> <span class="tool-badge badge-time">time</span></td>
+        <td>Записать время вручную на задачу (source=AGENT)</td>
+        <td><code>key</code>, <code>hours</code>, <code>note</code>, <code>sessionId</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">register_ai_session</span> <span class="tool-badge badge-time">time</span></td>
+        <td>Записать AI-сессию с метриками токенов и стоимостью. Автоматически раскладывает время по задачам пропорционально</td>
+        <td><code>issues[]</code> (key+ratio), <code>model</code>, <code>tokensInput</code>, <code>tokensOutput</code>, <code>costUSD</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Пример: регистрация AI-сессии</h3>
+  <pre><code><span class="comment">// Агент потратил на 2 задачи: 70% на PROJ-42, 30% на PROJ-43</span>
+register_ai_session({
+  issues: [
+    { key: <span class="string">"PROJ-42"</span>, ratio: <span class="string">0.7</span> },
+    { key: <span class="string">"PROJ-43"</span>, ratio: <span class="string">0.3</span> }
+  ],
+  model: <span class="string">"claude-sonnet-4-6"</span>,
+  tokensInput: <span class="string">45000</span>,
+  tokensOutput: <span class="string">12000</span>,
+  costUSD: <span class="string">0.87</span>
+})</code></pre>
+
+  <hr class="divider" />
+
+  <!-- ── Примеры ── -->
+  <h2 id="examples"><span class="icon">💬</span>Примеры запросов к AI</h2>
+
+  <h3>Получить информацию о задаче</h3>
+  <pre><code>Покажи задачу PROJ-42</code></pre>
+
+  <h3>Взять задачу в работу</h3>
+  <pre><code>Возьми PROJ-42 в работу и реализуй согласно описанию</code></pre>
+
+  <h3>Посмотреть текущий спринт</h3>
+  <pre><code>Что сейчас в активном спринте проекта TTMP? Покажи статусы задач</code></pre>
+
+  <h3>Статистика AI-работы</h3>
+  <pre><code>Сколько AI-времени и денег потрачено на PROJ-42?</code></pre>
+
+  <h3>Создать подзадачи</h3>
+  <pre><code>Декомпозируй PROJ-42 на подзадачи и создай их в системе</code></pre>
+
+  <h3>Добавить комментарий</h3>
+  <pre><code>Добавь в PROJ-42 комментарий с кратким итогом реализации</code></pre>
+
+  <hr class="divider" />
+
+  <!-- ── Ошибки ── -->
+  <h2 id="errors"><span class="icon">🔧</span>Ошибки и решения</h2>
+
+  <table class="error-table">
+    <thead>
+      <tr><th>Ошибка</th><th>Причина</th><th>Решение</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="err-code">401 Unauthorized</span></td>
+        <td>Неверный или устаревший Bearer-токен</td>
+        <td class="err-fix">Запросить актуальный токен у администратора</td>
+      </tr>
+      <tr>
+        <td><span class="err-code">Agent login failed 401</span></td>
+        <td>Системный агент не может авторизоваться в backend API</td>
+        <td class="err-fix">Администратор проверяет MCP_AGENT_PASSWORD в конфиге контейнера</td>
+      </tr>
+      <tr>
+        <td><span class="err-code">Issue not found: TTMP-X</span></td>
+        <td>Задача не существует или проект не тот</td>
+        <td class="err-fix">Проверить ключ задачи в системе. Убедиться, что подключена нужная среда (staging vs prod)</td>
+      </tr>
+      <tr>
+        <td><span class="err-code">Workflow transition not allowed</span></td>
+        <td>Переход между статусами запрещён workflow</td>
+        <td class="err-fix">Проверить допустимые переходы в настройках workflow проекта</td>
+      </tr>
+      <tr>
+        <td><span class="err-code">missing or unknown session ID</span></td>
+        <td>MCP-клиент не выполнил initialize перед вызовом</td>
+        <td class="err-fix">Нормальное поведение при ручных curl-запросах. В Claude Code/Cursor это делается автоматически</td>
+      </tr>
+      <tr>
+        <td><span class="err-code">fetch failed / ECONNREFUSED</span></td>
+        <td>MCP-сервер недоступен</td>
+        <td class="err-fix">Проверить, запущен ли контейнер: <code>docker ps | grep mcp</code>. Сообщить администратору</td>
+      </tr>
+      <tr>
+        <td><span class="err-code">403 You do not have access to this project</span></td>
+        <td>Проблема с ролью системного агента</td>
+        <td class="err-fix">Администратор проверяет роль пользователя <code>agent@flow-universe.internal</code> в БД (должна быть MANAGER)</td>
+      </tr>
+      <tr>
+        <td>Инструменты не появляются в Claude</td>
+        <td>Claude не подключился к MCP-серверу</td>
+        <td class="err-fix">Перезапустить Claude Code. Проверить <code>.mcp.json</code> на опечатки. Убедиться, что файл в корне проекта</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ── Безопасность ── -->
+  <h2 id="security"><span class="icon">🔒</span>Безопасность</h2>
+
+  <div class="callout warning">
+    <div class="callout-icon">⚠️</div>
+    <div class="callout-body">
+      <p><strong>Никогда не публикуй Bearer-токены</strong> в открытых репозиториях, публичных чатах, скриншотах или документах. Токены дают полный доступ к MCP-операциям.</p>
+    </div>
+  </div>
+
+  <h3>Что защищает система</h3>
+  <ul style="color:#8b949e; padding-left:20px; margin-bottom:16px; line-height:2;">
+    <li><strong style="color:#e6edf3">Bearer Token</strong> — каждый запрос проверяется, без токена — 401</li>
+    <li><strong style="color:#e6edf3">Workflow engine</strong> — write-операции валидируются на допустимость перехода</li>
+    <li><strong style="color:#e6edf3">RBAC</strong> — агент действует с правами MANAGER, не ADMIN</li>
+    <li><strong style="color:#e6edf3">Audit log</strong> — все действия агента записываются в audit_log с источником AGENT</li>
+  </ul>
+
+  <h3>Если токен скомпрометирован</h3>
+  <p>Сообщи администратору → токен меняется перезапуском контейнера с новым <code>MCP_SERVICE_TOKEN</code> → старый токен перестаёт работать немедленно.</p>
+
+  <!-- ── Для DevOps ── -->
+  <h2 id="ops"><span class="icon">🛠️</span>Для администратора / DevOps</h2>
+
+  <h3>Переменные окружения MCP-контейнера</h3>
+  <table class="env-table">
+    <tbody>
+      <tr><td class="env-key">MCP_TRANSPORT</td><td class="env-val">Транспорт: <code>http</code> или <code>stdio</code></td><td class="env-req req-yes">обяз.</td></tr>
+      <tr><td class="env-key">MCP_HTTP_PORT</td><td class="env-val">Порт HTTP-сервера (по умолчанию 3002)</td><td class="env-req req-no">опц.</td></tr>
+      <tr><td class="env-key">MCP_SERVICE_TOKEN</td><td class="env-val">Bearer-токен для аутентификации клиентов</td><td class="env-req req-yes">обяз.</td></tr>
+      <tr><td class="env-key">DATABASE_URL</td><td class="env-val">PostgreSQL connection string</td><td class="env-req req-yes">обяз.</td></tr>
+      <tr><td class="env-key">BACKEND_INTERNAL_URL</td><td class="env-val">URL backend API (обычно <code>http://backend:3000</code>)</td><td class="env-req req-yes">обяз.</td></tr>
+      <tr><td class="env-key">MCP_AGENT_EMAIL</td><td class="env-val">Email системного агента в БД</td><td class="env-req req-yes">обяз.</td></tr>
+      <tr><td class="env-key">MCP_AGENT_PASSWORD</td><td class="env-val">Пароль системного агента</td><td class="env-req req-yes">обяз.</td></tr>
+      <tr><td class="env-key">AI_HOURLY_RATE</td><td class="env-val">Ставка для расчёта AI-часов (по умолч. $50/hr)</td><td class="env-req req-no">опц.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Диагностика</h3>
+  <pre><code><span class="comment"># Статус контейнера</span>
+docker ps | grep mcp-flow-universe
+
+<span class="comment"># Логи</span>
+docker logs mcp-flow-universe --tail 50
+
+<span class="comment"># Проверка токена (должен вернуть список инструментов)</span>
+curl -s -X POST http://localhost:3002/mcp \
+  -H "Authorization: Bearer <STAGING_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}'</code></pre>
+
+  <h3>Ротация токена</h3>
+  <pre><code><span class="comment"># Генерация нового токена</span>
+NEW_TOKEN=$(openssl rand -base64 32)
+
+<span class="comment"># Перезапуск контейнера с новым токеном (пример для prod)</span>
+docker rm -f mcp-flow-universe
+docker run -d \
+  --name mcp-flow-universe \
+  --network tasktime-production_default \
+  -p 3002:3002 \
+  -e MCP_SERVICE_TOKEN="$NEW_TOKEN" \
+  <span class="comment"># ... остальные env vars</span>
+  ghcr.io/novakpaai/tasktime-backend:&lt;SHA&gt; \
+  node dist/mcp/server.js</code></pre>
+
+  <h3>Создание агента в новой БД</h3>
+  <pre><code><span class="comment"># Если агент ещё не создан</span>
+HASH=$(docker run --rm &lt;backend-image&gt; node --input-type=module &lt;&lt;'EOF'
+import bcrypt from "bcryptjs";
+process.stdout.write(await bcrypt.hash(process.env.PASS, 10));
+EOF
+)
+psql -U tasktime -d &lt;dbname&gt; -c \
+"INSERT INTO users (id, email, password_hash, name, role, is_active, created_at, updated_at, is_system)
+ VALUES (gen_random_uuid(), 'agent@flow-universe.internal', '$HASH', 'AI Agent',
+         'MANAGER', true, NOW(), NOW(), true)
+ ON CONFLICT (email) DO UPDATE SET password_hash=EXCLUDED.password_hash, role='MANAGER';"</code></pre>
+
+  <footer>
+    <p>Flow Universe · MCP Guide · Обновлено апрель 2026</p>
+    <p style="margin-top:6px;">Вопросы: обратись к администратору системы или открой задачу в Flow Universe с тегом MCP.</p>
+  </footer>
+
+</main>
+
+<script>
+  // Подсветка активного пункта меню при скролле
+  const sections = document.querySelectorAll('h2[id]');
+  const navLinks = document.querySelectorAll('.nav-link');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
