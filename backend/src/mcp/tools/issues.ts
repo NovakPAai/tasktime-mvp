@@ -168,6 +168,10 @@ export function registerIssueTools(server: McpServer) {
     },
     async ({ project, title, type, description, priority, parentKey }) => {
       try {
+        if (type === 'SUBTASK' && !parentKey) {
+          return errText('parentKey is required for SUBTASK');
+        }
+
         const proj = await prisma.project.findUnique({ where: { key: project.toUpperCase() } });
         if (!proj) return errText(`Project ${project} not found`);
 
