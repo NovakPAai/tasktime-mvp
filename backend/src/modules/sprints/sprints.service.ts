@@ -23,6 +23,11 @@ function mapSprintWithStats<TSprint extends SprintWithStatsSource>(sprint: TSpri
   const planningReadiness =
     totalIssues === 0 ? 0 : Math.round((estimatedIssues / totalIssues) * 100);
 
+  const totalEstimatedHours = sprint.issues?.reduce((sum, issue) => {
+    const h = issue.estimatedHours != null ? Number(issue.estimatedHours) : 0;
+    return sum + h;
+  }, 0) ?? 0;
+
   const sprintData = { ...sprint };
   delete (sprintData as Partial<TSprint> & SprintWithStatsSource).issues;
 
@@ -32,6 +37,7 @@ function mapSprintWithStats<TSprint extends SprintWithStatsSource>(sprint: TSpri
       totalIssues,
       estimatedIssues,
       planningReadiness,
+      totalEstimatedHours,
     },
   };
 }

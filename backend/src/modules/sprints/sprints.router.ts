@@ -4,9 +4,12 @@ import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { createSprintDto, updateSprintDto, moveIssuesToSprintDto } from './sprints.dto.js';
 import * as sprintsService from './sprints.service.js';
+import * as aiService from '../ai/ai.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { parsePagination } from '../../shared/utils/params.js';
+import { prisma } from '../../prisma/client.js';
+import { delCachedJson } from '../../shared/redis.js';
 
 const router = Router();
 router.use(authenticate);
@@ -113,6 +116,45 @@ router.post('/projects/:projectId/backlog/issues', validate(moveIssuesToSprintDt
   try {
     await sprintsService.moveIssuesToSprint(null, req.body.issueIds);
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// Bulk AI estimate all issues in a sprint
+router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER', 'USER'), async (req: AuthRequest, res, next) => {
+  try {
+    const sprintId = req.params.id as string;
+
+    const issues = await prisma.issue.findMany({
+      where: { sprintId },
+      select: { id: true },
+    });
+
+    const results: Array<{ issueId: string; estimatedHours?: number; error?: string }> = [];
+
+    for (const issue of issues) {
+      try {
+        const result = await aiService.estimateIssue({ issueId: issue.id });
+        results.push({ issueId: issue.id, estimatedHours: result.estimatedHours });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        results.push({ issueId: issue.id, error: msg });
+      }
+    }
+
+    // Invalidate sprint issues cache so stats recalculate
+    await delCachedJson(`sprint:issues:${sprintId}`);
+
+    await logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
+      total: issues.length,
+      estimated: results.filter(r => !r.error).length,
+    });
+
+    res.json({
+      total: issues.length,
+      estimated: results.filter(r => !r.error).length,
+      failed: results.filter(r => !!r.error).length,
+      results,
+    });
   } catch (err) { next(err); }
 });
 
