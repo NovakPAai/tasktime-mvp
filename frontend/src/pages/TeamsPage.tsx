@@ -24,16 +24,16 @@ const DARK_C = {
 };
 
 const LIGHT_C = {
-  bg: '#F0F2FA',
+  bg: '#F6F8FA',
   bgCard: '#FFFFFF',
-  bgCardAlt: '#F8F9FB',
+  bgCardAlt: '#F6F8FA',
   border: '#D0D7DE',
   headerBg: '#F6F8FA',
   btnBorder: '#D0D7DE',
   t1: '#1F2328',
   t2: '#424A53',
-  t3: '#6E7781',
-  t4: '#AFB8C1',
+  t3: '#656D76',
+  t4: '#8C959F',
 };
 
 const AVATAR_GRADS = [

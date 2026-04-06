@@ -16,20 +16,22 @@ const DARK_C = {
   tabActiveBg: 'linear-gradient(in oklab 135deg, oklab(59.3% -0.002 -0.207 / 20%) 0%, oklab(54.1% 0.096 -0.227 / 12%) 100%)',
   tabActiveText: '#4F6EF7',
   tabText: '#8B949E',
+  red: '#EF4444',
 };
 
 const LIGHT_C = {
-  bg: '#F0F2FA',
+  bg: '#F6F8FA',
   bgCard: '#FFFFFF',
-  bgSprintBlock: '#F0F2FA',
+  bgSprintBlock: '#F6F8FA',
   border: '#D0D7DE',
   t1: '#1F2328',
   t2: '#424A53',
-  t3: '#6E7781',
+  t3: '#656D76',
   progBg: '#D0D7DE',
-  tabActiveBg: 'linear-gradient(in oklab 135deg, oklab(59.3% -0.002 -0.207 / 12%) 0%, oklab(54.1% 0.096 -0.227 / 6%) 100%)',
+  tabActiveBg: '#4F6EF71A',
   tabActiveText: '#4F6EF7',
-  tabText: '#6E7781',
+  tabText: '#656D76',
+  red: '#CF222E',
 };
 
 type FlowIssue = { text: string; dotColor: string; textColor: string };
@@ -60,105 +62,119 @@ type FlowTeam = {
   flowIssues: FlowIssue[];
 };
 
-const FLOW_TEAMS: FlowTeam[] = [
-  {
-    id: 'deliver',
-    abbr: 'ПП',
-    abbrGrad:
-      'linear-gradient(in oklab 135deg, oklab(63.7% 0.188 0.089) 0%, oklab(57.7% 0.191 0.099) 100%)',
-    name: 'Платёжный поток',
-    membersCount: 6,
-    typeTag: 'DELIVER',
-    typeTagBg: '#EF444414',
-    typeTagText: '#EF4444',
-    accentBorder: '#EF4444',
-    hasBottleneck: true,
-    throughput: '4.2',
-    throughputColor: '#E2E8F8',
-    wip: '12',
-    wipColor: '#F59E0B',
-    wipLimit: 8,
-    cycleTime: '18д',
-    cycleTimeColor: '#E2E8F8',
-    sprintName: 'Спринт 5 · Q2',
-    sprintDates: '31 мар — 14 апр',
-    sprintProgress: 65,
-    sprintProgGrad:
-      'linear-gradient(in oklab 90deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)',
-    sprintPlanned: '13/20 задач запланировано',
-    flowIssues: [
-      { text: 'Блокировка проверки SWIFT — 4 дня', dotColor: '#EF4444', textColor: '#C9D1D9' },
-      { text: 'Ревью архитектуры задержано', dotColor: '#F59E0B', textColor: '#C9D1D9' },
-      { text: 'WIP превышен на 50%', dotColor: '#F59E0B', textColor: '#C9D1D9' },
-    ],
-  },
-  {
-    id: 'develop',
-    abbr: 'КП',
-    abbrGrad: LOGO_GRAD,
-    name: 'Клиентский поток',
-    membersCount: 7,
-    typeTag: 'DEVELOP',
-    typeTagBg: '#4F6EF71A',
-    typeTagText: '#4F6EF7',
-    accentBorder: '#4ADE80',
-    hasBottleneck: false,
-    throughput: '7.8',
-    throughputColor: '#4ADE80',
-    wip: '6',
-    wipColor: '#4ADE80',
-    wipLimit: 8,
-    cycleTime: '9д',
-    cycleTimeColor: '#E2E8F8',
-    sprintName: 'Спринт 3 · Q2',
-    sprintDates: '1 апр — 15 апр',
-    sprintProgress: 88,
-    sprintProgGrad:
-      'linear-gradient(in oklab 90deg, oklab(80% -0.160 0.086) 0%, oklab(72.3% -0.166 0.097) 100%)',
-    sprintPlanned: '22/25 задач запланировано',
-    flowIssues: [
-      { text: 'Поток в норме, WIP в пределах', dotColor: '#4ADE80', textColor: '#C9D1D9' },
-      { text: 'Запланировано тех. долг на Q2', dotColor: '#8B949E', textColor: '#8B949E' },
-    ],
-  },
-  {
-    id: 'design',
-    abbr: 'УА',
-    abbrGrad:
-      'linear-gradient(in oklab 135deg, oklab(62.7% 0.130 -0.193) 0%, oklab(54.1% 0.096 -0.227) 100%)',
-    name: 'UX / Аналитика',
-    membersCount: 5,
-    typeTag: 'DESIGN',
-    typeTagBg: '#A88BFA1A',
-    typeTagText: '#A78BFA',
-    accentBorder: '#A78BFA',
-    hasBottleneck: false,
-    throughput: '5.1',
-    throughputColor: '#E2E8F8',
-    wip: '5',
-    wipColor: '#E2E8F8',
-    wipLimit: 6,
-    cycleTime: '12д',
-    cycleTimeColor: '#E2E8F8',
-    sprintName: 'Design Q2 Wave 1',
-    sprintDates: '7 апр — 21 апр',
-    sprintProgress: 44,
-    sprintProgGrad:
-      'linear-gradient(in oklab 90deg, oklab(70.9% 0.064 -0.146) 0%, oklab(54.1% 0.096 -0.227) 100%)',
-    sprintPlanned: '11/25 задач запланировано',
-    flowIssues: [
-      { text: 'Ожидание фидбека от бизнеса', dotColor: '#F59E0B', textColor: '#C9D1D9' },
-      { text: 'Планируется UI Kit ревью', dotColor: '#8B949E', textColor: '#8B949E' },
-    ],
-  },
-];
+function getFlowTeams(isLight: boolean): FlowTeam[] {
+  const txtActive = isLight ? '#1F2328' : '#C9D1D9';
+  const txtMuted = isLight ? '#656D76' : '#8B949E';
+  const green = isLight ? '#1A7F37' : '#4ADE80';
+  const amber = isLight ? '#D97706' : '#F59E0B';
+  const neutral = isLight ? '#1F2328' : '#E2E8F8';
+  const muted = isLight ? '#8C959F' : '#8B949E';
+  const red = isLight ? '#CF222E' : '#EF4444';
+  const purple = isLight ? '#7C3AED' : '#A78BFA';
+
+  return [
+    {
+      id: 'deliver',
+      abbr: 'ПП',
+      abbrGrad:
+        'linear-gradient(in oklab 135deg, oklab(63.7% 0.188 0.089) 0%, oklab(57.7% 0.191 0.099) 100%)',
+      name: 'Платёжный поток',
+      membersCount: 6,
+      typeTag: 'DELIVER',
+      typeTagBg: isLight ? '#CF222E12' : '#EF444414',
+      typeTagText: red,
+      accentBorder: red,
+      hasBottleneck: true,
+      throughput: '4.2',
+      throughputColor: neutral,
+      wip: '12',
+      wipColor: amber,
+      wipLimit: 8,
+      cycleTime: '18д',
+      cycleTimeColor: neutral,
+      sprintName: 'Спринт 5 · Q2',
+      sprintDates: '31 мар — 14 апр',
+      sprintProgress: 65,
+      sprintProgGrad:
+        'linear-gradient(in oklab 90deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)',
+      sprintPlanned: '13/20 задач запланировано',
+      flowIssues: [
+        { text: 'Блокировка проверки SWIFT — 4 дня', dotColor: red, textColor: txtActive },
+        { text: 'Ревью архитектуры задержано', dotColor: amber, textColor: txtActive },
+        { text: 'WIP превышен на 50%', dotColor: amber, textColor: txtActive },
+      ],
+    },
+    {
+      id: 'develop',
+      abbr: 'КП',
+      abbrGrad: LOGO_GRAD,
+      name: 'Клиентский поток',
+      membersCount: 7,
+      typeTag: 'DEVELOP',
+      typeTagBg: isLight ? '#1A7F3714' : '#4F6EF71A',
+      typeTagText: isLight ? '#1A7F37' : '#4F6EF7',
+      accentBorder: green,
+      hasBottleneck: false,
+      throughput: '7.8',
+      throughputColor: green,
+      wip: '6',
+      wipColor: green,
+      wipLimit: 8,
+      cycleTime: '9д',
+      cycleTimeColor: neutral,
+      sprintName: 'Спринт 3 · Q2',
+      sprintDates: '1 апр — 15 апр',
+      sprintProgress: 88,
+      sprintProgGrad:
+        'linear-gradient(in oklab 90deg, oklab(80% -0.160 0.086) 0%, oklab(72.3% -0.166 0.097) 100%)',
+      sprintPlanned: '22/25 задач запланировано',
+      flowIssues: [
+        { text: 'Поток в норме, WIP в пределах', dotColor: green, textColor: txtActive },
+        { text: 'Запланировано тех. долг на Q2', dotColor: muted, textColor: txtMuted },
+      ],
+    },
+    {
+      id: 'design',
+      abbr: 'УА',
+      abbrGrad:
+        'linear-gradient(in oklab 135deg, oklab(62.7% 0.130 -0.193) 0%, oklab(54.1% 0.096 -0.227) 100%)',
+      name: 'UX / Аналитика',
+      membersCount: 5,
+      typeTag: 'DESIGN',
+      typeTagBg: isLight ? '#7C3AED14' : '#A88BFA1A',
+      typeTagText: purple,
+      accentBorder: purple,
+      hasBottleneck: false,
+      throughput: '5.1',
+      throughputColor: neutral,
+      wip: '5',
+      wipColor: neutral,
+      wipLimit: 6,
+      cycleTime: '12д',
+      cycleTimeColor: neutral,
+      sprintName: 'Design Q2 Wave 1',
+      sprintDates: '7 апр — 21 апр',
+      sprintProgress: 44,
+      sprintProgGrad:
+        'linear-gradient(in oklab 90deg, oklab(70.9% 0.064 -0.146) 0%, oklab(54.1% 0.096 -0.227) 100%)',
+      sprintPlanned: '11/25 задач запланировано',
+      flowIssues: [
+        { text: 'Ожидание фидбека от бизнеса', dotColor: amber, textColor: txtActive },
+        { text: 'Планируется UI Kit ревью', dotColor: muted, textColor: txtMuted },
+      ],
+    },
+  ];
+}
 
 type TabKey = 'all' | 'DELIVER' | 'DEVELOP' | 'DESIGN' | 'bottleneck';
 
 export default function FlowTeamsPage() {
   const { mode } = useThemeStore();
-  const C = mode === 'light' ? LIGHT_C : DARK_C;
+  const isLight = mode === 'light';
+  const C = isLight ? LIGHT_C : DARK_C;
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+
+  const FLOW_TEAMS = getFlowTeams(isLight);
 
   const visibleTeams = FLOW_TEAMS.filter((t) => {
     if (activeTab === 'all') return true;
@@ -271,7 +287,7 @@ export default function FlowTeamsPage() {
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: '#EF4444',
+                    background: C.red,
                     flexShrink: 0,
                   }}
                 />
@@ -282,7 +298,7 @@ export default function FlowTeamsPage() {
                   fontSize: 12,
                   fontWeight: isActive ? 500 : 400,
                   lineHeight: '16px',
-                  color: tab.dot ? '#EF4444' : isActive ? C.tabActiveText : C.tabText,
+                  color: tab.dot ? C.red : isActive ? C.tabActiveText : C.tabText,
                 }}
               >
                 {tab.label}
@@ -322,14 +338,14 @@ export default function FlowTeamsPage() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 4,
-                  background: '#EF44441F',
+                  background: isLight ? '#CF222E14' : '#EF44441F',
                   borderRadius: 20,
                   paddingBlock: 3,
                   paddingInline: 8,
                 }}
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M5 1L9 9H1L5 1Z" fill="#EF4444" />
+                  <path d="M5 1L9 9H1L5 1Z" fill={C.red} />
                 </svg>
                 <span
                   style={{
@@ -338,7 +354,7 @@ export default function FlowTeamsPage() {
                     fontWeight: 600,
                     letterSpacing: '0.3px',
                     lineHeight: '12px',
-                    color: '#EF4444',
+                    color: C.red,
                   }}
                 >
                   УЗКОЕ МЕСТО
@@ -432,7 +448,7 @@ export default function FlowTeamsPage() {
             </div>
 
             {/* Metrics row */}
-            <div style={{ display: 'flex', marginBottom: 16 }}>
+            <div style={{ display: 'flex', marginBottom: 16, border: isLight ? `1px solid ${C.border}` : undefined, borderRadius: isLight ? 8 : undefined, overflow: isLight ? 'hidden' : undefined }}>
               {[
                 {
                   value: team.throughput,
