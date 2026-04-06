@@ -39,7 +39,7 @@ db-studio:
 
 # --- Documentation ---
 docs:
-	node scripts/generate-docs.js
+	$(shell command -v node || echo /usr/local/bin/node) scripts/generate-docs.js
 
 # --- Quality ---
 test:
