@@ -124,7 +124,7 @@ export default function AppLayout() {
 
       {/* Main content area — TTUI-173: overflowY: auto enables page-level scrolling */}
       <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <div id="main-scroll" style={{ flex: '1 1 0', overflowY: 'auto', minHeight: 0 }}>
+        <div id="main-scroll" style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
           <Outlet />
           <UatOnboardingOverlay />
         </div>

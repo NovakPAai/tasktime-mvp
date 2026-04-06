@@ -169,7 +169,6 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  color-scheme: dark;
 }
 
 /* === Ant Design base overrides for dark Linear theme === */
@@ -3160,7 +3159,7 @@ body {
   color: var(--t3);
 }
 
-[data-theme='light'] .tt-board-col,
+[data-theme='light'] .tt-board-column,
 [data-theme='light'] .tt-board-card {
   border-color: var(--b) !important;
 }
