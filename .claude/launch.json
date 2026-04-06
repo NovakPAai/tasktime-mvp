@@ -9,8 +9,8 @@
     },
     {
       "name": "frontend",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/pavelnovak/tasktime-mvp/frontend && node_modules/.bin/vite --port 5181"],
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["/Users/pavelnovak/tasktime-mvp/frontend/node_modules/.bin/vite", "--port", "5181", "--host", "localhost"],
       "port": 5181
     }
   ]
