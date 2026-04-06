@@ -39,7 +39,8 @@ db-studio:
 
 # --- Documentation ---
 docs:
-	$(shell command -v node || echo /usr/local/bin/node) scripts/generate-docs.js
+	@NODE_BIN=$$(command -v node) || { echo "Error: node not found on PATH"; exit 1; }; \
+	$$NODE_BIN scripts/generate-docs.js
 
 # --- Quality ---
 test:
