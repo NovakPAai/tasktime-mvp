@@ -91,38 +91,51 @@ export async function getSprintIssues(id: string) {
   const cached = await getCachedJson<SprintIssuesResult>(cacheKey);
   if (cached) return cached;
 
-  const sprint = await prisma.sprint.findUnique({
-    where: { id },
-    include: {
-      _count: { select: { issues: true } },
-      issues: {
-        select: {
-          id: true,
-          projectId: true,
-          number: true,
-          title: true,
-          estimatedHours: true,
-          issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconName: true, iconColor: true } },
-          status: true,
-          priority: true,
-          updatedAt: true,
-          assignee: { select: { id: true, name: true } },
-          project: { select: { id: true, name: true, key: true } },
+  const [sprint, hoursAgg] = await Promise.all([
+    prisma.sprint.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { issues: true } },
+        issues: {
+          select: {
+            id: true,
+            projectId: true,
+            number: true,
+            title: true,
+            estimatedHours: true,
+            issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconName: true, iconColor: true } },
+            status: true,
+            priority: true,
+            updatedAt: true,
+            assignee: { select: { id: true, name: true } },
+            project: { select: { id: true, name: true, key: true } },
+          },
+          orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+          take: 200,
         },
-        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
-        take: 200,
+        project: { select: { id: true, name: true, key: true } },
+        projectTeam: { select: { id: true, name: true } },
+        businessTeam: { select: { id: true, name: true } },
+        flowTeam: { select: { id: true, name: true } },
       },
-      project: { select: { id: true, name: true, key: true } },
-      projectTeam: { select: { id: true, name: true } },
-      businessTeam: { select: { id: true, name: true } },
-      flowTeam: { select: { id: true, name: true } },
-    },
-  });
+    }),
+    // Separate aggregate to get accurate total regardless of the take: 200 limit above
+    prisma.issue.aggregate({
+      where: { sprintId: id },
+      _sum: { estimatedHours: true },
+    }),
+  ]);
 
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
+  const sprintWithStats = mapSprintWithStats(sprint);
+  // Override totalEstimatedHours with the accurate aggregate value
+  if (sprintWithStats.stats) {
+    sprintWithStats.stats.totalEstimatedHours = Number(hoursAgg._sum.estimatedHours ?? 0);
+  }
+
   const result = {
-    sprint: mapSprintWithStats(sprint),
+    sprint: sprintWithStats,
     issues: sprint.issues.map((issue) => ({
       ...issue,
       type: issue.issueTypeConfig?.systemKey ?? null,

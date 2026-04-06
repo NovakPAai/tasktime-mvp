@@ -288,19 +288,24 @@ export default function SprintsPage() {
     projectTeamId?: string; businessTeamId?: string; flowTeamId?: string;
   }) => {
     if (!selectedSprintId) return;
-    await sprintsApi.updateSprint(selectedSprintId, {
-      name: vals.name,
-      goal: vals.goal ?? null,
-      startDate: vals.startDate ? vals.startDate.toISOString() : null,
-      endDate: vals.endDate ? vals.endDate.toISOString() : null,
-      projectTeamId: vals.projectTeamId ?? null,
-      businessTeamId: vals.businessTeamId ?? null,
-      flowTeamId: vals.flowTeamId ?? null,
-    });
-    setEditOpen(false);
-    editForm.resetFields();
-    void load();
-    void message.success('Спринт обновлён');
+    try {
+      await sprintsApi.updateSprint(selectedSprintId, {
+        name: vals.name,
+        goal: vals.goal ?? null,
+        startDate: vals.startDate ? vals.startDate.toISOString() : null,
+        endDate: vals.endDate ? vals.endDate.toISOString() : null,
+        projectTeamId: vals.projectTeamId ?? null,
+        businessTeamId: vals.businessTeamId ?? null,
+        flowTeamId: vals.flowTeamId ?? null,
+      });
+      setEditOpen(false);
+      editForm.resetFields();
+      void load();
+      void message.success('Спринт обновлён');
+    } catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      void message.error(err.response?.data?.error ?? 'Ошибка сохранения');
+    }
   };
 
   const handleEstimateAll = async () => {

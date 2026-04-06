@@ -9,7 +9,7 @@ import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { parsePagination } from '../../shared/utils/params.js';
 import { prisma } from '../../prisma/client.js';
-import { delCachedJson } from '../../shared/redis.js';
+import { delCachedJson, delCacheByPrefix } from '../../shared/redis.js';
 
 const router = Router();
 router.use(authenticate);
@@ -120,9 +120,15 @@ router.post('/projects/:projectId/backlog/issues', validate(moveIssuesToSprintDt
 });
 
 // Bulk AI estimate all issues in a sprint
-router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER', 'USER'), async (req: AuthRequest, res, next) => {
+router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res, next) => {
   try {
     const sprintId = req.params.id as string;
+
+    const sprint = await prisma.sprint.findUnique({
+      where: { id: sprintId },
+      select: { id: true, projectId: true },
+    });
+    if (!sprint) { res.status(404).json({ error: 'Sprint not found' }); return; }
 
     const issues = await prisma.issue.findMany({
       where: { sprintId },
@@ -141,8 +147,12 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER', 'USE
       }
     }
 
-    // Invalidate sprint issues cache so stats recalculate
-    await delCachedJson(`sprint:issues:${sprintId}`);
+    // Invalidate sprint issues cache + sprint list caches so totalEstimatedHours recalculates
+    await Promise.all([
+      delCachedJson(`sprint:issues:${sprintId}`),
+      delCacheByPrefix(`sprints:project:${sprint.projectId}:`),
+      delCacheByPrefix('sprints:all:'),
+    ]);
 
     await logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
       total: issues.length,
