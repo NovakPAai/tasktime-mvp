@@ -327,7 +327,7 @@
       <line x1="258" y1="64" x2="402" y2="64" stroke="#21262d" stroke-width="1"/>
       <rect x="258" y="73" width="144" height="20" rx="4" fill="#0a1f0f"/>
       <text x="330" y="87" text-anchor="middle" fill="#3fb950" font-size="10">HTTP :3002 · StreamableHTTP</text>
-      <text x="330" y="113" text-anchor="middle" fill="#8b949e" font-size="11">14 инструментов</text>
+      <text x="330" y="113" text-anchor="middle" fill="#8b949e" font-size="11">15 инструментов</text>
       <text x="330" y="131" text-anchor="middle" fill="#8b949e" font-size="11">read / write / time</text>
       <line x1="258" y1="142" x2="402" y2="142" stroke="#21262d" stroke-width="1"/>
       <text x="330" y="158" text-anchor="middle" fill="#484f58" font-size="10">agent@flow-universe.internal</text>
@@ -532,32 +532,32 @@
       <tr>
         <td><span class="tool-name">get_issue</span> <span class="tool-badge badge-read">read</span></td>
         <td>Карточка задачи: статус, тип, спринт, исполнитель, комментарии, время</td>
-        <td><code>key</code>: TTMP-95</td>
+        <td><code>key</code>: TTMP-95 или UUID</td>
       </tr>
       <tr>
         <td><span class="tool-name">list_issues</span> <span class="tool-badge badge-read">read</span></td>
-        <td>Список задач проекта с фильтрацией</td>
-        <td><code>projectKey</code>, <code>status</code>, <code>assigneeId</code>, <code>sprintId</code></td>
+        <td>Список задач проекта с фильтрацией. <code>sprint="active"</code> — текущий спринт</td>
+        <td><code>project</code>, <code>sprint</code>, <code>status</code>, <code>aiEligible</code>, <code>assigneeType</code>, <code>limit</code></td>
       </tr>
       <tr>
-        <td><span class="tool-name">get_sprint</span> <span class="tool-badge badge-read">read</span></td>
-        <td>Спринт: задачи, статусы, прогресс</td>
-        <td><code>sprintId</code></td>
+        <td><span class="tool-name">get_sprint_context</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Активный (или последний плановый) спринт: задачи, статистика, AI-саммари</td>
+        <td><code>project</code>: TTMP</td>
       </tr>
       <tr>
-        <td><span class="tool-name">list_sprints</span> <span class="tool-badge badge-read">read</span></td>
-        <td>Все спринты проекта</td>
-        <td><code>projectKey</code></td>
+        <td><span class="tool-name">get_backlog</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Задачи в бэклоге (не привязанные ни к одному спринту)</td>
+        <td><code>project</code>, <code>limit</code></td>
       </tr>
       <tr>
-        <td><span class="tool-name">get_project</span> <span class="tool-badge badge-read">read</span></td>
-        <td>Информация о проекте</td>
-        <td><code>key</code>: TTMP</td>
+        <td><span class="tool-name">get_comments</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Все комментарии к задаче</td>
+        <td><code>key</code>: TTMP-95</td>
       </tr>
       <tr>
-        <td><span class="tool-name">list_projects</span> <span class="tool-badge badge-read">read</span></td>
-        <td>Все проекты системы</td>
-        <td>—</td>
+        <td><span class="tool-name">get_eligible_issues</span> <span class="tool-badge badge-read">read</span></td>
+        <td>Очередь AI-eligible задач, ещё не взятых в работу (для автономного агента)</td>
+        <td><code>project</code>, <code>limit</code></td>
       </tr>
       <tr>
         <td><span class="tool-name">get_time_summary</span> <span class="tool-badge badge-read">read</span></td>
@@ -582,27 +582,27 @@
       </tr>
       <tr>
         <td><span class="tool-name">add_comment</span> <span class="tool-badge badge-write">write</span></td>
-        <td>Добавить комментарий к задаче от имени AI-агента</td>
+        <td>Добавить прогресс-комментарий или итог к задаче от имени AI-агента</td>
         <td><code>key</code>, <code>body</code></td>
       </tr>
       <tr>
         <td><span class="tool-name">create_subtask</span> <span class="tool-badge badge-write">write</span></td>
-        <td>Создать подзадачу (SUBTASK) к существующей задаче</td>
+        <td>Создать подзадачу (SUBTASK) к существующей задаче (реальная декомпозиция)</td>
         <td><code>parentKey</code>, <code>title</code>, <code>description</code>, <code>priority</code></td>
       </tr>
       <tr>
         <td><span class="tool-name">claim_issue</span> <span class="tool-badge badge-write">write</span></td>
-        <td>Взять задачу в работу: присвоить агенту + перевести в IN_PROGRESS</td>
+        <td>Атомарно взять AI-eligible задачу: назначить агента + перевести в IN_PROGRESS</td>
         <td><code>key</code></td>
       </tr>
       <tr>
         <td><span class="tool-name">complete_issue</span> <span class="tool-badge badge-write">write</span></td>
-        <td>Завершить задачу: статус DONE + итоговый комментарий</td>
+        <td>Завершить работу агента: статус → REVIEW (ожидает аппрув человека) + итоговый комментарий</td>
         <td><code>key</code>, <code>summary</code></td>
       </tr>
       <tr>
         <td><span class="tool-name">fail_issue</span> <span class="tool-badge badge-write">write</span></td>
-        <td>Отметить задачу как проваленную агентом: сброс исполнителя + причина</td>
+        <td>Эскалация: агент не смог завершить. Сбрасывает задачу в OPEN для человека</td>
         <td><code>key</code>, <code>reason</code></td>
       </tr>
     </tbody>
