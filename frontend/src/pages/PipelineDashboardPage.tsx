@@ -201,6 +201,16 @@ export default function PipelineDashboardPage() {
     }
   };
 
+  const handleCancelDeploy = async (batchId: string) => {
+    setError(null);
+    try {
+      await pipelineApi.cancelDeploy(batchId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка отмены деплоя');
+    }
+  };
+
   const handleDeployProd = async (batchId: string) => {
     setProdDeploying(batchId);
     setError(null);
@@ -409,7 +419,10 @@ export default function PipelineDashboardPage() {
                     <ActionBtn label={stagingDeploying === selected.id ? 'Запуск...' : '→ Deploy Staging'} color={C.acc} onClick={() => handleDeployStaging(selected.id)} disabled={stagingDeploying !== null} />
                   )}
                   {selected.state === 'DEPLOYING' && (
-                    <span style={{ fontSize: 12, color: C.warn, fontStyle: 'italic' }}>⟳ Деплой в процессе...</span>
+                    <>
+                      <span style={{ fontSize: 12, color: C.warn, fontStyle: 'italic' }}>⟳ Деплой в процессе...</span>
+                      <ActionBtn label="✗ Отменить" color={C.error} onClick={() => handleCancelDeploy(selected.id)} />
+                    </>
                   )}
                   {selected.state === 'TESTING' && (
                     <>
