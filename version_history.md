@@ -2,7 +2,26 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.6**
+**Last version: 2.7**
+
+---
+
+## [2.7] [2026-04-06] feat(ui): Fonts & Tokens + Sidebar Collapse + Bug Fixes
+
+**PR:** [#NovakPA/thirsty-feynman](https://github.com/jackrescuer-gif/tasktime-mvp)
+**Ветка:** `NovakPA/thirsty-feynman`
+
+### Что изменилось
+- **TTUI-162/163:** @font-face для Space Grotesk 600/700, Inter 400/500/600 из `/public/fonts/*.woff2`. Google Fonts CDN удалён из `index.html`. Работает offline (Astra Linux, Red OS)
+- **TTUI-118:** `[data-theme='light']` CSS-токены в `styles.css` — полный набор переменных для светлой темы
+- **TTUI-119:** Шрифты self-hosted подтверждены, CDN зависимость устранена
+- **TTUI-84:** `frontend/src/store/ui.store.ts` — Zustand persist store (`tt-ui`) с `sidebarCollapsed: boolean`
+- **TTUI-85:** `AppLayout.tsx` читает `sidebarCollapsed` из ui.store, передаёт `collapsed` и `onCollapseToggle` в Sidebar
+- **TTUI-86:** Sidebar анимируется 220→52px (`transition: width 0.2s cubic-bezier`). Collapsed: иконки центрированы, текст/сабменю/разделители скрыты
+- **TTUI-87:** Кнопка-шеврон в футере сайдбара — раскрыть/свернуть. Анимация rotate(180deg)
+- **TTUI-73/170:** `[data-theme='light']` overrides для glass-эффектов: убраны `rgba(255,255,255,X)` в кнопках, заголовках таблиц, модалах, дровере
+- **TTUI-173:** `AppLayout` main-scroll контейнер `overflowY:auto` — страницы теперь скроллируются
+- **TTUI-174:** CSS для `.ant-table-row-expand-icon` через CSS vars — expand-иконка дерева задач корректна в обеих темах
 
 ---
 
