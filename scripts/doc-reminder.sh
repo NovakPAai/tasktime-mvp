@@ -56,7 +56,7 @@ fi
 if echo "$FILE" | grep -qE 'backend/src/modules/.*\.router\.ts$'; then
   echo ""
   echo "✅ Авто: маршруты изменились → запускаю generate-docs --routes"
-  (cd "$MAIN_REPO" && node scripts/generate-docs.js --routes 2>/dev/null) && \
+  (cd "$MAIN_REPO" && node scripts/generate-docs.js --routes 2>&1) && \
     echo "   docs/api/reference.md обновлён" || \
     echo "   ⚠️  generate-docs --routes не смог выполниться"
 fi
@@ -64,7 +64,7 @@ fi
 if echo "$FILE" | grep -qE 'prisma/schema\.prisma$'; then
   echo ""
   echo "✅ Авто: schema.prisma изменилась → запускаю generate-docs --schema"
-  (cd "$MAIN_REPO" && node scripts/generate-docs.js --schema 2>/dev/null) && \
+  (cd "$MAIN_REPO" && node scripts/generate-docs.js --schema 2>&1) && \
     echo "   docs/architecture/data-model.md обновлён" || \
     echo "   ⚠️  generate-docs --schema не смог выполниться"
 fi
@@ -72,7 +72,7 @@ fi
 if echo "$FILE" | grep -qE 'backend/src/app\.ts$'; then
   echo ""
   echo "✅ Авто: app.ts изменился → запускаю generate-docs --modules"
-  (cd "$MAIN_REPO" && node scripts/generate-docs.js --modules 2>/dev/null) && \
+  (cd "$MAIN_REPO" && node scripts/generate-docs.js --modules 2>&1) && \
     echo "   docs/architecture/backend-modules.md обновлён" || \
     echo "   ⚠️  generate-docs --modules не смог выполниться"
 fi
@@ -80,7 +80,7 @@ fi
 if echo "$FILE" | grep -qE 'frontend/src/App\.tsx$'; then
   echo ""
   echo "✅ Авто: App.tsx изменился → запускаю generate-docs --frontend"
-  (cd "$MAIN_REPO" && node scripts/generate-docs.js --frontend 2>/dev/null) && \
+  (cd "$MAIN_REPO" && node scripts/generate-docs.js --frontend 2>&1) && \
     echo "   docs/architecture/frontend-architecture.md обновлён" || \
     echo "   ⚠️  generate-docs --frontend не смог выполниться"
 fi
