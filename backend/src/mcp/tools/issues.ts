@@ -178,6 +178,9 @@ export function registerIssueTools(server: McpServer) {
         let parentId: string | undefined;
         if (parentKey) {
           const parent = await resolveKey(parentKey);
+          if (parent.projectId !== proj.id) {
+            return errText(`Parent issue ${parentKey} belongs to project ${parent.projectKey}, not ${project.toUpperCase()}`);
+          }
           parentId = parent.id;
         }
 
