@@ -39,10 +39,10 @@ export async function listIssuesWithKanbanFields(
   projectId: string,
   sprintId?: string,
 ): Promise<Issue[]> {
-  const { data } = await api.get<Issue[]>(`/projects/${projectId}/issues`, {
+  const { data } = await api.get<{ data: Issue[]; meta: unknown }>(`/projects/${projectId}/issues`, {
     params: { includeKanbanFields: 'true', ...(sprintId ? { sprintId } : {}) },
   });
-  return data;
+  return data.data;
 }
 
 export async function getIssue(id: string): Promise<Issue> {

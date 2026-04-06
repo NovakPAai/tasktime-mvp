@@ -615,6 +615,7 @@ export async function bulkDeleteIssues(projectId: string, issueIds: string[]): P
     where: { id: { in: issueIds }, projectId },
   });
 
+  await delCacheByPrefix(`issues:list:${projectId}:`);
   return { deletedCount: count };
 }
 

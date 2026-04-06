@@ -177,9 +177,11 @@ export default function AdminPage() {
       }
       const page = await sprintsApi.listSprints(selectedProjectId);
       setSprints(page.data);
-      if (!selectedSprintId && page.data.length > 0) {
-        setSelectedSprintId(page.data[0].id);
-      }
+      setSelectedSprintId((prev) => {
+        if (!prev) return page.data[0]?.id;
+        const existsInProject = page.data.some((s) => s.id === prev);
+        return existsInProject ? prev : page.data[0]?.id;
+      });
     };
     void loadSprints();
   // eslint-disable-next-line react-hooks/exhaustive-deps
