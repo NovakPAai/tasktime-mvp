@@ -154,6 +154,43 @@ export function registerIssueTools(server: McpServer) {
     },
   );
 
+  // ── create_issue ──────────────────────────────────────────────────────────────
+  server.tool(
+    'create_issue',
+    'Create an issue of any type (EPIC, STORY, TASK, BUG, SUBTASK) in a project',
+    {
+      project: z.string().describe('Project key, e.g. TTMP'),
+      title: z.string().min(1).max(500),
+      type: z.enum(['EPIC', 'STORY', 'TASK', 'BUG', 'SUBTASK']).default('TASK'),
+      description: z.string().optional(),
+      priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
+      parentKey: z.string().optional().describe('Parent issue key (required for SUBTASK, optional for STORY/TASK/BUG under EPIC)'),
+    },
+    async ({ project, title, type, description, priority, parentKey }) => {
+      try {
+        const proj = await prisma.project.findUnique({ where: { key: project.toUpperCase() } });
+        if (!proj) return errText(`Project ${project} not found`);
+
+        let parentId: string | undefined;
+        if (parentKey) {
+          const parent = await resolveKey(parentKey);
+          parentId = parent.id;
+        }
+
+        const issue = await api.post<{ number: number; project: { key: string } }>(
+          `/api/projects/${proj.id}/issues`,
+          { title, description, type, priority, parentId },
+        );
+
+        const issueKey = `${issue.project.key}-${issue.number}`;
+        const parentStr = parentKey ? ` → ${parentKey}` : '';
+        return text(`Created ${issueKey}: "${title}" (${type}${parentStr}) ✓`);
+      } catch (err) {
+        return errText(err);
+      }
+    },
+  );
+
   // ── create_subtask ────────────────────────────────────────────────────────────
   server.tool(
     'create_subtask',

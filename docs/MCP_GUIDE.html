@@ -327,7 +327,7 @@
       <line x1="258" y1="64" x2="402" y2="64" stroke="#21262d" stroke-width="1"/>
       <rect x="258" y="73" width="144" height="20" rx="4" fill="#0a1f0f"/>
       <text x="330" y="87" text-anchor="middle" fill="#3fb950" font-size="10">HTTP :3002 · StreamableHTTP</text>
-      <text x="330" y="113" text-anchor="middle" fill="#8b949e" font-size="11">15 инструментов</text>
+      <text x="330" y="113" text-anchor="middle" fill="#8b949e" font-size="11">16 инструментов</text>
       <text x="330" y="131" text-anchor="middle" fill="#8b949e" font-size="11">read / write / time</text>
       <line x1="258" y1="142" x2="402" y2="142" stroke="#21262d" stroke-width="1"/>
       <text x="330" y="158" text-anchor="middle" fill="#484f58" font-size="10">agent@flow-universe.internal</text>
@@ -558,6 +558,11 @@
         <td><span class="tool-name">get_eligible_issues</span> <span class="tool-badge badge-read">read</span></td>
         <td>Очередь AI-eligible задач, ещё не взятых в работу (для автономного агента)</td>
         <td><code>project</code>, <code>limit</code></td>
+      </tr>
+      <tr>
+        <td><span class="tool-name">create_issue</span> <span class="tool-badge badge-write">write</span></td>
+        <td>Создать задачу любого типа: EPIC, STORY, TASK, BUG, SUBTASK. <code>parentKey</code> опционален</td>
+        <td><code>project</code>, <code>title</code>, <code>type</code>, <code>priority</code>, <code>description</code>, <code>parentKey?</code></td>
       </tr>
       <tr>
         <td><span class="tool-name">get_time_summary</span> <span class="tool-badge badge-read">read</span></td>
