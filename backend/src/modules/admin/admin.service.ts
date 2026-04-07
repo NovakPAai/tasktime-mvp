@@ -265,6 +265,10 @@ export async function updateUserAdmin(actorId: string, userId: string, dto: Upda
     dto.name = user.name.slice(0, -NA_SUFFIX.length);
   }
 
+  if (dto.isActive === false && user.isActive && !user.name.endsWith(NA_SUFFIX)) {
+    dto.name = user.name + NA_SUFFIX;
+  }
+
   const updated = await prisma.user.update({
     where: { id: userId },
     data: dto,
