@@ -82,5 +82,17 @@ export async function getSprintIssues(id: string): Promise<SprintDetailsResponse
   return data;
 }
 
+export interface EstimateAllResult {
+  total: number;
+  estimated: number;
+  failed: number;
+  results: Array<{ issueId: string; estimatedHours?: number; error?: string }>;
+}
+
+export async function estimateAllSprintIssues(sprintId: string): Promise<EstimateAllResult> {
+  const { data } = await api.post<EstimateAllResult>(`/sprints/${sprintId}/ai/estimate-all`);
+  return data;
+}
+
 // Re-export PaginationMeta for convenience
 export type { PaginationMeta };

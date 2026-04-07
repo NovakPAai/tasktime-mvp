@@ -18,7 +18,7 @@ export interface Sprint {
   projectTeam?: Team;
   businessTeam?: Team;
   flowTeam?: Team;
-  stats?: { totalIssues: number; estimatedIssues: number; planningReadiness: number };
+  stats?: { totalIssues: number; estimatedIssues: number; planningReadiness: number; totalEstimatedHours: number };
 }
 
 export interface SprintDetailsResponse {

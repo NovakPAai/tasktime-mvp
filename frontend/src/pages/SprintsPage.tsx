@@ -7,7 +7,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { AxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
-import { Modal, Form, Input, Popconfirm, Select, Checkbox, message } from 'antd';
+import { Modal, Form, Input, Popconfirm, Select, Checkbox, DatePicker, message } from 'antd';
+import dayjs from 'dayjs';
 import * as sprintsApi from '../api/sprints';
 import * as projectsApi from '../api/projects';
 import * as teamsApi from '../api/teams';
@@ -171,7 +172,10 @@ export default function SprintsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [estimating, setEstimating] = useState(false);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const load = useCallback(async () => {
@@ -261,6 +265,66 @@ export default function SprintsPage() {
     void sprintsApi.getSprintIssues(selectedSprintId)
       .then(data => setSprintIssues(data.issues))
       .catch(() => {});
+  };
+
+  const openEditModal = (sprint: typeof selectedSprint) => {
+    if (!sprint) return;
+    editForm.setFieldsValue({
+      name: sprint.name,
+      goal: sprint.goal ?? '',
+      startDate: sprint.startDate ? dayjs(sprint.startDate) : null,
+      endDate: sprint.endDate ? dayjs(sprint.endDate) : null,
+      projectTeamId: sprint.projectTeam?.id ?? undefined,
+      businessTeamId: sprint.businessTeam?.id ?? undefined,
+      flowTeamId: sprint.flowTeam?.id ?? undefined,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async (vals: {
+    name: string; goal?: string;
+    startDate?: ReturnType<typeof dayjs> | null;
+    endDate?: ReturnType<typeof dayjs> | null;
+    projectTeamId?: string; businessTeamId?: string; flowTeamId?: string;
+  }) => {
+    if (!selectedSprintId) return;
+    try {
+      await sprintsApi.updateSprint(selectedSprintId, {
+        name: vals.name,
+        goal: vals.goal ?? null,
+        startDate: vals.startDate ? vals.startDate.toISOString() : null,
+        endDate: vals.endDate ? vals.endDate.toISOString() : null,
+        projectTeamId: vals.projectTeamId ?? null,
+        businessTeamId: vals.businessTeamId ?? null,
+        flowTeamId: vals.flowTeamId ?? null,
+      });
+      setEditOpen(false);
+      editForm.resetFields();
+      void load();
+      void message.success('Спринт обновлён');
+    } catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      void message.error(err.response?.data?.error ?? 'Ошибка сохранения');
+    }
+  };
+
+  const handleEstimateAll = async () => {
+    if (!selectedSprintId) return;
+    setEstimating(true);
+    try {
+      const result = await sprintsApi.estimateAllSprintIssues(selectedSprintId);
+      void message.success(`Оценено ${result.estimated} из ${result.total} задач`);
+      void load();
+      // Reload sprint issues to reflect new estimatedHours
+      void sprintsApi.getSprintIssues(selectedSprintId)
+        .then(data => setSprintIssues(data.issues))
+        .catch(() => {});
+    } catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      void message.error(err.response?.data?.error ?? 'Ошибка оценки');
+    } finally {
+      setEstimating(false);
+    }
   };
 
   const selectedSprint = sprints.find(s => s.id === selectedSprintId) ?? null;
@@ -388,6 +452,15 @@ export default function SprintsPage() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(selectedSprint)}
+                    style={{ backgroundColor: closeBtnBg, border: `1px solid ${T.border}`, borderRadius: 8, paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12, cursor: 'pointer', color: T.t3, fontFamily: F.sans, fontSize: 12 }}
+                  >
+                    ✎ Редактировать
+                  </button>
+                )}
                 <div>
                   <div style={{ color: T.t4, fontFamily: F.sans, fontSize: 10, lineHeight: '12px', textAlign: 'right' }}>Дата начала</div>
                   <div style={{ color: T.t2, fontFamily: F.display, fontSize: 12, fontWeight: 600, lineHeight: '16px', textAlign: 'right' }}>
@@ -453,19 +526,31 @@ export default function SprintsPage() {
                   </span>
                 </div>
               )}
-              {/* Status dots */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                {[
-                  { dot: T.green,  label: `Done: ${doneCount}` },
-                  { dot: T.amber,  label: `In Progress: ${inProgressCount}` },
-                  { dot: T.violet, label: `Review: ${reviewCount}` },
-                  { dot: T.t3,     label: `Open: ${openCount}` },
-                ].map(({ dot, label }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <div style={{ backgroundColor: dot, borderRadius: '50%', width: 6, height: 6, flexShrink: 0 }} />
-                    <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>{label}</span>
+              {/* Status dots + total estimated hours */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  {[
+                    { dot: T.green,  label: `Done: ${doneCount}` },
+                    { dot: T.amber,  label: `In Progress: ${inProgressCount}` },
+                    { dot: T.violet, label: `Review: ${reviewCount}` },
+                    { dot: T.t3,     label: `Open: ${openCount}` },
+                  ].map(({ dot, label }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ backgroundColor: dot, borderRadius: '50%', width: 6, height: 6, flexShrink: 0 }} />
+                      <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+                {selectedSprint.stats != null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <span style={{ color: T.t4, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>Общая оценка:</span>
+                    <span style={{ color: T.t1, fontFamily: F.display, fontSize: 12, fontWeight: 600, lineHeight: '14px' }}>
+                      {selectedSprint.stats.totalEstimatedHours > 0
+                        ? `${selectedSprint.stats.totalEstimatedHours.toFixed(1)} ч`
+                        : '—'}
+                    </span>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -488,6 +573,16 @@ export default function SprintsPage() {
                 >
                   Детали
                 </button>
+                {canManage && sprintIssues.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleEstimateAll()}
+                    disabled={estimating}
+                    style={{ backgroundColor: closeBtnBg, border: `1px solid ${T.border}`, borderRadius: 6, paddingTop: 5, paddingBottom: 5, paddingLeft: 12, paddingRight: 12, cursor: estimating ? 'not-allowed' : 'pointer', color: estimating ? T.t4 : T.acc, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', opacity: estimating ? 0.6 : 1 }}
+                  >
+                    {estimating ? 'Оцениваю…' : 'Оценить трудоёмкость задач'}
+                  </button>
+                )}
                 {canManage && selectedSprint.state !== 'CLOSED' && (
                   <button
                     type="button"
@@ -730,6 +825,42 @@ export default function SprintsPage() {
           <Form.Item name="goal" label="Цель">
             <Input.TextArea rows={2} />
           </Form.Item>
+          <Form.Item name="projectTeamId" label="Проектная команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+          <Form.Item name="businessTeamId" label="Бизнес-функциональная команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+          <Form.Item name="flowTeamId" label="Flow-команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* ── Edit sprint modal ────────────────────────────────────────────────── */}
+      <Modal
+        title="Редактировать спринт"
+        open={editOpen}
+        onCancel={() => { setEditOpen(false); editForm.resetFields(); }}
+        onOk={() => editForm.submit()}
+        okText="Сохранить"
+        cancelText="Отмена"
+      >
+        <Form form={editForm} layout="vertical" onFinish={v => void handleEditSave(v)}>
+          <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="goal" label="Цель">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Form.Item name="startDate" label="Дата начала" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+            <Form.Item name="endDate" label="Дата окончания" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+          </div>
           <Form.Item name="projectTeamId" label="Проектная команда">
             <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
           </Form.Item>

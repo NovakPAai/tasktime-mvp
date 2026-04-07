@@ -189,22 +189,37 @@ export default function Sidebar({
         MozOsxFontSmoothing: 'grayscale',
       };
 
-  const adminSubItems: [string, string][] = [
-    ['/admin/dashboard', 'Дашборд'],
-    ['/admin/monitoring', 'Мониторинг'],
-    ['/admin/users', 'Пользователи'],
-    ['/admin/roles', 'Назначение ролей'],
-    ['/admin/projects', 'Проекты'],
-    ['/admin/categories', 'Категории'],
-    ['/admin/link-types', 'Виды связей'],
-    ['/admin/issue-type-configs', 'Типы задач'],
-    ['/admin/issue-type-schemes', 'Схемы типов задач'],
-    ['/admin/custom-fields', 'Кастомные поля'],
-    ['/admin/field-schemas', 'Схемы полей'],
-    ['/admin/workflow-statuses', 'Статусы'],
-    ['/admin/workflows', 'Workflow'],
-    ['/admin/workflow-schemes', 'Схемы workflow'],
-    ['/admin/transition-screens', 'Экраны переходов'],
+  type AdminNavItem =
+    | { type: 'link'; path: string; label: string }
+    | { type: 'divider'; label: string };
+
+  const adminNavItems: AdminNavItem[] = [
+    { type: 'divider', label: 'Обзор' },
+    { type: 'link', path: '/admin/dashboard',   label: 'Дашборд' },
+    { type: 'link', path: '/admin/monitoring',  label: 'Мониторинг' },
+
+    { type: 'divider', label: 'Пользователи' },
+    { type: 'link', path: '/admin/users',       label: 'Пользователи' },
+    { type: 'link', path: '/admin/roles',       label: 'Назначение ролей' },
+
+    { type: 'divider', label: 'Проекты' },
+    { type: 'link', path: '/admin/projects',    label: 'Проекты' },
+    { type: 'link', path: '/admin/categories',  label: 'Категории' },
+
+    { type: 'divider', label: 'Задачи' },
+    { type: 'link', path: '/admin/issue-type-configs',  label: 'Типы задач' },
+    { type: 'link', path: '/admin/issue-type-schemes',  label: 'Схемы типов задач' },
+    { type: 'link', path: '/admin/link-types',          label: 'Виды связей' },
+
+    { type: 'divider', label: 'Поля' },
+    { type: 'link', path: '/admin/custom-fields',  label: 'Кастомные поля' },
+    { type: 'link', path: '/admin/field-schemas',  label: 'Схемы полей' },
+
+    { type: 'divider', label: 'Workflow' },
+    { type: 'link', path: '/admin/workflow-statuses',    label: 'Статусы' },
+    { type: 'link', path: '/admin/workflows',            label: 'Workflow' },
+    { type: 'link', path: '/admin/workflow-schemes',     label: 'Схемы workflow' },
+    { type: 'link', path: '/admin/transition-screens',   label: 'Экраны переходов' },
   ];
 
   return (
@@ -396,12 +411,23 @@ export default function Sidebar({
                   </>
                 )}
               </div>
-              {isAdminOpen && adminSubItems.map(([key, label]) => (
-                <div key={key} style={subItemStyle(key)} onClick={() => onNavigate(key)} onMouseEnter={() => setHovered(key)} onMouseLeave={() => setHovered(null)}>
-                  <div style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: isActive(key) ? tokens.acc : tokens.inactive, flexShrink: 0 }} />
-                  <span style={subTextStyle(key)}>{label}</span>
-                </div>
-              ))}
+              {isAdminOpen && adminNavItems.map((item, idx) => {
+                if (item.type === 'divider') {
+                  return (
+                    <div key={`div-${idx}`} style={{ paddingLeft: 28, paddingTop: idx === 0 ? 4 : 10, paddingBottom: 2 }}>
+                      <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.7px', textTransform: 'uppercase', color: tokens.inactive, opacity: 0.55 }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={item.path} style={subItemStyle(item.path)} onClick={() => onNavigate(item.path)} onMouseEnter={() => setHovered(item.path)} onMouseLeave={() => setHovered(null)}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: isActive(item.path) ? tokens.acc : tokens.inactive, flexShrink: 0 }} />
+                    <span style={subTextStyle(item.path)}>{item.label}</span>
+                  </div>
+                );
+              })}
               <div style={{ height: 1, backgroundColor: tokens.border, margin: '6px 4px' }} />
             </>
           )}

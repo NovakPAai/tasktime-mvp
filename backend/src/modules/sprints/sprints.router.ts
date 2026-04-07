@@ -4,9 +4,12 @@ import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { createSprintDto, updateSprintDto, moveIssuesToSprintDto } from './sprints.dto.js';
 import * as sprintsService from './sprints.service.js';
+import * as aiService from '../ai/ai.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { parsePagination } from '../../shared/utils/params.js';
+import { prisma } from '../../prisma/client.js';
+import { delCachedJson, delCacheByPrefix, acquireLock, releaseLock } from '../../shared/redis.js';
 
 const router = Router();
 router.use(authenticate);
@@ -109,10 +112,75 @@ router.post('/sprints/:id/issues', requireRole('ADMIN', 'MANAGER'), validate(mov
 });
 
 // Move issues to backlog
-router.post('/projects/:projectId/backlog/issues', validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
+router.post('/projects/:projectId/backlog/issues', requireRole('ADMIN', 'MANAGER'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
   try {
     await sprintsService.moveIssuesToSprint(null, req.body.issueIds);
+    await logAudit(req, 'sprint.issues_moved_to_backlog', 'project', req.params.projectId as string, { issueIds: req.body.issueIds });
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// Bulk AI estimate all issues in a sprint
+router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res, next) => {
+  try {
+    const sprintId = req.params.id as string;
+
+    const sprint = await prisma.sprint.findUnique({
+      where: { id: sprintId },
+      select: { id: true, projectId: true },
+    });
+    if (!sprint) { res.status(404).json({ error: 'Sprint not found' }); return; }
+
+    // Per-sprint distributed lock with owner token to prevent concurrent bulk estimates
+    const lockKey = `lock:estimate-all:${sprintId}`;
+    const lockToken = await acquireLock(lockKey, 300);
+    if (!lockToken) {
+      res.status(409).json({ error: 'Estimation already in progress for this sprint' });
+      return;
+    }
+
+    try {
+      const issues = await prisma.issue.findMany({
+        where: { sprintId },
+        select: { id: true },
+      });
+
+      const results: Array<{ issueId: string; estimatedHours?: number; error?: string }> = [];
+
+      for (const issue of issues) {
+        try {
+          const result = await aiService.estimateIssue({ issueId: issue.id });
+          results.push({ issueId: issue.id, estimatedHours: result.estimatedHours });
+        } catch (err) {
+          console.error('estimate-all issue error:', { sprintId, issueId: issue.id, err });
+          results.push({ issueId: issue.id, error: 'Failed to estimate issue' });
+        }
+      }
+
+      // Best-effort: invalidate caches and audit — don't fail the response if Redis/DB is flaky
+      try {
+        await Promise.all([
+          delCachedJson(`sprint:issues:${sprintId}`),
+          delCacheByPrefix(`sprints:project:${sprint.projectId}:`),
+          delCacheByPrefix('sprints:all:'),
+          logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
+            total: issues.length,
+            estimated: results.filter(r => !r.error).length,
+          }),
+        ]);
+      } catch (cleanupErr) {
+        console.error('estimate-all post-cleanup error:', cleanupErr);
+      }
+
+      res.json({
+        total: issues.length,
+        estimated: results.filter(r => !r.error).length,
+        failed: results.filter(r => !!r.error).length,
+        results,
+      });
+    } finally {
+      await releaseLock(lockKey, lockToken);
+    }
   } catch (err) { next(err); }
 });
 

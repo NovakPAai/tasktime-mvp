@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createClient, type RedisClientType } from 'redis';
 import { config } from '../config.js';
 
@@ -168,6 +169,46 @@ export async function deleteCachedByPattern(pattern: string): Promise<void> {
     if (keys.length > 0) await redis.del(keys);
   } catch (err) {
     console.error('Failed to delete cached keys by pattern:', err);
+  }
+}
+
+// Lua script: atomic compare-and-delete — only deletes key if value matches owner token
+const RELEASE_LOCK_SCRIPT = `if redis.call("get",KEYS[1]) == ARGV[1] then return redis.call("del",KEYS[1]) else return 0 end`;
+
+/**
+ * Acquire a distributed lock using Redis SET NX EX with a unique owner token.
+ * Returns the owner token string on success, or null if the lock is already held.
+ * In test env (no Redis) returns a synthetic token so tests aren't blocked.
+ * In prod with Redis errors returns null to enforce the lock.
+ */
+export async function acquireLock(key: string, ttlSeconds = 60): Promise<string | null> {
+  const redis = await getRedisClientInternal();
+  if (!redis) {
+    return process.env.NODE_ENV === 'test' ? 'test-token' : null;
+  }
+
+  const token = randomUUID();
+  try {
+    const result = await redis.set(key, token, { NX: true, EX: ttlSeconds });
+    return result === 'OK' ? token : null;
+  } catch (err) {
+    console.error('acquireLock Redis error:', err);
+    return process.env.NODE_ENV === 'test' ? 'test-token' : null;
+  }
+}
+
+/**
+ * Release a distributed lock only if the caller owns it (token matches).
+ * Uses an atomic Lua script to prevent releasing another owner's lock.
+ */
+export async function releaseLock(key: string, token: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    await redis.eval(RELEASE_LOCK_SCRIPT, { keys: [key], arguments: [token] });
+  } catch (err) {
+    console.error('releaseLock Redis error:', err);
   }
 }
 

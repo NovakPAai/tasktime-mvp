@@ -23,6 +23,11 @@ function mapSprintWithStats<TSprint extends SprintWithStatsSource>(sprint: TSpri
   const planningReadiness =
     totalIssues === 0 ? 0 : Math.round((estimatedIssues / totalIssues) * 100);
 
+  const totalEstimatedHours = sprint.issues?.reduce((sum, issue) => {
+    const h = issue.estimatedHours != null ? Number(issue.estimatedHours) : 0;
+    return sum + h;
+  }, 0) ?? 0;
+
   const sprintData = { ...sprint };
   delete (sprintData as Partial<TSprint> & SprintWithStatsSource).issues;
 
@@ -32,6 +37,7 @@ function mapSprintWithStats<TSprint extends SprintWithStatsSource>(sprint: TSpri
       totalIssues,
       estimatedIssues,
       planningReadiness,
+      totalEstimatedHours,
     },
   };
 }
@@ -85,38 +91,56 @@ export async function getSprintIssues(id: string) {
   const cached = await getCachedJson<SprintIssuesResult>(cacheKey);
   if (cached) return cached;
 
-  const sprint = await prisma.sprint.findUnique({
-    where: { id },
-    include: {
-      _count: { select: { issues: true } },
-      issues: {
-        select: {
-          id: true,
-          projectId: true,
-          number: true,
-          title: true,
-          estimatedHours: true,
-          issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconName: true, iconColor: true } },
-          status: true,
-          priority: true,
-          updatedAt: true,
-          assignee: { select: { id: true, name: true } },
-          project: { select: { id: true, name: true, key: true } },
+  const [sprint, hoursAgg, estimatedIssueCount] = await Promise.all([
+    prisma.sprint.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { issues: true } },
+        issues: {
+          select: {
+            id: true,
+            projectId: true,
+            number: true,
+            title: true,
+            estimatedHours: true,
+            issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconName: true, iconColor: true } },
+            status: true,
+            priority: true,
+            updatedAt: true,
+            assignee: { select: { id: true, name: true } },
+            project: { select: { id: true, name: true, key: true } },
+          },
+          orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+          take: 200,
         },
-        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
-        take: 200,
+        project: { select: { id: true, name: true, key: true } },
+        projectTeam: { select: { id: true, name: true } },
+        businessTeam: { select: { id: true, name: true } },
+        flowTeam: { select: { id: true, name: true } },
       },
-      project: { select: { id: true, name: true, key: true } },
-      projectTeam: { select: { id: true, name: true } },
-      businessTeam: { select: { id: true, name: true } },
-      flowTeam: { select: { id: true, name: true } },
-    },
-  });
+    }),
+    prisma.issue.aggregate({
+      where: { sprintId: id },
+      _sum: { estimatedHours: true },
+    }),
+    prisma.issue.count({
+      where: { sprintId: id, estimatedHours: { not: null } },
+    }),
+  ]);
 
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
+  const sprintWithStats = mapSprintWithStats(sprint);
+  // Override stats with accurate values from _count and aggregates (not limited by take: 200)
+  const totalIssues = sprint._count.issues;
+  sprintWithStats.stats.totalIssues = totalIssues;
+  sprintWithStats.stats.estimatedIssues = estimatedIssueCount;
+  sprintWithStats.stats.planningReadiness =
+    totalIssues === 0 ? 0 : Math.round((estimatedIssueCount / totalIssues) * 100);
+  sprintWithStats.stats.totalEstimatedHours = Number(hoursAgg._sum.estimatedHours ?? 0);
+
   const result = {
-    sprint: mapSprintWithStats(sprint),
+    sprint: sprintWithStats,
     issues: sprint.issues.map((issue) => ({
       ...issue,
       type: issue.issueTypeConfig?.systemKey ?? null,
