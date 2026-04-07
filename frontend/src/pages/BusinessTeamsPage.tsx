@@ -17,24 +17,19 @@ const DARK_C = {
 };
 
 const LIGHT_C = {
-  bg: '#F0F2FA',
+  bg: '#F6F8FA',
   bgCard: '#FFFFFF',
-  bgStat: '#F0F2FA',
+  bgStat: '#F6F8FA',
   border: '#D0D7DE',
   t1: '#1F2328',
   t2: '#424A53',
-  t3: '#6E7781',
-  t4: '#AFB8C1',
+  t3: '#656D76',
+  t4: '#8C959F',
   acc: '#4F6EF7',
   progBg: '#D0D7DE',
 };
 
 type StatusKey = 'ACTIVE' | 'PAUSED';
-
-const STATUS_CFG: Record<StatusKey, { label: string; badgeBg: string; badgeText: string }> = {
-  ACTIVE: { label: 'АКТИВНА', badgeBg: '#4ADE801F', badgeText: '#4ADE80' },
-  PAUSED: { label: 'НА ПАУЗЕ', badgeBg: '#8B949E1F', badgeText: '#8B949E' },
-};
 
 type IconType = 'payments' | 'risks' | 'analytics';
 
@@ -75,77 +70,97 @@ function TeamIcon({ type, gradient }: { type: IconType; gradient: string }) {
   );
 }
 
-const TEAMS_DATA = [
-  {
-    id: 'payments',
-    icon: 'payments' as IconType,
-    iconGradient: LOGO_GRAD,
-    name: 'Платежи',
-    owner: 'A. Kovaleva',
-    status: 'ACTIVE' as StatusKey,
-    membersCount: 12,
-    kpiValue: '94%',
-    kpiColor: '#4ADE80',
-    sprintsCount: 3,
-    sprintsColor: '#F59E0B',
-    initiatives: [
-      { text: 'Переход на SBP 2.0', color: '#C9D1D9' },
-      { text: 'Интеграция эквайринга', color: '#C9D1D9' },
-      { text: 'Рефакторинг биллинга', color: '#8B949E' },
-    ],
-    progressWidth: '68%',
-    progressGrad:
-      'linear-gradient(in oklab 90deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)',
-  },
-  {
-    id: 'risks',
-    icon: 'risks' as IconType,
-    iconGradient:
-      'linear-gradient(in oklab 135deg, oklab(63.7% 0.188 0.089) 0%, oklab(57.7% 0.191 0.099) 100%)',
-    name: 'Риски и ИБ',
-    owner: 'M. Volkov',
-    status: 'ACTIVE' as StatusKey,
-    membersCount: 8,
-    kpiValue: '71%',
-    kpiColor: '#F59E0B',
-    sprintsCount: 2,
-    sprintsColor: '#F59E0B',
-    initiatives: [
-      { text: 'Аудит ФЗ-152', color: '#C9D1D9' },
-      { text: 'DLP интеграция', color: '#C9D1D9' },
-      { text: 'Тест-пенетрейшн Q2', color: '#8B949E' },
-    ],
-    progressWidth: '71%',
-    progressGrad:
-      'linear-gradient(in oklab 90deg, oklab(76.9% 0.056 0.155) 0%, oklab(66.6% 0.083 0.134) 100%)',
-  },
-  {
-    id: 'analytics',
-    icon: 'analytics' as IconType,
-    iconGradient:
-      'linear-gradient(in oklab 135deg, oklab(69.6% -0.142 0.045) 0%, oklab(59.6% -0.122 0.037) 100%)',
-    name: 'Аналитика',
-    owner: 'S. Voronov',
-    status: 'PAUSED' as StatusKey,
-    membersCount: 5,
-    kpiValue: '55%',
-    kpiColor: '#8B949E',
-    sprintsCount: 1,
-    sprintsColor: '#8B949E',
-    initiatives: [
-      { text: 'BI дашборды для CIO', color: '#8B949E' },
-      { text: 'Отчёт по оттоку', color: '#8B949E' },
-      { text: 'ML-модель рисков', color: '#484F58' },
-    ],
-    progressWidth: '55%',
-    progressGrad:
-      'linear-gradient(in oklab 90deg, oklab(66.2% -0.006 -0.017) 0%, oklab(56.5% -0.006 -0.018) 100%)',
-  },
-];
+function getTeamsData(isLight: boolean) {
+  const kpiGood = isLight ? '#1A7F37' : '#4ADE80';
+  const kpiWarn = isLight ? '#D97706' : '#F59E0B';
+  const kpiMuted = isLight ? '#8C959F' : '#8B949E';
+  const txtActive = isLight ? '#1F2328' : '#C9D1D9';
+  const txtMuted = isLight ? '#656D76' : '#8B949E';
+  const txtFaint = isLight ? '#D0D7DE' : '#484F58';
+
+  return [
+    {
+      id: 'payments',
+      icon: 'payments' as IconType,
+      iconGradient: LOGO_GRAD,
+      name: 'Платежи',
+      owner: 'A. Kovaleva',
+      status: 'ACTIVE' as StatusKey,
+      membersCount: 12,
+      kpiValue: '94%',
+      kpiColor: kpiGood,
+      sprintsCount: 3,
+      sprintsColor: kpiWarn,
+      initiatives: [
+        { text: 'Переход на SBP 2.0', color: txtActive },
+        { text: 'Интеграция эквайринга', color: txtActive },
+        { text: 'Рефакторинг биллинга', color: txtMuted },
+      ],
+      progressWidth: '68%',
+      progressGrad:
+        'linear-gradient(in oklab 90deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)',
+    },
+    {
+      id: 'risks',
+      icon: 'risks' as IconType,
+      iconGradient:
+        'linear-gradient(in oklab 135deg, oklab(63.7% 0.188 0.089) 0%, oklab(57.7% 0.191 0.099) 100%)',
+      name: 'Риски и ИБ',
+      owner: 'M. Volkov',
+      status: 'ACTIVE' as StatusKey,
+      membersCount: 8,
+      kpiValue: '71%',
+      kpiColor: kpiWarn,
+      sprintsCount: 2,
+      sprintsColor: kpiWarn,
+      initiatives: [
+        { text: 'Аудит ФЗ-152', color: txtActive },
+        { text: 'DLP интеграция', color: txtActive },
+        { text: 'Тест-пенетрейшн Q2', color: txtMuted },
+      ],
+      progressWidth: '71%',
+      progressGrad:
+        'linear-gradient(in oklab 90deg, oklab(76.9% 0.056 0.155) 0%, oklab(66.6% 0.083 0.134) 100%)',
+    },
+    {
+      id: 'analytics',
+      icon: 'analytics' as IconType,
+      iconGradient:
+        'linear-gradient(in oklab 135deg, oklab(69.6% -0.142 0.045) 0%, oklab(59.6% -0.122 0.037) 100%)',
+      name: 'Аналитика',
+      owner: 'S. Voronov',
+      status: 'PAUSED' as StatusKey,
+      membersCount: 5,
+      kpiValue: '55%',
+      kpiColor: kpiMuted,
+      sprintsCount: 1,
+      sprintsColor: kpiMuted,
+      initiatives: [
+        { text: 'BI дашборды для CIO', color: txtMuted },
+        { text: 'Отчёт по оттоку', color: txtMuted },
+        { text: 'ML-модель рисков', color: txtFaint },
+      ],
+      progressWidth: '55%',
+      progressGrad:
+        'linear-gradient(in oklab 90deg, oklab(66.2% -0.006 -0.017) 0%, oklab(56.5% -0.006 -0.018) 100%)',
+    },
+  ];
+}
 
 export default function BusinessTeamsPage() {
   const { mode } = useThemeStore();
-  const C = mode === 'light' ? LIGHT_C : DARK_C;
+  const isLight = mode === 'light';
+  const C = isLight ? LIGHT_C : DARK_C;
+
+  const STATUS_CFG: Record<StatusKey, { label: string; badgeBg: string; badgeText: string; border?: string }> = isLight ? {
+    ACTIVE: { label: 'АКТИВНА', badgeBg: '#1A7F371A', badgeText: '#1A7F37' },
+    PAUSED: { label: 'НА ПАУЗЕ', badgeBg: C.bg, badgeText: C.t4, border: `1px solid ${C.border}` },
+  } : {
+    ACTIVE: { label: 'АКТИВНА', badgeBg: '#4ADE801F', badgeText: '#4ADE80' },
+    PAUSED: { label: 'НА ПАУЗЕ', badgeBg: '#8B949E1F', badgeText: '#8B949E' },
+  };
+
+  const teamsData = getTeamsData(isLight);
 
   return (
     <div
@@ -219,20 +234,23 @@ export default function BusinessTeamsPage() {
 
       {/* Cards row */}
       <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden' }}>
-        {TEAMS_DATA.map((team) => {
+        {teamsData.map((team) => {
           const sCfg = STATUS_CFG[team.status];
+          const cardBg = isLight && team.status === 'PAUSED' ? C.bg : C.bgCard;
+          const cardOpacity = isLight && team.status === 'PAUSED' ? 0.85 : 1;
           return (
             <div
               key={team.id}
               style={{
                 flex: 1,
-                background: C.bgCard,
+                background: cardBg,
                 border: `1px solid ${C.border}`,
                 borderRadius: 12,
                 padding: 20,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 14,
+                opacity: cardOpacity,
               }}
             >
               {/* Card header */}
@@ -272,6 +290,7 @@ export default function BusinessTeamsPage() {
                 <div
                   style={{
                     background: sCfg.badgeBg,
+                    border: sCfg.border,
                     borderRadius: 20,
                     paddingBlock: 3,
                     paddingInline: 8,

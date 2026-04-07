@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 import { useThemeStore } from '../../store/theme.store';
+import { useUiStore } from '../../store/ui.store';
 import Sidebar from './Sidebar';
 import UatOnboardingOverlay from '../uat/UatOnboardingOverlay';
 
@@ -27,6 +28,7 @@ export default function AppLayout() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { mode, toggle } = useThemeStore();
+  const { sidebarCollapsed, toggleSidebar } = useUiStore();
   const isLight = mode === 'light';
 
   const isMobile = useIsMobile();
@@ -107,6 +109,7 @@ export default function AppLayout() {
       <Sidebar
         isLight={isLight}
         mobileOpen={mobileOpen}
+        collapsed={!isMobile && sidebarCollapsed}
         openKeys={openKeys}
         userRole={user?.role}
         user={user}
@@ -116,11 +119,12 @@ export default function AppLayout() {
         onNavigate={handleNav}
         onThemeToggle={handleThemeToggle}
         onLogout={handleLogout}
+        onCollapseToggle={toggleSidebar}
       />
 
-      {/* Main content area */}
+      {/* Main content area — TTUI-173: overflowY: auto enables page-level scrolling */}
       <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0, padding: 0 }}>
+        <div id="main-scroll" style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
           <Outlet />
           <UatOnboardingOverlay />
         </div>

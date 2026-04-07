@@ -31,7 +31,7 @@ const DARK_C = {
 const LIGHT_C = {
   bg: '#F6F8FA', bgCard: '#FFFFFF', bgHdr: '#F6F8FA',
   border: '#D0D7DE', borderBtn: '#D0D7DE', borderRow: '#EAEEF2',
-  t1: '#1F2328', t2: '#1F2328', t3: '#8C959F', t4: '#8C959F',
+  t1: '#1F2328', t2: '#3D444D', t3: '#656D76', t4: '#8C959F',
   acc: '#4F6EF7', progressBg: '#EAEEF2', rowHighlight: '#F6F8FA',
   btnBg: '#FFFFFF', btnText: '#1F2328',
 };

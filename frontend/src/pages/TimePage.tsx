@@ -16,56 +16,62 @@ const LOGO_GRAD =
 
 // ─── Tokens Dark (Paper 2RY-0) ────────────────────────────────────────────────
 const DARK_C = {
-  bg:          '#080B14',
-  bgCard:      '#0F1320',
-  bgRow:       '#080B14',
-  bgRowAlt:    '#0F1320',
-  bgRowHover:  '#141928',
-  border:      '#1E2640',
-  borderInner: '#0D1017',
-  t1:          '#E2E8F8',
-  t2:          '#C9D1D9',
-  t3:          '#8B949E',
-  t4:          '#484F58',
-  acc:         '#4F6EF7',
-  accKey:      '#6366F1',
-  green:       '#4ADE80',
-  amber:       '#F59E0B',
-  timerBorder: '#4F6EF7',
-  stopBg:      'rgba(207, 34, 46, 0.08)',
-  stopBorder:  'rgba(207, 34, 46, 0.25)',
-  stopText:    '#F85149',
-  aiBadgeBg:   'rgba(163, 139, 250, 0.12)',
-  aiBadgeText: '#A78BFA',
-  humanBg:     'rgba(79, 110, 247, 0.12)',
-  humanText:   '#4F6EF7',
+  bg:             '#080B14',
+  bgCard:         '#0F1320',
+  bgRow:          '#080B14',
+  bgRowAlt:       '#0F1320',
+  bgRowHover:     '#141928',
+  bgTableHeader:  '#0F1320',
+  border:         '#1E2640',
+  borderInner:    '#0D1017',
+  t1:             '#E2E8F8',
+  t2:             '#C9D1D9',
+  t3:             '#8B949E',
+  t4:             '#484F58',
+  acc:            '#4F6EF7',
+  accKey:         '#6366F1',
+  green:          '#4ADE80',
+  amber:          '#F59E0B',
+  timerBorder:    '#4F6EF7',
+  stopBg:         'rgba(207, 34, 46, 0.08)',
+  stopBorder:     'rgba(207, 34, 46, 0.25)',
+  stopText:       '#F85149',
+  aiBadgeBg:      'rgba(163, 139, 250, 0.12)',
+  aiBadgeText:    '#A78BFA',
+  humanBg:        'rgba(79, 110, 247, 0.12)',
+  humanText:      '#4F6EF7',
+  dashColor:      '#484F58',
+  aiCostColor:    '#8B949E',
 };
 
 // ─── Tokens Light (Paper 2WD-0) ───────────────────────────────────────────────
 const LIGHT_C = {
-  bg:          '#F0F2FA',
-  bgCard:      '#FFFFFF',
-  bgRow:       '#FFFFFF',
-  bgRowAlt:    '#F8F9FC',
-  bgRowHover:  '#F0F2FA',
-  border:      '#D0D7DE',
-  borderInner: '#E8EBF0',
-  t1:          '#1F2328',
-  t2:          '#3D444D',
-  t3:          '#656D76',
-  t4:          '#9198A1',
-  acc:         '#4F6EF7',
-  accKey:      '#4F6EF7',
-  green:       '#1A7F37',
-  amber:       '#9A6700',
-  timerBorder: '#4F6EF7',
-  stopBg:      'rgba(207, 34, 46, 0.08)',
-  stopBorder:  'rgba(207, 34, 46, 0.25)',
-  stopText:    '#CF222E',
-  aiBadgeBg:   'rgba(138, 75, 215, 0.08)',
-  aiBadgeText: '#6F42C1',
-  humanBg:     'rgba(79, 110, 247, 0.08)',
-  humanText:   '#4F6EF7',
+  bg:             '#F6F8FA',
+  bgCard:         '#FFFFFF',
+  bgRow:          '#FFFFFF',
+  bgRowAlt:       '#F8F9FC',
+  bgRowHover:     '#F6F8FA',
+  bgTableHeader:  '#F6F8FA',
+  border:         '#D0D7DE',
+  borderInner:    '#EAEEF2',
+  t1:             '#1F2328',
+  t2:             '#3D444D',
+  t3:             '#656D76',
+  t4:             '#8C959F',
+  acc:            '#4F6EF7',
+  accKey:         '#4F6EF7',
+  green:          '#1A7F37',
+  amber:          '#9A6700',
+  timerBorder:    '#4F6EF7',
+  stopBg:         '#CF222E14',
+  stopBorder:     '#CF222E40',
+  stopText:       '#CF222E',
+  aiBadgeBg:      'rgba(138, 75, 215, 0.08)',
+  aiBadgeText:    '#6F42C1',
+  humanBg:        'rgba(79, 110, 247, 0.08)',
+  humanText:      '#4F6EF7',
+  dashColor:      '#C6CDD4',
+  aiCostColor:    '#4F6EF7',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -381,10 +387,10 @@ export default function TimePage() {
       {/* ── Summary stat pills ── */}
       <div style={{ display: 'flex', gap: 10 }}>
         {[
-          { label: 'Человек',   value: formatHoursMin(summary.humanHours) },
-          { label: 'AI',        value: formatHoursMin(summary.agentHours) },
-          { label: 'Всего',     value: formatHoursMin(summary.totalHours) },
-          { label: 'AI стоимость', value: `$${summary.agentCost.toFixed(4)}` },
+          { label: 'Человек',      value: formatHoursMin(summary.humanHours), valueColor: C.t1 },
+          { label: 'AI',           value: formatHoursMin(summary.agentHours), valueColor: C.t1 },
+          { label: 'Всего',        value: formatHoursMin(summary.totalHours), valueColor: C.t1 },
+          { label: 'AI стоимость', value: `$${summary.agentCost.toFixed(4)}`, valueColor: C.aiCostColor },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -399,7 +405,7 @@ export default function TimePage() {
             <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 10, color: C.t3, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
               {stat.label}
             </div>
-            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 700, color: C.t1 }}>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 700, color: stat.valueColor }}>
               {stat.value}
             </div>
           </div>
@@ -415,12 +421,13 @@ export default function TimePage() {
       }}>
         {/* Table header */}
         <div style={{
-          display:       'flex',
-          alignItems:    'center',
-          gap:           8,
-          paddingBlock:  8,
-          paddingInline: 20,
-          borderBottom:  `1px solid ${C.border}`,
+          display:        'flex',
+          alignItems:     'center',
+          gap:            8,
+          paddingBlock:   8,
+          paddingInline:  20,
+          background:     C.bgTableHeader,
+          borderBottom:   `1px solid ${C.border}`,
         }}>
           {[
             { label: 'ДАТА',    style: colStyles.date },
@@ -516,7 +523,7 @@ export default function TimePage() {
                       </span>
                     </>
                   ) : (
-                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: C.t3 }}>—</span>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: C.dashColor }}>—</span>
                   )}
                   {log.note && (
                     <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: C.t4, flexShrink: 0 }}>

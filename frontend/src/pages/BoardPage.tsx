@@ -40,18 +40,18 @@ const DARK_C = {
 };
 
 const LIGHT_C = {
-  bg:           '#F0F2FA',
+  bg:           '#F6F8FA',
   bgCard:       '#FFFFFF',
-  bgCardCancel: '#F0F2FA',
+  bgCardCancel: '#F6F8FA',
   border:       '#D0D7DE',
   borderDone:   '#C8E6C9',
-  borderInner:  '#E4E7EF',
-  headerBorder: '#E4E7EF',
+  borderInner:  '#EEF0F2',
+  headerBorder: '#D0D7DE',
   t1:           '#1F2328',
-  t2:           '#424A53',
-  t3:           '#6E7781',
-  t4:           '#AFB8C1',
-  t5:           '#8896A4',
+  t2:           '#3D444D',
+  t3:           '#656D76',
+  t4:           '#8C959F',
+  t5:           '#8C959F',
   key:          '#6366F1',
   selBg:        '#FFFFFF',
 };
