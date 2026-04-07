@@ -64,10 +64,16 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
       return next(new AppError(401, 'Session expired due to inactivity', { code: 'SESSION_EXPIRED' }));
     }
 
-    // Extend session
-    void touchUserSession(payload.userId, lifetimeMinutes * 60);
+    // Extend session — await so TOCTOU expiry is detected
+    const touched = await touchUserSession(payload.userId, lifetimeMinutes * 60);
+    if (!touched) {
+      // Session expired between the check and the touch — deny access
+      return next(new AppError(401, 'Session expired due to inactivity', { code: 'SESSION_EXPIRED' }));
+    }
+  } else {
+    // Redis unavailable or session not found — degrade gracefully, rely on JWT expiry only
+    console.warn(`[auth] sliding-session check skipped for user=${payload.userId}: Redis unavailable or session missing`);
   }
-  // If session === null: Redis unavailable or no session key — degrade gracefully, rely on JWT expiry only
 
   next();
 }

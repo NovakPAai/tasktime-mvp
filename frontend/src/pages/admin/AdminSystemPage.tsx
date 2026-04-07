@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { InputNumber, Button, Form, message, Spin, Typography, Divider } from 'antd';
+import { InputNumber, Button, Form, message } from 'antd';
 import { adminApi } from '../../api/admin';
-
-const { Title, Text } = Typography;
 
 export default function AdminSystemPage() {
   const [loading, setLoading] = useState(true);
@@ -11,13 +9,24 @@ export default function AdminSystemPage() {
   const [form] = Form.useForm();
 
   useEffect(() => {
+    let isMounted = true;
+
     adminApi.getSystemSettings()
       .then(settings => {
+        if (!isMounted) return;
         setSessionLifetimeMinutes(settings.sessionLifetimeMinutes);
         form.setFieldsValue({ sessionLifetimeMinutes: settings.sessionLifetimeMinutes });
       })
-      .catch(() => message.error('Не удалось загрузить системные настройки'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!isMounted) return;
+        message.error('Не удалось загрузить системные настройки');
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+
+    return () => { isMounted = false; };
   }, [form]);
 
   const handleSave = async (values: { sessionLifetimeMinutes: number }) => {
@@ -36,19 +45,21 @@ export default function AdminSystemPage() {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
+        <span>Загрузка...</span>
       </div>
     );
   }
 
   return (
     <div style={{ maxWidth: 520, padding: '32px 24px' }}>
-      <Title level={4} style={{ marginBottom: 4 }}>Система</Title>
-      <Text type="secondary" style={{ display: 'block', marginBottom: 32 }}>
+      <h4 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 600 }}>Система</h4>
+      <p style={{ margin: '0 0 32px', color: 'rgba(0,0,0,0.45)' }}>
         Параметры безопасности и поведения системы. Доступно только для роли Супер Администратор.
-      </Text>
+      </p>
 
-      <Divider orientation="left" orientationMargin={0}>Сессия пользователя</Divider>
+      <p style={{ margin: '0 0 16px', fontWeight: 500, color: 'rgba(0,0,0,0.65)', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 8 }}>
+        Сессия пользователя
+      </p>
 
       <Form form={form} layout="vertical" onFinish={handleSave}>
         <Form.Item
@@ -71,6 +82,7 @@ export default function AdminSystemPage() {
             step={5}
             style={{ width: 200 }}
             addonAfter="мин"
+            aria-label="Время жизни сессии в минутах"
           />
         </Form.Item>
 

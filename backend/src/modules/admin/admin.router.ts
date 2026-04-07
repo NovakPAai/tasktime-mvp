@@ -3,7 +3,7 @@ import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole, requireSuperAdmin } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import * as adminService from './admin.service.js';
-import { createUserDto, updateUserAdminDto, assignProjectRoleDto } from './admin.dto.js';
+import { createUserDto, updateUserAdminDto, assignProjectRoleDto, updateSystemSettingsDto } from './admin.dto.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { rotateUserPassword } from '../users/password-rotation.service.js';
@@ -156,13 +156,9 @@ router.get('/admin/settings/system', requireSuperAdmin(), async (_req, res, next
   }
 });
 
-router.patch('/admin/settings/system', requireSuperAdmin(), async (req: AuthRequest, res, next) => {
+router.patch('/admin/settings/system', requireSuperAdmin(), validate(updateSystemSettingsDto), async (req: AuthRequest, res, next) => {
   try {
-    const { sessionLifetimeMinutes } = req.body as { sessionLifetimeMinutes?: unknown };
-    if (typeof sessionLifetimeMinutes !== 'number' || !Number.isInteger(sessionLifetimeMinutes) || sessionLifetimeMinutes < 5 || sessionLifetimeMinutes > 10080) {
-      res.status(400).json({ error: 'sessionLifetimeMinutes must be an integer between 5 and 10080' });
-      return;
-    }
+    const { sessionLifetimeMinutes } = req.body as { sessionLifetimeMinutes: number };
     await adminService.setSessionLifetime(req.user!.userId, sessionLifetimeMinutes);
     const settings = await adminService.getSystemSettings();
     res.json(settings);

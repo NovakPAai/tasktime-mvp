@@ -1,6 +1,11 @@
 import api from './client';
 import type { PaginatedResponse } from '../types';
 
+export interface SystemSettings {
+  sessionLifetimeMinutes: number;
+  registrationEnabled: boolean;
+}
+
 export interface ProjectRole {
   id: string;
   role: 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
@@ -68,10 +73,10 @@ export const adminApi = {
 
   // System settings
   getSystemSettings: () =>
-    api.get<{ sessionLifetimeMinutes: number; registrationEnabled: boolean }>('/admin/settings/system').then(r => r.data),
+    api.get<SystemSettings>('/admin/settings/system').then(r => r.data),
 
   setSessionLifetime: (sessionLifetimeMinutes: number) =>
-    api.patch<{ sessionLifetimeMinutes: number; registrationEnabled: boolean }>('/admin/settings/system', { sessionLifetimeMinutes }).then(r => r.data),
+    api.patch<SystemSettings>('/admin/settings/system', { sessionLifetimeMinutes }).then(r => r.data),
 };
 
 export interface AdminStats {

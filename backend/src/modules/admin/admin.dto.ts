@@ -17,6 +17,11 @@ export const assignProjectRoleDto = z.object({
   role: z.enum(['ADMIN', 'MANAGER', 'USER', 'VIEWER']),
 });
 
+export const updateSystemSettingsDto = z.object({
+  sessionLifetimeMinutes: z.number().int().min(5).max(10080),
+});
+
 export type CreateUserDto = z.infer<typeof createUserDto>;
 export type UpdateUserAdminDto = z.infer<typeof updateUserAdminDto>;
 export type AssignProjectRoleDto = z.infer<typeof assignProjectRoleDto>;
+export type UpdateSystemSettingsDto = z.infer<typeof updateSystemSettingsDto>;
