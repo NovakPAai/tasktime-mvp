@@ -44,6 +44,7 @@ jobs:
           fi
 
           echo "primary_tag=${PRIMARY_TAG}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
           {
             echo "backend_tags<<EOF"
@@ -71,6 +72,9 @@ jobs:
           file: backend/Dockerfile
           push: true
           tags: ${{ steps.vars.outputs.backend_tags }}
+          build-args: |
+            GIT_SHA=${{ env.SOURCE_SHA }}
+            BUILD_TIME=${{ steps.vars.outputs.build_time }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
