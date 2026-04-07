@@ -115,6 +115,7 @@ router.post('/sprints/:id/issues', requireRole('ADMIN', 'MANAGER'), validate(mov
 router.post('/projects/:projectId/backlog/issues', requireRole('ADMIN', 'MANAGER'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
   try {
     await sprintsService.moveIssuesToSprint(null, req.body.issueIds);
+    await logAudit(req, 'sprint.issues_moved_to_backlog', 'project', req.params.projectId as string, { issueIds: req.body.issueIds });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
