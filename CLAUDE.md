@@ -165,7 +165,7 @@ Flow Universe — импортозамещение Jira для российск�
 - Makefile: setup, dev, backend, frontend
 
 **Запуск:** `make setup && make dev` → http://localhost:5173
-**Прод:** http://5.129.242.171:8080/
+**Прод:** http://flowuniverse.ru/
 **Аккаунты:** admin/manager/dev/viewer @tasktime.ru, пароль: password123
 
 ### Sprint 2 — DONE (2026-03-10)
@@ -434,10 +434,10 @@ MCP_SERVICE_TOKEN=<jwt> docker compose --profile mcp up -d mcp-tasktime
 
 ## Battle (боевой сервер)
 
-- **URL:** http://5.129.242.171
+- **URL:** http://flowuniverse.ru
 - **Логин:** Claude@tasktime.ru / Pa88W0rd89765123
 - **Sync-скрипт:** `backend/scripts/sync-issue-with-battle.mjs`
-- **Пример pull:** `TASKTIME_BASE_URL=http://5.129.242.171 TASKTIME_ACCESS_TOKEN=<token> node scripts/sync-issue-with-battle.mjs pull TTMP-82 TTMP-83 TTMP-84 --set-in-progress`
+- **Пример pull:** `TASKTIME_BASE_URL=http://flowuniverse.ru TASKTIME_ACCESS_TOKEN=<token> node scripts/sync-issue-with-battle.mjs pull TTMP-82 TTMP-83 TTMP-84 --set-in-progress`
 
 ## CI/CD Pipeline (2026-03-13)
 
