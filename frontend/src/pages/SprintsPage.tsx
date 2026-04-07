@@ -4,10 +4,10 @@
  * Zero CSS class dependencies, zero Ant Design layout.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { AxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
-import { Modal, Form, Input, Popconfirm, Select, Checkbox, DatePicker, message } from 'antd';
+import { Modal, Form, Input, Popconfirm, Select, Checkbox, DatePicker, message, Pagination, Spin } from 'antd';
 import dayjs from 'dayjs';
 import * as sprintsApi from '../api/sprints';
 import * as projectsApi from '../api/projects';
@@ -174,6 +174,9 @@ export default function SprintsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [backlog, setBacklog] = useState<Issue[]>([]);
+  const [backlogTotal, setBacklogTotal] = useState(0);
+  const [backlogPage, setBacklogPage] = useState(1);
+  const [backlogLoading, setBacklogLoading] = useState(false);
   const [sprintIssues, setSprintIssues] = useState<Issue[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTab, setActiveTab] = useState<SprintState>('ACTIVE');
@@ -188,16 +191,32 @@ export default function SprintsPage() {
   const [editForm] = Form.useForm();
   const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
+  const BACKLOG_PAGE_SIZE = 20;
+  const backlogReqSeq = useRef(0);
+
+  const loadBacklog = useCallback(async (page: number) => {
+    if (!projectId) return;
+    const reqId = ++backlogReqSeq.current;
+    setBacklogLoading(true);
+    try {
+      const res = await sprintsApi.getBacklog(projectId, { page, limit: BACKLOG_PAGE_SIZE });
+      if (reqId !== backlogReqSeq.current) return; // stale response — discard
+      setBacklog(res.data);
+      setBacklogTotal(res.meta.total);
+      setBacklogPage(page);
+    } finally {
+      if (reqId === backlogReqSeq.current) setBacklogLoading(false);
+    }
+  }, [projectId]);
+
   const load = useCallback(async () => {
     if (!projectId) return;
-    const [spPage, blPage, ts, proj] = await Promise.all([
+    const [spPage, ts, proj] = await Promise.all([
       sprintsApi.listSprints(projectId),
-      sprintsApi.getBacklog(projectId),
       teamsApi.listTeams(),
       projectsApi.getProject(projectId),
     ]);
     const sp = spPage.data;
-    const bl = blPage.data;
     setSprints(sp);
     setTeams(ts);
     setProject(proj);
@@ -207,7 +226,6 @@ export default function SprintsPage() {
       const active = sp.find(s => s.state === 'ACTIVE');
       return (active ?? sp[0]).id;
     });
-    setBacklog(bl);
   }, [projectId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -273,9 +291,8 @@ export default function SprintsPage() {
     await sprintsApi.moveIssuesToSprint(selectedSprintId, selectedBacklog);
     setSelectedBacklog([]);
     setBacklogOpen(false);
-    // Reload both the sprint list/backlog AND the sprint issues list
-    // (selectedSprintId doesn't change so the useEffect won't auto-trigger)
     void load();
+    void loadBacklog(1);
     void sprintsApi.getSprintIssues(selectedSprintId)
       .then(data => setSprintIssues(data.issues))
       .catch(() => {});
@@ -608,9 +625,11 @@ export default function SprintsPage() {
                   </button>
                 )}
                 {canManage && selectedSprint.state !== 'CLOSED' && (
+                  /* Открывает модал беклога: lazy-load первой страницы при клике,
+                     пагинация по BACKLOG_PAGE_SIZE задач, выбор через чекбоксы */
                   <button
                     type="button"
-                    onClick={() => setBacklogOpen(true)}
+                    onClick={() => { setBacklogOpen(true); void loadBacklog(1); }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.acc, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', padding: 0 }}
                   >
                     + Добавить из беклога
@@ -733,7 +752,7 @@ export default function SprintsPage() {
       <Modal
         title="Добавить задачи из беклога"
         open={backlogOpen}
-        onCancel={() => { setBacklogOpen(false); setSelectedBacklog([]); }}
+        onCancel={() => { setBacklogOpen(false); setSelectedBacklog([]); setBacklogPage(1); }}
         onOk={() => void handleMoveToSprint()}
         okText={`Добавить в спринт${selectedBacklog.length ? ` (${selectedBacklog.length})` : ''}`}
         okButtonProps={{ disabled: selectedBacklog.length === 0 }}
@@ -785,7 +804,8 @@ export default function SprintsPage() {
           <div style={{ width: 50, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Оценка</div>
         </div>
 
-        {backlog.length === 0 ? (
+        <Spin spinning={backlogLoading}>
+        {!backlogLoading && backlog.length === 0 ? (
           <p style={{ color: T.t3, fontFamily: F.sans, fontSize: 13, padding: '16px 0' }}>Бэклог пуст</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 380, overflow: 'auto' }}>
@@ -841,6 +861,20 @@ export default function SprintsPage() {
             })}
           </div>
         )}
+        {backlogTotal > BACKLOG_PAGE_SIZE && (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
+            <Pagination
+              current={backlogPage}
+              pageSize={BACKLOG_PAGE_SIZE}
+              total={backlogTotal}
+              showSizeChanger={false}
+              showTotal={total => `${total} задач`}
+              onChange={page => void loadBacklog(page)}
+              size="small"
+            />
+          </div>
+        )}
+        </Spin>
       </Modal>
 
       {/* ── New sprint modal ─────────────────────────────────────────────────── */}
