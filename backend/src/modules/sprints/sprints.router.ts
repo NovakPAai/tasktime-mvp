@@ -9,7 +9,7 @@ import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { parsePagination } from '../../shared/utils/params.js';
 import { prisma } from '../../prisma/client.js';
-import { delCachedJson, delCacheByPrefix } from '../../shared/redis.js';
+import { delCachedJson, delCacheByPrefix, acquireLock, releaseLock } from '../../shared/redis.js';
 
 const router = Router();
 router.use(authenticate);
@@ -130,6 +130,13 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
     });
     if (!sprint) { res.status(404).json({ error: 'Sprint not found' }); return; }
 
+    const lockKey = `lock:estimate-all:${sprintId}`;
+    const acquired = await acquireLock(lockKey, 300); // 5 min TTL — max time for a full sprint estimate
+    if (!acquired) {
+      res.status(409).json({ error: 'Estimation already in progress for this sprint' });
+      return;
+    }
+
     const issues = await prisma.issue.findMany({
       where: { sprintId },
       select: { id: true },
@@ -137,27 +144,30 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
 
     const results: Array<{ issueId: string; estimatedHours?: number; error?: string }> = [];
 
-    for (const issue of issues) {
-      try {
-        const result = await aiService.estimateIssue({ issueId: issue.id });
-        results.push({ issueId: issue.id, estimatedHours: result.estimatedHours });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        results.push({ issueId: issue.id, error: msg });
+    try {
+      for (const issue of issues) {
+        try {
+          const result = await aiService.estimateIssue({ issueId: issue.id });
+          results.push({ issueId: issue.id, estimatedHours: result.estimatedHours });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          results.push({ issueId: issue.id, error: msg });
+        }
       }
+    } finally {
+      await releaseLock(lockKey);
     }
 
-    // Invalidate sprint issues cache + sprint list caches so totalEstimatedHours recalculates
-    await Promise.all([
+    // Best-effort: invalidate caches and audit — don't fail the response if Redis/DB is flaky
+    Promise.all([
       delCachedJson(`sprint:issues:${sprintId}`),
       delCacheByPrefix(`sprints:project:${sprint.projectId}:`),
       delCacheByPrefix('sprints:all:'),
-    ]);
-
-    await logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
-      total: issues.length,
-      estimated: results.filter(r => !r.error).length,
-    });
+      logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
+        total: issues.length,
+        estimated: results.filter(r => !r.error).length,
+      }),
+    ]).catch((err) => console.error('estimate-all post-cleanup error:', err));
 
     res.json({
       total: issues.length,

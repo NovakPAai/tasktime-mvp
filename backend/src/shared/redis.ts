@@ -104,6 +104,30 @@ export async function delCacheByPrefix(prefix: string): Promise<void> {
   }
 }
 
+/**
+ * Acquire a simple distributed lock using SET NX EX.
+ * Returns true if the lock was acquired, false if it was already held.
+ */
+export async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return true; // no Redis → allow (dev/test fallback)
+
+  try {
+    const result = await redis.set(key, '1', { NX: true, EX: ttlSeconds });
+    return result === 'OK';
+  } catch (err) {
+    console.error('Failed to acquire Redis lock:', err);
+    return true; // allow on error to avoid blocking
+  }
+}
+
+/**
+ * Release a distributed lock acquired with acquireLock.
+ */
+export async function releaseLock(key: string): Promise<void> {
+  await delCachedJson(key);
+}
+
 export type UserSession = {
   userId: string;
   email: string;
