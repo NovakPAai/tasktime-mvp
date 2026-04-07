@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
+import { config } from '../../config.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
 import { hashPassword } from '../../shared/utils/password.js';
@@ -502,6 +503,8 @@ const SESSION_LIFETIME_DEFAULT = 60;
 export type SystemSettings = {
   sessionLifetimeMinutes: number;
   registrationEnabled: boolean;
+  /** JWT access-token TTL — read from JWT_EXPIRES_IN env var, read-only at runtime. */
+  jwtExpiresIn: string;
 };
 
 export async function getSystemSettings(): Promise<SystemSettings> {
@@ -514,6 +517,7 @@ export async function getSystemSettings(): Promise<SystemSettings> {
   return {
     sessionLifetimeMinutes: isNaN(raw) || raw < 1 ? SESSION_LIFETIME_DEFAULT : raw,
     registrationEnabled: regSetting ? regSetting.value !== 'false' : true,
+    jwtExpiresIn: config.JWT_EXPIRES_IN,
   };
 }
 

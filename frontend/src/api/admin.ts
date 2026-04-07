@@ -4,6 +4,8 @@ import type { PaginatedResponse } from '../types';
 export interface SystemSettings {
   sessionLifetimeMinutes: number;
   registrationEnabled: boolean;
+  /** JWT access-token TTL from JWT_EXPIRES_IN env var — read-only, requires server restart to change. */
+  jwtExpiresIn: string;
 }
 
 export interface ProjectRole {

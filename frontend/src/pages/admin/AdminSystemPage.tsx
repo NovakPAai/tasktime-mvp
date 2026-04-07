@@ -6,6 +6,7 @@ export default function AdminSystemPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sessionLifetimeMinutes, setSessionLifetimeMinutes] = useState<number>(60);
+  const [jwtExpiresIn, setJwtExpiresIn] = useState<string>('1h');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -15,6 +16,7 @@ export default function AdminSystemPage() {
       .then(settings => {
         if (!isMounted) return;
         setSessionLifetimeMinutes(settings.sessionLifetimeMinutes);
+        setJwtExpiresIn(settings.jwtExpiresIn);
         form.setFieldsValue({ sessionLifetimeMinutes: settings.sessionLifetimeMinutes });
       })
       .catch(() => {
@@ -57,15 +59,16 @@ export default function AdminSystemPage() {
         Параметры безопасности и поведения системы. Доступно только для роли Супер Администратор.
       </p>
 
+      {/* ── Сессия пользователя ── */}
       <p style={{ margin: '0 0 16px', fontWeight: 500, color: 'rgba(0,0,0,0.65)', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 8 }}>
         Сессия пользователя
       </p>
 
       <Form form={form} layout="vertical" onFinish={handleSave}>
         <Form.Item
-          label="Время жизни сессии (минуты бездействия)"
+          label="Время бездействия до выхода (скользящая сессия)"
           name="sessionLifetimeMinutes"
-          extra={`Пользователь выйдет автоматически, если не проявлял активности дольше указанного времени. Текущее значение: ${sessionLifetimeMinutes} мин.`}
+          extra={`Пользователь выйдет автоматически, если не проявлял активности дольше указанного времени. Текущее значение: ${sessionLifetimeMinutes} мин. Вступает в силу немедленно.`}
           rules={[
             { required: true, message: 'Укажите время в минутах' },
             {
@@ -92,6 +95,40 @@ export default function AdminSystemPage() {
           </Button>
         </Form.Item>
       </Form>
+
+      {/* ── JWT access-token ── */}
+      <p style={{ margin: '24px 0 16px', fontWeight: 500, color: 'rgba(0,0,0,0.65)', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 8 }}>
+        JWT access-token
+      </p>
+
+      <div style={{ marginBottom: 8 }}>
+        <span style={{ color: 'rgba(0,0,0,0.45)', fontSize: 12 }}>Срок действия токена (JWT_EXPIRES_IN)</span>
+        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            display: 'inline-block',
+            padding: '4px 12px',
+            background: 'rgba(0,0,0,0.04)',
+            border: '1px solid rgba(0,0,0,0.12)',
+            borderRadius: 6,
+            fontFamily: 'monospace',
+            fontSize: 14,
+          }}>
+            {jwtExpiresIn}
+          </span>
+          <span style={{ color: 'rgba(0,0,0,0.35)', fontSize: 12 }}>только чтение</span>
+        </div>
+      </div>
+
+      <p style={{ margin: '8px 0 0', color: 'rgba(0,0,0,0.45)', fontSize: 12, lineHeight: 1.6 }}>
+        Задаётся переменной окружения <code>JWT_EXPIRES_IN</code> в файле <code>backend/.env</code>.
+        После изменения требуется перезапуск сервера (<code>docker compose restart backend</code>).
+        Уже выданные токены будут действовать до истечения их текущего срока.
+      </p>
+      <p style={{ margin: '6px 0 0', color: 'rgba(0,0,0,0.45)', fontSize: 12, lineHeight: 1.6 }}>
+        <strong>Отличие от скользящей сессии:</strong> JWT_EXPIRES_IN — жёсткий потолок жизни токена
+        (пользователь выйдет не позже этого срока). Скользящая сессия — более ранний выход при бездействии,
+        настраивается выше без перезапуска.
+      </p>
     </div>
   );
 }
