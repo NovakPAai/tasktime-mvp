@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
-import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { config } from '../../config.js';
+import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
 import { hashPassword } from '../../shared/utils/password.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
@@ -217,6 +218,19 @@ export async function deleteUser(actorId: string, userId: string) {
 }
 
 const NA_SUFFIX = ' (N/A)';
+const MAX_NAME_LEN = 255;
+
+function appendNaSuffix(name: string): string {
+  if (name.endsWith(NA_SUFFIX)) return name;
+  const base = name.length + NA_SUFFIX.length > MAX_NAME_LEN
+    ? name.slice(0, MAX_NAME_LEN - NA_SUFFIX.length)
+    : name;
+  return base + NA_SUFFIX;
+}
+
+function stripNaSuffix(name: string): string {
+  return name.endsWith(NA_SUFFIX) ? name.slice(0, -NA_SUFFIX.length) : name;
+}
 
 export async function deactivateUserAdmin(actorId: string, userId: string) {
   if (actorId === userId) throw new AppError(400, 'Cannot deactivate yourself');
@@ -225,7 +239,7 @@ export async function deactivateUserAdmin(actorId: string, userId: string) {
   if (!user) throw new AppError(404, 'User not found');
   if (user.isSystem) throw new AppError(403, 'Cannot deactivate system users');
 
-  const newName = user.name.endsWith(NA_SUFFIX) ? user.name : user.name + NA_SUFFIX;
+  const newName = appendNaSuffix(user.name);
 
   const updated = await prisma.user.update({
     where: { id: userId },
@@ -261,8 +275,12 @@ export async function updateUserAdmin(actorId: string, userId: string, dto: Upda
     }
   }
 
-  if (dto.isActive === true && !user.isActive && user.name.endsWith(NA_SUFFIX)) {
-    dto.name = user.name.slice(0, -NA_SUFFIX.length);
+  if (dto.isActive === true && !user.isActive) {
+    dto.name = stripNaSuffix(dto.name ?? user.name);
+  }
+
+  if (dto.isActive === false && user.isActive) {
+    dto.name = appendNaSuffix(dto.name ?? user.name);
   }
 
   const updated = await prisma.user.update({
@@ -491,6 +509,56 @@ export async function setRegistrationSetting(actorId: string, enabled: boolean):
   });
 
   return enabled;
+}
+
+// ===== SESSION SETTINGS =====
+
+const SESSION_LIFETIME_KEY = 'session_lifetime_minutes';
+const SESSION_LIFETIME_CACHE_KEY = `settings:${SESSION_LIFETIME_KEY}`;
+const SESSION_LIFETIME_DEFAULT = 60;
+
+export type SystemSettings = {
+  sessionLifetimeMinutes: number;
+  registrationEnabled: boolean;
+  /** JWT access-token TTL — read from JWT_EXPIRES_IN env var, read-only at runtime. */
+  jwtExpiresIn: string;
+};
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  const [sessionSetting, regSetting] = await Promise.all([
+    prisma.systemSetting.findUnique({ where: { key: SESSION_LIFETIME_KEY } }),
+    prisma.systemSetting.findUnique({ where: { key: REGISTRATION_KEY } }),
+  ]);
+
+  const raw = sessionSetting ? parseInt(sessionSetting.value, 10) : SESSION_LIFETIME_DEFAULT;
+  return {
+    sessionLifetimeMinutes: isNaN(raw) || raw < 1 ? SESSION_LIFETIME_DEFAULT : raw,
+    registrationEnabled: regSetting ? regSetting.value !== 'false' : true,
+    jwtExpiresIn: config.JWT_EXPIRES_IN,
+  };
+}
+
+export async function setSessionLifetime(actorId: string, minutes: number): Promise<number> {
+  await prisma.systemSetting.upsert({
+    where: { key: SESSION_LIFETIME_KEY },
+    create: { key: SESSION_LIFETIME_KEY, value: String(minutes) },
+    update: { value: String(minutes) },
+  });
+
+  // Invalidate the Redis cache so auth middleware picks up the new value immediately
+  await delCachedJson(SESSION_LIFETIME_CACHE_KEY);
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'system.session_lifetime_changed',
+      entityType: 'system',
+      entityId: SESSION_LIFETIME_KEY,
+      userId: actorId,
+      details: { sessionLifetimeMinutes: minutes },
+    },
+  });
+
+  return minutes;
 }
 
 

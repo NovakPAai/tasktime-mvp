@@ -1,0 +1,85 @@
+{
+  "key": "TTADM-68",
+  "title": "[Workflow Editor] Невозможно добавить переход: conditions/validators/postFunctions null не проходит Zod валидацию",
+  "generatedAt": "2026-04-07T00:00:00.000Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "apiUrl": "http://flowuniverse.ru/api",
+    "issueId": "7c5b4315-d710-4b39-97eb-a2235d70c367",
+    "fetchedAt": "2026-04-07T00:00:00.000Z"
+  },
+  "issue": {
+    "type": "BUG",
+    "status": "OPEN",
+    "priority": "CRITICAL",
+    "project": "TTADM",
+    "assignee": null,
+    "creator": "Claude Code",
+    "estimatedHours": null,
+    "description": "Критический баг: создание перехода в Workflow Editor падало с ошибкой при пустых conditions/validators/postFunctions. Root cause: Zod .optional() не принимал null с фронтенда.",
+    "acceptanceCriteria": null
+  },
+  "implementationStatus": {
+    "done": true,
+    "commitSha": "e8d59eb",
+    "commitMessage": "feat+fix: merge PR#138 + PR#143 — workflow editor fixes + Session 3 UI rebuild",
+    "mergedAt": "2026-03-26",
+    "fixes": [
+      "Backend: rulesField .optional() → .nullish() в workflows.dto.ts",
+      "Frontend: parseJson возвращает undefined вместо null",
+      "Frontend: apiErrorMessage с маппингом кодов ошибок",
+      "Frontend UX: поле fromStatusId скрыто при isGlobal=true, убрана опция __global__"
+    ]
+  },
+  "dependencies": {
+    "backendModules": ["workflows"],
+    "frontendComponents": ["AdminWorkflowEditorPage"],
+    "prismaModels": [],
+    "externalPackages": [],
+    "blockers": []
+  },
+  "risks": [
+    {
+      "id": 1,
+      "description": "Регрессия при пустых массивах в БД (null vs [])",
+      "probability": "LOW",
+      "impact": "Сервис не создаёт переход",
+      "mitigation": ".nullish() покрывает оба случая"
+    }
+  ],
+  "requirements": {
+    "functional": [
+      "FR-1: Создание перехода с пустыми conditions/validators/postFunctions без ошибки 400",
+      "FR-2: При isGlobal=true поле fromStatusId скрывается",
+      "FR-3: Читаемые сообщения об ошибках"
+    ],
+    "nonFunctional": [
+      "API response < 200ms (p95)",
+      "Без изменений схемы Prisma"
+    ],
+    "security": [
+      "SEC-1: Пустые массивы не изменяют RBAC-проверки"
+    ]
+  },
+  "acceptanceCriteria": [
+    "AC-1: Переход с пустыми rules создаётся без ошибки",
+    "AC-2: При isGlobal=true поле fromStatusId не отображается",
+    "AC-3: Читаемые тексты ошибок при нарушении ограничений",
+    "AC-4: Все тесты зелёные",
+    "AC-5: Code review пройден"
+  ],
+  "estimation": {
+    "analysis": 0.2,
+    "backend": 0.1,
+    "frontend": 0.8,
+    "testing": 0,
+    "review": 0.4,
+    "total": 1.5
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [],
+    "blocks": [],
+    "dependsOn": ["TTADM-67"]
+  }
+}
