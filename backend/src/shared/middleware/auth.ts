@@ -3,10 +3,13 @@ import type { UserRole } from '@prisma/client';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { AppError } from './error-handler.js';
 import type { AuthRequest } from '../types/index.js';
-import { getUserSession, touchUserSession, getCachedJson, setCachedJson } from '../redis.js';
+import { getUserSession, touchUserSession, getCachedJson, setCachedJson, isRedisAvailable } from '../redis.js';
 import { prisma } from '../../prisma/client.js';
 
 const DEFAULT_SESSION_LIFETIME_MINUTES = 60;
+
+// In-process counter — exported so health/metrics endpoints can expose it.
+export const sessionFallbackCounter = { total: 0, redis_unavailable: 0, session_missing: 0 };
 const SETTING_CACHE_TTL_SECONDS = 60;
 const SESSION_LIFETIME_SETTING_KEY = 'session_lifetime_minutes';
 const SESSION_LIFETIME_CACHE_KEY = `settings:${SESSION_LIFETIME_SETTING_KEY}`;
@@ -71,13 +74,16 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
       return next(new AppError(401, 'Session expired due to inactivity', { code: 'SESSION_EXPIRED' }));
     }
   } else {
-    // session===null has three causes: (1) Redis unavailable, (2) session key expired by Redis TTL,
-    // (3) session was never created (e.g. system accounts). In all cases we degrade gracefully
-    // and fall back to JWT expiry as the only expiry mechanism. This is intentional: a Redis outage
-    // must not lock all users out. Scenario (2) means the user has been idle longer than
-    // lifetimeMinutes — but we can only detect it if the key still exists; once Redis evicts it we
-    // rely on the JWT exp claim. Logs allow ops to monitor frequency.
-    console.warn(`[auth] sliding-session check skipped for user=${payload.userId}: Redis unavailable or session missing`);
+    // session===null has three causes: (1) Redis unavailable, (2) session key expired/missing,
+    // (3) session was never created (system accounts). Degrade gracefully — rely on JWT expiry.
+    const reason = (await isRedisAvailable()) ? 'session_missing' : 'redis_unavailable';
+    sessionFallbackCounter.total += 1;
+    sessionFallbackCounter[reason] += 1;
+    console.warn('[auth] sliding-session fallback', {
+      userId: payload.userId,
+      reason,
+      counter: sessionFallbackCounter,
+    });
   }
 
   next();

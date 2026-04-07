@@ -119,6 +119,12 @@ function buildSessionKey(userId: string): string {
   return `session:${userId}`;
 }
 
+/** Returns true when a Redis client is connected and ready. */
+export async function isRedisAvailable(): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  return redis !== null;
+}
+
 export async function setUserSession(userId: string, session: Omit<UserSession, 'userId'>): Promise<void> {
   const redis = await getRedisClientInternal();
   if (!redis) return;
