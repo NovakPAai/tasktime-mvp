@@ -4,7 +4,7 @@
  * Zero CSS class dependencies, zero Ant Design layout.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { AxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import { Modal, Form, Input, Popconfirm, Select, Checkbox, DatePicker, message, Pagination, Spin } from 'antd';
@@ -182,17 +182,20 @@ export default function SprintsPage() {
   const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
 
   const BACKLOG_PAGE_SIZE = 20;
+  const backlogReqSeq = useRef(0);
 
   const loadBacklog = useCallback(async (page: number) => {
     if (!projectId) return;
+    const reqId = ++backlogReqSeq.current;
     setBacklogLoading(true);
     try {
       const res = await sprintsApi.getBacklog(projectId, { page, limit: BACKLOG_PAGE_SIZE });
+      if (reqId !== backlogReqSeq.current) return; // stale response — discard
       setBacklog(res.data);
       setBacklogTotal(res.meta.total);
       setBacklogPage(page);
     } finally {
-      setBacklogLoading(false);
+      if (reqId === backlogReqSeq.current) setBacklogLoading(false);
     }
   }, [projectId]);
 
@@ -598,6 +601,8 @@ export default function SprintsPage() {
                   </button>
                 )}
                 {canManage && selectedSprint.state !== 'CLOSED' && (
+                  /* Открывает модал беклога: lazy-load первой страницы при клике,
+                     пагинация по BACKLOG_PAGE_SIZE задач, выбор через чекбоксы */
                   <button
                     type="button"
                     onClick={() => { setBacklogOpen(true); void loadBacklog(1); }}
