@@ -112,7 +112,7 @@ router.post('/sprints/:id/issues', requireRole('ADMIN', 'MANAGER'), validate(mov
 });
 
 // Move issues to backlog
-router.post('/projects/:projectId/backlog/issues', validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
+router.post('/projects/:projectId/backlog/issues', requireRole('ADMIN', 'MANAGER'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
   try {
     await sprintsService.moveIssuesToSprint(null, req.body.issueIds);
     res.json({ ok: true });
@@ -131,9 +131,10 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
     if (!sprint) { res.status(404).json({ error: 'Sprint not found' }); return; }
 
     // Per-sprint distributed lock to prevent concurrent bulk estimates
+    // Per-sprint distributed lock with owner token to prevent concurrent bulk estimates
     const lockKey = `lock:estimate-all:${sprintId}`;
-    const acquired = await acquireLock(lockKey, 300);
-    if (!acquired) {
+    const lockToken = await acquireLock(lockKey, 300);
+    if (!lockToken) {
       res.status(409).json({ error: 'Estimation already in progress for this sprint' });
       return;
     }
@@ -151,8 +152,8 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
           const result = await aiService.estimateIssue({ issueId: issue.id });
           results.push({ issueId: issue.id, estimatedHours: result.estimatedHours });
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          results.push({ issueId: issue.id, error: msg });
+          console.error('estimate-all issue error:', { sprintId, issueId: issue.id, err });
+          results.push({ issueId: issue.id, error: 'Failed to estimate issue' });
         }
       }
 
@@ -178,7 +179,7 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
         results,
       });
     } finally {
-      await releaseLock(lockKey);
+      await releaseLock(lockKey, lockToken);
     }
   } catch (err) { next(err); }
 });
