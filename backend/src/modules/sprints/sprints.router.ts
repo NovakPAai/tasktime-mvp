@@ -130,21 +130,22 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
     });
     if (!sprint) { res.status(404).json({ error: 'Sprint not found' }); return; }
 
+    // Per-sprint distributed lock to prevent concurrent bulk estimates
     const lockKey = `lock:estimate-all:${sprintId}`;
-    const acquired = await acquireLock(lockKey, 300); // 5 min TTL — max time for a full sprint estimate
+    const acquired = await acquireLock(lockKey, 300);
     if (!acquired) {
       res.status(409).json({ error: 'Estimation already in progress for this sprint' });
       return;
     }
 
-    const issues = await prisma.issue.findMany({
-      where: { sprintId },
-      select: { id: true },
-    });
-
-    const results: Array<{ issueId: string; estimatedHours?: number; error?: string }> = [];
-
     try {
+      const issues = await prisma.issue.findMany({
+        where: { sprintId },
+        select: { id: true },
+      });
+
+      const results: Array<{ issueId: string; estimatedHours?: number; error?: string }> = [];
+
       for (const issue of issues) {
         try {
           const result = await aiService.estimateIssue({ issueId: issue.id });
@@ -154,27 +155,31 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
           results.push({ issueId: issue.id, error: msg });
         }
       }
+
+      // Best-effort: invalidate caches and audit — don't fail the response if Redis/DB is flaky
+      try {
+        await Promise.all([
+          delCachedJson(`sprint:issues:${sprintId}`),
+          delCacheByPrefix(`sprints:project:${sprint.projectId}:`),
+          delCacheByPrefix('sprints:all:'),
+          logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
+            total: issues.length,
+            estimated: results.filter(r => !r.error).length,
+          }),
+        ]);
+      } catch (cleanupErr) {
+        console.error('estimate-all post-cleanup error:', cleanupErr);
+      }
+
+      res.json({
+        total: issues.length,
+        estimated: results.filter(r => !r.error).length,
+        failed: results.filter(r => !!r.error).length,
+        results,
+      });
     } finally {
       await releaseLock(lockKey);
     }
-
-    // Best-effort: invalidate caches and audit — don't fail the response if Redis/DB is flaky
-    Promise.all([
-      delCachedJson(`sprint:issues:${sprintId}`),
-      delCacheByPrefix(`sprints:project:${sprint.projectId}:`),
-      delCacheByPrefix('sprints:all:'),
-      logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
-        total: issues.length,
-        estimated: results.filter(r => !r.error).length,
-      }),
-    ]).catch((err) => console.error('estimate-all post-cleanup error:', err));
-
-    res.json({
-      total: issues.length,
-      estimated: results.filter(r => !r.error).length,
-      failed: results.filter(r => !!r.error).length,
-      results,
-    });
   } catch (err) { next(err); }
 });
 

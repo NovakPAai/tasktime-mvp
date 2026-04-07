@@ -104,30 +104,6 @@ export async function delCacheByPrefix(prefix: string): Promise<void> {
   }
 }
 
-/**
- * Acquire a simple distributed lock using SET NX EX.
- * Returns true if the lock was acquired, false if it was already held.
- */
-export async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
-  const redis = await getRedisClientInternal();
-  if (!redis) return true; // no Redis → allow (dev/test fallback)
-
-  try {
-    const result = await redis.set(key, '1', { NX: true, EX: ttlSeconds });
-    return result === 'OK';
-  } catch (err) {
-    console.error('Failed to acquire Redis lock:', err);
-    return true; // allow on error to avoid blocking
-  }
-}
-
-/**
- * Release a distributed lock acquired with acquireLock.
- */
-export async function releaseLock(key: string): Promise<void> {
-  await delCachedJson(key);
-}
-
 export type UserSession = {
   userId: string;
   email: string;
@@ -192,6 +168,38 @@ export async function deleteCachedByPattern(pattern: string): Promise<void> {
     if (keys.length > 0) await redis.del(keys);
   } catch (err) {
     console.error('Failed to delete cached keys by pattern:', err);
+  }
+}
+
+/**
+ * Acquire a distributed lock using Redis SET NX EX.
+ * Returns true if lock acquired, false otherwise.
+ * In test env (no Redis) returns true so tests aren't blocked.
+ * In prod with Redis errors returns false to enforce the lock.
+ */
+export async function acquireLock(key: string, ttlSeconds = 60): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  if (!redis) {
+    return process.env.NODE_ENV === 'test';
+  }
+
+  try {
+    const result = await redis.set(key, '1', { NX: true, EX: ttlSeconds });
+    return result === 'OK';
+  } catch (err) {
+    console.error('acquireLock Redis error:', err);
+    return process.env.NODE_ENV === 'test';
+  }
+}
+
+export async function releaseLock(key: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    await redis.del(key);
+  } catch (err) {
+    console.error('releaseLock Redis error:', err);
   }
 }
 

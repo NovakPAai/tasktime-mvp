@@ -91,7 +91,7 @@ export async function getSprintIssues(id: string) {
   const cached = await getCachedJson<SprintIssuesResult>(cacheKey);
   if (cached) return cached;
 
-  const [sprint, hoursAgg] = await Promise.all([
+  const [sprint, hoursAgg, estimatedIssueCount] = await Promise.all([
     prisma.sprint.findUnique({
       where: { id },
       include: {
@@ -119,20 +119,25 @@ export async function getSprintIssues(id: string) {
         flowTeam: { select: { id: true, name: true } },
       },
     }),
-    // Separate aggregate to get accurate total regardless of the take: 200 limit above
     prisma.issue.aggregate({
       where: { sprintId: id },
       _sum: { estimatedHours: true },
+    }),
+    prisma.issue.count({
+      where: { sprintId: id, estimatedHours: { not: null } },
     }),
   ]);
 
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
   const sprintWithStats = mapSprintWithStats(sprint);
-  // Override totalEstimatedHours with the accurate aggregate value
-  if (sprintWithStats.stats) {
-    sprintWithStats.stats.totalEstimatedHours = Number(hoursAgg._sum.estimatedHours ?? 0);
-  }
+  // Override stats with accurate values from _count and aggregates (not limited by take: 200)
+  const totalIssues = sprint._count.issues;
+  sprintWithStats.stats.totalIssues = totalIssues;
+  sprintWithStats.stats.estimatedIssues = estimatedIssueCount;
+  sprintWithStats.stats.planningReadiness =
+    totalIssues === 0 ? 0 : Math.round((estimatedIssueCount / totalIssues) * 100);
+  sprintWithStats.stats.totalEstimatedHours = Number(hoursAgg._sum.estimatedHours ?? 0);
 
   const result = {
     sprint: sprintWithStats,
