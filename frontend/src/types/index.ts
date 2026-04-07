@@ -10,6 +10,18 @@
  *   …и т.д.
  */
 
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: PaginationMeta;
+}
+
 export type { UserRole, User, AuthResponse } from './auth.types';
 
 export type {

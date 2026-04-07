@@ -98,8 +98,8 @@ describe('Issue response includes both status (string) and workflowStatus (objec
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(2);
-    for (const issue of res.body) {
+    expect(res.body.data.length).toBe(2);
+    for (const issue of res.body.data) {
       expect(typeof issue.status).toBe('string');
       expect(issue).toHaveProperty('workflowStatus');
     }
@@ -233,10 +233,10 @@ describe('Фильтрация по строковому status работает
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(1);
-    expect(res.body[0].status).toBe('DONE');
+    expect(res.body.data.length).toBe(1);
+    expect(res.body.data[0].status).toBe('DONE');
     // Задача с OPEN не попала в выборку
-    expect(res.body.map((i: { id: string }) => i.id)).not.toContain(issue1.body.id);
+    expect(res.body.data.map((i: { id: string }) => i.id)).not.toContain(issue1.body.id);
   });
 
   it('GET /api/projects/:id/issues?status=OPEN,IN_PROGRESS — множественный фильтр', async () => {
@@ -268,8 +268,8 @@ describe('Фильтрация по строковому status работает
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(2);
-    const returnedStatuses = res.body.map((i: { status: string }) => i.status);
+    expect(res.body.data.length).toBe(2);
+    const returnedStatuses = res.body.data.map((i: { status: string }) => i.status);
     expect(returnedStatuses).toContain('OPEN');
     expect(returnedStatuses).toContain('IN_PROGRESS');
     expect(returnedStatuses).not.toContain('DONE');

@@ -41,37 +41,31 @@ export async function getStats() {
     _count: { _all: true },
   });
 
-  const issuesByAssigneeRaw = await prisma.issue.groupBy({
-    by: ['assigneeId'],
-    _count: { _all: true },
-    where: { assigneeId: { not: null } },
-  });
+  // Single query: users with assigned issues count — replaces groupBy + separate findMany + JS map.
+  // Fetch unassigned count in parallel to preserve the null-assignee bucket in stats.
+  const [usersWithIssues, unassignedCount] = await Promise.all([
+    prisma.user.findMany({
+      where: { assignedIssues: { some: {} } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        _count: { select: { assignedIssues: true } },
+      },
+    }),
+    prisma.issue.count({ where: { assigneeId: null } }),
+  ]);
 
-  const assigneeIds = issuesByAssigneeRaw
-    .map((row) => row.assigneeId)
-    .filter((id): id is string => Boolean(id));
-
-  const assignees =
-    assigneeIds.length === 0
-      ? []
-      : await prisma.user.findMany({
-          where: { id: { in: assigneeIds } },
-          select: { id: true, name: true, email: true },
-        });
-
-  const assigneeMap = new Map<string, { name: string | null; email: string }>();
-  for (const user of assignees) {
-    assigneeMap.set(user.id, { name: user.name, email: user.email });
-  }
-
-  const issuesByAssignee = issuesByAssigneeRaw.map((row) => {
-    if (!row.assigneeId) {
-      return { ...row, assigneeName: null };
-    }
-    const meta = assigneeMap.get(row.assigneeId);
-    const name = meta?.name || meta?.email || row.assigneeId;
-    return { ...row, assigneeName: name };
-  });
+  const issuesByAssignee: AdminStats['issuesByAssignee'] = [
+    ...usersWithIssues.map((u) => ({
+      assigneeId: u.id,
+      assigneeName: u.name || u.email,
+      _count: { _all: u._count.assignedIssues },
+    })),
+    ...(unassignedCount > 0
+      ? [{ assigneeId: null, assigneeName: 'Без исполнителя', _count: { _all: unassignedCount } }]
+      : []),
+  ];
 
   const recentActivity = await getActivity();
 
@@ -168,7 +162,7 @@ export async function createUser(dto: CreateUserDto) {
       id: true, email: true, name: true, role: true,
       isActive: true, mustChangePassword: true, createdAt: true,
     },
-  });
+  } as const);
 
   await prisma.auditLog.create({
     data: {

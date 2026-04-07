@@ -1,0 +1,64 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  - title: '🚀 Новые функции'
+    labels:
+      - 'feature'
+      - 'feat'
+  - title: '🐛 Исправления'
+    labels:
+      - 'bug'
+      - 'fix'
+  - title: '♻️ Рефакторинг'
+    labels:
+      - 'refactor'
+  - title: '🧪 Тесты'
+    labels:
+      - 'test'
+  - title: '⚡ Производительность'
+    labels:
+      - 'perf'
+  - title: '🔧 Инфраструктура'
+    labels:
+      - 'chore'
+      - 'ci'
+  - title: '📚 Документация'
+    labels:
+      - 'docs'
+  - title: '⚠️ Ломающие изменения'
+    labels:
+      - 'breaking'
+
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - 'breaking'
+  minor:
+    labels:
+      - 'feature'
+      - 'feat'
+  patch:
+    labels:
+      - 'bug'
+      - 'fix'
+      - 'refactor'
+      - 'chore'
+      - 'ci'
+      - 'docs'
+      - 'test'
+      - 'perf'
+  default: patch
+
+exclude-labels:
+  - 'skip-changelog'
+
+template: |
+  ## Что нового
+
+  $CHANGES
+
+  **Полный changelog:** $PREVIOUS_TAG...v$RESOLVED_VERSION

@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { PrismaClient, Prisma, type User } from '@prisma/client';
 
 import { bootstrapDefaultUsers, getBootstrapUsers } from './bootstrap.js';
+import { hashPassword } from '../shared/utils/password.js';
 
 const prisma = new PrismaClient();
 
@@ -52,6 +53,23 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   if (!ttmpOnly) {
     await bootstrapDefaultUsers(client, defaultPassword, bootstrapUsers);
   }
+
+  // MCP system agent user — upsert so it's always present.
+  // Password is set from AGENT_MCP_PASSWORD env var (required for API write ops).
+  // Falls back to a random string so login is impossible if the var is not set.
+  const agentRawPassword = process.env.AGENT_MCP_PASSWORD ?? Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  const agentPasswordHash = await hashPassword(agentRawPassword);
+  await client.user.upsert({
+    where: { email: 'agent@flow-universe.internal' },
+    create: {
+      email: 'agent@flow-universe.internal',
+      name: 'Flow Universe Agent',
+      passwordHash: agentPasswordHash,
+      role: 'MANAGER',
+      isActive: true,
+    },
+    update: { passwordHash: agentPasswordHash, role: 'MANAGER' },
+  });
 
   const seededUsers = await Promise.all(
     bootstrapUsers.map((user) =>

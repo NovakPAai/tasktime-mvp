@@ -138,3 +138,46 @@ export async function listCheckRunsForCommit(
   );
   return check_runs;
 }
+
+export async function triggerWorkflowDispatch(
+  owner: string,
+  repo: string,
+  workflowFile: string,
+  ref: string,
+  inputs: Record<string, string>,
+): Promise<void> {
+  if (!config.GITHUB_TOKEN) {
+    throw new Error('GITHUB_TOKEN is not configured — cannot trigger workflow dispatch');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref, inputs }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`GitHub workflow dispatch timed out after 10s for ${workflowFile}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const hint = res.status === 403 ? ' — check that GITHUB_TOKEN has Actions: write permission on this repo' : '';
+    throw new Error(`GitHub workflow dispatch failed (${res.status})${hint}: ${text}`);
+  }
+}

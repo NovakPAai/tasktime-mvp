@@ -4,8 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Image tag to deploy
+        description: Docker image tag to deploy
         required: true
+        type: string
+      batch_id:
+        description: Pipeline Service batch ID (for callback)
+        required: false
         type: string
 
 permissions:
@@ -16,6 +20,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
 
@@ -41,13 +48,23 @@ jobs:
         run: |
           ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" "
             ENV_FILE='${{ secrets.PRODUCTION_DEPLOY_PATH }}/deploy/env/backend.production.env'
-            # Remove stale secret lines (idempotent)
             sed -i '/^AI_PROVIDER=/d; /^ANTHROPIC_API_KEY=/d' \"\$ENV_FILE\"
             echo 'AI_PROVIDER=${{ secrets.AI_PROVIDER }}' >> \"\$ENV_FILE\"
             echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' >> \"\$ENV_FILE\"
           "
 
       - name: Run remote deploy
+        id: remote_deploy
         run: |
           ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" \
-            "cd '${{ secrets.PRODUCTION_DEPLOY_PATH }}' && chmod +x deploy/scripts/*.sh && ./deploy/scripts/deploy.sh production '${{ github.event.inputs.image_tag }}'"
+            "cd '${{ secrets.PRODUCTION_DEPLOY_PATH }}' && chmod +x deploy/scripts/*.sh && ./deploy/scripts/deploy.sh production '${{ inputs.image_tag }}'"
+
+      - name: Callback to Pipeline Service
+        if: always() && inputs.batch_id != ''
+        env:
+          DEPLOY_STATUS: ${{ steps.remote_deploy.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}
+        run: |
+          curl -sf -X POST "${{ secrets.PIPELINE_SERVICE_URL }}/api/batches/${{ inputs.batch_id }}/deploy-callback" \
+            -H "x-pipeline-api-key: ${{ secrets.PIPELINE_SERVICE_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"status\":\"${DEPLOY_STATUS}\",\"target\":\"PRODUCTION\",\"workflowRunId\":${{ github.run_id }},\"workflowRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" || true

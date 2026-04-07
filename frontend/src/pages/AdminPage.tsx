@@ -113,7 +113,7 @@ export default function AdminPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [statsData, adminUsers, allUsers, allProjects] = await Promise.all([
+        const [statsData, adminUsersPage, allUsers, allProjects] = await Promise.all([
           adminApi.getStats(),
           adminApi.listAdminUsers(),
           authApi.listUsers(),
@@ -123,13 +123,19 @@ export default function AdminPage() {
         const userMap: Record<string, User> = {};
         allUsers.forEach((u) => { userMap[u.id] = u; });
         setUsersMap(userMap);
-        setUsers(adminUsers.map((u) => ({
-          id: u.id, email: u.email, name: u.name, role: u.role,
-          isActive: u.isActive, createdAt: u.createdAt,
-          createdIssues: u._count.createdIssues,
-          assignedIssues: u._count.assignedIssues,
-          timeLogs: u._count.timeLogs,
-        })));
+        setUsers(
+          adminUsersPage.data.map((u) => ({
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            role: u.role,
+            isActive: u.isActive,
+            createdAt: u.createdAt,
+            createdIssues: u._count.createdIssues,
+            assignedIssues: u._count.assignedIssues,
+            timeLogs: u._count.timeLogs,
+          }))
+        );
         setProjects(allProjects);
         if (allProjects.length > 0) setSelectedProjectId(allProjects[0].id);
       } catch (err) {
@@ -164,10 +170,16 @@ export default function AdminPage() {
 
   useEffect(() => {
     const loadSprints = async () => {
-      if (!selectedProjectId) { setSprints([]); setSelectedSprintId(undefined); return; }
-      const data = await sprintsApi.listSprints(selectedProjectId);
-      setSprints(data);
-      if (!selectedSprintId && data.length > 0) setSelectedSprintId(data[0].id);
+      if (!selectedProjectId) {
+        setSprints([]);
+        setSelectedSprintId(undefined);
+        return;
+      }
+      const page = await sprintsApi.listSprints(selectedProjectId);
+      setSprints(page.data);
+      if (!selectedSprintId && page.data.length > 0) {
+        setSelectedSprintId(page.data[0].id);
+      }
     };
     void loadSprints();
   // eslint-disable-next-line react-hooks/exhaustive-deps

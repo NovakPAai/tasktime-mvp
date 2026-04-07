@@ -95,7 +95,7 @@ describe('Issues API', () => {
     const res = await request.get(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(2);
+    expect(res.body.data.length).toBe(2);
   });
 
   it('GET /api/projects/:projectId/issues - supports filters and search', async () => {
@@ -117,14 +117,14 @@ describe('Issues API', () => {
       .query({ status: 'DONE' })
       .set('Authorization', `Bearer ${adminToken}`);
     expect(resStatus.status).toBe(200);
-    expect(resStatus.body.length).toBe(1);
+    expect(resStatus.body.data.length).toBe(1);
 
     const resSearch = await request
       .get(`/api/projects/${projectId}/issues`)
       .query({ search: 'bug' })
       .set('Authorization', `Bearer ${adminToken}`);
     expect(resSearch.status).toBe(200);
-    expect(resSearch.body.length).toBe(1);
+    expect(resSearch.body.data.length).toBe(1);
   });
 
   it('PATCH /api/issues/:id/status - changes status', async () => {
@@ -192,6 +192,6 @@ describe('Issues API', () => {
       .query({ status: 'IN_PROGRESS' })
       .set('Authorization', `Bearer ${adminToken}`);
     expect(list.status).toBe(200);
-    expect(list.body.length).toBe(2);
+    expect(list.body.data.length).toBe(2);
   });
 });

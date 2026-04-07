@@ -233,7 +233,7 @@ describe('AI Creator Detection — aiEligible / aiAssigneeType / aiExecutionStat
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(list.status).toBe(200);
-    const found = list.body.find((i: any) => i.id === issue.body.id);
+    const found = list.body.data.find((i: any) => i.id === issue.body.id);
     expect(found).toBeTruthy();
     expect(found.aiEligible).toBe(true);
     expect(found.aiAssigneeType).toBe('AGENT');

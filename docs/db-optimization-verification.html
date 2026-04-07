@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DB Optimization — Чеклист верификации</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      line-height: 1.6;
+      padding: 40px 24px 80px;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    /* Header */
+    .header {
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 28px;
+      margin-bottom: 40px;
+    }
+    .header-tag {
+      display: inline-block;
+      background: #1f2937;
+      color: #60a5fa;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid #1d4ed8;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #8b949e;
+      font-size: 14px;
+    }
+    .subtitle strong { color: #c9d1d9; }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+    .stat-pill {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+    }
+    .stat-pill .num { font-size: 22px; font-weight: 700; color: #f0f6fc; display: block; line-height: 1.2; }
+    .stat-pill .lbl { color: #8b949e; font-size: 11px; }
+    .stat-pill.green .num { color: #3fb950; }
+    .stat-pill.blue .num  { color: #58a6ff; }
+    .stat-pill.orange .num { color: #d29922; }
+    .stat-pill.red .num   { color: #f85149; }
+
+    /* Section */
+    .section {
+      margin-bottom: 48px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .section-num {
+      width: 32px; height: 32px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #f0f6fc;
+      flex-shrink: 0;
+    }
+    h2 { font-size: 18px; font-weight: 700; color: #f0f6fc; }
+    .section-desc { font-size: 13px; color: #8b949e; margin-top: 2px; }
+
+    /* Check items */
+    .checks { display: flex; flex-direction: column; gap: 8px; }
+    .check {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+    .check-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .check-box {
+      width: 18px; height: 18px;
+      border: 2px solid #30363d;
+      border-radius: 4px;
+      margin-top: 2px;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .check-box.done {
+      background: #238636;
+      border-color: #238636;
+      position: relative;
+    }
+    .check-box.done::after {
+      content: '✓';
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .check-box.fail {
+      background: #b91c1c;
+      border-color: #b91c1c;
+    }
+    .check-box.fail::after {
+      content: '✗';
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .check-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f0f6fc;
+      flex: 1;
+    }
+    .check-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .badge-critical { background: #450a0a; color: #f87171; border: 1px solid #7f1d1d; }
+    .badge-high     { background: #431407; color: #fb923c; border: 1px solid #7c2d12; }
+    .badge-medium   { background: #1c1917; color: #a8a29e; border: 1px solid #44403c; }
+    .badge-info     { background: #0c1a2e; color: #60a5fa; border: 1px solid #1e3a5f; }
+
+    .check-body {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #21262d;
+    }
+    .check-desc {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 10px;
+    }
+
+    /* Code blocks */
+    pre {
+      background: #010409;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12.5px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin-bottom: 10px;
+      color: #e6edf3;
+      position: relative;
+    }
+    pre .comment { color: #6e7681; }
+    pre .keyword { color: #ff7b72; }
+    pre .string  { color: #a5d6ff; }
+    pre .value   { color: #79c0ff; }
+    pre .fn      { color: #d2a8ff; }
+    pre .ok      { color: #3fb950; }
+    pre .warn    { color: #d29922; }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .copy-btn:hover { background: #30363d; color: #f0f6fc; }
+
+    /* Expected output */
+    .expected {
+      background: #0d1f0e;
+      border: 1px solid #1a4223;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      color: #3fb950;
+      font-family: monospace;
+    }
+    .expected-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #3fb950;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      opacity: 0.7;
+    }
+    .fail-note {
+      background: #1a0a0a;
+      border: 1px solid #7f1d1d;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      color: #f87171;
+      margin-top: 8px;
+    }
+    .fail-label { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; opacity: 0.7; }
+
+    /* Index table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    th {
+      background: #21262d;
+      color: #8b949e;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #21262d;
+      font-family: monospace;
+      font-size: 12.5px;
+    }
+    tr:last-child td { border-bottom: none; }
+    .td-green { color: #3fb950; }
+    .td-blue  { color: #58a6ff; }
+
+    /* Warning box */
+    .warning-box {
+      background: #1a1100;
+      border: 1px solid #5a3e00;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #d29922;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .warning-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    /* Info box */
+    .info-box {
+      background: #0c1a2e;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #60a5fa;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    /* Progress summary */
+    .progress-section {
+      position: sticky;
+      bottom: 24px;
+      margin-top: 40px;
+    }
+    .progress-bar-container {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .progress-bar {
+      flex: 1;
+      height: 8px;
+      background: #21262d;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #238636, #3fb950);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .progress-text {
+      font-size: 13px;
+      color: #8b949e;
+      white-space: nowrap;
+    }
+    .progress-count { font-weight: 700; color: #f0f6fc; }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid #21262d;
+      margin: 32px 0;
+    }
+
+    /* Environment tabs */
+    .env-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .env-tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid #30363d;
+      background: #161b22;
+      color: #8b949e;
+      cursor: pointer;
+    }
+    .env-tab.active-staging { background: #1c2a1c; border-color: #238636; color: #3fb950; }
+    .env-tab.active-prod    { background: #2a1c1c; border-color: #b91c1c; color: #f87171; }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      .progress-section { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-tag">Flow Universe · DB Optimization</div>
+    <h1>Чеклист верификации после деплоя</h1>
+    <p class="subtitle">
+      Ветка: <strong>NovakPA/vibrant-leavitt</strong> &nbsp;·&nbsp;
+      Staging: <strong>${STAGING_HOST}</strong> &nbsp;·&nbsp;
+      Production: <strong>${PROD_HOST}</strong>
+    </p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-pill green"><span class="num">11</span><span class="lbl">новых индексов</span></div>
+    <div class="stat-pill red"><span class="num">N+1</span><span class="lbl">исправлен (gitlab)</span></div>
+    <div class="stat-pill blue"><span class="num">7</span><span class="lbl">endpoint с pagination</span></div>
+    <div class="stat-pill orange"><span class="num">8</span><span class="lbl">новых Redis-кешей</span></div>
+    <div class="stat-pill green"><span class="num">✓</span><span class="lbl">cache invalidation</span></div>
+    <div class="stat-pill red"><span class="num">✓</span><span class="lbl">TOCTOU fix</span></div>
+  </div>
+
+  <!-- SECTION 1: DEPLOY -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <div>
+        <h2>Деплой и миграция</h2>
+        <div class="section-desc">Убедиться, что CI прошёл и миграция применилась</div>
+      </div>
+    </div>
+    <div class="checks">
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">CI зелёный — все шаги прошли</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">Открыть GitHub Actions для ветки и убедиться: build, lint, tests — все зелёные.</p>
+          <pre><span class="comment"># Проверить статус последнего CI run</span>
+gh run list --branch NovakPA/vibrant-leavitt --limit 5
+gh run view &lt;RUN_ID&gt;</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">✓  build · lint · test — all passed</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Миграция применена: 20260402000000_add_perf_indexes</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">Подключиться к БД на staging и проверить таблицу истории миграций Prisma.</p>
+          <pre><span class="comment"># SSH на staging</span>
+ssh user@${STAGING_HOST}
+
+<span class="comment"># Подключиться к PostgreSQL</span>
+docker exec -it tasktime-postgres psql -U tasktime -d tasktime
+
+<span class="comment"># Проверить, что миграция есть в истории</span>
+<span class="keyword">SELECT</span> migration_name, finished_at
+<span class="keyword">FROM</span> _prisma_migrations
+<span class="keyword">WHERE</span> migration_name <span class="keyword">LIKE</span> <span class="string">'%perf_indexes%'</span>;</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">20260402000000_add_perf_indexes | 2026-04-02 ...</div>
+          <div class="fail-note">
+            <div class="fail-label">Если пусто</div>
+            Запустить вручную: <code>docker exec tasktime-backend npx prisma migrate deploy</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Production: индексы созданы через CONCURRENTLY</div>
+          <span class="check-badge badge-critical">Critical (prod only)</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">На production с живым трафиком <code>CREATE INDEX</code> внутри транзакции блокирует запись.
+          Нужно предварительно создать индексы вручную с <code>CONCURRENTLY</code>, до применения миграции.</p>
+          <pre><span class="comment">-- Выполнять на prod PostgreSQL ДО prisma migrate deploy</span>
+<span class="comment">-- CONCURRENTLY не блокирует запись, но нельзя внутри транзакции</span>
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"refresh_tokens_user_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"refresh_tokens"</span>(<span class="string">"user_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"sprints_project_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"sprints"</span>(<span class="string">"project_team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"sprints_business_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"sprints"</span>(<span class="string">"business_team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"sprints_flow_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"sprints"</span>(<span class="string">"flow_team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"comments_author_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"comments"</span>(<span class="string">"author_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"team_members_team_id_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"team_members"</span>(<span class="string">"team_id"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"audit_logs_action_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"audit_logs"</span>(<span class="string">"action"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"issues_created_at_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"issues"</span>(<span class="string">"created_at"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"issues_updated_at_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"issues"</span>(<span class="string">"updated_at"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"issues_status_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"issues"</span>(<span class="string">"status"</span>);
+
+<span class="keyword">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> <span class="string">"time_logs_log_date_idx"</span>
+  <span class="keyword">ON</span> <span class="string">"time_logs"</span>(<span class="string">"log_date"</span>);</pre>
+          <div class="expected-label">После — запустить migrate deploy</div>
+          <div class="expected">prisma migrate deploy обнаружит IF NOT EXISTS и пропустит CREATE INDEX.
+Статус миграции в _prisma_migrations будет: finished_at IS NOT NULL</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 2: INDEXES -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <div>
+        <h2>Индексы PostgreSQL</h2>
+        <div class="section-desc">Все 11 индексов должны присутствовать в pg_indexes</div>
+      </div>
+    </div>
+    <div class="checks">
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">11 новых индексов созданы</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="keyword">SELECT</span> indexname, tablename
+<span class="keyword">FROM</span> pg_indexes
+<span class="keyword">WHERE</span> schemaname = <span class="string">'public'</span>
+  <span class="keyword">AND</span> indexname <span class="keyword">IN</span> (
+    <span class="string">'refresh_tokens_user_id_idx'</span>,
+    <span class="string">'sprints_project_team_id_idx'</span>,
+    <span class="string">'sprints_business_team_id_idx'</span>,
+    <span class="string">'sprints_flow_team_id_idx'</span>,
+    <span class="string">'comments_author_id_idx'</span>,
+    <span class="string">'team_members_team_id_idx'</span>,
+    <span class="string">'audit_logs_action_idx'</span>,
+    <span class="string">'issues_created_at_idx'</span>,
+    <span class="string">'issues_updated_at_idx'</span>,
+    <span class="string">'issues_status_idx'</span>,
+    <span class="string">'time_logs_log_date_idx'</span>
+  )
+<span class="keyword">ORDER BY</span> tablename;</pre>
+          <div class="expected-label">Ожидаемый результат — 11 строк</div>
+          <table>
+            <tr><th>indexname</th><th>tablename</th></tr>
+            <tr><td class="td-green">audit_logs_action_idx</td><td class="td-blue">audit_logs</td></tr>
+            <tr><td class="td-green">comments_author_id_idx</td><td class="td-blue">comments</td></tr>
+            <tr><td class="td-green">issues_created_at_idx</td><td class="td-blue">issues</td></tr>
+            <tr><td class="td-green">issues_status_idx</td><td class="td-blue">issues</td></tr>
+            <tr><td class="td-green">issues_updated_at_idx</td><td class="td-blue">issues</td></tr>
+            <tr><td class="td-green">refresh_tokens_user_id_idx</td><td class="td-blue">refresh_tokens</td></tr>
+            <tr><td class="td-green">sprints_business_team_id_idx</td><td class="td-blue">sprints</td></tr>
+            <tr><td class="td-green">sprints_flow_team_id_idx</td><td class="td-blue">sprints</td></tr>
+            <tr><td class="td-green">sprints_project_team_id_idx</td><td class="td-blue">sprints</td></tr>
+            <tr><td class="td-green">team_members_team_id_idx</td><td class="td-blue">team_members</td></tr>
+            <tr><td class="td-green">time_logs_log_date_idx</td><td class="td-blue">time_logs</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">EXPLAIN показывает Index Scan (не Seq Scan)</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">Проверить на реальном проекте, что запрос использует индекс.</p>
+          <pre><span class="comment">-- Заменить &lt;PROJECT_UUID&gt; на реальный ID проекта</span>
+<span class="keyword">EXPLAIN ANALYZE</span>
+<span class="keyword">SELECT</span> id, title, status, priority
+<span class="keyword">FROM</span> issues
+<span class="keyword">WHERE</span> project_id = <span class="string">'&lt;PROJECT_UUID&gt;'</span>
+  <span class="keyword">AND</span> status = <span class="string">'IN_PROGRESS'</span>
+<span class="keyword">ORDER BY</span> created_at <span class="keyword">DESC</span>
+<span class="keyword">LIMIT</span> 100;</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">→ Bitmap Index Scan on issues_project_id_status_idx
+   или Index Scan using issues_created_at_idx</div>
+          <div class="fail-note">
+            <div class="fail-label">Если Seq Scan</div>
+            Таблица слишком маленькая — PostgreSQL предпочитает seq scan на малых объёмах. Это нормально для dev/staging с небольшими данными. Индексы заработают при росте таблицы.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 3: PAGINATION -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <div>
+        <h2>Pagination API</h2>
+        <div class="section-desc">Endpoint'ы возвращают {data, meta} вместо массива</div>
+      </div>
+    </div>
+
+    <div class="warning-box">
+      <span class="warning-icon">⚠</span>
+      <div>Получить JWT-токен перед тестами: <code>POST /api/auth/login</code> с <code>${ADMIN_EMAIL} / ${ADMIN_PASSWORD}</code><br>
+      Подставить в переменную <code>TOKEN</code> во всех запросах ниже.</div>
+    </div>
+
+    <div class="checks">
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Авторизация — получить токен</div>
+          <span class="check-badge badge-info">Setup</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># Получить токен</span>
+TOKEN=$(curl -s -X POST http://${STAGING_HOST}/api/auth/login \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"email":"${ADMIN_EMAIL}","password":"${ADMIN_PASSWORD}"}'</span> \
+  | <span class="fn">jq</span> -r .accessToken)
+
+echo <span class="string">"Token: $TOKEN"</span>
+
+<span class="comment"># Получить ID проекта</span>
+PROJECT_ID=$(curl -s http://${STAGING_HOST}/api/projects \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  | <span class="fn">jq</span> -r <span class="string">'.[0].id'</span>)
+
+echo <span class="string">"Project: $PROJECT_ID"</span></pre>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">GET /api/projects/:id/issues — paginated response</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># Первая страница, 10 записей</span>
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> <span class="string">'{data_length: (.data | length), meta}'</span></pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">{
+  "data_length": 10,
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": &lt;N&gt;,
+    "totalPages": &lt;K&gt;
+  }
+}</div>
+          <div class="fail-note">
+            <div class="fail-label">Если вернулся массив (без meta)</div>
+            Фронтенд API-слой не обновлён или деплой не включил новые файлы. Проверить версию контейнера.
+          </div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">GET /api/projects/:id/sprints — paginated</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre>curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/sprints?page=1&amp;limit=5" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> .meta</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">{ "page": 1, "limit": 5, "total": &lt;N&gt;, "totalPages": &lt;K&gt; }</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">GET /api/projects/:id/backlog — paginated</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre>curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/backlog?limit=10" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> .meta</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">{ "page": 1, "limit": 10, "total": &lt;N&gt;, "totalPages": &lt;K&gt; }</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">GET /api/admin/users — paginated</div>
+          <span class="check-badge badge-medium">Medium</span>
+        </div>
+        <div class="check-body">
+          <pre>curl -s "http://${STAGING_HOST}/api/admin/users?limit=5" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> .meta</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">{ "page": 1, "limit": 5, "total": &lt;N&gt;, "totalPages": &lt;K&gt; }</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 4: N+1 FIX -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <div>
+        <h2>N+1 fix — GitLab webhook</h2>
+        <div class="section-desc">Webhook должен генерировать ровно 3 запроса к БД, независимо от числа ключей</div>
+      </div>
+    </div>
+    <div class="checks">
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Тест webhook — 3 запроса к БД вместо 2N</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">Включить query logging на staging, отправить webhook с несколькими ключами и посчитать запросы.</p>
+
+          <pre><span class="comment"># 1. Войти в контейнер backend и включить логи</span>
+docker exec -it tasktime-backend sh
+<span class="comment"># Установить в .env или запустить с переменной:</span>
+<span class="comment"># DEBUG=prisma:query</span></pre>
+
+          <pre><span class="comment"># 2. Отправить тестовый webhook с 3 issue-ключами</span>
+curl -s -X POST http://${STAGING_HOST}/api/webhooks/gitlab \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{
+    "object_kind": "push",
+    "ref": "refs/heads/feature/DEMO-1",
+    "commits": [
+      {"message": "fix DEMO-2 and BACK-1 resolved"},
+      {"message": "update DEMO-3"}
+    ]
+  }'</span></pre>
+
+          <pre><span class="comment"># 3. Проверить логи контейнера</span>
+docker logs tasktime-backend --tail 30 | grep -E "prisma:query|SELECT|UPDATE|INSERT"</pre>
+
+          <div class="expected-label">Ожидаемый результат — ровно 3 запроса</div>
+          <div class="expected">Query 1: SELECT ... FROM "issues" WHERE ... IN (...)
+Query 2: UPDATE "issues" SET "status" = $1 WHERE "id" IN (...)
+Query 3: INSERT INTO "audit_logs" ...</div>
+          <div class="fail-note">
+            <div class="fail-label">Если запросов больше (кратно N ключам)</div>
+            N+1 не исправлен — проверить, что задеплоился новый код gitlab.service.ts
+          </div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">TOCTOU fix — webhook не открывает DONE/CANCELLED задачи</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">Webhook теперь использует транзакцию с повторной проверкой статуса.
+          Убедиться, что задачи в терминальных состояниях не изменяются.</p>
+          <pre><span class="comment"># 1. Найти DONE-задачу в проекте DEMO</span>
+docker exec -it tasktime-postgres psql -U tasktime -d tasktime -c \
+  "SELECT key_combined, status FROM issues
+   JOIN projects ON issues.project_id = projects.id
+   WHERE projects.key = 'DEMO' AND issues.status = 'DONE'
+   LIMIT 1;"
+
+<span class="comment"># Допустим, задача DEMO-5 имеет статус DONE</span>
+<span class="comment"># 2. Отправить webhook, ссылающийся на эту задачу</span>
+curl -s -X POST http://${STAGING_HOST}/api/webhooks/gitlab \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{
+    "object_kind": "push",
+    "ref": "refs/heads/feature/DEMO-5",
+    "commits": []
+  }'</span>
+
+<span class="comment"># 3. Проверить, что статус не изменился</span>
+docker exec -it tasktime-postgres psql -U tasktime -d tasktime -c \
+  "SELECT status FROM issues
+   JOIN projects ON issues.project_id = projects.id
+   WHERE projects.key = 'DEMO' AND issues.number = 5;"</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">status = DONE  ← не изменился, TOCTOU guard сработал</div>
+          <div class="fail-note">
+            <div class="fail-label">Если статус изменился на IN_PROGRESS</div>
+            TOCTOU fix не применился — проверить, что задеплоился новый код gitlab.service.ts с $transaction
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 5: REDIS CACHE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">5</div>
+      <div>
+        <h2>Redis — кеш работает</h2>
+        <div class="section-desc">Повторный запрос не должен генерировать запросы к БД</div>
+      </div>
+    </div>
+    <div class="checks">
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Ключи в Redis появляются после первого запроса</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># 1. Сделать первый запрос (заполнить кеш)</span>
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+<span class="comment"># 2. Проверить ключи в Redis</span>
+docker exec -it tasktime-redis redis-cli KEYS "issues:list:*"</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">1) "issues:list:&lt;PROJECT_ID&gt;:s=:t=:pr=:a=:sp=:fr=:to=:q=:pg=1:lm=10"</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Второй запрос быстрее — обслуживается из кеша</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># Измерить время двух последовательных запросов</span>
+echo <span class="string">"=== Запрос 1 (промах кеша) ==="</span>
+time curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+echo <span class="string">"=== Запрос 2 (попадание в кеш) ==="</span>
+time curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">Запрос 1: ~50–200 ms (идёт в БД)
+Запрос 2: ~5–20 ms  (Redis кеш)</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">TTL кеша — не более 30 секунд</div>
+          <span class="check-badge badge-medium">Medium</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># Проверить TTL любого ключа</span>
+docker exec tasktime-redis redis-cli TTL <span class="string">"issues:list:&lt;PROJECT_ID&gt;:..."</span>
+
+<span class="comment"># Или через scan + ttl</span>
+docker exec tasktime-redis redis-cli --scan --pattern "issues:*" \
+  | head -1 | xargs -I{} docker exec tasktime-redis redis-cli TTL {}</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">Число от 1 до 30 (секунды до истечения)</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Cache invalidation — создание задачи сбрасывает кеш</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">После создания/обновления задачи старые ключи <code>issues:list:*</code> должны удалиться из Redis.</p>
+          <pre><span class="comment"># 1. Прогреть кеш</span>
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=10" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+<span class="comment"># 2. Убедиться, что ключи есть</span>
+docker exec tasktime-redis redis-cli KEYS "issues:list:*" | wc -l
+<span class="comment"># Ожидаем: 1 (или больше)</span>
+
+<span class="comment"># 3. Создать новую задачу</span>
+curl -s -X POST http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"title":"Cache invalidation test","type":"TASK","priority":"LOW"}'</span> &gt; /dev/null
+
+<span class="comment"># 4. Проверить, что ключи удалились</span>
+docker exec tasktime-redis redis-cli KEYS "issues:list:*" | wc -l
+<span class="comment"># Ожидаем: 0</span></pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">До создания:  1+ ключей в Redis
+После создания: 0 ключей (инвалидированы)</div>
+          <div class="fail-note">
+            <div class="fail-label">Если ключи остались</div>
+            delCacheByPrefix не вызывается — проверить, что createIssue в issues.service.ts задеплоился корректно
+          </div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Cache invalidation — старт спринта сбрасывает sprint-кеши</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># 1. Прогреть кеш спринтов</span>
+curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/sprints" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+docker exec tasktime-redis redis-cli KEYS "sprints:*" | wc -l
+<span class="comment"># Ожидаем: 1+</span>
+
+<span class="comment"># 2. Получить ID PLANNED-спринта</span>
+SPRINT_ID=$(curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/sprints" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  | <span class="fn">jq</span> -r <span class="string">'.data[] | select(.state=="PLANNED") | .id'</span> | head -1)
+
+<span class="comment"># 3. Стартовать спринт</span>
+curl -s -X POST http://${STAGING_HOST}/api/sprints/$SPRINT_ID/start \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+<span class="comment"># 4. Проверить кеш</span>
+docker exec tasktime-redis redis-cli KEYS "sprints:*" | wc -l
+<span class="comment"># Ожидаем: 0</span></pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">После startSprint: 0 ключей sprints:* в Redis</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Cache invalidation — логирование времени сбрасывает time:summary</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># 1. Прогреть кеш</span>
+curl -s http://${STAGING_HOST}/api/time/summary \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+docker exec tasktime-redis redis-cli KEYS "time:summary:*"
+<span class="comment"># Ожидаем: 1 ключ</span>
+
+<span class="comment"># 2. Залогировать время вручную</span>
+ISSUE_ID=$(curl -s "http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?limit=1" \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> | <span class="fn">jq</span> -r '.data[0].id')
+
+curl -s -X POST http://${STAGING_HOST}/api/issues/$ISSUE_ID/time \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"hours": 1, "note": "cache invalidation test"}'</span> &gt; /dev/null
+
+<span class="comment"># 3. Проверить кеш</span>
+docker exec tasktime-redis redis-cli KEYS "time:summary:*"
+<span class="comment"># Ожидаем: пусто (ключ удалён)</span></pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">После logManual: ключ time:summary:* удалён из Redis</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 6: UI CHECK -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">6</div>
+      <div>
+        <h2>UI — страницы не сломаны</h2>
+        <div class="section-desc">Визуальная проверка ключевых страниц после смены формата ответа API</div>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <span>ℹ</span>
+      <div>API-функции в frontend обновлены: <code>listSprints</code>, <code>getBacklog</code>, <code>listAllSprints</code>, <code>listAdminUsers</code> теперь возвращают <code>PaginatedResponse&lt;T&gt;</code> вместо <code>T[]</code>. Компоненты извлекают <code>.data</code> самостоятельно. Нужно убедиться, что данные отображаются корректно.</div>
+    </div>
+
+    <div class="checks">
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Issues list — задачи отображаются в проекте</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">Открыть проект → убедиться, что список задач не пустой, нет ошибок в консоли.</p>
+          <pre><span class="comment"># Адрес staging</span>
+http://${STAGING_HOST}/projects/&lt;PROJECT_ID&gt;</pre>
+          <div class="expected-label">Проверить</div>
+          <div class="expected">✓  Задачи отображаются списком
+✓  Нет ошибок "Cannot read properties of undefined"
+✓  Нет пустых страниц там, где должны быть данные</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Kanban Board — карточки в колонках</div>
+          <span class="check-badge badge-critical">Critical</span>
+        </div>
+        <div class="check-body">
+          <pre>http://${STAGING_HOST}/projects/&lt;PROJECT_ID&gt;/board</pre>
+          <div class="expected-label">Проверить</div>
+          <div class="expected">✓  Колонки OPEN / IN_PROGRESS / REVIEW / DONE заполнены
+✓  Drag-and-drop не сломан</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Sprints — список спринтов виден</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <pre>http://${STAGING_HOST}/projects/&lt;PROJECT_ID&gt;/sprints</pre>
+          <div class="expected-label">Проверить</div>
+          <div class="expected">✓  Спринты отображаются
+✓  Backlog-задачи видны</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Admin / Users — список пользователей</div>
+          <span class="check-badge badge-medium">Medium</span>
+        </div>
+        <div class="check-body">
+          <pre>http://${STAGING_HOST}/admin  <span class="comment">(вкладка Users)</span></pre>
+          <div class="expected-label">Проверить</div>
+          <div class="expected">✓  Пользователи отображаются с метриками (_count)</div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Admin stats — задачи без исполнителя в breakdown</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">issuesByAssignee теперь содержит null-bucket «Без исполнителя».
+          Ранее задачи без assigneeId пропадали из статистики.</p>
+          <pre><span class="comment"># Проверить ответ /api/admin/stats</span>
+curl -s http://${STAGING_HOST}/api/admin/stats \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+  | <span class="fn">jq</span> <span class="string">'.issuesByAssignee[] | select(.assigneeId == null)'</span></pre>
+          <div class="expected-label">Ожидаемый результат (если есть неназначенные задачи)</div>
+          <div class="expected">{
+  "assigneeId": null,
+  "assigneeName": "Без исполнителя",
+  "_count": { "_all": &lt;N&gt; }
+}</div>
+          <div class="fail-note">
+            <div class="fail-label">Если null-bucket отсутствует</div>
+            Проверить, что все задачи имеют assigneeId. Если нет — admin.service.ts обновился некорректно.
+          </div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Консоль браузера — нет ошибок</div>
+          <span class="check-badge badge-high">High</span>
+        </div>
+        <div class="check-body">
+          <p class="check-desc">F12 → Console → убедиться что нет красных ошибок при загрузке страниц выше.</p>
+          <div class="expected-label">Проверить</div>
+          <div class="expected">✓  0 ошибок в консоли
+✓  Нет 4xx / 5xx в Network tab</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 7: PERFORMANCE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">7</div>
+      <div>
+        <h2>Замер производительности</h2>
+        <div class="section-desc">Убедиться, что p95 latency &lt; 200ms (NFR)</div>
+      </div>
+    </div>
+    <div class="checks">
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">p95 latency — 20 последовательных запросов</div>
+          <span class="check-badge badge-medium">Medium</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># Снять 20 замеров и посмотреть распределение</span>
+for i in $(seq 1 20); do
+  curl -o /dev/null -s -w <span class="string">"%{time_total}\n"</span> \
+    -H <span class="string">"Authorization: Bearer $TOKEN"</span> \
+    <span class="string">"http://${STAGING_HOST}/api/projects/$PROJECT_ID/issues?page=1&amp;limit=50"</span>
+done | sort -n | awk <span class="string">'
+  NR==1  {min=$0}
+  NR==19 {p95=$0}
+  END    {print "min="min"s  p95="p95"s  target=0.200s"}'</span></pre>
+          <div class="expected-label">Целевой результат (NFR)</div>
+          <div class="expected">min=0.00Xs  p95=0.XXXs  target=0.200s
+<span style="color:#3fb950">✓ p95 должен быть ниже 0.200s</span></div>
+        </div>
+      </div>
+
+      <div class="check">
+        <div class="check-header">
+          <div class="check-box" onclick="toggle(this)"></div>
+          <div class="check-title">Admin stats — кеш ускоряет дорогой агрегат</div>
+          <span class="check-badge badge-medium">Medium</span>
+        </div>
+        <div class="check-body">
+          <pre><span class="comment"># Первый запрос (холодный кеш)</span>
+time curl -s http://${STAGING_HOST}/api/admin/stats \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null
+
+<span class="comment"># Второй запрос (горячий кеш)</span>
+time curl -s http://${STAGING_HOST}/api/admin/stats \
+  -H <span class="string">"Authorization: Bearer $TOKEN"</span> &gt; /dev/null</pre>
+          <div class="expected-label">Ожидаемый результат</div>
+          <div class="expected">1-й запрос: ~100–500 ms
+2-й запрос: ~5–15 ms  ← Redis cache hit</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- Summary -->
+  <div style="background:#161b22;border:1px solid #21262d;border-radius:8px;padding:20px 24px;">
+    <div style="font-size:13px;color:#8b949e;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Что было оптимизировано и исправлено</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+      <div style="color:#c9d1d9;">✦ 11 индексов на FK и date-range колонках</div>
+      <div style="color:#c9d1d9;">✦ N+1 fix в GitLab webhook (2N → 3 запроса)</div>
+      <div style="color:#c9d1d9;">✦ TOCTOU fix: $transaction + повтор guard в gitlab</div>
+      <div style="color:#c9d1d9;">✦ JS aggregation → DB count в dashboard</div>
+      <div style="color:#c9d1d9;">✦ double query → single в admin stats</div>
+      <div style="color:#c9d1d9;">✦ Null-bucket «Без исполнителя» в issuesByAssignee</div>
+      <div style="color:#c9d1d9;">✦ Pagination на 7 endpoint'ах</div>
+      <div style="color:#c9d1d9;">✦ Hard cap take:500 на Board</div>
+      <div style="color:#c9d1d9;">✦ Redis cache на 8 дорогих запросах</div>
+      <div style="color:#c9d1d9;">✦ Cache invalidation в 13 write-методах</div>
+      <div style="color:#c9d1d9;">✦ Frontend API возвращает PaginatedResponse&lt;T&gt;</div>
+      <div style="color:#c9d1d9;">✦ IF NOT EXISTS + CONCURRENTLY guide в миграции</div>
+    </div>
+  </div>
+
+  <!-- Sticky progress bar -->
+  <div class="progress-section">
+    <div class="progress-bar-container">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-text">Выполнено: <span class="progress-count" id="progress-count">0</span> / <span id="progress-total">0</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const boxes = document.querySelectorAll('.check-box');
+  const fill = document.getElementById('progress-fill');
+  const count = document.getElementById('progress-count');
+  const total = document.getElementById('progress-total');
+  total.textContent = boxes.length;
+
+  function toggle(el) {
+    if (!el.classList.contains('done')) {
+      el.classList.add('done');
+    } else {
+      el.classList.remove('done');
+    }
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const done = document.querySelectorAll('.check-box.done').length;
+    count.textContent = done;
+    fill.style.width = (done / boxes.length * 100) + '%';
+  }
+
+  // Copy buttons
+  document.querySelectorAll('pre').forEach(pre => {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'copy';
+    btn.onclick = () => {
+      navigator.clipboard.writeText(pre.innerText.replace(/^copy\n/, ''));
+      btn.textContent = '✓';
+      setTimeout(() => btn.textContent = 'copy', 1500);
+    };
+    pre.style.position = 'relative';
+    pre.appendChild(btn);
+  });
+</script>
+
+</body>
+</html>

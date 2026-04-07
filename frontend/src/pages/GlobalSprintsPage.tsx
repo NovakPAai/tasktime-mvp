@@ -129,12 +129,12 @@ export default function GlobalSprintsPage() {
 
   useEffect(() => {
     async function loadSprints() {
-      const data = await sprintsApi.listAllSprints({
+      const page = await sprintsApi.listAllSprints({
         state:     stateFilter === 'ALL' ? undefined : stateFilter,
         projectId: projectFilter,
         teamId:    teamFilter,
       });
-      setSprints(data);
+      setSprints(page.data);
     }
     loadSprints();
   }, [stateFilter, projectFilter, teamFilter]);
