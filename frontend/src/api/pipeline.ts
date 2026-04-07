@@ -192,4 +192,11 @@ export const pipelineApi = {
     });
     return mapBatch(unwrap(raw));
   },
+
+  cancelDeploy: async (batchId: string): Promise<StagingBatch> => {
+    const raw = await pipelineFetch<unknown>(`/api/batches/${batchId}/cancel-deploy`, {
+      method: 'POST',
+    });
+    return mapBatch(unwrap(raw));
+  },
 };
