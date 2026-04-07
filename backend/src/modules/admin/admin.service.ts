@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
-import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { config } from '../../config.js';
+import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
 import { hashPassword } from '../../shared/utils/password.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
@@ -508,6 +509,56 @@ export async function setRegistrationSetting(actorId: string, enabled: boolean):
   });
 
   return enabled;
+}
+
+// ===== SESSION SETTINGS =====
+
+const SESSION_LIFETIME_KEY = 'session_lifetime_minutes';
+const SESSION_LIFETIME_CACHE_KEY = `settings:${SESSION_LIFETIME_KEY}`;
+const SESSION_LIFETIME_DEFAULT = 60;
+
+export type SystemSettings = {
+  sessionLifetimeMinutes: number;
+  registrationEnabled: boolean;
+  /** JWT access-token TTL — read from JWT_EXPIRES_IN env var, read-only at runtime. */
+  jwtExpiresIn: string;
+};
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  const [sessionSetting, regSetting] = await Promise.all([
+    prisma.systemSetting.findUnique({ where: { key: SESSION_LIFETIME_KEY } }),
+    prisma.systemSetting.findUnique({ where: { key: REGISTRATION_KEY } }),
+  ]);
+
+  const raw = sessionSetting ? parseInt(sessionSetting.value, 10) : SESSION_LIFETIME_DEFAULT;
+  return {
+    sessionLifetimeMinutes: isNaN(raw) || raw < 1 ? SESSION_LIFETIME_DEFAULT : raw,
+    registrationEnabled: regSetting ? regSetting.value !== 'false' : true,
+    jwtExpiresIn: config.JWT_EXPIRES_IN,
+  };
+}
+
+export async function setSessionLifetime(actorId: string, minutes: number): Promise<number> {
+  await prisma.systemSetting.upsert({
+    where: { key: SESSION_LIFETIME_KEY },
+    create: { key: SESSION_LIFETIME_KEY, value: String(minutes) },
+    update: { value: String(minutes) },
+  });
+
+  // Invalidate the Redis cache so auth middleware picks up the new value immediately
+  await delCachedJson(SESSION_LIFETIME_CACHE_KEY);
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'system.session_lifetime_changed',
+      entityType: 'system',
+      entityId: SESSION_LIFETIME_KEY,
+      userId: actorId,
+      details: { sessionLifetimeMinutes: minutes },
+    },
+  });
+
+  return minutes;
 }
 
 

@@ -1,0 +1,113 @@
+{
+  "key": "TTMP-171",
+  "title": "Сессия пользователя",
+  "generatedAt": "2026-04-07T00:00:00.000Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "apiUrl": "http://flowuniverse.ru/api",
+    "issueId": "3516de77-11f8-4d73-b196-c3d98cbfb879",
+    "fetchedAt": "2026-04-07T00:00:00.000Z"
+  },
+  "issue": {
+    "type": "TASK",
+    "status": "IN_PROGRESS",
+    "priority": "MEDIUM",
+    "project": "TTMP",
+    "assignee": "Георгий Дубовик",
+    "creator": "Георгий Дубовик",
+    "estimatedHours": 1,
+    "description": "Изменить механизм протухания сессии пользователя. \nСделать в админке раздел \"Система\".\nРаздел виден только роли Супер Админ.\nВынести туда настройку с временем жизни сессии. Время жизни должно указываться в минутах.\nСам механизм жизни сессии поменять на отсчет времени от последней активности пользователя. Должен соответствовать установленной настройке.",
+    "acceptanceCriteria": "В админке есть настройка, которую может менять роль супер админа."
+  },
+  "dependencies": {
+    "backendModules": [
+      "auth",
+      "admin",
+      "shared/middleware/auth",
+      "shared/redis"
+    ],
+    "frontendComponents": [
+      "pages/admin/AdminSystemPage.tsx (новый)",
+      "pages/AdminPage.tsx (сайдбар)",
+      "App.tsx (роут /admin/system)",
+      "api/admin.ts (новые методы)"
+    ],
+    "prismaModels": [
+      "SystemSetting — использовать существующую, новый ключ session_lifetime_minutes"
+    ],
+    "externalPackages": [],
+    "blockers": []
+  },
+  "risks": [
+    {
+      "id": 1,
+      "description": "authenticate middleware становится async — нужна корректная обработка ошибок",
+      "probability": "MEDIUM",
+      "impact": "Поломка всей аутентификации",
+      "mitigation": "Покрыть тестами все защищённые эндпоинты"
+    },
+    {
+      "id": 2,
+      "description": "Redis недоступен — нельзя проверить sliding session",
+      "probability": "MEDIUM",
+      "impact": "Невозможность авторизации без деградации",
+      "mitigation": "Fallback: если Redis null — пропускать sliding check, полагаться на JWT"
+    },
+    {
+      "id": 3,
+      "description": "Существующие access-токены валидны после тайм-аута",
+      "probability": "HIGH",
+      "impact": "Неполная защита при отключённом Redis",
+      "mitigation": "Sliding check через Redis-сессию, не только JWT"
+    },
+    {
+      "id": 4,
+      "description": "MCP-агент (agent@flow-universe.internal) может сломаться",
+      "probability": "MEDIUM",
+      "impact": "Падение AI-агента",
+      "mitigation": "Исключить системных пользователей (isSystem=true) из sliding check"
+    }
+  ],
+  "requirements": {
+    "functional": [
+      "FR-1: SystemSetting key session_lifetime_minutes, CRUD через API",
+      "FR-2: Раздел Система в Админке — только SUPER_ADMIN",
+      "FR-3: Каждый аутентифицированный запрос обновляет lastSeenAt и TTL в Redis",
+      "FR-4: Бездействие > session_lifetime_minutes → 401",
+      "FR-5: Фронт при SESSION_EXPIRED → редирект на логин с уведомлением",
+      "FR-6: Системные пользователи исключены из sliding check"
+    ],
+    "nonFunctional": [
+      "API response < 200ms p95",
+      "session_lifetime_minutes кэшируется в Redis 60 сек",
+      "Деградация при недоступном Redis — warning + skip sliding check"
+    ],
+    "security": [
+      "SEC-1: Только SUPER_ADMIN читает и меняет системные настройки",
+      "SEC-2: Минимальный тайм-аут 5 минут",
+      "SEC-3: Изменение настройки логируется в AuditLog (system.session_lifetime_changed)"
+    ]
+  },
+  "acceptanceCriteria": [
+    "AC-1: В Админке есть раздел Система, видимый только для SUPER_ADMIN",
+    "AC-2: В разделе есть настройка времени жизни сессии в минутах",
+    "AC-3: SUPER_ADMIN может изменить и сохранить значение",
+    "AC-4: После N минут бездействия пользователь получает 401 и перенаправляется на логин",
+    "AC-5: Активный пользователь не выбрасывается (сессия продлевается)",
+    "AC-6: Системный агент не выбрасывается по тайм-ауту"
+  ],
+  "estimation": {
+    "analysis": 0.5,
+    "backend": 3,
+    "frontend": 2.5,
+    "testing": 2,
+    "review": 1,
+    "total": 9
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [],
+    "blocks": [],
+    "dependsOn": []
+  }
+}

@@ -1,6 +1,13 @@
 import api from './client';
 import type { PaginatedResponse } from '../types';
 
+export interface SystemSettings {
+  sessionLifetimeMinutes: number;
+  registrationEnabled: boolean;
+  /** JWT access-token TTL from JWT_EXPIRES_IN env var — read-only, requires server restart to change. */
+  jwtExpiresIn: string;
+}
+
 export interface ProjectRole {
   id: string;
   role: 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
@@ -65,6 +72,13 @@ export const adminApi = {
 
   setRegistrationSetting: (enabled: boolean) =>
     api.patch<{ registrationEnabled: boolean }>('/admin/settings/registration', { enabled }).then(r => r.data),
+
+  // System settings
+  getSystemSettings: () =>
+    api.get<SystemSettings>('/admin/settings/system').then(r => r.data),
+
+  setSessionLifetime: (sessionLifetimeMinutes: number) =>
+    api.patch<SystemSettings>('/admin/settings/system', { sessionLifetimeMinutes }).then(r => r.data),
 };
 
 export interface AdminStats {
