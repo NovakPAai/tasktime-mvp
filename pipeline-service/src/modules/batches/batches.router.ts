@@ -441,6 +441,12 @@ router.post('/:id/deploy-callback', validate(callbackBody), async (req, res, nex
     });
     if (!batch) { res.status(404).json({ error: 'Batch not found' }); return; }
 
+    // If the batch was already manually cancelled, ignore late callbacks silently
+    if (batch.state === 'FAILED' && !batch.deployEvents[0]) {
+      res.json({ data: batch, deployEvent: null });
+      return;
+    }
+
     const runningEvent = batch.deployEvents[0];
     const finishedAt = new Date();
 

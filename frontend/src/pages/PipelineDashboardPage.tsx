@@ -178,6 +178,7 @@ export default function PipelineDashboardPage() {
 
   const [stagingDeploying, setStagingDeploying] = useState<string | null>(null);
   const [prodDeploying, setProdDeploying] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
 
   const handleTransition = async (batchId: string, state: BatchState) => {
     try {
@@ -202,12 +203,16 @@ export default function PipelineDashboardPage() {
   };
 
   const handleCancelDeploy = async (batchId: string) => {
+    if (cancelling === batchId) return;
+    setCancelling(batchId);
     setError(null);
     try {
       await pipelineApi.cancelDeploy(batchId);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка отмены деплоя');
+    } finally {
+      setCancelling(null);
     }
   };
 
