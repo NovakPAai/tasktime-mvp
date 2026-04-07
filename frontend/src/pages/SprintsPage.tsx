@@ -139,6 +139,15 @@ function formatDate(iso?: string | null): string {
   return `${d.getDate()} ${months[d.getMonth()] ?? ''} ${d.getFullYear()}`;
 }
 
+function getRemainingDays(sprint: Sprint): string {
+  if (!sprint.startDate || !sprint.endDate) return 'N/A';
+  const end = new Date(sprint.endDate).getTime();
+  if (!Number.isFinite(end)) return 'N/A';
+  const diff = end - Date.now();
+  if (diff <= 0) return '0';
+  return String(Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
 function getTimeProgress(sprint: Sprint): number {
   if (!sprint.startDate || !sprint.endDate) return 0;
   const start = new Date(sprint.startDate).getTime();
@@ -224,11 +233,15 @@ export default function SprintsPage() {
 
   const handleCreate = async (vals: {
     name: string; goal?: string;
+    startDate?: ReturnType<typeof dayjs> | null;
+    endDate?: ReturnType<typeof dayjs> | null;
     projectTeamId?: string; businessTeamId?: string; flowTeamId?: string;
   }) => {
     if (!projectId) return;
     await sprintsApi.createSprint(projectId, {
       name: vals.name, goal: vals.goal,
+      startDate: vals.startDate ? vals.startDate.toISOString() : undefined,
+      endDate: vals.endDate ? vals.endDate.toISOString() : undefined,
       projectTeamId: vals.projectTeamId,
       businessTeamId: vals.businessTeamId,
       flowTeamId: vals.flowTeamId,
@@ -443,6 +456,19 @@ export default function SprintsPage() {
                   }}>
                     {selectedSprint.state}
                   </span>
+                  {selectedSprint.state === 'ACTIVE' && (
+                    <span style={{
+                      backgroundColor: `${T.amber}1F`,
+                      color: T.amber,
+                      borderRadius: 20, paddingTop: 3, paddingBottom: 3, paddingLeft: 10, paddingRight: 10,
+                      fontFamily: F.sans, fontSize: 10, fontWeight: 600, lineHeight: '12px',
+                    }}>
+                      {(() => {
+                        const rem = getRemainingDays(selectedSprint);
+                        return rem === 'N/A' ? 'N/A' : `${rem} дн. осталось`;
+                      })()}
+                    </span>
+                  )}
                 </div>
                 {selectedSprint.goal && (
                   <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 12, lineHeight: '16px' }}>
@@ -602,6 +628,7 @@ export default function SprintsPage() {
               <div style={{ flex: 1, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Задача</div>
               <div style={{ width: 100, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Статус</div>
               <div style={{ width: 70, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Приоритет</div>
+              <div style={{ width: 56, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Оценка</div>
               <div style={{ width: 56, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Срок</div>
               <div style={{ width: 100, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Исполнитель</div>
             </div>
@@ -659,6 +686,10 @@ export default function SprintsPage() {
                       {/* Priority */}
                       <div style={{ width: 70, flexShrink: 0, color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
                         {issue.priority}
+                      </div>
+                      {/* Estimated hours */}
+                      <div style={{ width: 56, flexShrink: 0, color: issue.estimatedHours ? T.t2 : T.t4, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
+                        {issue.estimatedHours ? `${issue.estimatedHours}ч` : '—'}
                       </div>
                       {/* Due date */}
                       <div style={{ width: 56, flexShrink: 0, color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
@@ -753,6 +784,7 @@ export default function SprintsPage() {
           <div style={{ flex: 1, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Задача</div>
           <div style={{ width: 90, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Статус</div>
           <div style={{ width: 60, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Приор.</div>
+          <div style={{ width: 50, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Оценка</div>
         </div>
 
         {backlog.length === 0 ? (
@@ -802,6 +834,10 @@ export default function SprintsPage() {
                   <span style={{ width: 60, flexShrink: 0, color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11 }}>
                     {issue.priority}
                   </span>
+                  {/* Estimated hours */}
+                  <span style={{ width: 50, flexShrink: 0, color: issue.estimatedHours ? T.t2 : T.t4, fontFamily: F.sans, fontSize: 11 }}>
+                    {issue.estimatedHours ? `${issue.estimatedHours}ч` : '—'}
+                  </span>
                 </label>
               );
             })}
@@ -825,6 +861,14 @@ export default function SprintsPage() {
           <Form.Item name="goal" label="Цель">
             <Input.TextArea rows={2} />
           </Form.Item>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Form.Item name="startDate" label="Дата начала" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+            <Form.Item name="endDate" label="Дата окончания" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+          </div>
           <Form.Item name="projectTeamId" label="Проектная команда">
             <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
           </Form.Item>
