@@ -141,8 +141,9 @@ function formatDate(iso?: string | null): string {
 
 function getRemainingDays(sprint: Sprint): string {
   if (!sprint.startDate || !sprint.endDate) return 'N/A';
+  const start = new Date(sprint.startDate).getTime();
   const end = new Date(sprint.endDate).getTime();
-  if (!Number.isFinite(end)) return 'N/A';
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 'N/A';
   const diff = end - Date.now();
   if (diff <= 0) return '0';
   return String(Math.ceil(diff / (1000 * 60 * 60 * 24)));
@@ -463,10 +464,7 @@ export default function SprintsPage() {
                       borderRadius: 20, paddingTop: 3, paddingBottom: 3, paddingLeft: 10, paddingRight: 10,
                       fontFamily: F.sans, fontSize: 10, fontWeight: 600, lineHeight: '12px',
                     }}>
-                      {(() => {
-                        const rem = getRemainingDays(selectedSprint);
-                        return rem === 'N/A' ? 'N/A' : `${rem} дн. осталось`;
-                      })()}
+                      {getRemainingDays(selectedSprint) === 'N/A' ? 'N/A' : `${getRemainingDays(selectedSprint)} дн. осталось`}
                     </span>
                   )}
                 </div>

@@ -313,7 +313,7 @@ export async function bulkEstimateIssues(sprintId: string): Promise<BulkEstimate
   if (!sprint) throw new AppError(404, 'Sprint not found');
 
   const lockKey = `lock:estimate-all:${sprintId}`;
-  const lockToken = await acquireLock(lockKey, 300);
+  const lockToken = await acquireLock(lockKey, 900);
   if (!lockToken) throw new AppError(409, 'Estimation already in progress for this sprint');
 
   try {
@@ -330,7 +330,8 @@ export async function bulkEstimateIssues(sprintId: string): Promise<BulkEstimate
         results.push({ issueId: issue.id, estimatedHours: result.estimatedHours });
       } catch (err) {
         console.error('estimate-all issue error:', { sprintId, issueId: issue.id, err });
-        results.push({ issueId: issue.id, error: 'Failed to estimate issue' });
+        const errorType = err instanceof AppError ? err.message : 'Internal error';
+        results.push({ issueId: issue.id, error: `Failed: ${errorType}` });
       }
     }
 
