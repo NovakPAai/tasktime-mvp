@@ -18,7 +18,7 @@ async function getSessionLifetimeMinutes(): Promise<number> {
   try {
     const setting = await prisma.systemSetting.findUnique({ where: { key: SESSION_LIFETIME_SETTING_KEY } });
     const value = setting ? parseInt(setting.value, 10) : DEFAULT_SESSION_LIFETIME_MINUTES;
-    const result = isNaN(value) || value < 1 ? DEFAULT_SESSION_LIFETIME_MINUTES : value;
+    const result = isNaN(value) || value < 5 ? DEFAULT_SESSION_LIFETIME_MINUTES : value;
     await setCachedJson(SESSION_LIFETIME_CACHE_KEY, result, SETTING_CACHE_TTL_SECONDS);
     return result;
   } catch {
@@ -71,7 +71,12 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
       return next(new AppError(401, 'Session expired due to inactivity', { code: 'SESSION_EXPIRED' }));
     }
   } else {
-    // Redis unavailable or session not found — degrade gracefully, rely on JWT expiry only
+    // session===null has three causes: (1) Redis unavailable, (2) session key expired by Redis TTL,
+    // (3) session was never created (e.g. system accounts). In all cases we degrade gracefully
+    // and fall back to JWT expiry as the only expiry mechanism. This is intentional: a Redis outage
+    // must not lock all users out. Scenario (2) means the user has been idle longer than
+    // lifetimeMinutes — but we can only detect it if the key still exists; once Redis evicts it we
+    // rely on the JWT exp claim. Logs allow ops to monitor frequency.
     console.warn(`[auth] sliding-session check skipped for user=${payload.userId}: Redis unavailable or session missing`);
   }
 
