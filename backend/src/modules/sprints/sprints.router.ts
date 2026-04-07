@@ -131,7 +131,6 @@ router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), asy
     });
     if (!sprint) { res.status(404).json({ error: 'Sprint not found' }); return; }
 
-    // Per-sprint distributed lock to prevent concurrent bulk estimates
     // Per-sprint distributed lock with owner token to prevent concurrent bulk estimates
     const lockKey = `lock:estimate-all:${sprintId}`;
     const lockToken = await acquireLock(lockKey, 300);
