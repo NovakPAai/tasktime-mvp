@@ -2,7 +2,8 @@ import type { Prisma, SprintState } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateSprintDto, UpdateSprintDto } from './sprints.dto.js';
-import { getCachedJson, setCachedJson, delCacheByPrefix, delCachedJson } from '../../shared/redis.js';
+import { getCachedJson, setCachedJson, delCacheByPrefix, delCachedJson, acquireLock, releaseLock } from '../../shared/redis.js';
+import * as aiService from '../ai/ai.service.js';
 import {
   type PaginationParams,
   paginationToSkipTake,
@@ -296,6 +297,55 @@ export async function getBacklog(projectId: string, pagination?: PaginationParam
   const result = buildPaginatedResponse(items, total, p);
   await setCachedJson(cacheKey, result);
   return result;
+}
+
+export type BulkEstimateResult = {
+  total: number;
+  estimated: number;
+  failed: number;
+  results: Array<{ issueId: string; estimatedHours?: number; error?: string }>;
+};
+
+export async function bulkEstimateIssues(sprintId: string): Promise<BulkEstimateResult> {
+  const sprint = await prisma.sprint.findUnique({
+    where: { id: sprintId },
+    select: { id: true, projectId: true },
+  });
+  if (!sprint) throw new AppError(404, 'Sprint not found');
+
+  const lockKey = `lock:estimate-all:${sprintId}`;
+  const lockToken = await acquireLock(lockKey, 300);
+  if (!lockToken) throw new AppError(409, 'Estimation already in progress for this sprint');
+
+  try {
+    const issues = await prisma.issue.findMany({
+      where: { sprintId },
+      select: { id: true },
+    });
+
+    const results: BulkEstimateResult['results'] = [];
+
+    for (const issue of issues) {
+      try {
+        const result = await aiService.estimateIssue({ issueId: issue.id });
+        results.push({ issueId: issue.id, estimatedHours: result.estimatedHours });
+      } catch (err) {
+        console.error('estimate-all issue error:', { sprintId, issueId: issue.id, err });
+        results.push({ issueId: issue.id, error: 'Failed to estimate issue' });
+      }
+    }
+
+    await invalidateSprintCaches(sprint.projectId, sprintId);
+
+    return {
+      total: issues.length,
+      estimated: results.filter(r => !r.error).length,
+      failed: results.filter(r => !!r.error).length,
+      results,
+    };
+  } finally {
+    await releaseLock(lockKey, lockToken);
+  }
 }
 
 interface ListAllSprintsFilters {
