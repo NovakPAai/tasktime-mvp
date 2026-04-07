@@ -388,6 +388,11 @@ export default function LoginPage() {
     api.get<{ registrationEnabled: boolean }>('/auth/registration-status')
       .then(r => setRegistrationEnabled(r.data.registrationEnabled))
       .catch(() => {});
+
+    if (sessionStorage.getItem('sessionExpiredNotice')) {
+      sessionStorage.removeItem('sessionExpiredNotice');
+      message.warning('Сессия истекла из-за бездействия. Войдите снова.');
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {

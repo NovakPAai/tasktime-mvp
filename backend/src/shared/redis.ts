@@ -160,6 +160,28 @@ export async function deleteUserSession(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Update lastSeenAt and reset TTL for an existing session (sliding window).
+ * Returns false if the session does not exist (already expired).
+ */
+export async function touchUserSession(userId: string, ttlSeconds: number): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return true; // Redis unavailable — allow request, degrade gracefully
+
+  try {
+    const raw = await redis.get(buildSessionKey(userId));
+    if (!raw) return false; // session expired
+
+    const session = JSON.parse(raw) as UserSession;
+    session.lastSeenAt = new Date().toISOString();
+    await redis.set(buildSessionKey(userId), JSON.stringify(session), { EX: ttlSeconds });
+    return true;
+  } catch (err) {
+    console.error('Failed to touch user session in Redis:', err);
+    return true; // Redis error — allow request, degrade gracefully
+  }
+}
+
 export async function deleteCachedByPattern(pattern: string): Promise<void> {
   const redis = await getRedisClientInternal();
   if (!redis) return;

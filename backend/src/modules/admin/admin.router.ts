@@ -147,6 +147,30 @@ router.patch('/admin/settings/registration', requireSuperAdmin(), async (req: Au
   }
 });
 
+router.get('/admin/settings/system', requireSuperAdmin(), async (_req, res, next) => {
+  try {
+    const settings = await adminService.getSystemSettings();
+    res.json(settings);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/admin/settings/system', requireSuperAdmin(), async (req: AuthRequest, res, next) => {
+  try {
+    const { sessionLifetimeMinutes } = req.body as { sessionLifetimeMinutes?: unknown };
+    if (typeof sessionLifetimeMinutes !== 'number' || !Number.isInteger(sessionLifetimeMinutes) || sessionLifetimeMinutes < 5 || sessionLifetimeMinutes > 10080) {
+      res.status(400).json({ error: 'sessionLifetimeMinutes must be an integer between 5 and 10080' });
+      return;
+    }
+    await adminService.setSessionLifetime(req.user!.userId, sessionLifetimeMinutes);
+    const settings = await adminService.getSystemSettings();
+    res.json(settings);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/admin/uat-tests', requireRole('ADMIN', 'MANAGER', 'USER', 'VIEWER'), async (req, res, next) => {
   try {
     const { role } = req.query as { role?: UatRole };

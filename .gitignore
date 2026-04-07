@@ -42,3 +42,6 @@ deploy/env/backend.staging.env
 deploy/env/backend.production.env
 deploy/backups/
 *.tsbuildinfo
+
+# MCP
+.mcp.json

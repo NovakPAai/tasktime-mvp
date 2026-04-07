@@ -105,6 +105,7 @@ export default function Sidebar({
   const isPlanningOpen = openKeys.includes('planning-submenu');
   const isAdminOpen = openKeys.includes('admin-submenu');
   const isAdmin = hasRequiredRole(userRole, 'ADMIN');
+  const isSuperAdmin = userRole === 'SUPER_ADMIN';
 
   function toggleSubmenu(key: string) {
     onOpenKeysChange(
@@ -220,6 +221,11 @@ export default function Sidebar({
     { type: 'link', path: '/admin/workflows',            label: 'Workflow' },
     { type: 'link', path: '/admin/workflow-schemes',     label: 'Схемы workflow' },
     { type: 'link', path: '/admin/transition-screens',   label: 'Экраны переходов' },
+
+    ...(isSuperAdmin ? [
+      { type: 'divider' as const, label: 'Администрирование' },
+      { type: 'link' as const, path: '/admin/system', label: 'Система' },
+    ] : []),
   ];
 
   return (

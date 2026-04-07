@@ -65,6 +65,13 @@ export const adminApi = {
 
   setRegistrationSetting: (enabled: boolean) =>
     api.patch<{ registrationEnabled: boolean }>('/admin/settings/registration', { enabled }).then(r => r.data),
+
+  // System settings
+  getSystemSettings: () =>
+    api.get<{ sessionLifetimeMinutes: number; registrationEnabled: boolean }>('/admin/settings/system').then(r => r.data),
+
+  setSessionLifetime: (sessionLifetimeMinutes: number) =>
+    api.patch<{ sessionLifetimeMinutes: number; registrationEnabled: boolean }>('/admin/settings/system', { sessionLifetimeMinutes }).then(r => r.data),
 };
 
 export interface AdminStats {

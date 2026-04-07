@@ -3,23 +3,71 @@ import type { UserRole } from '@prisma/client';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { AppError } from './error-handler.js';
 import type { AuthRequest } from '../types/index.js';
+import { getUserSession, touchUserSession, getCachedJson, setCachedJson } from '../redis.js';
+import { prisma } from '../../prisma/client.js';
 
-export function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
+const DEFAULT_SESSION_LIFETIME_MINUTES = 60;
+const SETTING_CACHE_TTL_SECONDS = 60;
+const SESSION_LIFETIME_SETTING_KEY = 'session_lifetime_minutes';
+const SESSION_LIFETIME_CACHE_KEY = `settings:${SESSION_LIFETIME_SETTING_KEY}`;
+
+async function getSessionLifetimeMinutes(): Promise<number> {
+  const cached = await getCachedJson<number>(SESSION_LIFETIME_CACHE_KEY);
+  if (cached !== null) return cached;
+
+  try {
+    const setting = await prisma.systemSetting.findUnique({ where: { key: SESSION_LIFETIME_SETTING_KEY } });
+    const value = setting ? parseInt(setting.value, 10) : DEFAULT_SESSION_LIFETIME_MINUTES;
+    const result = isNaN(value) || value < 1 ? DEFAULT_SESSION_LIFETIME_MINUTES : value;
+    await setCachedJson(SESSION_LIFETIME_CACHE_KEY, result, SETTING_CACHE_TTL_SECONDS);
+    return result;
+  } catch {
+    return DEFAULT_SESSION_LIFETIME_MINUTES;
+  }
+}
+
+export async function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     return next(new AppError(401, 'Authentication required'));
   }
 
+  let payload;
   try {
     const token = header.slice(7);
-    const payload = verifyAccessToken(token);
-    req.user = {
-      userId: payload.userId,
-      email: payload.email,
-      role: payload.role as UserRole,
-    };
-    next();
+    payload = verifyAccessToken(token);
   } catch {
-    next(new AppError(401, 'Invalid or expired token'));
+    return next(new AppError(401, 'Invalid or expired token'));
   }
+
+  req.user = {
+    userId: payload.userId,
+    email: payload.email,
+    role: payload.role as UserRole,
+  };
+
+  // Sliding session check — skip for system accounts
+  const session = await getUserSession(payload.userId);
+
+  if (session !== null) {
+    // Redis is available and session exists — check inactivity
+    if (!session.userId) {
+      // Corrupted session data — allow through
+      return next();
+    }
+
+    const lifetimeMinutes = await getSessionLifetimeMinutes();
+    const lastSeen = new Date(session.lastSeenAt).getTime();
+    const idleMs = Date.now() - lastSeen;
+
+    if (idleMs > lifetimeMinutes * 60 * 1000) {
+      return next(new AppError(401, 'Session expired due to inactivity', { code: 'SESSION_EXPIRED' }));
+    }
+
+    // Extend session
+    void touchUserSession(payload.userId, lifetimeMinutes * 60);
+  }
+  // If session === null: Redis unavailable or no session key — degrade gracefully, rely on JWT expiry only
+
+  next();
 }
