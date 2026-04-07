@@ -65,7 +65,7 @@ export async function getStats() {
     ...(unassignedCount > 0
       ? [{ assigneeId: null, assigneeName: 'Без исполнителя', _count: { _all: unassignedCount } }]
       : []),
-  ];
+  ].sort((a, b) => b._count._all - a._count._all);
 
   const recentActivity = await getActivity();
 

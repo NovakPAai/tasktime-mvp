@@ -1,5 +1,6 @@
 import type { IssueStatus } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
+import { delCacheByPrefix } from '../../../shared/redis.js';
 
 /** Extract issue keys like PROJ-42 from text (branch name, commit message, MR title). */
 export function extractIssueKeys(text: string): string[] {
@@ -82,6 +83,7 @@ async function updateIssuesByKeys(keys: string[], status: IssueStatus): Promise<
     },
     select: {
       id: true,
+      projectId: true,
       number: true,
       project: { select: { key: true } },
     },
@@ -105,6 +107,8 @@ async function updateIssuesByKeys(keys: string[], status: IssueStatus): Promise<
   // write below another request could close one of these issues. Re-applying the
   // terminal-state guard inside the transaction ensures we only update (and audit)
   // issues that are still non-terminal at write time.
+  const projectIds = [...new Set(issues.map((i) => i.projectId))];
+
   await prisma.$transaction(async (tx) => {
     const updatable = await tx.issue.findMany({
       where: { id: { in: issueIds }, status: { notIn: ['DONE', 'CANCELLED'] } },
@@ -133,4 +137,7 @@ async function updateIssuesByKeys(keys: string[], status: IssueStatus): Promise<
       })),
     });
   });
+
+  // Invalidate issue list caches for all affected projects
+  await Promise.all(projectIds.map((pid) => delCacheByPrefix(`issues:list:${pid}:`)));
 }

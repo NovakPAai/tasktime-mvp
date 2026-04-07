@@ -19,7 +19,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
     concurrency:
       group: deploy-production
       cancel-in-progress: false

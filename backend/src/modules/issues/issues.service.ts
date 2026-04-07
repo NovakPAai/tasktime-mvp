@@ -615,6 +615,7 @@ export async function bulkDeleteIssues(projectId: string, issueIds: string[]): P
     where: { id: { in: issueIds }, projectId },
   });
 
+  await delCacheByPrefix(`issues:list:${projectId}:`);
   return { deletedCount: count };
 }
 
@@ -807,6 +808,8 @@ export async function changeIssueType(id: string, dto: ChangeTypeDto) {
     });
   });
 
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+
   return getIssue(id);
 }
 
@@ -949,6 +952,12 @@ export async function moveIssue(id: string, dto: MoveIssueDto) {
       },
     });
   });
+
+  // Invalidate cache for both source and target projects
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  if (dto.targetProjectId !== issue.projectId) {
+    await delCacheByPrefix(`issues:list:${dto.targetProjectId}:`);
+  }
 
   return getIssue(id);
 }

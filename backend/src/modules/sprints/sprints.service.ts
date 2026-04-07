@@ -219,22 +219,21 @@ export async function closeSprint(id: string) {
 }
 
 export async function moveIssuesToSprint(sprintId: string | null, issueIds: string[]) {
-  // Need projectId for backlog cache invalidation — fetch one of the issues
-  const sample = issueIds.length > 0
-    ? await prisma.issue.findUnique({ where: { id: issueIds[0] }, select: { projectId: true } })
-    : null;
+  // Fetch all unique projectIds for correct cache invalidation across projects
+  const affectedIssues = issueIds.length > 0
+    ? await prisma.issue.findMany({ where: { id: { in: issueIds } }, select: { projectId: true } })
+    : [];
+  const projectIds = [...new Set(affectedIssues.map((i) => i.projectId))];
 
   await prisma.issue.updateMany({
     where: { id: { in: issueIds } },
     data: { sprintId },
   });
 
-  if (sample) {
-    await Promise.all([
-      delCacheByPrefix(`backlog:${sample.projectId}:`),
-      ...(sprintId ? [delCachedJson(`sprint:issues:${sprintId}`)] : []),
-    ]);
-  }
+  await Promise.all([
+    ...projectIds.map((pid) => delCacheByPrefix(`backlog:${pid}:`)),
+    ...(sprintId ? [delCachedJson(`sprint:issues:${sprintId}`)] : []),
+  ]);
 }
 
 export async function getBacklog(projectId: string, pagination?: PaginationParams) {

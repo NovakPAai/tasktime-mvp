@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { UserRole, IssueStatus } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import { getCachedJson, setCachedJson, deleteCachedByPattern } from '../../shared/redis.js';
+import { getCachedJson, setCachedJson, deleteCachedByPattern, delCacheByPrefix } from '../../shared/redis.js';
 import { evaluateConditions } from './conditions/index.js';
 import { runValidators } from './validators/index.js';
 import { runPostFunctions } from './post-functions/index.js';
@@ -343,6 +343,9 @@ export async function executeTransition(
       },
     });
   });
+
+  // Invalidate issues list cache after status change
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
 
   // Post-functions (fire-and-forget, errors logged)
   const postFunctionRules = transition.postFunctions ? (transition.postFunctions as unknown as PostFunctionRule[]) : [];
