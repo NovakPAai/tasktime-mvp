@@ -38,6 +38,7 @@ import AdminWorkflowSchemesPage from './pages/admin/AdminWorkflowSchemesPage';
 import AdminWorkflowSchemeEditorPage from './pages/admin/AdminWorkflowSchemeEditorPage';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
+import AdminSystemPage from './pages/admin/AdminSystemPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import SettingsPage from './pages/SettingsPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
@@ -193,6 +194,7 @@ export default function App() {
             <Route path="admin/workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
             <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
             <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
+            <Route path="admin/system" element={<AdminSystemPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="pipeline" element={<PipelineDashboardPage />} />
           </Route>

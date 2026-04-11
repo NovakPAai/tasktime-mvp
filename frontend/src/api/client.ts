@@ -20,6 +20,15 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
     if (error.response?.status === 401 && !original._retry) {
+      // Session expired due to inactivity — do not attempt refresh, redirect immediately
+      if (error.response?.data?.code === 'SESSION_EXPIRED') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        sessionStorage.setItem('sessionExpiredNotice', '1');
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
       original._retry = true;
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {

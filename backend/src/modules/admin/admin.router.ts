@@ -3,7 +3,7 @@ import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole, requireSuperAdmin } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import * as adminService from './admin.service.js';
-import { createUserDto, updateUserAdminDto, assignProjectRoleDto } from './admin.dto.js';
+import { createUserDto, updateUserAdminDto, assignProjectRoleDto, updateSystemSettingsDto } from './admin.dto.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { rotateUserPassword } from '../users/password-rotation.service.js';
@@ -142,6 +142,26 @@ router.patch('/admin/settings/registration', requireSuperAdmin(), async (req: Au
     }
     const registrationEnabled = await adminService.setRegistrationSetting(req.user!.userId, enabled);
     res.json({ registrationEnabled });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/admin/settings/system', requireSuperAdmin(), async (_req, res, next) => {
+  try {
+    const settings = await adminService.getSystemSettings();
+    res.json(settings);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/admin/settings/system', requireSuperAdmin(), validate(updateSystemSettingsDto), async (req: AuthRequest, res, next) => {
+  try {
+    const { sessionLifetimeMinutes } = req.body as { sessionLifetimeMinutes: number };
+    await adminService.setSessionLifetime(req.user!.userId, sessionLifetimeMinutes);
+    const settings = await adminService.getSystemSettings();
+    res.json(settings);
   } catch (err) {
     next(err);
   }

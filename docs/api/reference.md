@@ -30,6 +30,29 @@
 { "error": "Human-readable message" }
 ```
 
+## Pagination
+
+Endpoints that return lists support optional pagination query parameters:
+
+| Parameter | Type | Default | Max | Description |
+|-----------|------|---------|-----|-------------|
+| `page` | integer | 1 | — | Page number (1-based) |
+| `limit` | integer | 100 | 500 | Items per page |
+
+**Paginated response envelope:**
+
+```json
+{
+  "data": [...],
+  "meta": {
+    "page": 1,
+    "limit": 100,
+    "total": 342,
+    "totalPages": 4
+  }
+}
+```
+
 ---
 
 ## Auth endpoints — `/api/auth`
@@ -499,6 +522,27 @@ AI estimates effort for an issue.
 { "estimatedHours": 8, "reasoning": "...", "session": { ...aiSession } }
 ```
 
+### POST `/api/sprints/:id/ai/estimate-all`
+Bulk AI estimate for all issues in a sprint. Requires `ADMIN` or `MANAGER` role. Uses a per-sprint Redis lock to prevent concurrent runs.
+```json
+// Response 200
+{
+  "total": 12,
+  "estimated": 10,
+  "failed": 2,
+  "results": [
+    { "issueId": "uuid", "estimatedHours": 8 },
+    { "issueId": "uuid", "error": "AI service unavailable" }
+  ]
+}
+
+// Response 404
+{ "error": "Sprint not found" }
+
+// Response 409
+{ "error": "Estimation already in progress for this sprint" }
+```
+
 ### POST `/api/ai/decompose`
 AI decomposes issue into subtasks.
 ```json
@@ -590,6 +634,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `POST` | `/api/ai/estimate` | 🔒 |
 | `POST` | `/api/ai/decompose` | 🔒 |
 | `POST` | `/api/ai/suggest-assignee` | 🔒 |
+| `POST` | `/api/sprints/:id/ai/estimate-all` | 🔒 ADMIN, MANAGER |
 
 ### Auth
 

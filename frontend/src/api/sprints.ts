@@ -1,8 +1,18 @@
 import api from './client';
-import type { Sprint, Issue, SprintState, SprintDetailsResponse } from '../types';
+import type { Sprint, Issue, SprintState, SprintDetailsResponse, PaginatedResponse, PaginationMeta } from '../types';
 
-export async function listSprints(projectId: string): Promise<Sprint[]> {
-  const { data } = await api.get<Sprint[]>(`/projects/${projectId}/sprints`);
+export interface PaginationQuery {
+  page?: number;
+  limit?: number;
+}
+
+export async function listSprints(
+  projectId: string,
+  pagination?: PaginationQuery,
+): Promise<PaginatedResponse<Sprint>> {
+  const { data } = await api.get<PaginatedResponse<Sprint>>(`/projects/${projectId}/sprints`, {
+    params: pagination,
+  });
   return data;
 }
 
@@ -43,8 +53,13 @@ export async function moveIssuesToSprint(sprintId: string, issueIds: string[]) {
   await api.post(`/sprints/${sprintId}/issues`, { issueIds });
 }
 
-export async function getBacklog(projectId: string): Promise<Issue[]> {
-  const { data } = await api.get<Issue[]>(`/projects/${projectId}/backlog`);
+export async function getBacklog(
+  projectId: string,
+  pagination?: PaginationQuery,
+): Promise<PaginatedResponse<Issue>> {
+  const { data } = await api.get<PaginatedResponse<Issue>>(`/projects/${projectId}/backlog`, {
+    params: pagination,
+  });
   return data;
 }
 
@@ -52,8 +67,13 @@ export async function moveIssuesToBacklog(projectId: string, issueIds: string[])
   await api.post(`/projects/${projectId}/backlog/issues`, { issueIds });
 }
 
-export async function listAllSprints(params?: { state?: SprintState | 'ALL'; projectId?: string; teamId?: string }): Promise<Sprint[]> {
-  const { data } = await api.get<Sprint[]>('/sprints', { params });
+export async function listAllSprints(
+  params?: { state?: SprintState | 'ALL'; projectId?: string; teamId?: string },
+  pagination?: PaginationQuery,
+): Promise<PaginatedResponse<Sprint>> {
+  const { data } = await api.get<PaginatedResponse<Sprint>>('/sprints', {
+    params: { ...params, ...pagination },
+  });
   return data;
 }
 
@@ -61,3 +81,18 @@ export async function getSprintIssues(id: string): Promise<SprintDetailsResponse
   const { data } = await api.get<SprintDetailsResponse>(`/sprints/${id}/issues`);
   return data;
 }
+
+export interface EstimateAllResult {
+  total: number;
+  estimated: number;
+  failed: number;
+  results: Array<{ issueId: string; estimatedHours?: number; error?: string }>;
+}
+
+export async function estimateAllSprintIssues(sprintId: string): Promise<EstimateAllResult> {
+  const { data } = await api.post<EstimateAllResult>(`/sprints/${sprintId}/ai/estimate-all`);
+  return data;
+}
+
+// Re-export PaginationMeta for convenience
+export type { PaginationMeta };

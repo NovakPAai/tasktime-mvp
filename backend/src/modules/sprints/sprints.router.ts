@@ -6,6 +6,7 @@ import { createSprintDto, updateSprintDto, moveIssuesToSprintDto } from './sprin
 import * as sprintsService from './sprints.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
+import { parsePagination } from '../../shared/utils/params.js';
 
 const router = Router();
 router.use(authenticate);
@@ -13,17 +14,18 @@ router.use(authenticate);
 // Global list of sprints with optional filters
 router.get('/sprints', async (req, res, next) => {
   try {
-    const { state, projectId, teamId } = req.query as {
+    const { state, projectId, teamId, page, limit } = req.query as {
       state?: string;
       projectId?: string;
       teamId?: string;
+      page?: string;
+      limit?: string;
     };
 
-    const sprints = await sprintsService.listAllSprints({
-      state,
-      projectId,
-      teamId,
-    });
+    const sprints = await sprintsService.listAllSprints(
+      { state, projectId, teamId },
+      parsePagination({ page, limit }),
+    );
     res.json(sprints);
   } catch (err) {
     next(err);
@@ -33,7 +35,11 @@ router.get('/sprints', async (req, res, next) => {
 // List sprints
 router.get('/projects/:projectId/sprints', async (req, res, next) => {
   try {
-    const sprints = await sprintsService.listSprints(req.params.projectId as string);
+    const { page, limit } = req.query as { page?: string; limit?: string };
+    const sprints = await sprintsService.listSprints(
+      req.params.projectId as string,
+      parsePagination({ page, limit }),
+    );
     res.json(sprints);
   } catch (err) { next(err); }
 });
@@ -48,7 +54,11 @@ router.get('/sprints/:id/issues', async (req, res, next) => {
 // Backlog (issues without sprint)
 router.get('/projects/:projectId/backlog', async (req, res, next) => {
   try {
-    const issues = await sprintsService.getBacklog(req.params.projectId as string);
+    const { page, limit } = req.query as { page?: string; limit?: string };
+    const issues = await sprintsService.getBacklog(
+      req.params.projectId as string,
+      parsePagination({ page, limit }),
+    );
     res.json(issues);
   } catch (err) { next(err); }
 });
@@ -99,10 +109,24 @@ router.post('/sprints/:id/issues', requireRole('ADMIN', 'MANAGER'), validate(mov
 });
 
 // Move issues to backlog
-router.post('/projects/:projectId/backlog/issues', validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
+router.post('/projects/:projectId/backlog/issues', requireRole('ADMIN', 'MANAGER'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
   try {
     await sprintsService.moveIssuesToSprint(null, req.body.issueIds);
+    await logAudit(req, 'sprint.issues_moved_to_backlog', 'project', req.params.projectId as string, { issueIds: req.body.issueIds });
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// Bulk AI estimate all issues in a sprint
+router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res, next) => {
+  try {
+    const sprintId = req.params.id as string;
+    const result = await sprintsService.bulkEstimateIssues(sprintId);
+    await logAudit(req, 'sprint.ai_estimate_all', 'sprint', sprintId, {
+      total: result.total,
+      estimated: result.estimated,
+    });
+    res.json(result);
   } catch (err) { next(err); }
 });
 

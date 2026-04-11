@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
-import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { config } from '../../config.js';
+import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
 import { hashPassword } from '../../shared/utils/password.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
@@ -41,37 +42,31 @@ export async function getStats() {
     _count: { _all: true },
   });
 
-  const issuesByAssigneeRaw = await prisma.issue.groupBy({
-    by: ['assigneeId'],
-    _count: { _all: true },
-    where: { assigneeId: { not: null } },
-  });
+  // Single query: users with assigned issues count — replaces groupBy + separate findMany + JS map.
+  // Fetch unassigned count in parallel to preserve the null-assignee bucket in stats.
+  const [usersWithIssues, unassignedCount] = await Promise.all([
+    prisma.user.findMany({
+      where: { assignedIssues: { some: {} } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        _count: { select: { assignedIssues: true } },
+      },
+    }),
+    prisma.issue.count({ where: { assigneeId: null } }),
+  ]);
 
-  const assigneeIds = issuesByAssigneeRaw
-    .map((row) => row.assigneeId)
-    .filter((id): id is string => Boolean(id));
-
-  const assignees =
-    assigneeIds.length === 0
-      ? []
-      : await prisma.user.findMany({
-          where: { id: { in: assigneeIds } },
-          select: { id: true, name: true, email: true },
-        });
-
-  const assigneeMap = new Map<string, { name: string | null; email: string }>();
-  for (const user of assignees) {
-    assigneeMap.set(user.id, { name: user.name, email: user.email });
-  }
-
-  const issuesByAssignee = issuesByAssigneeRaw.map((row) => {
-    if (!row.assigneeId) {
-      return { ...row, assigneeName: null };
-    }
-    const meta = assigneeMap.get(row.assigneeId);
-    const name = meta?.name || meta?.email || row.assigneeId;
-    return { ...row, assigneeName: name };
-  });
+  const issuesByAssignee: AdminStats['issuesByAssignee'] = [
+    ...usersWithIssues.map((u) => ({
+      assigneeId: u.id,
+      assigneeName: u.name || u.email,
+      _count: { _all: u._count.assignedIssues },
+    })),
+    ...(unassignedCount > 0
+      ? [{ assigneeId: null, assigneeName: 'Без исполнителя', _count: { _all: unassignedCount } }]
+      : []),
+  ].sort((a, b) => b._count._all - a._count._all);
 
   const recentActivity = await getActivity();
 
@@ -168,7 +163,7 @@ export async function createUser(dto: CreateUserDto) {
       id: true, email: true, name: true, role: true,
       isActive: true, mustChangePassword: true, createdAt: true,
     },
-  });
+  } as const);
 
   await prisma.auditLog.create({
     data: {
@@ -223,6 +218,19 @@ export async function deleteUser(actorId: string, userId: string) {
 }
 
 const NA_SUFFIX = ' (N/A)';
+const MAX_NAME_LEN = 255;
+
+function appendNaSuffix(name: string): string {
+  if (name.endsWith(NA_SUFFIX)) return name;
+  const base = name.length + NA_SUFFIX.length > MAX_NAME_LEN
+    ? name.slice(0, MAX_NAME_LEN - NA_SUFFIX.length)
+    : name;
+  return base + NA_SUFFIX;
+}
+
+function stripNaSuffix(name: string): string {
+  return name.endsWith(NA_SUFFIX) ? name.slice(0, -NA_SUFFIX.length) : name;
+}
 
 export async function deactivateUserAdmin(actorId: string, userId: string) {
   if (actorId === userId) throw new AppError(400, 'Cannot deactivate yourself');
@@ -231,7 +239,7 @@ export async function deactivateUserAdmin(actorId: string, userId: string) {
   if (!user) throw new AppError(404, 'User not found');
   if (user.isSystem) throw new AppError(403, 'Cannot deactivate system users');
 
-  const newName = user.name.endsWith(NA_SUFFIX) ? user.name : user.name + NA_SUFFIX;
+  const newName = appendNaSuffix(user.name);
 
   const updated = await prisma.user.update({
     where: { id: userId },
@@ -267,8 +275,12 @@ export async function updateUserAdmin(actorId: string, userId: string, dto: Upda
     }
   }
 
-  if (dto.isActive === true && !user.isActive && user.name.endsWith(NA_SUFFIX)) {
-    dto.name = user.name.slice(0, -NA_SUFFIX.length);
+  if (dto.isActive === true && !user.isActive) {
+    dto.name = stripNaSuffix(dto.name ?? user.name);
+  }
+
+  if (dto.isActive === false && user.isActive) {
+    dto.name = appendNaSuffix(dto.name ?? user.name);
   }
 
   const updated = await prisma.user.update({
@@ -497,6 +509,56 @@ export async function setRegistrationSetting(actorId: string, enabled: boolean):
   });
 
   return enabled;
+}
+
+// ===== SESSION SETTINGS =====
+
+const SESSION_LIFETIME_KEY = 'session_lifetime_minutes';
+const SESSION_LIFETIME_CACHE_KEY = `settings:${SESSION_LIFETIME_KEY}`;
+const SESSION_LIFETIME_DEFAULT = 60;
+
+export type SystemSettings = {
+  sessionLifetimeMinutes: number;
+  registrationEnabled: boolean;
+  /** JWT access-token TTL — read from JWT_EXPIRES_IN env var, read-only at runtime. */
+  jwtExpiresIn: string;
+};
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  const [sessionSetting, regSetting] = await Promise.all([
+    prisma.systemSetting.findUnique({ where: { key: SESSION_LIFETIME_KEY } }),
+    prisma.systemSetting.findUnique({ where: { key: REGISTRATION_KEY } }),
+  ]);
+
+  const raw = sessionSetting ? parseInt(sessionSetting.value, 10) : SESSION_LIFETIME_DEFAULT;
+  return {
+    sessionLifetimeMinutes: isNaN(raw) || raw < 1 ? SESSION_LIFETIME_DEFAULT : raw,
+    registrationEnabled: regSetting ? regSetting.value !== 'false' : true,
+    jwtExpiresIn: config.JWT_EXPIRES_IN,
+  };
+}
+
+export async function setSessionLifetime(actorId: string, minutes: number): Promise<number> {
+  await prisma.systemSetting.upsert({
+    where: { key: SESSION_LIFETIME_KEY },
+    create: { key: SESSION_LIFETIME_KEY, value: String(minutes) },
+    update: { value: String(minutes) },
+  });
+
+  // Invalidate the Redis cache so auth middleware picks up the new value immediately
+  await delCachedJson(SESSION_LIFETIME_CACHE_KEY);
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'system.session_lifetime_changed',
+      entityType: 'system',
+      entityId: SESSION_LIFETIME_KEY,
+      userId: actorId,
+      details: { sessionLifetimeMinutes: minutes },
+    },
+  });
+
+  return minutes;
 }
 
 

@@ -76,12 +76,19 @@ export async function changeRole(actor: RoleChangeActor, id: string, dto: Change
 }
 
 const NA_SUFFIX = ' (N/A)';
+const MAX_NAME_LEN = 255;
 
 export async function deactivateUser(id: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
 
-  const newName = user.name.endsWith(NA_SUFFIX) ? user.name : user.name + NA_SUFFIX;
+  let newName = user.name;
+  if (!newName.endsWith(NA_SUFFIX)) {
+    const base = newName.length + NA_SUFFIX.length > MAX_NAME_LEN
+      ? newName.slice(0, MAX_NAME_LEN - NA_SUFFIX.length)
+      : newName;
+    newName = base + NA_SUFFIX;
+  }
 
   return prisma.user.update({
     where: { id },

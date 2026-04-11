@@ -1,3 +1,44 @@
+/* === SELF-HOSTED FONTS (TTUI-162, TTUI-163) === */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/space-grotesk-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/space-grotesk-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* === BACKGROUNDS (FlowUniverse Design System v1.0) === */
   --bg: #080B14;
@@ -87,6 +128,31 @@
   --space-6: 16px;
 }
 
+/* === LIGHT THEME TOKENS (TTUI-118) === */
+[data-theme='light'] {
+  --bg: #F5F3FF;
+  --bg-sb: #FDFCFF;
+  --bg-el: #FFFFFF;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+  --bg-sel: rgba(79, 110, 247, 0.10);
+  --bg-input: #FFFFFF;
+  --bg-modal: #FFFFFF;
+  --b: #E8E4F8;
+  --b2: #E8E4F8;
+  --b3: rgba(0, 0, 0, 0.12);
+  --b-focus: #4F6EF7;
+  --t1: #0D0F1A;
+  --t2: #3A3D52;
+  --t3: #6B7280;
+  --t4: #A0A8B8;
+  --t-placeholder: #B0B8CC;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
+  color-scheme: light;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -103,7 +169,6 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  color-scheme: dark;
 }
 
 /* === Ant Design base overrides for dark Linear theme === */
@@ -209,6 +274,23 @@ body {
 
 .ant-table-tbody > tr > td {
   background-color: transparent;
+}
+
+/* TTUI-174: Tree indent expand icon theming */
+.ant-table-row-expand-icon {
+  border-color: var(--b2);
+  background: var(--bg-el);
+  color: var(--t3);
+}
+
+.ant-table-row-expand-icon:hover {
+  color: var(--acc);
+  border-color: var(--acc);
+}
+
+.ant-table-row-expand-icon::before,
+.ant-table-row-expand-icon::after {
+  background: var(--t3);
 }
 
 /* === Admin: roles & activity === */
@@ -3027,5 +3109,66 @@ body {
   line-height: 12px;
   color: var(--t4);
   display: block;
+}
+
+/* === LIGHT THEME OVERRIDES (TTUI-73, TTUI-170) ===
+ * Fix hardcoded rgba(255,255,255,X) glass effects that look wrong on light backgrounds.
+ * All rules below are scoped to [data-theme='light'] to avoid affecting dark theme.
+ */
+[data-theme='light'] .ant-table-thead > tr > th {
+  border-bottom: 1px solid var(--b);
+}
+
+[data-theme='light'] .ant-btn-primary {
+  color: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(79, 110, 247, 0.3),
+    0 2px 8px rgba(79, 110, 247, 0.25);
+}
+
+[data-theme='light'] .ant-btn-primary:hover,
+[data-theme='light'] .ant-btn-primary:focus {
+  box-shadow:
+    0 0 0 1px rgba(79, 110, 247, 0.4),
+    0 4px 12px rgba(79, 110, 247, 0.3);
+}
+
+[data-theme='light'] .tt-btn-primary {
+  box-shadow:
+    0 0 0 1px rgba(79, 110, 247, 0.3),
+    0 2px 8px rgba(79, 110, 247, 0.25);
+}
+
+[data-theme='light'] .tt-btn-primary:hover {
+  box-shadow:
+    0 0 0 1px rgba(79, 110, 247, 0.4),
+    0 4px 12px rgba(79, 110, 247, 0.3);
+}
+
+[data-theme='light'] .tt-topbar {
+  border-bottom: 1px solid var(--b);
+}
+
+[data-theme='light'] .ant-table-row-expand-icon {
+  color: var(--t3);
+  border-color: var(--b);
+  background: var(--bg-el);
+}
+
+[data-theme='light'] .ant-table-row-indent + .ant-table-row-expand-icon {
+  color: var(--t3);
+}
+
+[data-theme='light'] .tt-board-column,
+[data-theme='light'] .tt-board-card {
+  border-color: var(--b) !important;
+}
+
+[data-theme='light'] .ant-modal-content {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-theme='light'] .ant-drawer-content-wrapper {
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.1) !important;
 }
 

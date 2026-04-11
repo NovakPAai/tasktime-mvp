@@ -4,10 +4,11 @@
  * Zero CSS class dependencies, zero Ant Design layout.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { AxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
-import { Modal, Form, Input, Popconfirm, Select, Checkbox, message } from 'antd';
+import { Modal, Form, Input, Popconfirm, Select, Checkbox, DatePicker, message, Pagination, Spin } from 'antd';
+import dayjs from 'dayjs';
 import * as sprintsApi from '../api/sprints';
 import * as projectsApi from '../api/projects';
 import * as teamsApi from '../api/teams';
@@ -138,6 +139,16 @@ function formatDate(iso?: string | null): string {
   return `${d.getDate()} ${months[d.getMonth()] ?? ''} ${d.getFullYear()}`;
 }
 
+function getRemainingDays(sprint: Sprint): string {
+  if (!sprint.startDate || !sprint.endDate) return 'N/A';
+  const start = new Date(sprint.startDate).getTime();
+  const end = new Date(sprint.endDate).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 'N/A';
+  const diff = end - Date.now();
+  if (diff <= 0) return '0';
+  return String(Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
 function getTimeProgress(sprint: Sprint): number {
   if (!sprint.startDate || !sprint.endDate) return 0;
   const start = new Date(sprint.startDate).getTime();
@@ -163,6 +174,9 @@ export default function SprintsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [backlog, setBacklog] = useState<Issue[]>([]);
+  const [backlogTotal, setBacklogTotal] = useState(0);
+  const [backlogPage, setBacklogPage] = useState(1);
+  const [backlogLoading, setBacklogLoading] = useState(false);
   const [sprintIssues, setSprintIssues] = useState<Issue[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTab, setActiveTab] = useState<SprintState>('ACTIVE');
@@ -171,17 +185,38 @@ export default function SprintsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [estimating, setEstimating] = useState(false);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+
+  const BACKLOG_PAGE_SIZE = 20;
+  const backlogReqSeq = useRef(0);
+
+  const loadBacklog = useCallback(async (page: number) => {
+    if (!projectId) return;
+    const reqId = ++backlogReqSeq.current;
+    setBacklogLoading(true);
+    try {
+      const res = await sprintsApi.getBacklog(projectId, { page, limit: BACKLOG_PAGE_SIZE });
+      if (reqId !== backlogReqSeq.current) return; // stale response — discard
+      setBacklog(res.data);
+      setBacklogTotal(res.meta.total);
+      setBacklogPage(page);
+    } finally {
+      if (reqId === backlogReqSeq.current) setBacklogLoading(false);
+    }
+  }, [projectId]);
 
   const load = useCallback(async () => {
     if (!projectId) return;
-    const [sp, bl, ts, proj] = await Promise.all([
+    const [spPage, ts, proj] = await Promise.all([
       sprintsApi.listSprints(projectId),
-      sprintsApi.getBacklog(projectId),
       teamsApi.listTeams(),
       projectsApi.getProject(projectId),
     ]);
+    const sp = spPage.data;
     setSprints(sp);
     setTeams(ts);
     setProject(proj);
@@ -191,7 +226,6 @@ export default function SprintsPage() {
       const active = sp.find(s => s.state === 'ACTIVE');
       return (active ?? sp[0]).id;
     });
-    setBacklog(bl);
   }, [projectId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -218,11 +252,15 @@ export default function SprintsPage() {
 
   const handleCreate = async (vals: {
     name: string; goal?: string;
+    startDate?: ReturnType<typeof dayjs> | null;
+    endDate?: ReturnType<typeof dayjs> | null;
     projectTeamId?: string; businessTeamId?: string; flowTeamId?: string;
   }) => {
     if (!projectId) return;
     await sprintsApi.createSprint(projectId, {
       name: vals.name, goal: vals.goal,
+      startDate: vals.startDate ? vals.startDate.toISOString() : undefined,
+      endDate: vals.endDate ? vals.endDate.toISOString() : undefined,
       projectTeamId: vals.projectTeamId,
       businessTeamId: vals.businessTeamId,
       flowTeamId: vals.flowTeamId,
@@ -253,12 +291,71 @@ export default function SprintsPage() {
     await sprintsApi.moveIssuesToSprint(selectedSprintId, selectedBacklog);
     setSelectedBacklog([]);
     setBacklogOpen(false);
-    // Reload both the sprint list/backlog AND the sprint issues list
-    // (selectedSprintId doesn't change so the useEffect won't auto-trigger)
     void load();
+    void loadBacklog(1);
     void sprintsApi.getSprintIssues(selectedSprintId)
       .then(data => setSprintIssues(data.issues))
       .catch(() => {});
+  };
+
+  const openEditModal = (sprint: typeof selectedSprint) => {
+    if (!sprint) return;
+    editForm.setFieldsValue({
+      name: sprint.name,
+      goal: sprint.goal ?? '',
+      startDate: sprint.startDate ? dayjs(sprint.startDate) : null,
+      endDate: sprint.endDate ? dayjs(sprint.endDate) : null,
+      projectTeamId: sprint.projectTeam?.id ?? undefined,
+      businessTeamId: sprint.businessTeam?.id ?? undefined,
+      flowTeamId: sprint.flowTeam?.id ?? undefined,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async (vals: {
+    name: string; goal?: string;
+    startDate?: ReturnType<typeof dayjs> | null;
+    endDate?: ReturnType<typeof dayjs> | null;
+    projectTeamId?: string; businessTeamId?: string; flowTeamId?: string;
+  }) => {
+    if (!selectedSprintId) return;
+    try {
+      await sprintsApi.updateSprint(selectedSprintId, {
+        name: vals.name,
+        goal: vals.goal ?? null,
+        startDate: vals.startDate ? vals.startDate.toISOString() : null,
+        endDate: vals.endDate ? vals.endDate.toISOString() : null,
+        projectTeamId: vals.projectTeamId ?? null,
+        businessTeamId: vals.businessTeamId ?? null,
+        flowTeamId: vals.flowTeamId ?? null,
+      });
+      setEditOpen(false);
+      editForm.resetFields();
+      void load();
+      void message.success('Спринт обновлён');
+    } catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      void message.error(err.response?.data?.error ?? 'Ошибка сохранения');
+    }
+  };
+
+  const handleEstimateAll = async () => {
+    if (!selectedSprintId) return;
+    setEstimating(true);
+    try {
+      const result = await sprintsApi.estimateAllSprintIssues(selectedSprintId);
+      void message.success(`Оценено ${result.estimated} из ${result.total} задач`);
+      void load();
+      // Reload sprint issues to reflect new estimatedHours
+      void sprintsApi.getSprintIssues(selectedSprintId)
+        .then(data => setSprintIssues(data.issues))
+        .catch(() => {});
+    } catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      void message.error(err.response?.data?.error ?? 'Ошибка оценки');
+    } finally {
+      setEstimating(false);
+    }
   };
 
   const selectedSprint = sprints.find(s => s.id === selectedSprintId) ?? null;
@@ -377,6 +474,16 @@ export default function SprintsPage() {
                   }}>
                     {selectedSprint.state}
                   </span>
+                  {selectedSprint.state === 'ACTIVE' && (
+                    <span style={{
+                      backgroundColor: `${T.amber}1F`,
+                      color: T.amber,
+                      borderRadius: 20, paddingTop: 3, paddingBottom: 3, paddingLeft: 10, paddingRight: 10,
+                      fontFamily: F.sans, fontSize: 10, fontWeight: 600, lineHeight: '12px',
+                    }}>
+                      {getRemainingDays(selectedSprint) === 'N/A' ? 'N/A' : `${getRemainingDays(selectedSprint)} дн. осталось`}
+                    </span>
+                  )}
                 </div>
                 {selectedSprint.goal && (
                   <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 12, lineHeight: '16px' }}>
@@ -386,6 +493,15 @@ export default function SprintsPage() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(selectedSprint)}
+                    style={{ backgroundColor: closeBtnBg, border: `1px solid ${T.border}`, borderRadius: 8, paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12, cursor: 'pointer', color: T.t3, fontFamily: F.sans, fontSize: 12 }}
+                  >
+                    ✎ Редактировать
+                  </button>
+                )}
                 <div>
                   <div style={{ color: T.t4, fontFamily: F.sans, fontSize: 10, lineHeight: '12px', textAlign: 'right' }}>Дата начала</div>
                   <div style={{ color: T.t2, fontFamily: F.display, fontSize: 12, fontWeight: 600, lineHeight: '16px', textAlign: 'right' }}>
@@ -451,19 +567,31 @@ export default function SprintsPage() {
                   </span>
                 </div>
               )}
-              {/* Status dots */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                {[
-                  { dot: T.green,  label: `Done: ${doneCount}` },
-                  { dot: T.amber,  label: `In Progress: ${inProgressCount}` },
-                  { dot: T.violet, label: `Review: ${reviewCount}` },
-                  { dot: T.t3,     label: `Open: ${openCount}` },
-                ].map(({ dot, label }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <div style={{ backgroundColor: dot, borderRadius: '50%', width: 6, height: 6, flexShrink: 0 }} />
-                    <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>{label}</span>
+              {/* Status dots + total estimated hours */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  {[
+                    { dot: T.green,  label: `Done: ${doneCount}` },
+                    { dot: T.amber,  label: `In Progress: ${inProgressCount}` },
+                    { dot: T.violet, label: `Review: ${reviewCount}` },
+                    { dot: T.t3,     label: `Open: ${openCount}` },
+                  ].map(({ dot, label }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ backgroundColor: dot, borderRadius: '50%', width: 6, height: 6, flexShrink: 0 }} />
+                      <span style={{ color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+                {selectedSprint.stats != null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <span style={{ color: T.t4, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>Общая оценка:</span>
+                    <span style={{ color: T.t1, fontFamily: F.display, fontSize: 12, fontWeight: 600, lineHeight: '14px' }}>
+                      {selectedSprint.stats.totalEstimatedHours > 0
+                        ? `${selectedSprint.stats.totalEstimatedHours.toFixed(1)} ч`
+                        : '—'}
+                    </span>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -486,10 +614,22 @@ export default function SprintsPage() {
                 >
                   Детали
                 </button>
-                {canManage && selectedSprint.state !== 'CLOSED' && (
+                {canManage && sprintIssues.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setBacklogOpen(true)}
+                    onClick={() => void handleEstimateAll()}
+                    disabled={estimating}
+                    style={{ backgroundColor: closeBtnBg, border: `1px solid ${T.border}`, borderRadius: 6, paddingTop: 5, paddingBottom: 5, paddingLeft: 12, paddingRight: 12, cursor: estimating ? 'not-allowed' : 'pointer', color: estimating ? T.t4 : T.acc, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', opacity: estimating ? 0.6 : 1 }}
+                  >
+                    {estimating ? 'Оцениваю…' : 'Оценить трудоёмкость задач'}
+                  </button>
+                )}
+                {canManage && selectedSprint.state !== 'CLOSED' && (
+                  /* Открывает модал беклога: lazy-load первой страницы при клике,
+                     пагинация по BACKLOG_PAGE_SIZE задач, выбор через чекбоксы */
+                  <button
+                    type="button"
+                    onClick={() => { setBacklogOpen(true); void loadBacklog(1); }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.acc, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', padding: 0 }}
                   >
                     + Добавить из беклога
@@ -505,6 +645,7 @@ export default function SprintsPage() {
               <div style={{ flex: 1, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Задача</div>
               <div style={{ width: 100, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Статус</div>
               <div style={{ width: 70, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Приоритет</div>
+              <div style={{ width: 56, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Оценка</div>
               <div style={{ width: 56, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Срок</div>
               <div style={{ width: 100, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '12px', textTransform: 'uppercase' }}>Исполнитель</div>
             </div>
@@ -563,6 +704,10 @@ export default function SprintsPage() {
                       <div style={{ width: 70, flexShrink: 0, color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
                         {issue.priority}
                       </div>
+                      {/* Estimated hours */}
+                      <div style={{ width: 56, flexShrink: 0, color: issue.estimatedHours ? T.t2 : T.t4, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
+                        {issue.estimatedHours ? `${issue.estimatedHours}ч` : '—'}
+                      </div>
                       {/* Due date */}
                       <div style={{ width: 56, flexShrink: 0, color: T.t3, fontFamily: F.sans, fontSize: 11, lineHeight: '14px' }}>
                         {issue.dueDate ? formatDate(issue.dueDate) : '—'}
@@ -607,7 +752,7 @@ export default function SprintsPage() {
       <Modal
         title="Добавить задачи из беклога"
         open={backlogOpen}
-        onCancel={() => { setBacklogOpen(false); setSelectedBacklog([]); }}
+        onCancel={() => { setBacklogOpen(false); setSelectedBacklog([]); setBacklogPage(1); }}
         onOk={() => void handleMoveToSprint()}
         okText={`Добавить в спринт${selectedBacklog.length ? ` (${selectedBacklog.length})` : ''}`}
         okButtonProps={{ disabled: selectedBacklog.length === 0 }}
@@ -656,9 +801,11 @@ export default function SprintsPage() {
           <div style={{ flex: 1, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Задача</div>
           <div style={{ width: 90, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Статус</div>
           <div style={{ width: 60, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Приор.</div>
+          <div style={{ width: 50, flexShrink: 0, color: T.t4, fontFamily: F.sans, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Оценка</div>
         </div>
 
-        {backlog.length === 0 ? (
+        <Spin spinning={backlogLoading}>
+        {!backlogLoading && backlog.length === 0 ? (
           <p style={{ color: T.t3, fontFamily: F.sans, fontSize: 13, padding: '16px 0' }}>Бэклог пуст</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 380, overflow: 'auto' }}>
@@ -705,11 +852,29 @@ export default function SprintsPage() {
                   <span style={{ width: 60, flexShrink: 0, color: PRIORITY_COLOR[issue.priority], fontFamily: F.sans, fontSize: 11 }}>
                     {issue.priority}
                   </span>
+                  {/* Estimated hours */}
+                  <span style={{ width: 50, flexShrink: 0, color: issue.estimatedHours ? T.t2 : T.t4, fontFamily: F.sans, fontSize: 11 }}>
+                    {issue.estimatedHours ? `${issue.estimatedHours}ч` : '—'}
+                  </span>
                 </label>
               );
             })}
           </div>
         )}
+        {backlogTotal > BACKLOG_PAGE_SIZE && (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
+            <Pagination
+              current={backlogPage}
+              pageSize={BACKLOG_PAGE_SIZE}
+              total={backlogTotal}
+              showSizeChanger={false}
+              showTotal={total => `${total} задач`}
+              onChange={page => void loadBacklog(page)}
+              size="small"
+            />
+          </div>
+        )}
+        </Spin>
       </Modal>
 
       {/* ── New sprint modal ─────────────────────────────────────────────────── */}
@@ -728,6 +893,50 @@ export default function SprintsPage() {
           <Form.Item name="goal" label="Цель">
             <Input.TextArea rows={2} />
           </Form.Item>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Form.Item name="startDate" label="Дата начала" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+            <Form.Item name="endDate" label="Дата окончания" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+          </div>
+          <Form.Item name="projectTeamId" label="Проектная команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+          <Form.Item name="businessTeamId" label="Бизнес-функциональная команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+          <Form.Item name="flowTeamId" label="Flow-команда">
+            <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* ── Edit sprint modal ────────────────────────────────────────────────── */}
+      <Modal
+        title="Редактировать спринт"
+        open={editOpen}
+        onCancel={() => { setEditOpen(false); editForm.resetFields(); }}
+        onOk={() => editForm.submit()}
+        okText="Сохранить"
+        cancelText="Отмена"
+      >
+        <Form form={editForm} layout="vertical" onFinish={v => void handleEditSave(v)}>
+          <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="goal" label="Цель">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Form.Item name="startDate" label="Дата начала" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+            <Form.Item name="endDate" label="Дата окончания" style={{ flex: 1 }}>
+              <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+            </Form.Item>
+          </div>
           <Form.Item name="projectTeamId" label="Проектная команда">
             <Select allowClear options={teams.map(t => ({ value: t.id, label: t.name }))} />
           </Form.Item>

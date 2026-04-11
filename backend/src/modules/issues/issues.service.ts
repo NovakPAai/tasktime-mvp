@@ -7,6 +7,12 @@ import type {
 } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { getCachedJson, setCachedJson, delCacheByPrefix } from '../../shared/redis.js';
+import {
+  type PaginationParams,
+  paginationToSkipTake,
+  buildPaginatedResponse,
+} from '../../shared/utils/params.js';
 import { getApplicableFields } from '../issue-custom-fields/issue-custom-fields.service.js';
 import { resolveWorkflowForIssue, executeTransition } from '../workflow-engine/workflow-engine.service.js';
 import type {
@@ -81,7 +87,11 @@ type ListIssuesFilters = {
   search?: string;
 };
 
-export async function listIssues(projectId: string, filters?: ListIssuesFilters) {
+export async function listIssues(
+  projectId: string,
+  filters?: ListIssuesFilters,
+  pagination?: PaginationParams,
+) {
   const where: Prisma.IssueWhereInput = { projectId };
 
   if (filters?.status && filters.status.length > 0) {
@@ -112,17 +122,52 @@ export async function listIssues(projectId: string, filters?: ListIssuesFilters)
     ];
   }
 
-  return prisma.issue.findMany({
-    where,
+  const p = pagination ?? { page: 1, limit: 100 };
+  const { skip, take } = paginationToSkipTake(p);
+
+  const sortedStatus = [...(filters?.status ?? [])].sort().join(',');
+  const sortedType = [...(filters?.issueTypeConfigId ?? [])].sort().join(',');
+  const sortedPriority = [...(filters?.priority ?? [])].sort().join(',');
+  const cacheKey =
+    `issues:list:${projectId}` +
+    `:s=${sortedStatus}:t=${sortedType}:pr=${sortedPriority}` +
+    `:a=${filters?.assigneeId ?? ''}:sp=${filters?.sprintId ?? ''}` +
+    `:fr=${filters?.from ?? ''}:to=${filters?.to ?? ''}:q=${filters?.search ?? ''}` +
+    `:pg=${p.page}:lm=${p.limit}`;
+
+  type IssueListItem = Awaited<ReturnType<typeof prisma.issue.findMany<{
     include: {
-      assignee: { select: { id: true, name: true, email: true } },
-      creator: { select: { id: true, name: true } },
-      issueTypeConfig: true,
-      workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
-      _count: { select: { children: true } },
-    },
-    orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
-  });
+      assignee: { select: { id: true; name: true; email: true } };
+      creator: { select: { id: true; name: true } };
+      issueTypeConfig: true;
+      workflowStatus: { select: { id: true; name: true; category: true; color: true; systemKey: true } };
+      _count: { select: { children: true } };
+    };
+  }>>>[number];
+
+  const cached = await getCachedJson<ReturnType<typeof buildPaginatedResponse<IssueListItem>>>(cacheKey);
+  if (cached) return cached;
+
+  const [items, total] = await Promise.all([
+    prisma.issue.findMany({
+      where,
+      include: {
+        assignee: { select: { id: true, name: true, email: true } },
+        creator: { select: { id: true, name: true } },
+        issueTypeConfig: true,
+        workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
+        _count: { select: { children: true } },
+      },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+      skip,
+      take,
+    }),
+    prisma.issue.count({ where }),
+  ]);
+
+  const result = buildPaginatedResponse(items, total, p);
+  await setCachedJson(cacheKey, result);
+  return result;
 }
 
 export async function searchIssuesGlobal(q: string, excludeId?: string, projectIds?: string[]) {
@@ -239,6 +284,7 @@ export async function bulkUpdateIssues(projectId: string, params: {
     data,
   });
 
+  await delCacheByPrefix(`issues:list:${projectId}:`);
   return { updatedCount: params.issueIds.length };
 }
 
@@ -385,6 +431,7 @@ export async function createIssue(projectId: string, creatorId: string, dto: Cre
     // No workflow configured — keep the OPEN fallback
   }
 
+  await delCacheByPrefix(`issues:list:${projectId}:`);
   return issue;
 }
 
@@ -397,7 +444,7 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
   }
 
   const { dueDate, ...rest } = dto;
-  return prisma.issue.update({
+  const updated = await prisma.issue.update({
     where: { id },
     data: {
       ...rest,
@@ -409,6 +456,9 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
       workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
     },
   });
+
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  return updated;
 }
 
 async function validateRequiredFieldsForDone(issueId: string): Promise<void> {
@@ -476,7 +526,7 @@ export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: s
 
   const wfStatus = await prisma.workflowStatus.findFirst({ where: { systemKey: dto.status } });
 
-  return prisma.issue.update({
+  const updated = await prisma.issue.update({
     where: { id },
     data: {
       status: dto.status,
@@ -486,6 +536,9 @@ export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: s
       workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
     },
   });
+
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  return updated;
 }
 
 export async function assignIssue(id: string, dto: AssignDto) {
@@ -497,11 +550,14 @@ export async function assignIssue(id: string, dto: AssignDto) {
     if (!user) throw new AppError(404, 'Assignee not found');
   }
 
-  return prisma.issue.update({
+  const updated = await prisma.issue.update({
     where: { id },
     data: { assigneeId: dto.assigneeId },
     include: { assignee: { select: { id: true, name: true } } },
   });
+
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  return updated;
 }
 
 export async function updateAiFlags(id: string, dto: UpdateAiFlagsDto) {
@@ -542,6 +598,7 @@ export async function deleteIssue(id: string) {
   if (!issue) throw new AppError(404, 'Issue not found');
 
   await prisma.issue.delete({ where: { id } });
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
 }
 
 export async function bulkDeleteIssues(projectId: string, issueIds: string[]): Promise<{ deletedCount: number }> {
@@ -558,6 +615,7 @@ export async function bulkDeleteIssues(projectId: string, issueIds: string[]): P
     where: { id: { in: issueIds }, projectId },
   });
 
+  await delCacheByPrefix(`issues:list:${projectId}:`);
   return { deletedCount: count };
 }
 
@@ -750,6 +808,8 @@ export async function changeIssueType(id: string, dto: ChangeTypeDto) {
     });
   });
 
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+
   return getIssue(id);
 }
 
@@ -892,6 +952,12 @@ export async function moveIssue(id: string, dto: MoveIssueDto) {
       },
     });
   });
+
+  // Invalidate cache for both source and target projects
+  await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  if (dto.targetProjectId !== issue.projectId) {
+    await delCacheByPrefix(`issues:list:${dto.targetProjectId}:`);
+  }
 
   return getIssue(id);
 }

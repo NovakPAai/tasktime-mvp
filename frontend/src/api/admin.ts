@@ -1,4 +1,12 @@
 import api from './client';
+import type { PaginatedResponse } from '../types';
+
+export interface SystemSettings {
+  sessionLifetimeMinutes: number;
+  registrationEnabled: boolean;
+  /** JWT access-token TTL from JWT_EXPIRES_IN env var — read-only, requires server restart to change. */
+  jwtExpiresIn: string;
+}
 
 export interface ProjectRole {
   id: string;
@@ -64,6 +72,13 @@ export const adminApi = {
 
   setRegistrationSetting: (enabled: boolean) =>
     api.patch<{ registrationEnabled: boolean }>('/admin/settings/registration', { enabled }).then(r => r.data),
+
+  // System settings
+  getSystemSettings: () =>
+    api.get<SystemSettings>('/admin/settings/system').then(r => r.data),
+
+  setSessionLifetime: (sessionLifetimeMinutes: number) =>
+    api.patch<SystemSettings>('/admin/settings/system', { sessionLifetimeMinutes }).then(r => r.data),
 };
 
 export interface AdminStats {
@@ -91,11 +106,13 @@ export async function getStats(): Promise<AdminStats> {
   return data;
 }
 
-export async function listAdminUsers() {
-  const { data } = await api.get<
-    AdminUsersResponse
-  >('/admin/users');
-  return data.users;
+export async function listAdminUsers(
+  pagination?: { page?: number; limit?: number },
+): Promise<PaginatedResponse<AdminUser>> {
+  const { data } = await api.get<PaginatedResponse<AdminUser>>('/admin/users', {
+    params: pagination,
+  });
+  return data;
 }
 
 export async function getIssuesByStatusReport(params: {
@@ -122,4 +139,3 @@ export async function getIssuesByAssigneeReport(params: {
   );
   return data;
 }
-

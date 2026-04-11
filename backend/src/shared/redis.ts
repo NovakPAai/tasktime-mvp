@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createClient, type RedisClientType } from 'redis';
 import { config } from '../config.js';
 
@@ -70,6 +71,40 @@ export async function setCachedJson<T>(key: string, value: T, ttlSeconds = confi
   }
 }
 
+/** Delete a single cache key. */
+export async function delCachedJson(key: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    await redis.del(key);
+  } catch (err) {
+    console.error('Failed to delete from Redis cache:', err);
+  }
+}
+
+/**
+ * Delete all keys whose name starts with `prefix`.
+ * Uses SCAN to avoid blocking the server; safe on large keyspaces.
+ */
+export async function delCacheByPrefix(prefix: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    let cursor = '0';
+    do {
+      const reply = await redis.scan(cursor, { MATCH: `${prefix}*`, COUNT: 100 });
+      cursor = reply.cursor;
+      if (reply.keys.length > 0) {
+        await redis.del(reply.keys);
+      }
+    } while (cursor !== '0');
+  } catch (err) {
+    console.error('Failed to delete cache by prefix:', err);
+  }
+}
+
 export type UserSession = {
   userId: string;
   email: string;
@@ -82,6 +117,12 @@ export type UserSession = {
 
 function buildSessionKey(userId: string): string {
   return `session:${userId}`;
+}
+
+/** Returns true when a Redis client is connected and ready. */
+export async function isRedisAvailable(): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  return redis !== null;
 }
 
 export async function setUserSession(userId: string, session: Omit<UserSession, 'userId'>): Promise<void> {
@@ -125,6 +166,28 @@ export async function deleteUserSession(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Update lastSeenAt and reset TTL for an existing session (sliding window).
+ * Returns false if the session does not exist (already expired).
+ */
+export async function touchUserSession(userId: string, ttlSeconds: number): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return true; // Redis unavailable — allow request, degrade gracefully
+
+  try {
+    const raw = await redis.get(buildSessionKey(userId));
+    if (!raw) return false; // session expired
+
+    const session = JSON.parse(raw) as UserSession;
+    session.lastSeenAt = new Date().toISOString();
+    await redis.set(buildSessionKey(userId), JSON.stringify(session), { EX: ttlSeconds });
+    return true;
+  } catch (err) {
+    console.error('Failed to touch user session in Redis:', err);
+    return true; // Redis error — allow request, degrade gracefully
+  }
+}
+
 export async function deleteCachedByPattern(pattern: string): Promise<void> {
   const redis = await getRedisClientInternal();
   if (!redis) return;
@@ -134,6 +197,46 @@ export async function deleteCachedByPattern(pattern: string): Promise<void> {
     if (keys.length > 0) await redis.del(keys);
   } catch (err) {
     console.error('Failed to delete cached keys by pattern:', err);
+  }
+}
+
+// Lua script: atomic compare-and-delete — only deletes key if value matches owner token
+const RELEASE_LOCK_SCRIPT = `if redis.call("get",KEYS[1]) == ARGV[1] then return redis.call("del",KEYS[1]) else return 0 end`;
+
+/**
+ * Acquire a distributed lock using Redis SET NX EX with a unique owner token.
+ * Returns the owner token string on success, or null if the lock is already held.
+ * In test env (no Redis) returns a synthetic token so tests aren't blocked.
+ * In prod with Redis errors returns null to enforce the lock.
+ */
+export async function acquireLock(key: string, ttlSeconds = 60): Promise<string | null> {
+  const redis = await getRedisClientInternal();
+  if (!redis) {
+    return process.env.NODE_ENV === 'test' ? 'test-token' : null;
+  }
+
+  const token = randomUUID();
+  try {
+    const result = await redis.set(key, token, { NX: true, EX: ttlSeconds });
+    return result === 'OK' ? token : null;
+  } catch (err) {
+    console.error('acquireLock Redis error:', err);
+    return process.env.NODE_ENV === 'test' ? 'test-token' : null;
+  }
+}
+
+/**
+ * Release a distributed lock only if the caller owns it (token matches).
+ * Uses an atomic Lua script to prevent releasing another owner's lock.
+ */
+export async function releaseLock(key: string, token: string): Promise<void> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return;
+
+  try {
+    await redis.eval(RELEASE_LOCK_SCRIPT, { keys: [key], arguments: [token] });
+  } catch (err) {
+    console.error('releaseLock Redis error:', err);
   }
 }
 

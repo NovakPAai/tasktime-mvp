@@ -4,13 +4,13 @@
     {
       "name": "backend",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/pavelnovak/tasktime-mvp && PORT=3002 ./backend/node_modules/.bin/tsx watch backend/src/server.ts"],
+      "runtimeArgs": ["-c", "cd /Users/pavelnovak/tasktime-mvp && PORT=3002 /usr/local/bin/node ./backend/node_modules/.bin/tsx watch backend/src/server.ts"],
       "port": 3002
     },
     {
       "name": "frontend",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/pavelnovak/tasktime-mvp/frontend && node_modules/.bin/vite --port 5181"],
+      "runtimeArgs": ["-c", "cd /Users/pavelnovak/tasktime-mvp/.claude/worktrees/thirsty-feynman/frontend && /usr/local/bin/node /Users/pavelnovak/tasktime-mvp/frontend/node_modules/.bin/vite --port 5181 --host localhost"],
       "port": 5181
     }
   ]

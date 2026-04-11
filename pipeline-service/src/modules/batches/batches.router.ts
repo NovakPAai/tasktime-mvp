@@ -368,6 +368,58 @@ router.post('/:id/deploy-production', async (req, res, next) => {
   }
 });
 
+// ─── POST /api/batches/:id/cancel-deploy ─────────────────────────────────────
+
+router.post('/:id/cancel-deploy', async (req, res, next) => {
+  try {
+    const batchId = req.params.id as string;
+    const batch = await prisma.stagingBatch.findUnique({
+      where: { id: batchId },
+      include: { deployEvents: { where: { status: 'RUNNING' }, orderBy: { startedAt: 'desc' }, take: 1 } },
+    });
+    if (!batch) { res.status(404).json({ error: 'Batch not found' }); return; }
+    if (batch.state !== 'DEPLOYING') {
+      res.status(422).json({ error: `Batch must be DEPLOYING to cancel (current: ${batch.state})` });
+      return;
+    }
+
+    const runningEvent = batch.deployEvents[0];
+    const finishedAt = new Date();
+
+    const updates = runningEvent
+      ? [
+          prisma.deployEvent.update({
+            where: { id: runningEvent.id },
+            data: {
+              status: 'FAILURE',
+              finishedAt,
+              durationMs: runningEvent.startedAt ? finishedAt.getTime() - runningEvent.startedAt.getTime() : null,
+              errorMessage: 'Cancelled manually',
+            },
+          }),
+          prisma.stagingBatch.update({
+            where: { id: batchId },
+            data: { state: 'FAILED' },
+            include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
+          }),
+        ]
+      : [
+          prisma.stagingBatch.update({
+            where: { id: batchId },
+            data: { state: 'FAILED' },
+            include: { pullRequests: { select: { id: true, externalId: true, title: true, ciStatus: true } }, deployEvents: { orderBy: { startedAt: 'desc' }, take: 5 } },
+          }),
+        ];
+
+    const results = await prisma.$transaction(updates);
+    const updatedBatch = results[results.length - 1];
+
+    res.json({ data: updatedBatch });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /api/batches/:id/deploy-callback ────────────────────────────────────
 
 const callbackBody = z.object({
@@ -388,6 +440,12 @@ router.post('/:id/deploy-callback', validate(callbackBody), async (req, res, nex
       include: { deployEvents: { where: { status: 'RUNNING' }, orderBy: { startedAt: 'desc' }, take: 1 } },
     });
     if (!batch) { res.status(404).json({ error: 'Batch not found' }); return; }
+
+    // If the batch was already manually cancelled, ignore late callbacks silently
+    if (batch.state === 'FAILED' && !batch.deployEvents[0]) {
+      res.json({ data: batch, deployEvent: null });
+      return;
+    }
 
     const runningEvent = batch.deployEvents[0];
     const finishedAt = new Date();

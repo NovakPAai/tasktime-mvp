@@ -13,6 +13,7 @@ export async function listProjects() {
   return prisma.project.findMany({
     include: projectInclude,
     orderBy: { createdAt: 'desc' },
+    take: 500,
   });
 }
 
@@ -89,11 +90,11 @@ export async function getProjectDashboard(projectId: string) {
       }),
       prisma.sprint.findFirst({
         where: { projectId, state: 'ACTIVE' },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          state: true,
           _count: { select: { issues: true } },
-          issues: {
-            select: { status: true },
-          },
         },
       }),
       prisma.issue.count({ where: { projectId } }),
@@ -109,7 +110,9 @@ export async function getProjectDashboard(projectId: string) {
   } | null = null;
 
   if (activeSprint) {
-    const doneInSprint = activeSprint.issues.filter((i) => i.status === 'DONE').length;
+    const doneInSprint = await prisma.issue.count({
+      where: { sprintId: activeSprint.id, status: 'DONE' },
+    });
     activeSprintSummary = {
       id: activeSprint.id,
       name: activeSprint.name,

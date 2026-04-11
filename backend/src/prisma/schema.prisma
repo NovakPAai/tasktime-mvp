@@ -54,6 +54,7 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("refresh_tokens")
 }
 
@@ -240,6 +241,9 @@ model Issue {
   @@index([parentId])
   @@index([sprintId])
   @@index([releaseId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([updatedAt])
   @@index([issueTypeConfigId])
   @@index([dueDate])
   @@map("issues")
@@ -301,6 +305,9 @@ model Sprint {
 
   @@unique([projectId, name], map: "sprints_project_id_name_key")
   @@index([projectId])
+  @@index([projectTeamId])
+  @@index([businessTeamId])
+  @@index([flowTeamId])
   @@index([releaseId])
   @@map("sprints")
 }
@@ -359,6 +366,7 @@ model Comment {
   author User  @relation(fields: [authorId], references: [id])
 
   @@index([issueId])
+  @@index([authorId])
   @@map("comments")
 }
 
@@ -391,6 +399,7 @@ model TimeLog {
   @@index([issueId])
   @@index([userId])
   @@index([agentSessionId])
+  @@index([logDate])
   @@map("time_logs")
 }
 
@@ -442,6 +451,7 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([createdAt])
+  @@index([action])
   @@map("audit_logs")
 }
 
@@ -644,6 +654,7 @@ model TeamMember {
 
   @@unique([teamId, userId])
   @@index([userId])
+  @@index([teamId])
   @@map("team_members")
 }
 

@@ -68,6 +68,7 @@ function useIsMobile() {
 interface SidebarProps {
   isLight: boolean;
   mobileOpen: boolean;
+  collapsed?: boolean;
   openKeys: string[];
   userRole?: UserRole;
   user?: User | null;
@@ -77,11 +78,13 @@ interface SidebarProps {
   onNavigate: (key: string) => void;
   onThemeToggle: () => void;
   onLogout: () => void;
+  onCollapseToggle?: () => void;
 }
 
 export default function Sidebar({
   isLight,
   mobileOpen,
+  collapsed = false,
   openKeys,
   userRole,
   user,
@@ -91,6 +94,7 @@ export default function Sidebar({
   onNavigate,
   onThemeToggle,
   onLogout,
+  onCollapseToggle,
 }: SidebarProps) {
   const location = useLocation();
   const [hovered, setHovered] = useState<string | null>(null);
@@ -101,6 +105,7 @@ export default function Sidebar({
   const isPlanningOpen = openKeys.includes('planning-submenu');
   const isAdminOpen = openKeys.includes('admin-submenu');
   const isAdmin = hasRequiredRole(userRole, 'ADMIN');
+  const isSuperAdmin = userRole === 'SUPER_ADMIN';
 
   function toggleSubmenu(key: string) {
     onOpenKeysChange(
@@ -124,8 +129,10 @@ export default function Sidebar({
   }
 
   const itemStyle = (key: string): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10,
+    padding: collapsed ? '8px' : '8px 10px',
+    justifyContent: collapsed ? 'center' : 'flex-start',
+    borderRadius: 8, cursor: 'pointer',
     backgroundColor: itemBg(key),
     transition: 'background-color 0.15s',
     userSelect: 'none',
@@ -137,10 +144,13 @@ export default function Sidebar({
     color: itemColor(key),
     fontWeight: isActive(key) ? 500 : 400,
     flexGrow: 1,
+    display: collapsed ? 'none' : undefined,
+    whiteSpace: 'nowrap',
   });
 
   const subItemStyle = (key: string): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 10,
+    display: collapsed ? 'none' : 'flex',
+    alignItems: 'center', gap: 10,
     padding: '6px 10px 6px 22px', borderRadius: 8, cursor: 'pointer',
     backgroundColor: isActive(key) ? tokens.itemActiveBg : hovered === key ? tokens.itemHoverBg : 'transparent',
     transition: 'background-color 0.15s',
@@ -153,6 +163,8 @@ export default function Sidebar({
     color: isActive(key) ? tokens.acc : tokens.inactive,
     fontWeight: isActive(key) ? 500 : 400,
   });
+
+  const sidebarW = collapsed ? 52 : 220;
 
   const sidebarStyle: React.CSSProperties = isMobile
     ? {
@@ -168,31 +180,52 @@ export default function Sidebar({
         MozOsxFontSmoothing: 'grayscale',
       }
     : {
-        width: 220, minWidth: 220, height: '100%',
+        width: sidebarW, minWidth: sidebarW, height: '100%',
         backgroundColor: tokens.bg,
         borderRight: `1px solid ${tokens.border}`,
         display: 'flex', flexDirection: 'column',
-        flexShrink: 0,
+        flexShrink: 0, overflow: 'hidden',
+        transition: 'width 0.2s cubic-bezier(0.4,0,0.2,1), min-width 0.2s cubic-bezier(0.4,0,0.2,1)',
         WebkitFontSmoothing: 'antialiased',
         MozOsxFontSmoothing: 'grayscale',
       };
 
-  const adminSubItems: [string, string][] = [
-    ['/admin/dashboard', 'Дашборд'],
-    ['/admin/monitoring', 'Мониторинг'],
-    ['/admin/users', 'Пользователи'],
-    ['/admin/roles', 'Назначение ролей'],
-    ['/admin/projects', 'Проекты'],
-    ['/admin/categories', 'Категории'],
-    ['/admin/link-types', 'Виды связей'],
-    ['/admin/issue-type-configs', 'Типы задач'],
-    ['/admin/issue-type-schemes', 'Схемы типов задач'],
-    ['/admin/custom-fields', 'Кастомные поля'],
-    ['/admin/field-schemas', 'Схемы полей'],
-    ['/admin/workflow-statuses', 'Статусы'],
-    ['/admin/workflows', 'Workflow'],
-    ['/admin/workflow-schemes', 'Схемы workflow'],
-    ['/admin/transition-screens', 'Экраны переходов'],
+  type AdminNavItem =
+    | { type: 'link'; path: string; label: string }
+    | { type: 'divider'; label: string };
+
+  const adminNavItems: AdminNavItem[] = [
+    { type: 'divider', label: 'Обзор' },
+    { type: 'link', path: '/admin/dashboard',   label: 'Дашборд' },
+    { type: 'link', path: '/admin/monitoring',  label: 'Мониторинг' },
+
+    { type: 'divider', label: 'Пользователи' },
+    { type: 'link', path: '/admin/users',       label: 'Пользователи' },
+    { type: 'link', path: '/admin/roles',       label: 'Назначение ролей' },
+
+    { type: 'divider', label: 'Проекты' },
+    { type: 'link', path: '/admin/projects',    label: 'Проекты' },
+    { type: 'link', path: '/admin/categories',  label: 'Категории' },
+
+    { type: 'divider', label: 'Задачи' },
+    { type: 'link', path: '/admin/issue-type-configs',  label: 'Типы задач' },
+    { type: 'link', path: '/admin/issue-type-schemes',  label: 'Схемы типов задач' },
+    { type: 'link', path: '/admin/link-types',          label: 'Виды связей' },
+
+    { type: 'divider', label: 'Поля' },
+    { type: 'link', path: '/admin/custom-fields',  label: 'Кастомные поля' },
+    { type: 'link', path: '/admin/field-schemas',  label: 'Схемы полей' },
+
+    { type: 'divider', label: 'Workflow' },
+    { type: 'link', path: '/admin/workflow-statuses',    label: 'Статусы' },
+    { type: 'link', path: '/admin/workflows',            label: 'Workflow' },
+    { type: 'link', path: '/admin/workflow-schemes',     label: 'Схемы workflow' },
+    { type: 'link', path: '/admin/transition-screens',   label: 'Экраны переходов' },
+
+    ...(isSuperAdmin ? [
+      { type: 'divider' as const, label: 'Администрирование' },
+      { type: 'link' as const, path: '/admin/system', label: 'Система' },
+    ] : []),
   ];
 
   return (
@@ -213,7 +246,7 @@ export default function Sidebar({
       <div style={sidebarStyle}>
 
         {/* ─── Logo ──────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 16px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, padding: collapsed ? '20px 10px 16px' : '20px 16px 16px', overflow: 'hidden' }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, backgroundImage: LOGO_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
               <rect x="2" y="2" width="5" height="5" rx="1" fill="#FFF" opacity={0.9} />
@@ -222,9 +255,11 @@ export default function Sidebar({
               <rect x="9" y="9" width="5" height="5" rx="1" fill="#FFF" opacity={0.9} />
             </svg>
           </div>
-          <span style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '20px', color: tokens.textPrimary, flexShrink: 0 }}>
-            Flow Universe
-          </span>
+          {!collapsed && (
+            <span style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '20px', color: tokens.textPrimary, flexShrink: 0, whiteSpace: 'nowrap' }}>
+              Flow Universe
+            </span>
+          )}
           {/* Mobile close button */}
           {isMobile && (
             <button
@@ -240,7 +275,7 @@ export default function Sidebar({
         </div>
 
         {/* ─── Nav ───────────────────────────────────────────────────── */}
-        <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 8px' }}>
+        <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: collapsed ? '8px 4px' : '8px 8px' }}>
 
           {/* Dashboard */}
           <div data-testid="nav-dashboard" style={itemStyle('/')} onClick={() => onNavigate('/')} onMouseEnter={() => setHovered('/')} onMouseLeave={() => setHovered(null)}>
@@ -295,10 +330,14 @@ export default function Sidebar({
             <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
               <path d="M8 1.5L9.5 6H14L10.5 9l1.5 5L8 11l-4 3 1.5-5L2 6h4.5L8 1.5z" stroke={tokens.inactive} strokeWidth="1.25" strokeLinejoin="round" />
             </svg>
-            <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13, lineHeight: '16px', color: tokens.inactive, flexGrow: 1 }}>Planning</span>
-            <svg width="12" height="12" fill="none" viewBox="0 0 12 12" style={{ flexShrink: 0, transition: 'transform 0.2s', transform: isPlanningOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-              <path d="M4.5 3L7.5 6L4.5 9" stroke={tokens.inactive} strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            {!collapsed && (
+              <>
+                <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13, lineHeight: '16px', color: tokens.inactive, flexGrow: 1 }}>Planning</span>
+                <svg width="12" height="12" fill="none" viewBox="0 0 12 12" style={{ flexShrink: 0, transition: 'transform 0.2s', transform: isPlanningOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                  <path d="M4.5 3L7.5 6L4.5 9" stroke={tokens.inactive} strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </>
+            )}
           </div>
           {isPlanningOpen && (
             <>
@@ -341,9 +380,11 @@ export default function Sidebar({
 
           {/* DevOps section */}
           <div style={{ height: 1, backgroundColor: tokens.border, margin: '6px 4px' }} />
-          <div style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: tokens.inactive, padding: '6px 12px 4px' }}>
-            DevOps
-          </div>
+          {!collapsed && (
+            <div style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: tokens.inactive, padding: '6px 12px 4px' }}>
+              DevOps
+            </div>
+          )}
           <div data-testid="nav-pipeline" style={itemStyle('/pipeline')} onClick={() => onNavigate('/pipeline')} onMouseEnter={() => setHovered('/pipeline')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
               <path d="M8 2l2 4h4l-3.5 3 1.5 5L8 11l-4 3 1.5-5L2 6h4l2-4z" stroke={itemColor('/pipeline')} strokeWidth="1.5" fill="none" />
@@ -367,17 +408,32 @@ export default function Sidebar({
                   <path d="M8 1.5L2 4.5v3.5c0 3 2.3 5.8 6 6.5 3.7-.7 6-3.5 6-6.5V4.5L8 1.5z" stroke={tokens.inactive} strokeWidth="1.5" strokeLinejoin="round" />
                   <path d="M5.5 8l2 2 3-3" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13, lineHeight: '16px', color: tokens.inactive, flexGrow: 1 }}>Admin</span>
-                <svg width="12" height="12" fill="none" viewBox="0 0 12 12" style={{ flexShrink: 0, transition: 'transform 0.2s', transform: isAdminOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                  <path d="M4.5 3L7.5 6L4.5 9" stroke={tokens.inactive} strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {!collapsed && (
+                  <>
+                    <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13, lineHeight: '16px', color: tokens.inactive, flexGrow: 1 }}>Admin</span>
+                    <svg width="12" height="12" fill="none" viewBox="0 0 12 12" style={{ flexShrink: 0, transition: 'transform 0.2s', transform: isAdminOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                      <path d="M4.5 3L7.5 6L4.5 9" stroke={tokens.inactive} strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </>
+                )}
               </div>
-              {isAdminOpen && adminSubItems.map(([key, label]) => (
-                <div key={key} style={subItemStyle(key)} onClick={() => onNavigate(key)} onMouseEnter={() => setHovered(key)} onMouseLeave={() => setHovered(null)}>
-                  <div style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: isActive(key) ? tokens.acc : tokens.inactive, flexShrink: 0 }} />
-                  <span style={subTextStyle(key)}>{label}</span>
-                </div>
-              ))}
+              {isAdminOpen && adminNavItems.map((item, idx) => {
+                if (item.type === 'divider') {
+                  return (
+                    <div key={`div-${idx}`} style={{ paddingLeft: 28, paddingTop: idx === 0 ? 4 : 10, paddingBottom: 2 }}>
+                      <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.7px', textTransform: 'uppercase', color: tokens.inactive, opacity: 0.55 }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={item.path} style={subItemStyle(item.path)} onClick={() => onNavigate(item.path)} onMouseEnter={() => setHovered(item.path)} onMouseLeave={() => setHovered(null)}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: isActive(item.path) ? tokens.acc : tokens.inactive, flexShrink: 0 }} />
+                    <span style={subTextStyle(item.path)}>{item.label}</span>
+                  </div>
+                );
+              })}
               <div style={{ height: 1, backgroundColor: tokens.border, margin: '6px 4px' }} />
             </>
           )}
@@ -401,8 +457,8 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* ─── Footer (user + theme + logout) ────────────────────────── */}
-        <div style={{ borderTop: `1px solid ${tokens.border}`, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* ─── Footer (user + theme + logout + collapse) ──────────────── */}
+        <div style={{ borderTop: `1px solid ${tokens.border}`, padding: collapsed ? '12px 8px' : '12px 16px', display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10, flexDirection: collapsed ? 'column' : 'row' }}>
           {user && (
             <>
               <div style={{ width: 30, height: 30, borderRadius: '50%', backgroundImage: avatarGrad(user.name), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -410,49 +466,68 @@ export default function Sidebar({
                   {getInitials(user.name)}
                 </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flexGrow: 1 }}>
-                <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: tokens.textPrimary, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {user.name}
-                </span>
-                <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, color: tokens.textMuted, lineHeight: '14px' }}>
-                  {user.role}
-                </span>
-              </div>
+              {!collapsed && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flexGrow: 1 }}>
+                  <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: tokens.textPrimary, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {user.name}
+                  </span>
+                  <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, color: tokens.textMuted, lineHeight: '14px' }}>
+                    {user.role}
+                  </span>
+                </div>
+              )}
             </>
           )}
 
-          {/* Theme toggle */}
-          <button
-            data-testid="nav-theme-toggle"
-            onClick={onThemeToggle}
-            title={isLight ? 'Тёмная тема' : 'Светлая тема'}
-            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, flexShrink: 0, opacity: animatingTheme ? 0.5 : 1, transition: 'opacity 0.3s' }}
-          >
-            {isLight ? (
-              <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
-                <circle cx="8" cy="8" r="3" stroke={tokens.inactive} strokeWidth="1.5" />
-                <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
-                <path d="M13.5 10.5A6 6 0 015.5 2.5a6 6 0 100 11 6 6 0 008-3z" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
+          {!collapsed && (
+            <>
+              {/* Theme toggle */}
+              <button
+                data-testid="nav-theme-toggle"
+                onClick={onThemeToggle}
+                title={isLight ? 'Тёмная тема' : 'Светлая тема'}
+                style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, flexShrink: 0, opacity: animatingTheme ? 0.5 : 1, transition: 'opacity 0.3s' }}
+              >
+                {isLight ? (
+                  <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+                    <circle cx="8" cy="8" r="3" stroke={tokens.inactive} strokeWidth="1.5" />
+                    <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+                    <path d="M13.5 10.5A6 6 0 015.5 2.5a6 6 0 100 11 6 6 0 008-3z" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
 
-          {/* Logout */}
-          <button
-            data-testid="nav-logout"
-            onClick={onLogout}
-            title="Выйти"
-            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, flexShrink: 0 }}
-          >
-            <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
-              <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M10.5 11L14 8l-3.5-3" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M14 8H6" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+              {/* Logout */}
+              <button
+                data-testid="nav-logout"
+                onClick={onLogout}
+                title="Выйти"
+                style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, flexShrink: 0 }}
+              >
+                <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+                  <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M10.5 11L14 8l-3.5-3" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M14 8H6" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            </>
+          )}
+
+          {/* Collapse toggle button (TTUI-87) — always visible on desktop */}
+          {!isMobile && onCollapseToggle && (
+            <button
+              onClick={onCollapseToggle}
+              title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+              style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, flexShrink: 0, marginTop: collapsed ? 8 : 0 }}
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0, transition: 'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                <path d="M10 3L6 8l4 5" stroke={tokens.inactive} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
         </div>
 
       </div>

@@ -39,6 +39,7 @@ const DARK_C = {
   bg: '#080B14',
   bgCard: '#0F1320',
   bgComment: '#161B22',
+  bgCommentNew: '#161B22',
   border: '#21262D',
   borderComment: '#30363D',
   t1: '#E2E8F8',
@@ -50,12 +51,14 @@ const DARK_C = {
   rightPanelBg: 'transparent',
   timerBg: '#161B22',
   labelColor: '#484F58',
+  sep: '#484F58',
 };
 
 const LIGHT_C = {
-  bg: '#F5F3FF',
+  bg: '#F6F8FA',
   bgCard: '#FFFFFF',
-  bgComment: '#FFFFFF',
+  bgComment: '#F6F8FA',
+  bgCommentNew: '#FFFFFF',
   border: '#D0D7DE',
   borderComment: '#D0D7DE',
   t1: '#1F2328',
@@ -67,6 +70,7 @@ const LIGHT_C = {
   rightPanelBg: '#F6F8FA',
   timerBg: '#FFFFFF',
   labelColor: '#8C959F',
+  sep: '#D0D7DE',
 };
 
 const LOGO_GRAD = 'linear-gradient(in oklab 135deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)';
@@ -463,11 +467,11 @@ export default function IssueDetailPage() {
           >
             ← Назад
           </button>
-          <span style={{ color: C.t4, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>/</span>
+          <span style={{ color: C.sep, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>/</span>
           <span style={{ color: C.t3, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>
             {issue.project?.name || 'Проект'}
           </span>
-          <span style={{ color: C.t4, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>/</span>
+          <span style={{ color: C.sep, fontSize: 12, fontFamily: '"Inter", system-ui, sans-serif' }}>/</span>
           <span style={{ color: C.acc, fontSize: 12, fontWeight: 600, fontFamily: '"Space Grotesk", system-ui, sans-serif' }}>
             {issueKey}
           </span>
@@ -643,7 +647,7 @@ export default function IssueDetailPage() {
           {/* New comment input */}
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <Avatar name={user?.name} size={28} />
-            <div style={{ flex: 1, backgroundColor: C.bgComment, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ flex: 1, backgroundColor: C.bgCommentNew, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <textarea
                 data-testid="comment-input"
                 value={newComment}
