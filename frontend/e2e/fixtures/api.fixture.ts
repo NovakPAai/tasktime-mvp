@@ -38,8 +38,9 @@ export async function login(
 }
 
 export async function getAdminSession(request: APIRequestContext): Promise<AuthSession> {
-  const email = process.env.E2E_ADMIN_EMAIL || 'admin@tasktime.ru';
-  const password = process.env.E2E_ADMIN_PASSWORD || 'password123';
+  const email = process.env.E2E_ADMIN_EMAIL || 'e2e-bot@tasktime.ru';
+  const password = process.env.E2E_ADMIN_PASSWORD;
+  if (!password) throw new Error('E2E_ADMIN_PASSWORD env var is required');
   return login(request, email, password);
 }
 

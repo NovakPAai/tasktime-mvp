@@ -6,8 +6,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@tasktime.ru';
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'password123';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'e2e-bot@tasktime.ru';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD) throw new Error('E2E_ADMIN_PASSWORD env var is required');
 const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:5173';
 
 export const AUTH_FILE = path.join(__dirname, '.auth/admin.json');
