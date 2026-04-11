@@ -1,2 +1,8 @@
 
 *.tsbuildinfo
+
+# E2E test artifacts
+e2e/.auth/
+e2e-report/
+playwright-report/
+test-results/
