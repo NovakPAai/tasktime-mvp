@@ -519,6 +519,7 @@ export default function ProjectDetailPage() {
             </button>
             {canCreate && (
               <button
+                data-testid="issue-create-btn"
                 style={{
                   background: LOGO_GRAD,
                   border: 'none',

@@ -1,0 +1,81 @@
+import { test, expect } from '../fixtures/test';
+import * as api from '../fixtures/api.fixture';
+
+const BASE = process.env.E2E_BASE_URL || 'http://localhost:5173';
+
+test.describe('Sprints', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  let projectId: string;
+  let accessToken: string;
+  let prefix: string;
+
+  test.beforeAll(async ({ request }) => {
+    prefix = `E2E_${Date.now()}_`;
+    const session = await api.getAdminSession(request);
+    accessToken = session.accessToken;
+    const key = `S${Date.now().toString().slice(-5)}`;
+    const project = await api.createProject(request, accessToken, `${prefix}SprintProject`, key);
+    projectId = project.id;
+  });
+
+  test.afterAll(async ({ request }) => {
+    const session = await api.getAdminSession(request);
+    await api.cleanupProjects(request, session.accessToken, prefix);
+  });
+
+  test('project sprints page renders backlog', async ({ page }) => {
+    await page.goto(`${BASE}/projects/${projectId}`);
+    // Project detail has sprints / backlog section
+    await expect(page.locator('h1, h2, [class*="heading"]').first()).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('global sprints page renders', async ({ page }) => {
+    await page.goto(`${BASE}/sprints`);
+    // SprintsPage uses inline styles (no h1/h2) — wait for any content
+    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    await expect(page).not.toHaveURL(/\/login$/);
+  });
+
+  test('create sprint via API and verify it appears', async ({ page, request }) => {
+    const sprintName = `${prefix}Sprint-${Date.now()}`;
+    const sprint = await api.createSprint(request, accessToken, projectId, sprintName);
+    expect(sprint.id).toBeTruthy();
+    expect(sprint.name).toBe(sprintName);
+
+    // Try project detail page first, then global sprints page
+    await page.goto(`${BASE}/projects/${projectId}`);
+    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 10_000 });
+
+    const visible = await page.getByText(sprintName).isVisible({ timeout: 5_000 }).catch(() => false);
+    if (!visible) {
+      // Sprint names might only appear on the sprints page
+      await page.goto(`${BASE}/sprints`);
+      await expect(page.getByText(sprintName)).toBeVisible({ timeout: 15_000 });
+    }
+  });
+
+  test('start sprint via API changes status to ACTIVE', async ({ request }) => {
+    const sprintName = `${prefix}ActiveSprint-${Date.now()}`;
+    const sprint = await api.createSprint(request, accessToken, projectId, sprintName);
+    const started = await api.startSprint(request, accessToken, sprint.id);
+    // Backend uses 'state' field (not 'status')
+    expect(started.state).toBe('ACTIVE');
+  });
+
+  test('add issue to sprint and close sprint via API', async ({ request }) => {
+    // Create a fresh project to avoid "already has active sprint" conflict
+    const key2 = `SC${Date.now().toString().slice(-4)}`;
+    const project2 = await api.createProject(request, accessToken, `${prefix}CloseSprint`, key2);
+    const sprintName = `${prefix}CloseSprint-${Date.now()}`;
+    const sprint = await api.createSprint(request, accessToken, project2.id, sprintName);
+    const issue = await api.createIssue(request, accessToken, project2.id, {
+      title: `${prefix}SprintIssue`,
+      type: 'TASK',
+    });
+    await api.addIssuesToSprint(request, accessToken, sprint.id, [issue.id]);
+    await api.startSprint(request, accessToken, sprint.id);
+    const closed = await api.closeSprint(request, accessToken, sprint.id);
+    expect(closed.state).toBe('CLOSED');
+  });
+});

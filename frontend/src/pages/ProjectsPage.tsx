@@ -198,6 +198,7 @@ export default function ProjectsPage() {
     return (
       <div
         key={project.id}
+        data-testid={`project-card-${project.id}`}
         onClick={() => navigate(`/projects/${project.id}`)}
         onMouseEnter={() => setHoveredCard(project.id)}
         onMouseLeave={() => setHoveredCard(null)}
@@ -405,6 +406,7 @@ export default function ProjectsPage() {
         {/* New Project — gradient bg */}
         {canCreate && (
           <button
+            data-testid="project-create-btn"
             onClick={() => setModalOpen(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderRadius: 8, padding: '9px 18px', cursor: 'pointer', backgroundImage: LOGO_GRAD, color: '#fff', fontFamily: F.sans, fontSize: 13, fontWeight: 600, letterSpacing: '0.01em', lineHeight: '16px', flexShrink: 0 }}
           >

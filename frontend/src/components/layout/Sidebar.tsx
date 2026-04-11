@@ -243,7 +243,7 @@ export default function Sidebar({
         <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 8px' }}>
 
           {/* Dashboard */}
-          <div style={itemStyle('/')} onClick={() => onNavigate('/')} onMouseEnter={() => setHovered('/')} onMouseLeave={() => setHovered(null)}>
+          <div data-testid="nav-dashboard" style={itemStyle('/')} onClick={() => onNavigate('/')} onMouseEnter={() => setHovered('/')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
               <rect x="1" y="1" width="6" height="6" rx="1.5" fill={itemColor('/')} />
               <rect x="9" y="1" width="6" height="6" rx="1.5" fill={itemColor('/')} opacity={0.6} />
@@ -254,7 +254,7 @@ export default function Sidebar({
           </div>
 
           {/* Projects */}
-          <div style={itemStyle('/projects')} onClick={() => onNavigate('/projects')} onMouseEnter={() => setHovered('/projects')} onMouseLeave={() => setHovered(null)}>
+          <div data-testid="nav-projects" style={itemStyle('/projects')} onClick={() => onNavigate('/projects')} onMouseEnter={() => setHovered('/projects')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
               <rect x="1" y="2" width="14" height="1.5" rx="0.75" fill={itemColor('/projects')} />
               <rect x="1" y="6" width="10" height="1.5" rx="0.75" fill={itemColor('/projects')} />
@@ -264,7 +264,7 @@ export default function Sidebar({
           </div>
 
           {/* Business Teams */}
-          <div style={itemStyle('/business-teams')} onClick={() => onNavigate('/business-teams')} onMouseEnter={() => setHovered('/business-teams')} onMouseLeave={() => setHovered(null)}>
+          <div data-testid="nav-business-teams" style={itemStyle('/business-teams')} onClick={() => onNavigate('/business-teams')} onMouseEnter={() => setHovered('/business-teams')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
               <rect x="5.5" y="1.5" width="5" height="3" rx="1" stroke={itemColor('/business-teams')} strokeWidth="1.25" />
               <rect x="1" y="9.5" width="4" height="3" rx="1" stroke={itemColor('/business-teams')} strokeWidth="1.25" />
@@ -276,7 +276,7 @@ export default function Sidebar({
           </div>
 
           {/* Flow Teams */}
-          <div style={itemStyle('/flow-teams')} onClick={() => onNavigate('/flow-teams')} onMouseEnter={() => setHovered('/flow-teams')} onMouseLeave={() => setHovered(null)}>
+          <div data-testid="nav-flow-teams" style={itemStyle('/flow-teams')} onClick={() => onNavigate('/flow-teams')} onMouseEnter={() => setHovered('/flow-teams')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
               <circle cx="8" cy="8" r="6" stroke={itemColor('/flow-teams')} strokeWidth="1.5" />
               <circle cx="8" cy="8" r="2" stroke={itemColor('/flow-teams')} strokeWidth="1.25" />
@@ -302,14 +302,14 @@ export default function Sidebar({
           </div>
           {isPlanningOpen && (
             <>
-              <div style={subItemStyle('/sprints')} onClick={() => onNavigate('/sprints')} onMouseEnter={() => setHovered('/sprints')} onMouseLeave={() => setHovered(null)}>
+              <div data-testid="nav-sprints" style={subItemStyle('/sprints')} onClick={() => onNavigate('/sprints')} onMouseEnter={() => setHovered('/sprints')} onMouseLeave={() => setHovered(null)}>
                 <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
                   <circle cx="8" cy="8" r="6" stroke={isActive('/sprints') ? tokens.acc : tokens.inactive} strokeWidth="1.5" />
                   <path d="M8 5v3l2 2" stroke={isActive('/sprints') ? tokens.acc : tokens.inactive} strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
                 <span style={subTextStyle('/sprints')}>Спринты</span>
               </div>
-              <div style={subItemStyle('/releases')} onClick={() => onNavigate('/releases')} onMouseEnter={() => setHovered('/releases')} onMouseLeave={() => setHovered(null)}>
+              <div data-testid="nav-releases" style={subItemStyle('/releases')} onClick={() => onNavigate('/releases')} onMouseEnter={() => setHovered('/releases')} onMouseLeave={() => setHovered(null)}>
                 <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
                   <path d="M8 1.5L14 5v6L8 14.5 2 11V5L8 1.5z" stroke={isActive('/releases') ? tokens.acc : tokens.inactive} strokeWidth="1.5" strokeLinejoin="round" />
                   <circle cx="8" cy="8" r="1.5" fill={isActive('/releases') ? tokens.acc : tokens.inactive} />
@@ -320,7 +320,7 @@ export default function Sidebar({
           )}
 
           {/* Time */}
-          <div style={itemStyle('/time')} onClick={() => onNavigate('/time')} onMouseEnter={() => setHovered('/time')} onMouseLeave={() => setHovered(null)}>
+          <div data-testid="nav-time" style={itemStyle('/time')} onClick={() => onNavigate('/time')} onMouseEnter={() => setHovered('/time')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
               <circle cx="8" cy="8" r="5.5" stroke={itemColor('/time')} strokeWidth="1.5" />
               <path d="M8 5.5v2.5l1.5 1.5" stroke={itemColor('/time')} strokeWidth="1.5" strokeLinecap="round" />
@@ -329,7 +329,7 @@ export default function Sidebar({
           </div>
 
           {/* Teams */}
-          <div style={itemStyle('/teams')} onClick={() => onNavigate('/teams')} onMouseEnter={() => setHovered('/teams')} onMouseLeave={() => setHovered(null)}>
+          <div data-testid="nav-teams" style={itemStyle('/teams')} onClick={() => onNavigate('/teams')} onMouseEnter={() => setHovered('/teams')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
               <circle cx="5" cy="5" r="2.5" stroke={itemColor('/teams')} strokeWidth="1.5" />
               <circle cx="11" cy="5" r="2.5" stroke={itemColor('/teams')} strokeWidth="1.5" />
@@ -344,7 +344,7 @@ export default function Sidebar({
           <div style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: tokens.inactive, padding: '6px 12px 4px' }}>
             DevOps
           </div>
-          <div style={itemStyle('/pipeline')} onClick={() => onNavigate('/pipeline')} onMouseEnter={() => setHovered('/pipeline')} onMouseLeave={() => setHovered(null)}>
+          <div data-testid="nav-pipeline" style={itemStyle('/pipeline')} onClick={() => onNavigate('/pipeline')} onMouseEnter={() => setHovered('/pipeline')} onMouseLeave={() => setHovered(null)}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
               <path d="M8 2l2 4h4l-3.5 3 1.5 5L8 11l-4 3 1.5-5L2 6h4l2-4z" stroke={itemColor('/pipeline')} strokeWidth="1.5" fill="none" />
             </svg>
@@ -423,6 +423,7 @@ export default function Sidebar({
 
           {/* Theme toggle */}
           <button
+            data-testid="nav-theme-toggle"
             onClick={onThemeToggle}
             title={isLight ? 'Тёмная тема' : 'Светлая тема'}
             style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, flexShrink: 0, opacity: animatingTheme ? 0.5 : 1, transition: 'opacity 0.3s' }}
@@ -441,6 +442,7 @@ export default function Sidebar({
 
           {/* Logout */}
           <button
+            data-testid="nav-logout"
             onClick={onLogout}
             title="Выйти"
             style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, flexShrink: 0 }}

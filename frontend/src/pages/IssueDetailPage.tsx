@@ -645,6 +645,7 @@ export default function IssueDetailPage() {
             <Avatar name={user?.name} size={28} />
             <div style={{ flex: 1, backgroundColor: C.bgComment, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <textarea
+                data-testid="comment-input"
                 value={newComment}
                 onChange={e => setNewComment(e.target.value)}
                 placeholder="Добавить комментарий... (Ctrl+Enter для отправки)"
@@ -657,6 +658,7 @@ export default function IssueDetailPage() {
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
+                  data-testid="comment-submit"
                   onClick={handleAddComment}
                   disabled={!newComment.trim()}
                   style={{
@@ -791,6 +793,7 @@ export default function IssueDetailPage() {
             <div style={{ display: 'flex', gap: 6 }}>
               {timerRunning ? (
                 <button
+                  data-testid="timer-stop"
                   onClick={handleStopTimer}
                   style={{
                     flex: 1, backgroundColor: isDark ? '#EF444426' : '#CF222E14',
@@ -805,6 +808,7 @@ export default function IssueDetailPage() {
               ) : (
                 <>
                   <button
+                    data-testid="timer-start"
                     onClick={handleStartTimer}
                     style={{
                       flex: 1, backgroundImage: LOGO_GRAD,
@@ -816,6 +820,7 @@ export default function IssueDetailPage() {
                     Старт
                   </button>
                   <button
+                    data-testid="timer-manual"
                     onClick={() => setTimeModalOpen(true)}
                     style={{
                       flex: 1, backgroundColor: isDark ? '#161B22' : '#FFFFFF',
