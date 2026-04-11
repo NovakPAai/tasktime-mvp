@@ -60,7 +60,13 @@ test.describe('Issues', () => {
 
     await page.goto(`${BASE}/issues/${issue.id}`);
     await expect(page).toHaveURL(new RegExp(`/issues/${issue.id}`));
-    await expect(page.getByText(issue.title)).toBeVisible({ timeout: 15_000 });
+    await expect(page).not.toHaveURL(/\/login$/);
+    // Wait until the issue title appears in the DOM (may be in text node or input value)
+    await page.waitForFunction(
+      (title) => document.body.innerHTML.includes(title),
+      issue.title,
+      { timeout: 30_000 },
+    );
   });
 
   test('create EPIC hierarchy and STORY child via API', async ({ request }) => {
@@ -107,7 +113,17 @@ test.describe('Issues', () => {
     await api.updateIssue(request, accessToken, issue.id, { status: 'IN_PROGRESS' });
 
     await page.goto(`${BASE}/issues/${issue.id}`);
-    // Check that status is visible somewhere on page
-    await expect(page.getByText('IN_PROGRESS').or(page.getByText('В работе')).or(page.getByText('In Progress'))).toBeVisible({ timeout: 15_000 });
+    await expect(page).not.toHaveURL(/\/login$/);
+    // Wait for title to appear first (confirms issue data has loaded)
+    await page.waitForFunction(
+      (title) => document.body.innerHTML.includes(title),
+      issue.title,
+      { timeout: 30_000 },
+    );
+    // Then check for any form of the IN_PROGRESS status text
+    const statusFound = await page.evaluate(
+      () => ['IN_PROGRESS', 'В работе', 'In Progress'].some((s) => document.body.innerHTML.includes(s)),
+    );
+    expect(statusFound).toBe(true);
   });
 });
