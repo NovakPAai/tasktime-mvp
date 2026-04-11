@@ -93,7 +93,7 @@ export async function updateRelease(id: string, dto: UpdateReleaseDto) {
 
   if (dto.name !== undefined && dto.name !== release.name) {
     const existing = await prisma.release.findUnique({
-      where: { projectId_name: { projectId: release.projectId, name: dto.name } },
+      where: { projectId_name: { projectId: release.projectId!, name: dto.name } },
     });
     if (existing) throw new AppError(409, 'Release with this name already exists');
   }
@@ -159,7 +159,7 @@ export async function addIssuesToRelease(releaseId: string, issueIds: string[]) 
   if (release.state === 'RELEASED') throw new AppError(400, 'Cannot add issues to a released release');
 
   await prisma.issue.updateMany({
-    where: { id: { in: issueIds }, projectId: release.projectId },
+    where: { id: { in: issueIds }, ...(release.projectId ? { projectId: release.projectId } : {}) },
     data: { releaseId },
   });
 }
