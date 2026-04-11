@@ -27,7 +27,7 @@ test.describe('Board', () => {
 
   test('board page renders columns', async ({ page }) => {
     await page.goto(`${BASE}/projects/${projectId}/board`);
-    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 30_000 });
     await expect(page).not.toHaveURL(/\/login$/);
     // Smoke: board page loaded. Testid-dependent tests below skip individually.
   });

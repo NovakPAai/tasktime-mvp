@@ -33,7 +33,7 @@ test.describe('Comments', () => {
   /** Helper: navigate to issue and return whether comment-input testid is available */
   async function gotoIssueAndCheckTestid(page: import('@playwright/test').Page): Promise<boolean> {
     await page.goto(`${BASE}/issues/${issueId}`);
-    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 30_000 });
     return page.locator('[data-testid="comment-input"]').isVisible({ timeout: 5_000 }).catch(() => false);
   }
 

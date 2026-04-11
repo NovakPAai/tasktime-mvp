@@ -28,7 +28,7 @@ test.describe('Admin — Misc smoke', () => {
       await page.waitForFunction(() => {
         const root = document.getElementById('root');
         return root !== null && (root.textContent?.trim().length ?? 0) > 0;
-      }, { timeout: 15_000 });
+      }, { timeout: 30_000 });
       // Must not end up on login page
       await expect(page).not.toHaveURL(/\/login$/);
     });

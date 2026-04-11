@@ -11,11 +11,12 @@ const isRemote = baseURL.startsWith('http://5.') ||
 
 export default defineConfig({
   testDir: './e2e/specs',
-  timeout: 90_000,
+  // Remote staging can be slow (VPS under load) — use 3-minute test timeout
+  timeout: isRemote ? 180_000 : 90_000,
   expect: {
-    timeout: 15_000,
+    timeout: isRemote ? 30_000 : 15_000,
   },
-  retries: isCI ? 2 : 0,
+  retries: isCI ? 2 : (isRemote ? 1 : 0),
   // Use 1 worker for remote staging to prevent concurrent beforeAll conflicts and server overload.
   workers: isRemote ? 1 : (isCI ? 2 : 4),
   use: {

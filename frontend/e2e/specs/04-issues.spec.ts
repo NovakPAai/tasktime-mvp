@@ -27,7 +27,7 @@ test.describe('Issues', () => {
   test('project detail shows issue list', async ({ page }) => {
     await page.goto(`${BASE}/projects/${projectId}`);
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}`));
-    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 30_000 });
     await expect(page).not.toHaveURL(/\/login$/);
     // Smoke: page loaded successfully. testid-dependent tests skip individually below.
   });
