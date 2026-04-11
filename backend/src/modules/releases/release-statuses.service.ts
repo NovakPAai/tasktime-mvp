@@ -70,11 +70,26 @@ export async function updateReleaseStatus(id: string, dto: UpdateReleaseStatusDt
 export async function deleteReleaseStatus(id: string) {
   const status = await prisma.releaseStatus.findUnique({
     where: { id },
-    include: { _count: { select: { releases: true, workflowSteps: true } } },
+    include: {
+      _count: {
+        select: {
+          releases: true,
+          workflowSteps: true,
+          transitionsFrom: true,
+          transitionsTo: true,
+        },
+      },
+    },
   });
   if (!status) throw new AppError(404, 'Release status not found');
-  if (status._count.releases > 0) throw new AppError(400, 'RELEASE_STATUS_IN_USE');
-  if (status._count.workflowSteps > 0) throw new AppError(400, 'RELEASE_STATUS_IN_USE');
+  if (
+    status._count.releases > 0 ||
+    status._count.workflowSteps > 0 ||
+    status._count.transitionsFrom > 0 ||
+    status._count.transitionsTo > 0
+  ) {
+    throw new AppError(400, 'RELEASE_STATUS_IN_USE');
+  }
 
   await prisma.releaseStatus.delete({ where: { id } });
   await invalidateStatusCache();

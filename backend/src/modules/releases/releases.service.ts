@@ -52,9 +52,13 @@ export async function listReleasesGlobal(query: ListReleasesQueryDto) {
 
   const orderBy: Prisma.ReleaseOrderByWithRelationInput = { [sortBy]: sortDir };
 
-  const cacheKey = releasesListCacheKey(
-    Buffer.from(JSON.stringify({ where, orderBy, page, limit })).toString('base64').slice(0, 64),
-  );
+  // Use a deterministic hash to avoid prefix collisions from base64 truncation
+  const payload = JSON.stringify({ where, orderBy, page, limit });
+  let hash = 0;
+  for (let i = 0; i < payload.length; i++) {
+    hash = Math.imul(31, hash) + payload.charCodeAt(i) | 0;
+  }
+  const cacheKey = releasesListCacheKey((hash >>> 0).toString(36));
 
   const cached = await getCachedJson<{ data: unknown[]; total: number; page: number; limit: number }>(cacheKey);
   if (cached) return cached;
@@ -136,8 +140,11 @@ export async function createReleaseGlobal(dto: CreateReleaseDto, createdById: st
 
     const initialStep = workflow.steps.find((s) => s.isInitial);
     if (initialStep) statusId = initialStep.statusId;
-  } catch {
-    // No workflow configured — create without status
+  } catch (err) {
+    // Only swallow "no workflow configured" — propagate real DB / config errors
+    if (!(err instanceof AppError) || err.message !== 'NO_RELEASE_WORKFLOW_CONFIGURED') {
+      throw err;
+    }
   }
 
   const release = await prisma.release.create({
@@ -158,6 +165,7 @@ export async function createReleaseGlobal(dto: CreateReleaseDto, createdById: st
     },
   });
 
+  await invalidateReleasesListCache();
   return release;
 }
 
@@ -195,7 +203,7 @@ export async function updateRelease(id: string, dto: UpdateReleaseDto) {
     if (existing) throw new AppError(409, 'Release with this name already exists');
   }
 
-  return prisma.release.update({
+  const updated = await prisma.release.update({
     where: { id },
     data: {
       ...(dto.name !== undefined && { name: dto.name }),
@@ -213,6 +221,8 @@ export async function updateRelease(id: string, dto: UpdateReleaseDto) {
       project: { select: { id: true, name: true, key: true } },
     },
   });
+  await invalidateReleasesListCache();
+  return updated;
 }
 
 // ─── RM-03.4: DELETE /api/releases/:id ────────────────────────────────────────
@@ -229,14 +239,16 @@ export async function deleteRelease(id: string): Promise<void> {
     throw new AppError(422, 'Cannot delete a release in DONE status');
   }
 
-  // Nullify Sprint.releaseId for sprints linked to this release
-  await prisma.sprint.updateMany({
-    where: { releaseId: id },
-    data: { releaseId: null },
-  });
-
-  // Delete the release (ReleaseItem cascade handled by Prisma onDelete: Cascade)
-  await prisma.release.delete({ where: { id } });
+  // Atomic: nullify sprint refs and delete release together
+  await prisma.$transaction([
+    prisma.sprint.updateMany({
+      where: { releaseId: id },
+      data: { releaseId: null },
+    }),
+    // ReleaseItem rows cascade-deleted by onDelete: Cascade on the FK
+    prisma.release.delete({ where: { id } }),
+  ]);
+  await invalidateReleasesListCache();
 }
 
 // ─── RM-03.5: ReleaseItem CRUD ────────────────────────────────────────────────
@@ -297,10 +309,16 @@ export async function listReleaseItems(releaseId: string, query: ListReleaseItem
   const release = await prisma.release.findUnique({ where: { id: releaseId } });
   if (!release) throw new AppError(404, 'Release not found');
 
-  const { page, limit, projectId } = query;
+  const { page, limit, projectId, status } = query;
 
   const where: Prisma.ReleaseItemWhereInput = { releaseId };
-  if (projectId) where.issue = { projectId };
+  if (projectId && status) {
+    where.issue = { projectId, workflowStatus: { name: status } };
+  } else if (projectId) {
+    where.issue = { projectId };
+  } else if (status) {
+    where.issue = { workflowStatus: { name: status } };
+  }
 
   const [items, total] = await Promise.all([
     prisma.releaseItem.findMany({
@@ -469,63 +487,68 @@ export async function cloneRelease(id: string, dto: CloneReleaseDto, createdById
     workflowId = workflow.id;
     const initialStep = workflow.steps.find((s) => s.isInitial);
     if (initialStep) statusId = initialStep.statusId;
-  } catch {
-    // No workflow — continue without status
+  } catch (err) {
+    if (!(err instanceof AppError) || err.message !== 'NO_RELEASE_WORKFLOW_CONFIGURED') {
+      throw err;
+    }
   }
 
-  const cloned = await prisma.release.create({
-    data: {
-      type: newType,
-      projectId: newProjectId ?? null,
-      name: newName,
-      description: source.description,
-      level: source.level,
-      statusId,
-      workflowId,
-      createdById,
-    },
-    include: {
-      status: { select: { id: true, name: true, category: true, color: true } },
-      project: { select: { id: true, name: true, key: true } },
-    },
+  // Atomic: create clone, items, sprints reassignment and audit in one transaction
+  const [cloned] = await prisma.$transaction(async (tx) => {
+    const created = await tx.release.create({
+      data: {
+        type: newType,
+        projectId: newProjectId ?? null,
+        name: newName,
+        description: source.description,
+        level: source.level,
+        statusId,
+        workflowId,
+        createdById,
+      },
+      include: {
+        status: { select: { id: true, name: true, category: true, color: true } },
+        project: { select: { id: true, name: true, key: true } },
+      },
+    });
+
+    if (dto.cloneItems && source.items.length > 0) {
+      await tx.releaseItem.createMany({
+        data: source.items.map((item) => ({
+          releaseId: created.id,
+          issueId: item.issueId,
+          addedById: createdById,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    if (dto.cloneSprints && source.sprints.length > 0) {
+      await tx.sprint.updateMany({
+        where: { id: { in: source.sprints.map((s) => s.id) } },
+        data: { releaseId: created.id },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: 'release.cloned',
+        entityType: 'release',
+        entityId: created.id,
+        userId: createdById,
+        details: {
+          sourceReleaseId: id,
+          sourceName: source.name,
+          cloneItems: dto.cloneItems,
+          cloneSprints: dto.cloneSprints,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return [created];
   });
 
-  // Clone items if requested
-  if (dto.cloneItems && source.items.length > 0) {
-    await prisma.releaseItem.createMany({
-      data: source.items.map((item) => ({
-        releaseId: cloned.id,
-        issueId: item.issueId,
-        addedById: createdById,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  // Clone sprints (re-assign) if requested
-  if (dto.cloneSprints && source.sprints.length > 0) {
-    await prisma.sprint.updateMany({
-      where: { id: { in: source.sprints.map((s) => s.id) } },
-      data: { releaseId: cloned.id },
-    });
-  }
-
-  // Audit log
-  await prisma.auditLog.create({
-    data: {
-      action: 'release.cloned',
-      entityType: 'release',
-      entityId: cloned.id,
-      userId: createdById,
-      details: {
-        sourceReleaseId: id,
-        sourceName: source.name,
-        cloneItems: dto.cloneItems,
-        cloneSprints: dto.cloneSprints,
-      } as Prisma.InputJsonValue,
-    },
-  });
-
+  await invalidateReleasesListCache();
   return cloned;
 }
 

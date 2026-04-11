@@ -116,15 +116,18 @@ export async function validateReleaseWorkflow(workflowId: string): Promise<Relea
   }
 
   // DEAD_END_STATUS
-  const globalTransitionToStatusIds = new Set(
-    wf.transitions.filter((t) => t.isGlobal).map((t) => t.toStatusId),
-  );
+  // A global transition is available from *every* status, so any status that has
+  // at least one outgoing global transition is not a dead-end regardless of its
+  // direct outgoing edges.
+  const hasGlobalOutgoing = wf.transitions.some((t) => t.isGlobal);
 
   for (const step of wf.steps) {
-    const outgoing = wf.transitions.filter((t) => t.fromStatusId === step.statusId);
+    const outgoing = wf.transitions.filter(
+      (t) => t.fromStatusId === step.statusId || t.isGlobal,
+    );
     if (
       outgoing.length === 0 &&
-      !globalTransitionToStatusIds.has(step.statusId) &&
+      !hasGlobalOutgoing &&
       step.status.category !== 'DONE'
     ) {
       warnings.push({
@@ -201,23 +204,25 @@ export async function addReleaseWorkflowStep(workflowId: string, dto: CreateRele
   });
   if (existing) throw new AppError(409, 'Status already in workflow');
 
-  if (dto.isInitial) {
-    await prisma.releaseWorkflowStep.updateMany({
-      where: { workflowId, isInitial: true },
-      data: { isInitial: false },
-    });
-  }
-
   const maxOrder = await prisma.releaseWorkflowStep.aggregate({
     where: { workflowId },
     _max: { orderIndex: true },
   });
   const orderIndex = dto.orderIndex ?? (maxOrder._max.orderIndex ?? -1) + 1;
 
-  const step = await prisma.releaseWorkflowStep.create({
-    data: { workflowId, statusId: dto.statusId, isInitial: dto.isInitial ?? false, orderIndex },
-    include: { status: true },
+  const step = await prisma.$transaction(async (tx) => {
+    if (dto.isInitial) {
+      await tx.releaseWorkflowStep.updateMany({
+        where: { workflowId, isInitial: true },
+        data: { isInitial: false },
+      });
+    }
+    return tx.releaseWorkflowStep.create({
+      data: { workflowId, statusId: dto.statusId, isInitial: dto.isInitial ?? false, orderIndex },
+      include: { status: true },
+    });
   });
+
   await invalidateReleaseWorkflowCache(workflowId);
   return step;
 }
@@ -233,21 +238,23 @@ export async function updateReleaseWorkflowStep(
   const step = await prisma.releaseWorkflowStep.findFirst({ where: { id: stepId, workflowId } });
   if (!step) throw new AppError(404, 'Release workflow step not found');
 
-  if (dto.isInitial) {
-    await prisma.releaseWorkflowStep.updateMany({
-      where: { workflowId, isInitial: true },
-      data: { isInitial: false },
+  const updated = await prisma.$transaction(async (tx) => {
+    if (dto.isInitial) {
+      await tx.releaseWorkflowStep.updateMany({
+        where: { workflowId, isInitial: true },
+        data: { isInitial: false },
+      });
+    }
+    return tx.releaseWorkflowStep.update({
+      where: { id: stepId },
+      data: {
+        ...(dto.isInitial !== undefined && { isInitial: dto.isInitial }),
+        ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
+      },
+      include: { status: true },
     });
-  }
-
-  const updated = await prisma.releaseWorkflowStep.update({
-    where: { id: stepId },
-    data: {
-      ...(dto.isInitial !== undefined && { isInitial: dto.isInitial }),
-      ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
-    },
-    include: { status: true },
   });
+
   await invalidateReleaseWorkflowCache(workflowId);
   return updated;
 }
@@ -259,7 +266,16 @@ export async function deleteReleaseWorkflowStep(workflowId: string, stepId: stri
   const step = await prisma.releaseWorkflowStep.findFirst({ where: { id: stepId, workflowId } });
   if (!step) throw new AppError(404, 'Release workflow step not found');
 
-  await prisma.releaseWorkflowStep.delete({ where: { id: stepId } });
+  // Delete step and any transitions that reference this status (from or to)
+  await prisma.$transaction([
+    prisma.releaseWorkflowTransition.deleteMany({
+      where: {
+        workflowId,
+        OR: [{ fromStatusId: step.statusId }, { toStatusId: step.statusId }],
+      },
+    }),
+    prisma.releaseWorkflowStep.delete({ where: { id: stepId } }),
+  ]);
   await invalidateReleaseWorkflowCache(workflowId);
   return { ok: true };
 }

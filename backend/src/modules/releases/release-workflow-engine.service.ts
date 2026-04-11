@@ -182,15 +182,11 @@ export async function getAvailableTransitions(
   for (const t of candidates) {
     const conditionRules = t.conditions ? (t.conditions as unknown as ReleaseConditionRule[]) : [];
     if (conditionRules.length > 0) {
-      try {
-        const { allowed } = await evaluateReleaseConditions(conditionRules, {
-          actorRole,
-          releaseId,
-        });
-        if (!allowed) continue;
-      } catch {
-        continue;
-      }
+      const { allowed } = await evaluateReleaseConditions(conditionRules, {
+        actorRole,
+        releaseId,
+      });
+      if (!allowed) continue;
     }
 
     available.push({
@@ -274,27 +270,32 @@ export async function executeTransition(
     updateData.releaseDate = new Date();
   }
 
-  await prisma.release.update({
-    where: { id: releaseId },
-    data: updateData,
-  });
-
-  // Audit log
-  await prisma.auditLog.create({
-    data: {
-      action: 'release.transitioned',
-      entityType: 'release',
-      entityId: releaseId,
-      userId: actorId,
-      details: {
-        transitionId: transition.id,
-        transitionName: transition.name,
-        fromStatusId: release.statusId,
-        fromStatusName: release.status?.name ?? null,
-        toStatusId: transition.toStatusId,
-        toStatusName: transition.toStatus.name,
-        ...(comment ? { comment } : {}),
-      } as Prisma.InputJsonValue,
-    },
-  });
+  // Atomic: update release + audit in one transaction, guard on current statusId
+  await prisma.$transaction([
+    prisma.release.update({
+      where: {
+        id: releaseId,
+        // Optimistic concurrency: ensure status hasn't changed since we loaded it
+        statusId: release.statusId,
+      },
+      data: updateData,
+    }),
+    prisma.auditLog.create({
+      data: {
+        action: 'release.transitioned',
+        entityType: 'release',
+        entityId: releaseId,
+        userId: actorId,
+        details: {
+          transitionId: transition.id,
+          transitionName: transition.name,
+          fromStatusId: release.statusId,
+          fromStatusName: release.status?.name ?? null,
+          toStatusId: transition.toStatusId,
+          toStatusName: transition.toStatus.name,
+          ...(comment ? { comment } : {}),
+        } as Prisma.InputJsonValue,
+      },
+    }),
+  ]);
 }

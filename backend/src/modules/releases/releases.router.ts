@@ -11,6 +11,7 @@ import {
   listReleaseItemsQueryDto,
   cloneReleaseDto,
   manageSprintsInReleaseDto,
+  executeTransitionDto,
 } from './releases.dto.js';
 import * as releasesService from './releases.service.js';
 import * as releaseWorkflowEngine from './release-workflow-engine.service.js';
@@ -139,39 +140,45 @@ router.post(
   },
 );
 
-// ─── RM-03.6: Transitions (already implemented) ──────────────────────────────
+// ─── RM-03.6: Transitions ────────────────────────────────────────────────────
 
-router.get('/releases/:id/transitions', async (req: AuthRequest, res, next) => {
-  try {
-    const result = await releaseWorkflowEngine.getAvailableTransitions(
-      req.params.id as string,
-      req.user!.userId,
-      req.user!.role,
-    );
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  '/releases/:id/transitions',
+  requireRole('ADMIN', 'MANAGER', 'USER'),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const result = await releaseWorkflowEngine.getAvailableTransitions(
+        req.params.id as string,
+        req.user!.userId,
+        req.user!.role,
+      );
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
-router.post('/releases/:id/transitions/:transitionId', async (req: AuthRequest, res, next) => {
-  try {
-    const comment = (req.body as { comment?: string }).comment;
-    await releaseWorkflowEngine.executeTransition(
-      req.params.id as string,
-      req.params.transitionId as string,
-      req.user!.userId,
-      req.user!.role,
-      comment,
-    );
-    await logAudit(req, 'release.transitioned', 'release', req.params.id as string, {
-      transitionId: req.params.transitionId,
-    });
-    res.json({ ok: true });
-  } catch (err) {
-    next(err);
-  }
-});
+router.post(
+  '/releases/:id/transitions/:transitionId',
+  requireRole('ADMIN', 'MANAGER', 'USER'),
+  validate(executeTransitionDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      await releaseWorkflowEngine.executeTransition(
+        req.params.id as string,
+        req.params.transitionId as string,
+        req.user!.userId,
+        req.user!.role,
+        (req.body as { comment?: string }).comment,
+      );
+      // audit is written inside executeTransition via prisma.$transaction
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ─── RM-03.7: GET /releases/:id/readiness — extended ─────────────────────────
 
