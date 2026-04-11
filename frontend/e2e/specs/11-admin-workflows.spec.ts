@@ -7,7 +7,12 @@ test.describe('Admin — Workflows', () => {
 
   test('admin workflows list page renders', async ({ page }) => {
     await page.goto(`${BASE}/admin/workflows`);
-    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    // Use textContent (not innerText) — inline-style pages may hide text via CSS,
+    // making innerText return empty while textContent still finds text.
+    await page.waitForFunction(() => {
+      const root = document.getElementById('root');
+      return root !== null && (root.textContent?.trim().length ?? 0) > 0;
+    }, { timeout: 15_000 });
     await expect(page).not.toHaveURL(/\/login$/);
   });
 
