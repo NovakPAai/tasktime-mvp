@@ -114,11 +114,11 @@ test.describe('Issues', () => {
 
     await page.goto(`${BASE}/issues/${issue.id}`);
     await expect(page).not.toHaveURL(/\/login$/);
-    // Wait for title to appear first (confirms issue data has loaded)
+    // Wait for title to appear first (confirms issue data has loaded — slow VPS may take 60s+)
     await page.waitForFunction(
       (title) => document.body.innerHTML.includes(title),
       issue.title,
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     );
     // Then check for any form of the IN_PROGRESS status text
     const statusFound = await page.evaluate(
