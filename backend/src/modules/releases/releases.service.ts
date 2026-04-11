@@ -658,10 +658,10 @@ export async function removeIssuesFromRelease(releaseId: string, issueIds: strin
 }
 
 // Deprecated stubs — kept for legacy handlers
-export async function markReleaseReady(_id: string): Promise<never> {
+export async function markReleaseReady(): Promise<never> {
   throw new AppError(410, 'Deprecated');
 }
 
-export async function markReleaseReleased(_id: string, _releaseDate?: string): Promise<never> {
+export async function markReleaseReleased(): Promise<never> {
   throw new AppError(410, 'Deprecated');
 }
