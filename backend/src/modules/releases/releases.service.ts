@@ -1,12 +1,542 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import type { CreateReleaseDto, UpdateReleaseDto } from './releases.dto.js';
+import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
+import { resolveWorkflowForRelease } from './release-workflow-engine.service.js';
+import type {
+  CreateReleaseDto,
+  UpdateReleaseDto,
+  ListReleasesQueryDto,
+  ReleaseItemsAddDto,
+  CloneReleaseDto,
+  ListReleaseItemsQueryDto,
+} from './releases.dto.js';
+
+// ─── Cache helpers ────────────────────────────────────────────────────────────
+
+const RELEASES_LIST_CACHE_TTL = 60; // 60 seconds
+const releasesListCacheKey = (suffix: string) => `releases:list:${suffix}`;
+
+export async function invalidateReleasesListCache(): Promise<void> {
+  // Pattern-based invalidation: delete known keys; for simplicity use a sentinel
+  await delCachedJson('releases:list:*');
+}
+
+// ─── RM-03.1: GET /api/releases — global list ────────────────────────────────
+
+export async function listReleasesGlobal(query: ListReleasesQueryDto) {
+  const { type, statusId, statusCategory, projectId, from, to, releaseDateFrom, releaseDateTo,
+    search, page, limit, sortBy, sortDir } = query;
+
+  const where: Prisma.ReleaseWhereInput = {};
+
+  if (type) where.type = type;
+  if (statusId) where.statusId = statusId;
+  if (statusCategory) where.status = { category: statusCategory };
+  if (projectId) where.projectId = projectId;
+  if (search) {
+    where.name = { contains: search, mode: 'insensitive' };
+  }
+  if (from || to) {
+    where.createdAt = {
+      ...(from ? { gte: new Date(from) } : {}),
+      ...(to ? { lte: new Date(to + 'T23:59:59Z') } : {}),
+    };
+  }
+  if (releaseDateFrom || releaseDateTo) {
+    where.releaseDate = {
+      ...(releaseDateFrom ? { gte: new Date(releaseDateFrom) } : {}),
+      ...(releaseDateTo ? { lte: new Date(releaseDateTo) } : {}),
+    };
+  }
+
+  const orderBy: Prisma.ReleaseOrderByWithRelationInput = { [sortBy]: sortDir };
+
+  const cacheKey = releasesListCacheKey(
+    Buffer.from(JSON.stringify({ where, orderBy, page, limit })).toString('base64').slice(0, 64),
+  );
+
+  const cached = await getCachedJson<{ data: unknown[]; total: number; page: number; limit: number }>(cacheKey);
+  if (cached) return cached;
+
+  const [releases, total] = await Promise.all([
+    prisma.release.findMany({
+      where,
+      include: {
+        status: { select: { id: true, name: true, category: true, color: true } },
+        project: { select: { id: true, name: true, key: true } },
+        _count: { select: { items: true, sprints: true } },
+      },
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.release.count({ where }),
+  ]);
+
+  // For INTEGRATION releases, attach _projects array (keys of projects from items)
+  const enriched = await Promise.all(
+    releases.map(async (r) => {
+      if (r.type !== 'INTEGRATION') return r;
+      const projectKeys = await prisma.issue.findMany({
+        where: { releaseItems: { some: { releaseId: r.id } } },
+        select: { project: { select: { key: true } } },
+        distinct: ['projectId'],
+      });
+      return {
+        ...r,
+        _projects: projectKeys.map((i) => i.project.key),
+      };
+    }),
+  );
+
+  const result = { data: enriched, total, page, limit };
+  await setCachedJson(cacheKey, result, RELEASES_LIST_CACHE_TTL);
+  return result;
+}
+
+// ─── RM-03.2: POST /api/releases — create with type + auto workflow status ────
+
+export async function createReleaseGlobal(dto: CreateReleaseDto, createdById: string) {
+  // Validate ATOMIC / INTEGRATION constraints
+  if (dto.type === 'ATOMIC' && !dto.projectId) {
+    throw new AppError(422, 'projectId is required for ATOMIC release');
+  }
+  if (dto.type === 'INTEGRATION' && dto.projectId) {
+    throw new AppError(422, 'projectId must be absent for INTEGRATION release');
+  }
+
+  if (dto.projectId) {
+    const project = await prisma.project.findUnique({ where: { id: dto.projectId } });
+    if (!project) throw new AppError(404, 'Project not found');
+  }
+
+  // Name uniqueness: ATOMIC — scoped to project; INTEGRATION — globally unique (projectId IS NULL)
+  const existingName = await prisma.release.findFirst({
+    where: {
+      name: dto.name,
+      ...(dto.type === 'ATOMIC'
+        ? { projectId: dto.projectId }
+        : { projectId: null }),
+    },
+  });
+  if (existingName) throw new AppError(409, 'Release with this name already exists');
+
+  // Resolve initial workflow status
+  let statusId: string | null = null;
+  let workflowId: string | null = dto.workflowId ?? null;
+
+  try {
+    const workflow = await resolveWorkflowForRelease({
+      id: 'new',
+      workflowId: workflowId,
+      type: dto.type ?? 'ATOMIC',
+    });
+    workflowId = workflow.id;
+
+    const initialStep = workflow.steps.find((s) => s.isInitial);
+    if (initialStep) statusId = initialStep.statusId;
+  } catch {
+    // No workflow configured — create without status
+  }
+
+  const release = await prisma.release.create({
+    data: {
+      type: dto.type ?? 'ATOMIC',
+      projectId: dto.projectId ?? null,
+      name: dto.name,
+      description: dto.description,
+      level: dto.level ?? 'MINOR',
+      statusId,
+      workflowId,
+      createdById,
+      plannedDate: dto.plannedDate ? new Date(dto.plannedDate) : null,
+    },
+    include: {
+      status: { select: { id: true, name: true, category: true, color: true } },
+      project: { select: { id: true, name: true, key: true } },
+    },
+  });
+
+  return release;
+}
+
+// ─── RM-03.3: PATCH /api/releases/:id — update (immutable: type, projectId) ──
+
+export async function updateRelease(id: string, dto: UpdateReleaseDto) {
+  const release = await prisma.release.findUnique({
+    where: { id },
+    include: { status: true },
+  });
+  if (!release) throw new AppError(404, 'Release not found');
+
+  // If status is in DONE category — only description can be changed
+  if (release.status?.category === 'DONE') {
+    const forbiddenFields = (['name', 'level', 'plannedDate', 'releaseDate'] as const).filter(
+      (f) => dto[f] !== undefined,
+    );
+    if (forbiddenFields.length > 0) {
+      throw new AppError(
+        422,
+        `Cannot update ${forbiddenFields.join(', ')} on a release in DONE status`,
+      );
+    }
+  }
+
+  // Name uniqueness check (scoped same as create)
+  if (dto.name !== undefined && dto.name !== release.name) {
+    const existing = await prisma.release.findFirst({
+      where: {
+        name: dto.name,
+        id: { not: id },
+        ...(release.projectId ? { projectId: release.projectId } : { projectId: null }),
+      },
+    });
+    if (existing) throw new AppError(409, 'Release with this name already exists');
+  }
+
+  return prisma.release.update({
+    where: { id },
+    data: {
+      ...(dto.name !== undefined && { name: dto.name }),
+      ...(dto.description !== undefined && { description: dto.description }),
+      ...(dto.level !== undefined && { level: dto.level }),
+      ...(dto.plannedDate !== undefined && {
+        plannedDate: dto.plannedDate ? new Date(dto.plannedDate) : null,
+      }),
+      ...(dto.releaseDate !== undefined && {
+        releaseDate: dto.releaseDate ? new Date(dto.releaseDate) : null,
+      }),
+    },
+    include: {
+      status: { select: { id: true, name: true, category: true, color: true } },
+      project: { select: { id: true, name: true, key: true } },
+    },
+  });
+}
+
+// ─── RM-03.4: DELETE /api/releases/:id ────────────────────────────────────────
+
+export async function deleteRelease(id: string): Promise<void> {
+  const release = await prisma.release.findUnique({
+    where: { id },
+    include: { status: true },
+  });
+  if (!release) throw new AppError(404, 'Release not found');
+
+  // Forbid delete if status category is DONE
+  if (release.status?.category === 'DONE') {
+    throw new AppError(422, 'Cannot delete a release in DONE status');
+  }
+
+  // Nullify Sprint.releaseId for sprints linked to this release
+  await prisma.sprint.updateMany({
+    where: { releaseId: id },
+    data: { releaseId: null },
+  });
+
+  // Delete the release (ReleaseItem cascade handled by Prisma onDelete: Cascade)
+  await prisma.release.delete({ where: { id } });
+}
+
+// ─── RM-03.5: ReleaseItem CRUD ────────────────────────────────────────────────
+
+export async function addReleaseItems(releaseId: string, dto: ReleaseItemsAddDto, addedById: string) {
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    include: { status: true },
+  });
+  if (!release) throw new AppError(404, 'Release not found');
+
+  // Forbid for DONE / CANCELLED status categories
+  if (release.status?.category === 'DONE' || release.status?.category === 'CANCELLED') {
+    throw new AppError(422, 'Cannot add items to a release in DONE/CANCELLED status');
+  }
+
+  // Validate issues exist
+  const issues = await prisma.issue.findMany({
+    where: { id: { in: dto.issueIds } },
+    select: { id: true, projectId: true },
+  });
+  if (issues.length !== dto.issueIds.length) {
+    throw new AppError(404, 'One or more issues not found');
+  }
+
+  // ATOMIC: only issues from the same project
+  if (release.type === 'ATOMIC' && release.projectId) {
+    const wrongProject = issues.find((i) => i.projectId !== release.projectId);
+    if (wrongProject) {
+      throw new AppError(
+        422,
+        'ATOMIC release can only contain issues from its own project',
+      );
+    }
+  }
+
+  // Upsert each item (skip if already exists via createMany skipDuplicates)
+  await prisma.releaseItem.createMany({
+    data: dto.issueIds.map((issueId) => ({
+      releaseId,
+      issueId,
+      addedById,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+export async function removeReleaseItems(releaseId: string, issueIds: string[]) {
+  const release = await prisma.release.findUnique({ where: { id: releaseId } });
+  if (!release) throw new AppError(404, 'Release not found');
+
+  await prisma.releaseItem.deleteMany({
+    where: { releaseId, issueId: { in: issueIds } },
+  });
+}
+
+export async function listReleaseItems(releaseId: string, query: ListReleaseItemsQueryDto) {
+  const release = await prisma.release.findUnique({ where: { id: releaseId } });
+  if (!release) throw new AppError(404, 'Release not found');
+
+  const { page, limit, projectId } = query;
+
+  const where: Prisma.ReleaseItemWhereInput = { releaseId };
+  if (projectId) where.issue = { projectId };
+
+  const [items, total] = await Promise.all([
+    prisma.releaseItem.findMany({
+      where,
+      include: {
+        issue: {
+          select: {
+            id: true,
+            number: true,
+            title: true,
+            status: true,
+            priority: true,
+            projectId: true,
+            project: { select: { id: true, name: true, key: true } },
+            assignee: { select: { id: true, name: true } },
+            issueTypeConfig: true,
+          },
+        },
+      },
+      orderBy: { addedAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.releaseItem.count({ where }),
+  ]);
+
+  return { data: items, total, page, limit };
+}
+
+// ─── RM-03.7: GET /releases/:id/readiness — extended metrics ─────────────────
+
+export async function getReleaseReadiness(id: string) {
+  const release = await prisma.release.findUnique({ where: { id } });
+  if (!release) throw new AppError(404, 'Release not found');
+
+  const [
+    totalSprints,
+    closedSprints,
+    totalItems,
+    doneItems,
+    cancelledItems,
+    inProgressItems,
+  ] = await Promise.all([
+    prisma.sprint.count({ where: { releaseId: id } }),
+    prisma.sprint.count({ where: { releaseId: id, state: 'CLOSED' } }),
+    prisma.releaseItem.count({ where: { releaseId: id } }),
+    prisma.releaseItem.count({
+      where: {
+        releaseId: id,
+        issue: { workflowStatus: { category: 'DONE' } },
+      },
+    }),
+    // cancelledItems: issues in DONE category but not in doneItems approximation
+    // WorkflowStatus has no CANCELLED category — use status name heuristic
+    prisma.releaseItem.count({
+      where: {
+        releaseId: id,
+        issue: { workflowStatus: { name: { contains: 'cancel', mode: 'insensitive' } } },
+      },
+    }),
+    prisma.releaseItem.count({
+      where: {
+        releaseId: id,
+        issue: { workflowStatus: { category: 'IN_PROGRESS' } },
+      },
+    }),
+  ]);
+
+  const completionPercent =
+    totalItems > 0 ? Math.round(((doneItems + cancelledItems) / totalItems) * 100) : 0;
+
+  // byProject — breakdown for INTEGRATION releases
+  let byProject: Array<{ projectId: string; key: string; name: string; total: number; done: number }> = [];
+  if (release.type === 'INTEGRATION') {
+    const projectGroups = await prisma.releaseItem.groupBy({
+      by: ['releaseId'],
+      where: { releaseId: id },
+      _count: { issueId: true },
+    });
+    // Detailed breakdown via raw aggregation
+    const projectBreakdown = await prisma.$queryRaw<
+      Array<{ project_id: string; project_key: string; project_name: string; total: bigint; done: bigint }>
+    >`
+      SELECT
+        p.id as project_id,
+        p.key as project_key,
+        p.name as project_name,
+        COUNT(ri.id) as total,
+        COUNT(CASE WHEN ws.category = 'DONE' THEN 1 END) as done
+      FROM release_items ri
+      JOIN issues i ON i.id = ri.issue_id
+      JOIN projects p ON p.id = i.project_id
+      LEFT JOIN workflow_statuses ws ON ws.id = i.workflow_status_id
+      WHERE ri.release_id = ${id}
+      GROUP BY p.id, p.key, p.name
+    `;
+    byProject = projectBreakdown.map((row) => ({
+      projectId: row.project_id,
+      key: row.project_key,
+      name: row.project_name,
+      total: Number(row.total),
+      done: Number(row.done),
+    }));
+    // Suppress unused variable warning
+    void projectGroups;
+  }
+
+  return {
+    totalSprints,
+    closedSprints,
+    totalItems,
+    doneItems,
+    cancelledItems,
+    inProgressItems,
+    completionPercent,
+    byProject,
+  };
+}
+
+// ─── RM-03.8: POST /releases/:id/clone ────────────────────────────────────────
+
+export async function cloneRelease(id: string, dto: CloneReleaseDto, createdById: string) {
+  const source = await prisma.release.findUnique({
+    where: { id },
+    include: {
+      items: true,
+      sprints: { select: { id: true } },
+    },
+  });
+  if (!source) throw new AppError(404, 'Release not found');
+
+  const newType = dto.type ?? source.type;
+  const newProjectId =
+    dto.projectId !== undefined ? dto.projectId : source.projectId;
+
+  // Validate ATOMIC / INTEGRATION constraints
+  if (newType === 'ATOMIC' && !newProjectId) {
+    throw new AppError(422, 'projectId is required for ATOMIC release');
+  }
+  if (newType === 'INTEGRATION' && newProjectId) {
+    throw new AppError(422, 'projectId must be absent for INTEGRATION release');
+  }
+
+  // Auto-generate name if not provided
+  const newName = dto.name ?? `${source.name} (copy)`;
+
+  // Check name uniqueness
+  const existing = await prisma.release.findFirst({
+    where: {
+      name: newName,
+      ...(newType === 'ATOMIC' ? { projectId: newProjectId } : { projectId: null }),
+    },
+  });
+  if (existing) throw new AppError(409, `Release named "${newName}" already exists`);
+
+  // Resolve initial workflow status
+  let statusId: string | null = null;
+  let workflowId: string | null = source.workflowId;
+
+  try {
+    const workflow = await resolveWorkflowForRelease({
+      id: 'new',
+      workflowId,
+      type: newType,
+    });
+    workflowId = workflow.id;
+    const initialStep = workflow.steps.find((s) => s.isInitial);
+    if (initialStep) statusId = initialStep.statusId;
+  } catch {
+    // No workflow — continue without status
+  }
+
+  const cloned = await prisma.release.create({
+    data: {
+      type: newType,
+      projectId: newProjectId ?? null,
+      name: newName,
+      description: source.description,
+      level: source.level,
+      statusId,
+      workflowId,
+      createdById,
+    },
+    include: {
+      status: { select: { id: true, name: true, category: true, color: true } },
+      project: { select: { id: true, name: true, key: true } },
+    },
+  });
+
+  // Clone items if requested
+  if (dto.cloneItems && source.items.length > 0) {
+    await prisma.releaseItem.createMany({
+      data: source.items.map((item) => ({
+        releaseId: cloned.id,
+        issueId: item.issueId,
+        addedById: createdById,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  // Clone sprints (re-assign) if requested
+  if (dto.cloneSprints && source.sprints.length > 0) {
+    await prisma.sprint.updateMany({
+      where: { id: { in: source.sprints.map((s) => s.id) } },
+      data: { releaseId: cloned.id },
+    });
+  }
+
+  // Audit log
+  await prisma.auditLog.create({
+    data: {
+      action: 'release.cloned',
+      entityType: 'release',
+      entityId: cloned.id,
+      userId: createdById,
+      details: {
+        sourceReleaseId: id,
+        sourceName: source.name,
+        cloneItems: dto.cloneItems,
+        cloneSprints: dto.cloneSprints,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  return cloned;
+}
+
+// ─── Legacy helpers (kept for old project-scoped route) ───────────────────────
 
 export async function listReleases(projectId: string) {
   return prisma.release.findMany({
     where: { projectId },
     include: {
-      _count: { select: { issues: true, sprints: true } },
+      status: { select: { id: true, name: true, category: true, color: true } },
+      _count: { select: { items: true, sprints: true } },
       project: { select: { id: true, name: true, key: true } },
     },
     orderBy: [{ state: 'asc' }, { createdAt: 'desc' }],
@@ -17,21 +547,26 @@ export async function getReleaseWithIssues(id: string) {
   const release = await prisma.release.findUnique({
     where: { id },
     include: {
-      _count: { select: { issues: true, sprints: true } },
-      issues: {
-        select: {
-          id: true,
-          projectId: true,
-          number: true,
-          title: true,
-          issueTypeConfig: true,
-          status: true,
-          priority: true,
-          updatedAt: true,
-          assignee: { select: { id: true, name: true } },
-          project: { select: { id: true, name: true, key: true } },
+      status: { select: { id: true, name: true, category: true, color: true } },
+      _count: { select: { items: true, sprints: true } },
+      items: {
+        include: {
+          issue: {
+            select: {
+              id: true,
+              projectId: true,
+              number: true,
+              title: true,
+              issueTypeConfig: true,
+              status: true,
+              priority: true,
+              updatedAt: true,
+              assignee: { select: { id: true, name: true } },
+              project: { select: { id: true, name: true, key: true } },
+            },
+          },
         },
-        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+        orderBy: { addedAt: 'desc' },
       },
       sprints: {
         select: {
@@ -60,64 +595,16 @@ export async function getReleaseSprints(id: string) {
     where: { releaseId: id },
     include: {
       _count: { select: { issues: true } },
-      issues: {
-        select: { id: true, status: true },
-      },
+      issues: { select: { id: true, status: true } },
     },
     orderBy: { createdAt: 'asc' },
-  });
-}
-
-export async function createRelease(projectId: string, dto: CreateReleaseDto) {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new AppError(404, 'Project not found');
-
-  const existing = await prisma.release.findUnique({
-    where: { projectId_name: { projectId, name: dto.name } },
-  });
-  if (existing) throw new AppError(409, 'Release with this name already exists');
-
-  return prisma.release.create({
-    data: {
-      projectId,
-      name: dto.name,
-      description: dto.description,
-      level: dto.level,
-    },
-  });
-}
-
-export async function updateRelease(id: string, dto: UpdateReleaseDto) {
-  const release = await prisma.release.findUnique({ where: { id } });
-  if (!release) throw new AppError(404, 'Release not found');
-
-  if (dto.name !== undefined && dto.name !== release.name) {
-    const existing = await prisma.release.findUnique({
-      where: { projectId_name: { projectId: release.projectId!, name: dto.name } },
-    });
-    if (existing) throw new AppError(409, 'Release with this name already exists');
-  }
-
-  return prisma.release.update({
-    where: { id },
-    data: {
-      ...(dto.name !== undefined && { name: dto.name }),
-      ...(dto.description !== undefined && { description: dto.description }),
-      ...(dto.level !== undefined && { level: dto.level }),
-      ...(dto.state !== undefined && { state: dto.state }),
-      ...(dto.releaseDate !== undefined && {
-        releaseDate: dto.releaseDate ? new Date(dto.releaseDate) : null,
-      }),
-    },
   });
 }
 
 export async function addSprintsToRelease(releaseId: string, sprintIds: string[]) {
   const release = await prisma.release.findUnique({ where: { id: releaseId } });
   if (!release) throw new AppError(404, 'Release not found');
-  if (release.state === 'RELEASED') throw new AppError(400, 'Cannot modify a released release');
 
-  // Check sprints exist in same project and are not already in another release
   const sprints = await prisma.sprint.findMany({
     where: { id: { in: sprintIds } },
     select: { id: true, name: true, projectId: true, releaseId: true },
@@ -128,7 +615,7 @@ export async function addSprintsToRelease(releaseId: string, sprintIds: string[]
   }
 
   for (const sprint of sprints) {
-    if (sprint.projectId !== release.projectId) {
+    if (release.projectId && sprint.projectId !== release.projectId) {
       throw new AppError(400, `Sprint "${sprint.name}" belongs to a different project`);
     }
     if (sprint.releaseId && sprint.releaseId !== releaseId) {
@@ -145,7 +632,6 @@ export async function addSprintsToRelease(releaseId: string, sprintIds: string[]
 export async function removeSprintsFromRelease(releaseId: string, sprintIds: string[]) {
   const release = await prisma.release.findUnique({ where: { id: releaseId } });
   if (!release) throw new AppError(404, 'Release not found');
-  if (release.state === 'RELEASED') throw new AppError(400, 'Cannot modify a released release');
 
   await prisma.sprint.updateMany({
     where: { id: { in: sprintIds }, releaseId },
@@ -153,10 +639,10 @@ export async function removeSprintsFromRelease(releaseId: string, sprintIds: str
   });
 }
 
+// Legacy: kept for backward compat
 export async function addIssuesToRelease(releaseId: string, issueIds: string[]) {
   const release = await prisma.release.findUnique({ where: { id: releaseId } });
   if (!release) throw new AppError(404, 'Release not found');
-  if (release.state === 'RELEASED') throw new AppError(400, 'Cannot add issues to a released release');
 
   await prisma.issue.updateMany({
     where: { id: { in: issueIds }, ...(release.projectId ? { projectId: release.projectId } : {}) },
@@ -171,91 +657,11 @@ export async function removeIssuesFromRelease(releaseId: string, issueIds: strin
   });
 }
 
-export async function markReleaseReady(id: string) {
-  const release = await prisma.release.findUnique({ where: { id } });
-  if (!release) throw new AppError(404, 'Release not found');
-  if (release.state !== 'DRAFT') throw new AppError(400, 'Only DRAFT releases can be marked READY');
-
-  // Guard: must have at least one sprint with at least one issue
-  const sprintCount = await prisma.sprint.count({ where: { releaseId: id } });
-  if (sprintCount === 0) {
-    throw new AppError(400, 'Release must have at least one sprint before marking ready');
-  }
-
-  const issueInSprintCount = await prisma.issue.count({
-    where: { sprint: { releaseId: id } },
-  });
-  if (issueInSprintCount === 0) {
-    throw new AppError(400, 'Release sprints must contain at least one issue before marking ready');
-  }
-
-  return prisma.release.update({
-    where: { id },
-    data: { state: 'READY' },
-  });
+// Deprecated stubs — kept for legacy handlers
+export async function markReleaseReady(_id: string): Promise<never> {
+  throw new AppError(410, 'Deprecated');
 }
 
-export async function markReleaseReleased(id: string, releaseDate?: string) {
-  const release = await prisma.release.findUnique({ where: { id } });
-  if (!release) throw new AppError(404, 'Release not found');
-  if (release.state === 'RELEASED') throw new AppError(400, 'Release is already released');
-
-  // Guard: all sprints must be CLOSED
-  const openSprintCount = await prisma.sprint.count({
-    where: { releaseId: id, state: { not: 'CLOSED' } },
-  });
-  if (openSprintCount > 0) {
-    throw new AppError(
-      400,
-      `Cannot release: ${openSprintCount} sprint(s) are not closed yet`,
-    );
-  }
-
-  // Guard: all issues in release sprints must be DONE or CANCELLED
-  const openIssueCount = await prisma.issue.count({
-    where: {
-      sprint: { releaseId: id },
-      status: { notIn: ['DONE', 'CANCELLED'] },
-    },
-  });
-  if (openIssueCount > 0) {
-    throw new AppError(
-      400,
-      `Cannot release: ${openIssueCount} issue(s) in release sprints are not done`,
-    );
-  }
-
-  return prisma.release.update({
-    where: { id },
-    data: {
-      state: 'RELEASED',
-      releaseDate: releaseDate ? new Date(releaseDate) : new Date(),
-    },
-  });
-}
-
-export async function getReleaseReadiness(id: string) {
-  const release = await prisma.release.findUnique({ where: { id } });
-  if (!release) throw new AppError(404, 'Release not found');
-
-  const [totalSprints, closedSprints, totalIssues, doneIssues] = await Promise.all([
-    prisma.sprint.count({ where: { releaseId: id } }),
-    prisma.sprint.count({ where: { releaseId: id, state: 'CLOSED' } }),
-    prisma.issue.count({ where: { sprint: { releaseId: id } } }),
-    prisma.issue.count({
-      where: { sprint: { releaseId: id }, status: { in: ['DONE', 'CANCELLED'] } },
-    }),
-  ]);
-
-  const canMarkReady = totalSprints > 0 && totalIssues > 0;
-  const canRelease = totalSprints > 0 && totalSprints === closedSprints && totalIssues === doneIssues;
-
-  return {
-    totalSprints,
-    closedSprints,
-    totalIssues,
-    doneIssues,
-    canMarkReady,
-    canRelease,
-  };
+export async function markReleaseReleased(_id: string, _releaseDate?: string): Promise<never> {
+  throw new AppError(410, 'Deprecated');
 }
