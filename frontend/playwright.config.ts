@@ -16,7 +16,8 @@ export default defineConfig({
     timeout: 15_000,
   },
   retries: isCI ? 2 : 0,
-  workers: isCI ? 2 : 4,
+  // Cap at 2 workers when targeting a remote staging server to avoid overloading it.
+  workers: isRemote ? 2 : (isCI ? 2 : 4),
   use: {
     baseURL,
     storageState: 'e2e/.auth/admin.json',

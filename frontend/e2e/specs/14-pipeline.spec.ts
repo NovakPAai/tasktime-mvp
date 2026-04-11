@@ -5,8 +5,12 @@ const BASE = process.env.E2E_BASE_URL || 'http://localhost:5173';
 test.describe('Pipeline', () => {
   test('pipeline page renders without crash', async ({ page }) => {
     await page.goto(`${BASE}/pipeline`);
-    // Pipeline page uses inline styles (no h1/h2), wait for JS content to render
-    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    // Use textContent (not innerText) — Pipeline page uses inline styles;
+    // loading spinner CSS may hide elements from innerText but textContent still finds text.
+    await page.waitForFunction(() => {
+      const root = document.getElementById('root');
+      return root !== null && (root.textContent?.trim().length ?? 0) > 0;
+    }, { timeout: 15_000 });
     await expect(page).not.toHaveURL(/\/login$/);
   });
 

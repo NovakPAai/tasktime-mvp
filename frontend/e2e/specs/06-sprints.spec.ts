@@ -63,8 +63,12 @@ test.describe('Sprints', () => {
   });
 
   test('start sprint via API changes status to ACTIVE', async ({ request }) => {
+    // Use a fresh project to avoid "already has active sprint" conflict if previous
+    // run left a stale ACTIVE sprint on projectId (failed cleanup scenario).
+    const keyA = `SA${Date.now().toString().slice(-4)}`;
+    const projectA = await api.createProject(request, accessToken, `${prefix}ActiveSprint`, keyA);
     const sprintName = `${prefix}ActiveSprint-${Date.now()}`;
-    const sprint = await api.createSprint(request, accessToken, projectId, sprintName);
+    const sprint = await api.createSprint(request, accessToken, projectA.id, sprintName);
     const started = await api.startSprint(request, accessToken, sprint.id);
     // Backend uses 'state' field (not 'status')
     expect(started.state).toBe('ACTIVE');
