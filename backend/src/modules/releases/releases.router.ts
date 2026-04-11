@@ -9,6 +9,7 @@ import {
   manageSprintsInReleaseDto,
 } from './releases.dto.js';
 import * as releasesService from './releases.service.js';
+import * as releaseWorkflowEngine from './release-workflow-engine.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 
@@ -151,6 +152,40 @@ router.post(
     }
   },
 );
+
+// GET /releases/:id/transitions — доступные переходы для релиза
+router.get('/releases/:id/transitions', async (req: AuthRequest, res, next) => {
+  try {
+    const result = await releaseWorkflowEngine.getAvailableTransitions(
+      req.params.id as string,
+      req.user!.userId,
+      req.user!.role,
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /releases/:id/transitions/:transitionId — выполнить переход
+router.post('/releases/:id/transitions/:transitionId', async (req: AuthRequest, res, next) => {
+  try {
+    const comment = (req.body as { comment?: string }).comment;
+    await releaseWorkflowEngine.executeTransition(
+      req.params.id as string,
+      req.params.transitionId as string,
+      req.user!.userId,
+      req.user!.role,
+      comment,
+    );
+    await logAudit(req, 'release.transitioned', 'release', req.params.id as string, {
+      transitionId: req.params.transitionId,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post(
   '/releases/:id/ready',
