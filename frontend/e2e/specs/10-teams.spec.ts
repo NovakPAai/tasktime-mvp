@@ -56,7 +56,15 @@ test.describe('Teams', () => {
     teamId = team.id;
 
     await page.goto(`${BASE}/teams`);
-    await expect(page.getByText(teamName)).toBeVisible({ timeout: 15_000 });
+    // Wait for the page to fully render before looking for the team name
+    await page.waitForFunction(() => document.body.innerText.trim().length > 10, { timeout: 15_000 });
+    const visible = await page.getByText(teamName).isVisible({ timeout: 10_000 }).catch(() => false);
+    if (!visible) {
+      // Reload once in case of stale cache
+      await page.reload();
+      await page.waitForFunction(() => document.body.innerText.trim().length > 10, { timeout: 10_000 });
+      await expect(page.getByText(teamName)).toBeVisible({ timeout: 10_000 });
+    }
   });
 
   test('create team via UI', async ({ page }) => {
