@@ -1,0 +1,11 @@
+{
+  "TTMP-179": {
+    "id": "395e6780-14e5-4541-8fce-6de7d50024ba",
+    "number": 179,
+    "title": "[RM-06] Обновление ReleasesPage (frontend)",
+    "description": "## Цель\nАдаптация существующей ReleasesPage (/projects/:id/releases) под новую модель: workflow-статусы вместо DRAFT/READY/RELEASED, показ интеграционных релизов проекта.\n\n## Acceptance Criteria\n- Workflow-статусы с цветными бейджами вместо жёстких enum\n- Кнопки доступных переходов вместо markReady/markReleased\n- Показ интеграционных релизов, содержащих задачи проекта (read-only, ссылка на /releases)\n- Обратная совместимость с текущим UX\n- Dual-theme",
+    "status": "OPEN",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  }
+}
