@@ -116,20 +116,14 @@ export async function validateReleaseWorkflow(workflowId: string): Promise<Relea
   }
 
   // DEAD_END_STATUS
-  // A global transition is available from *every* status, so any status that has
-  // at least one outgoing global transition is not a dead-end regardless of its
-  // direct outgoing edges.
-  const hasGlobalOutgoing = wf.transitions.some((t) => t.isGlobal);
-
+  // outgoing already includes global transitions (available from every status),
+  // so outgoing.length === 0 is only true when there are neither direct nor global
+  // transitions — the redundant hasGlobalOutgoing guard is removed.
   for (const step of wf.steps) {
     const outgoing = wf.transitions.filter(
       (t) => t.fromStatusId === step.statusId || t.isGlobal,
     );
-    if (
-      outgoing.length === 0 &&
-      !hasGlobalOutgoing &&
-      step.status.category !== 'DONE'
-    ) {
+    if (outgoing.length === 0 && step.status.category !== 'DONE') {
       warnings.push({
         type: 'DEAD_END_STATUS',
         message: `Status "${step.status.name}" has no outgoing transitions and is not DONE category`,

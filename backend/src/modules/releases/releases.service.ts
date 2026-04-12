@@ -131,14 +131,25 @@ export async function createReleaseGlobal(dto: CreateReleaseDto, createdById: st
   let statusId: string | null = null;
   let workflowId: string | null = dto.workflowId ?? null;
 
+  const releaseType = dto.type ?? 'ATOMIC';
+
   try {
     const workflow = await resolveWorkflowForRelease({
       id: 'new',
       workflowId: workflowId,
-      type: dto.type ?? 'ATOMIC',
+      type: releaseType,
     });
-    workflowId = workflow.id;
 
+    // If the caller provided an explicit workflowId, verify it is compatible with
+    // the release type (a type-specific workflow must not be used for another type).
+    if (dto.workflowId && workflow.releaseType !== null && workflow.releaseType !== releaseType) {
+      throw new AppError(
+        422,
+        `WORKFLOW_INCOMPATIBLE_WITH_RELEASE_TYPE: workflow is restricted to ${workflow.releaseType} releases`,
+      );
+    }
+
+    workflowId = workflow.id;
     const initialStep = workflow.steps.find((s) => s.isInitial);
     if (initialStep) statusId = initialStep.statusId;
   } catch (err) {
@@ -150,7 +161,7 @@ export async function createReleaseGlobal(dto: CreateReleaseDto, createdById: st
 
   const release = await prisma.release.create({
     data: {
-      type: dto.type ?? 'ATOMIC',
+      type: releaseType,
       projectId: dto.projectId ?? null,
       name: dto.name,
       description: dto.description,
@@ -402,12 +413,19 @@ export async function getReleaseReadiness(id: string) {
         issue: { workflowStatus: { category: 'DONE' } },
       },
     }),
-    // cancelledItems: issues in DONE category but not in doneItems approximation
-    // WorkflowStatus has no CANCELLED category — use status name heuristic
+    // cancelledItems: issues whose workflow status name contains "cancel".
+    // WorkflowStatus has no CANCELLED category — use status name heuristic.
+    // Exclude items already counted as doneItems (category=DONE) to avoid
+    // double-counting statuses like "Cancelled" that may sit in DONE category.
     prisma.releaseItem.count({
       where: {
         releaseId: id,
-        issue: { workflowStatus: { name: { contains: 'cancel', mode: 'insensitive' } } },
+        issue: {
+          workflowStatus: {
+            name: { contains: 'cancel', mode: 'insensitive' },
+            category: { not: 'DONE' },
+          },
+        },
       },
     }),
     prisma.releaseItem.count({
@@ -424,12 +442,6 @@ export async function getReleaseReadiness(id: string) {
   // byProject — breakdown for INTEGRATION releases
   let byProject: Array<{ projectId: string; key: string; name: string; total: number; done: number }> = [];
   if (release.type === 'INTEGRATION') {
-    const projectGroups = await prisma.releaseItem.groupBy({
-      by: ['releaseId'],
-      where: { releaseId: id },
-      _count: { issueId: true },
-    });
-    // Detailed breakdown via raw aggregation
     const projectBreakdown = await prisma.$queryRaw<
       Array<{ project_id: string; project_key: string; project_name: string; total: bigint; done: bigint }>
     >`
@@ -453,8 +465,6 @@ export async function getReleaseReadiness(id: string) {
       total: Number(row.total),
       done: Number(row.done),
     }));
-    // Suppress unused variable warning
-    void projectGroups;
   }
 
   return {

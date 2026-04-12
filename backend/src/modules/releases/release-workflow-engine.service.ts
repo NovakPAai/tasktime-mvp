@@ -1,4 +1,4 @@
-import type { UserRole, ReleaseStatusCategory, Prisma } from '@prisma/client';
+import type { UserRole, StatusCategory, ReleaseStatusCategory, Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
@@ -33,7 +33,9 @@ async function loadReleaseWorkflowFull(workflowId: string) {
 
 type ReleaseConditionRule =
   | { type: 'USER_HAS_GLOBAL_ROLE'; roles: UserRole[] }
-  | { type: 'ALL_ITEMS_IN_STATUS_CATEGORY'; category: ReleaseStatusCategory }
+  // category is a StatusCategory (TODO | IN_PROGRESS | DONE) because we
+  // are checking issue workflow statuses, not release statuses.
+  | { type: 'ALL_ITEMS_IN_STATUS_CATEGORY'; category: StatusCategory }
   | { type: 'ALL_SPRINTS_CLOSED' }
   | { type: 'MIN_ITEMS_COUNT'; minCount: number };
 
@@ -48,13 +50,14 @@ async function evaluateReleaseCondition(
       return rule.roles.includes(ctx.actorRole);
 
     case 'ALL_ITEMS_IN_STATUS_CATEGORY': {
-      // All issues linked via ReleaseItem must be in the given status category
+      // All issues linked via ReleaseItem must be in the given workflow status category.
+      // rule.category is WorkflowStatusCategory (TODO | IN_PROGRESS | DONE).
       const nonMatching = await prisma.releaseItem.count({
         where: {
           releaseId: ctx.releaseId,
           issue: {
             workflowStatus: {
-              category: { not: rule.category as never },
+              category: { not: rule.category },
             },
           },
         },
