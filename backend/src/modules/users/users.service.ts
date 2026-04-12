@@ -45,7 +45,7 @@ export async function updateUser(id: string, dto: UpdateUserDto) {
 
 type RoleChangeActor = {
   userId: string;
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RELEASE_MANAGER' | 'USER' | 'VIEWER';
 };
 
 export async function changeRole(actor: RoleChangeActor, id: string, dto: ChangeRoleDto) {

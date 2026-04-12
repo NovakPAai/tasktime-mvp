@@ -372,3 +372,84 @@ export async function executeTransition(
 
   return updatedIssue;
 }
+
+// ─── Batch transitions ────────────────────────────────────────────────────────
+
+export interface BatchTransitionsItem {
+  issueId: string;
+  issueKey: string;
+  title: string;
+  currentStatus: { id: string; name: string; category: string; color: string } | null;
+  transitions: TransitionResponse[];
+}
+
+export async function getBatchTransitions(
+  issueIds: string[],
+  actorId: string,
+  actorRole: UserRole,
+): Promise<BatchTransitionsItem[]> {
+  const issues = await prisma.issue.findMany({
+    where: { id: { in: issueIds } },
+    include: {
+      workflowStatus: true,
+      project: { select: { key: true } },
+    },
+  });
+
+  const results: BatchTransitionsItem[] = [];
+
+  for (const issue of issues) {
+    const workflow = await resolveWorkflowForIssue(issue);
+
+    const candidates = workflow.transitions.filter(
+      (t) => t.isGlobal || t.fromStatusId === issue.workflowStatusId,
+    );
+
+    const available: TransitionResponse[] = [];
+
+    for (const t of candidates) {
+      try {
+        const conditionRules = t.conditions ? (t.conditions as unknown as ConditionRule[]) : [];
+        if (conditionRules.length > 0) {
+          const allowed = evaluateConditions(conditionRules, {
+            actorId,
+            actorRole,
+            issue: { assigneeId: issue.assigneeId, creatorId: issue.creatorId },
+          });
+          if (!allowed) continue;
+        }
+      } catch {
+        continue;
+      }
+
+      available.push({
+        id: t.id,
+        name: t.name,
+        toStatus: {
+          id: t.toStatus.id,
+          name: t.toStatus.name,
+          category: t.toStatus.category,
+          color: t.toStatus.color,
+        },
+        requiresScreen: !!t.screen,
+      });
+    }
+
+    results.push({
+      issueId: issue.id,
+      issueKey: `${issue.project.key}-${issue.number}`,
+      title: issue.title,
+      currentStatus: issue.workflowStatus
+        ? {
+            id: issue.workflowStatus.id,
+            name: issue.workflowStatus.name,
+            category: issue.workflowStatus.category,
+            color: issue.workflowStatus.color,
+          }
+        : null,
+      transitions: available,
+    });
+  }
+
+  return results;
+}

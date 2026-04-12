@@ -50,10 +50,16 @@ export type { SprintState, Sprint, SprintDetailsResponse } from './sprint.types'
 export type { TeamMember, Team } from './team.types';
 
 export type {
+  ReleaseType,
   ReleaseLevel,
   ReleaseState,
+  ReleaseStatus,
   SprintInRelease,
   ReleaseReadiness,
+  ReleaseTransition,
+  ReleaseTransitionsResponse,
+  ReleaseAuditEntry,
+  ReleaseItem,
   Release,
 } from './release.types';
 

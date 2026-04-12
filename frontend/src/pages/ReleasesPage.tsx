@@ -14,9 +14,9 @@ import {
   Select,
   Table,
   Tag,
-  Tooltip,
   Progress,
   Button,
+  Spin,
 } from 'antd';
 import {
   DeleteOutlined,
@@ -28,7 +28,7 @@ import * as projectsApi from '../api/projects';
 import * as sprintsApi from '../api/sprints';
 import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
-import type { Release, Issue, ReleaseLevel, ReleaseState, SprintInRelease, ReleaseReadiness, Sprint } from '../types';
+import type { Release, Issue, ReleaseLevel, ReleaseState, SprintInRelease, ReleaseReadiness, Sprint, ReleaseTransition, ReleaseStatus } from '../types';
 
 // ─── Tokens Dark (Paper 4EO-0) ──────────────────────────
 const DARK_C = {
@@ -88,7 +88,7 @@ const SPRINT_STATE_COLOR: Record<string, string> = {
   CLOSED:  'success',
 };
 
-type FilterTab = 'ALL' | ReleaseState;
+type FilterTab = 'ALL' | 'TODO' | 'IN_PROGRESS' | 'DONE';
 
 export default function ReleasesPage() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -98,8 +98,8 @@ export default function ReleasesPage() {
   const isDark = mode !== 'light';
   const C = isDark ? DARK_C : LIGHT_C;
 
-  // ─── Status badge configs (theme-aware) ──────────────────
-  const STATUS_CFG: Record<ReleaseState, { bg: string; text: string; label: string }> = {
+  // ─── Status badge — dynamic from workflow ────────────────
+  const legacyStatusCfg: Record<ReleaseState, { bg: string; text: string; label: string }> = {
     RELEASED: isDark
       ? { bg: '#4ADE801F', text: '#4ADE80',  label: 'RELEASED' }
       : { bg: '#1A7F371A', text: '#1A7F37',  label: 'RELEASED' },
@@ -110,6 +110,18 @@ export default function ReleasesPage() {
       ? { bg: '#8B949E1F', text: '#8B949E',  label: 'DRAFT' }
       : { bg: '#8C959F1A', text: '#8C959F',  label: 'DRAFT' },
   };
+
+  const getStatusBadge = (r: Release): { bg: string; text: string; label: string } => {
+    if (r.status?.color && r.status?.name) {
+      const c = r.status.color;
+      return { bg: `${c}26`, text: c, label: r.status.name };
+    }
+    return legacyStatusCfg[r.state] ?? legacyStatusCfg.DRAFT;
+  };
+
+  const getReleaseCategory = (r: Release): string => r.status?.category ?? (
+    r.state === 'RELEASED' ? 'DONE' : r.state === 'READY' ? 'IN_PROGRESS' : 'TODO'
+  );
 
   const LEVEL_CFG: Record<ReleaseLevel, { bg: string; text: string }> = {
     MAJOR: isDark
@@ -133,8 +145,13 @@ export default function ReleasesPage() {
   const [addSprintsModalOpen, setAddSprintsModalOpen] = useState(false);
   const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([]);
+  const [transitions, setTransitions] = useState<ReleaseTransition[]>([]);
+  const [currentStatus, setCurrentStatus] = useState<ReleaseStatus | null>(null);
+  const [transitioning, setTransitioning] = useState<string | null>(null);
+  const [loadingTransitions, setLoadingTransitions] = useState(false);
+  const [integrationReleases, setIntegrationReleases] = useState<Release[]>([]);
   const [form] = Form.useForm();
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'SUPER_ADMIN';
 
   // ─── Load ─────────────────────────────────────────────────
   const loadReleases = useCallback(async () => {
@@ -163,21 +180,50 @@ export default function ReleasesPage() {
 
   const loadSelectedRelease = useCallback(async (releaseId: string) => {
     const full = await releasesApi.getReleaseWithIssues(releaseId);
-    setSelectedRelease(full);
+    setSelectedRelease(full as typeof full & { issues?: Issue[] });
     const r = await releasesApi.getReleaseReadiness(releaseId);
     setReadiness(r);
   }, []);
 
-  useEffect(() => { loadProject(); loadReleases(); }, [loadProject, loadReleases]);
+  const loadTransitions = useCallback(async (releaseId: string) => {
+    setLoadingTransitions(true);
+    try {
+      const r = await releasesApi.getAvailableTransitions(releaseId);
+      setTransitions(r.transitions);
+      setCurrentStatus(r.currentStatus);
+    } catch {
+      setTransitions([]);
+      setCurrentStatus(null);
+    } finally {
+      setLoadingTransitions(false);
+    }
+  }, []);
+
+  const loadIntegrationReleases = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const r = await releasesApi.listReleasesGlobal({ type: 'INTEGRATION', limit: 50 });
+      setIntegrationReleases(r.data.filter(rel =>
+        !rel._projects || rel._projects.includes(projectId) || rel._projects.length === 0
+      ));
+    } catch {
+      setIntegrationReleases([]);
+    }
+  }, [projectId]);
+
+  useEffect(() => { loadProject(); loadReleases(); loadIntegrationReleases(); }, [loadProject, loadReleases, loadIntegrationReleases]);
 
   useEffect(() => {
     if (selectedRelease?.id) {
       loadSelectedRelease(selectedRelease.id);
+      loadTransitions(selectedRelease.id);
     } else {
       setSelectedRelease(null);
       setReadiness(null);
+      setTransitions([]);
+      setCurrentStatus(null);
     }
-  }, [selectedRelease?.id, loadSelectedRelease]);
+  }, [selectedRelease?.id, loadSelectedRelease, loadTransitions]);
 
   useEffect(() => {
     if (projectId && (addModalOpen || (selectedRelease && canManage))) loadProjectIssues();
@@ -202,27 +248,20 @@ export default function ReleasesPage() {
     }
   };
 
-  const handleMarkReady = async (releaseId: string) => {
+  const handleTransition = async (transitionId: string) => {
+    if (!selectedRelease) return;
+    setTransitioning(transitionId);
     try {
-      await releasesApi.markReleaseReady(releaseId);
-      message.success('Релиз помечен как готовый к выпуску');
+      await releasesApi.executeTransition(selectedRelease.id, transitionId);
+      message.success('Статус обновлён');
       loadReleases();
-      if (selectedRelease?.id === releaseId) loadSelectedRelease(releaseId);
+      loadSelectedRelease(selectedRelease.id);
+      loadTransitions(selectedRelease.id);
     } catch (e) {
       const err = e as AxiosError<{ error?: string }>;
       message.error(err.response?.data?.error || 'Ошибка');
-    }
-  };
-
-  const handleMarkReleased = async (releaseId: string) => {
-    try {
-      await releasesApi.markReleaseReleased(releaseId);
-      message.success('Релиз выпущен');
-      loadReleases();
-      if (selectedRelease?.id === releaseId) loadSelectedRelease(releaseId);
-    } catch (e) {
-      const err = e as AxiosError<{ error?: string }>;
-      message.error(err.response?.data?.error || 'Ошибка');
+    } finally {
+      setTransitioning(null);
     }
   };
 
@@ -279,32 +318,15 @@ export default function ReleasesPage() {
 
   const filteredReleases = filterTab === 'ALL'
     ? releases
-    : releases.filter((r) => r.state === filterTab);
+    : releases.filter((r) => getReleaseCategory(r) === filterTab);
 
-  // First RELEASED in filtered list — not dimmed; rest are dimmed
-  const firstReleasedId = filteredReleases.find((r) => r.state === 'RELEASED')?.id;
+  // First DONE in filtered list — not dimmed; rest are dimmed
+  const firstReleasedId = filteredReleases.find((r) => getReleaseCategory(r) === 'DONE')?.id;
 
   const formatDate = (iso?: string | null) => {
     if (!iso) return '—';
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
-  const getReadyTooltip = () => {
-    if (!readiness) return '';
-    if (readiness.totalSprints === 0) return 'Добавьте хотя бы один спринт с задачами';
-    if (readiness.totalIssues === 0) return 'В спринтах нет задач';
-    return '';
-  };
-
-  const getReleaseTooltip = () => {
-    if (!readiness) return '';
-    const parts: string[] = [];
-    if (readiness.totalSprints > readiness.closedSprints)
-      parts.push(`${readiness.totalSprints - readiness.closedSprints} спринт(ов) не закрыто`);
-    if (readiness.totalIssues > readiness.doneIssues)
-      parts.push(`${readiness.totalIssues - readiness.doneIssues} задач(и) не выполнено`);
-    return parts.join(', ');
   };
 
   // ─── Sub-table columns ────────────────────────────────────
@@ -334,7 +356,7 @@ export default function ReleasesPage() {
       render: (_: unknown, r: SprintInRelease) =>
         r.startDate ? `${formatDate(r.startDate)} — ${formatDate(r.endDate)}` : '—',
     },
-    ...(canManage && selectedRelease?.state !== 'RELEASED'
+    ...(canManage && getReleaseCategory(selectedRelease ?? { state: 'DRAFT' } as Release) !== 'DONE'
       ? [{
           title: '', width: 40,
           render: (_: unknown, r: SprintInRelease) => (
@@ -357,11 +379,6 @@ export default function ReleasesPage() {
     display: 'inline-block', paddingBlock: 4, paddingInline: 10,
     border: `1px solid ${C.borderBtn}`, borderRadius: 6, cursor: 'pointer',
     background: isDark ? 'transparent' : C.btnBg,
-  };
-
-  const btnPrimary: React.CSSProperties = {
-    display: 'inline-block', paddingBlock: 4, paddingInline: 10,
-    backgroundImage: LOGO_GRAD, borderRadius: 6, cursor: 'pointer',
   };
 
   // ─── JSX ─────────────────────────────────────────────────
@@ -395,7 +412,7 @@ export default function ReleasesPage() {
             Релизы
           </div>
           <div style={{ fontFamily: F.sans, fontSize: 13, color: C.t3, lineHeight: '16px' }}>
-            {project?.name ?? '...'} · {releases.length} релизов · {releases.filter(r => r.state !== 'RELEASED').length} в работе
+            {project?.name ?? '...'} · {releases.length} релизов · {releases.filter(r => getReleaseCategory(r) !== 'DONE').length} в работе
           </div>
         </div>
         {canManage && (
@@ -412,23 +429,28 @@ export default function ReleasesPage() {
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {(['ALL', 'DRAFT', 'READY', 'RELEASED'] as const).map((tab) => {
-          const isActive = filterTab === tab;
+        {([
+          { key: 'ALL',         label: 'Все' },
+          { key: 'TODO',        label: 'Открытые' },
+          { key: 'IN_PROGRESS', label: 'В работе' },
+          { key: 'DONE',        label: 'Завершённые' },
+        ] as const).map(({ key, label }) => {
+          const isActive = filterTab === key;
           return (
             <div
-              key={tab}
+              key={key}
               style={{
                 borderRadius: 6, paddingBlock: 6, paddingInline: 14, cursor: 'pointer',
                 backgroundImage: isActive && isDark ? C.tabActiveBg : undefined,
                 backgroundColor: isActive && !isDark ? C.tabActiveBg as string : undefined,
               }}
-              onClick={() => setFilterTab(tab)}
+              onClick={() => setFilterTab(key)}
             >
               <span style={{
                 fontFamily: F.sans, fontSize: 12, fontWeight: isActive ? 500 : 400,
                 color: isActive ? C.tabActiveText : C.tabText,
               }}>
-                {tab === 'ALL' ? 'Все' : tab}
+                {label}
               </span>
             </div>
           );
@@ -467,12 +489,13 @@ export default function ReleasesPage() {
           </div>
         ) : (
           filteredReleases.map((r, idx) => {
-            const isDimmed = r.state === 'RELEASED' && r.id !== firstReleasedId;
-            const isHighlighted = r.state === 'READY';
+            const cat = getReleaseCategory(r);
+            const isDimmed = cat === 'DONE' && r.id !== firstReleasedId;
+            const isHighlighted = cat === 'IN_PROGRESS';
             const isLast = idx === filteredReleases.length - 1;
             const isSelected = selectedRelease?.id === r.id;
             const levelCfg = LEVEL_CFG[r.level] ?? LEVEL_CFG.MINOR;
-            const statusCfg = STATUS_CFG[r.state];
+            const statusCfg = getStatusBadge(r);
 
             return (
               <div
@@ -559,7 +582,7 @@ export default function ReleasesPage() {
                 <div style={{
                   flexShrink: 0, width: 130,
                   fontFamily: F.sans, fontSize: 12, lineHeight: '16px',
-                  color: r.state === 'READY'
+                  color: cat === 'IN_PROGRESS'
                     ? (isDark ? '#4ADE80' : '#1A7F37')
                     : isDimmed ? C.t4 : C.t3,
                 }}>
@@ -568,18 +591,7 @@ export default function ReleasesPage() {
 
                 {/* Actions */}
                 <div style={{ flex: 1, display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {/* READY: Выпустить + Открыть */}
-                  {r.state === 'READY' && canManage && (
-                    <Popconfirm title="Выпустить релиз?" onConfirm={() => handleMarkReleased(r.id)}>
-                      <div style={{ ...btnPrimary }}>
-                        <span style={{ fontFamily: F.sans, fontSize: 11, color: '#FFFFFF', lineHeight: '14px' }}>
-                          Выпустить
-                        </span>
-                      </div>
-                    </Popconfirm>
-                  )}
-
-                  {/* Открыть */}
+                  {/* Открыть/Закрыть — transitions available in detail panel */}
                   <div style={{ ...btnOutlined }} onClick={() => {
                     if (isSelected) {
                       setSelectedRelease(null);
@@ -591,17 +603,6 @@ export default function ReleasesPage() {
                       {isSelected ? 'Закрыть' : 'Открыть'}
                     </span>
                   </div>
-
-                  {/* DRAFT: … (mark ready) */}
-                  {r.state === 'DRAFT' && canManage && (
-                    <Popconfirm title="Отметить релиз готовым к выпуску?" onConfirm={() => handleMarkReady(r.id)}>
-                      <div style={{ ...btnOutlined }}>
-                        <span style={{ fontFamily: F.sans, fontSize: 11, color: C.t3, lineHeight: '14px' }}>
-                          …
-                        </span>
-                      </div>
-                    </Popconfirm>
-                  )}
                 </div>
               </div>
             );
@@ -617,57 +618,76 @@ export default function ReleasesPage() {
         }}>
           {/* Detail header */}
           <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             backgroundColor: isDark ? '#161B22' : C.bgHeaderRow,
             borderBottom: `1px solid ${C.border}`,
             paddingInline: 20, paddingBlock: 12,
           }}>
-            <span style={{ fontFamily: F.display, fontSize: 14, fontWeight: 700, color: C.t1 }}>
-              {selectedRelease.name}
-            </span>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {/* Readiness progress */}
-              {readiness && selectedRelease.state !== 'RELEASED' && (
-                <span style={{ fontFamily: F.sans, fontSize: 11, color: C.t3 }}>
-                  Спринтов: {readiness.closedSprints}/{readiness.totalSprints} · Задач: {readiness.doneIssues}/{readiness.totalIssues}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: transitions.length > 0 || loadingTransitions ? 10 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontFamily: F.display, fontSize: 14, fontWeight: 700, color: C.t1 }}>
+                  {selectedRelease.name}
                 </span>
-              )}
-              {canManage && selectedRelease.state === 'DRAFT' && readiness && (
-                <Tooltip title={getReadyTooltip()}>
-                  <div
-                    style={{
-                      ...btnOutlined,
-                      opacity: readiness.canMarkReady ? 1 : 0.5,
-                      cursor: readiness.canMarkReady ? 'pointer' : 'not-allowed',
-                    }}
-                    onClick={() => { if (readiness.canMarkReady) handleMarkReady(selectedRelease.id); }}
-                  >
-                    <span style={{ fontFamily: F.sans, fontSize: 11, color: C.btnText, lineHeight: '14px' }}>
-                      Отметить готовым
+                {currentStatus && (
+                  <div style={{
+                    display: 'inline-block',
+                    backgroundColor: `${currentStatus.color}26`,
+                    borderRadius: 20, paddingBlock: 3, paddingInline: 10,
+                  }}>
+                    <span style={{
+                      fontFamily: F.sans, fontSize: 10, fontWeight: 600,
+                      letterSpacing: '0.3px', color: currentStatus.color,
+                    }}>
+                      {currentStatus.name}
                     </span>
                   </div>
-                </Tooltip>
-              )}
-              {canManage && selectedRelease.state === 'READY' && readiness && (
-                <Tooltip title={getReleaseTooltip()}>
-                  <Popconfirm title="Выпустить релиз?" onConfirm={() => handleMarkReleased(selectedRelease.id)} disabled={!readiness.canRelease}>
-                    <div style={{
-                      ...btnPrimary,
-                      opacity: readiness.canRelease ? 1 : 0.5,
-                      cursor: readiness.canRelease ? 'pointer' : 'not-allowed',
-                    }}>
-                      <span style={{ fontFamily: F.sans, fontSize: 11, color: '#FFFFFF', lineHeight: '14px' }}>
-                        Выпустить релиз
-                      </span>
-                    </div>
-                  </Popconfirm>
-                </Tooltip>
+                )}
+              </div>
+              {readiness && getReleaseCategory(selectedRelease) !== 'DONE' && (
+                <span style={{ fontFamily: F.sans, fontSize: 11, color: C.t3 }}>
+                  Спринтов: {readiness.closedSprints}/{readiness.totalSprints} · Задач: {readiness.doneIssues ?? readiness.doneItems ?? 0}/{readiness.totalIssues ?? readiness.totalItems ?? 0}
+                </span>
               )}
             </div>
+            {/* Transition buttons */}
+            {canManage && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {loadingTransitions ? (
+                  <Spin size="small" />
+                ) : transitions.map(t => {
+                  const tColor = t.toStatus.color || C.acc;
+                  return (
+                    <Popconfirm
+                      key={t.id}
+                      title={`Перейти в статус «${t.toStatus.name}»?`}
+                      onConfirm={() => handleTransition(t.id)}
+                      okText="Да"
+                      cancelText="Отмена"
+                    >
+                      <div
+                        style={{
+                          border: `1px solid ${tColor}60`,
+                          background: `${tColor}15`,
+                          borderRadius: 6,
+                          paddingBlock: 4, paddingInline: 12,
+                          cursor: transitioning === t.id ? 'not-allowed' : 'pointer',
+                          opacity: transitioning === t.id ? 0.6 : 1,
+                        }}
+                      >
+                        <span style={{
+                          fontFamily: F.display, fontSize: 12, fontWeight: 600, color: tColor,
+                        }}>
+                          → {t.toStatus.name}
+                        </span>
+                      </div>
+                    </Popconfirm>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Readiness progress bars */}
-          {readiness && selectedRelease.state !== 'RELEASED' && (
+          {readiness && getReleaseCategory(selectedRelease) !== 'DONE' && (
             <div style={{ paddingInline: 20, paddingBlock: 12, borderBottom: `1px solid ${isDark ? C.border : '#EAEEF2'}` }}>
               <div style={{ display: 'flex', gap: 32 }}>
                 <div style={{ flex: 1 }}>
@@ -682,12 +702,12 @@ export default function ReleasesPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: F.sans, fontSize: 11, color: C.t3, marginBottom: 4 }}>
-                    Задачи выполнены: {readiness.doneIssues}/{readiness.totalIssues}
+                    Задачи выполнены: {(readiness.doneIssues ?? readiness.doneItems ?? 0)}/{(readiness.totalIssues ?? readiness.totalItems ?? 0)}
                   </div>
                   <Progress
-                    percent={readiness.totalIssues > 0 ? Math.round((readiness.doneIssues / readiness.totalIssues) * 100) : 0}
+                    percent={(readiness.totalIssues ?? readiness.totalItems ?? 0) > 0 ? Math.round(((readiness.doneIssues ?? readiness.doneItems ?? 0) / (readiness.totalIssues ?? readiness.totalItems ?? 0)) * 100) : 0}
                     size="small"
-                    status={readiness.doneIssues === readiness.totalIssues && readiness.totalIssues > 0 ? 'success' : 'active'}
+                    status={(readiness.doneIssues ?? readiness.doneItems ?? 0) === (readiness.totalIssues ?? readiness.totalItems ?? 0) && (readiness.totalIssues ?? readiness.totalItems ?? 0) > 0 ? 'success' : 'active'}
                   />
                 </div>
               </div>
@@ -700,7 +720,7 @@ export default function ReleasesPage() {
               <span style={{ fontFamily: F.display, fontSize: 13, fontWeight: 700, color: C.t1 }}>
                 Спринты
               </span>
-              {canManage && selectedRelease.state !== 'RELEASED' && (
+              {canManage && getReleaseCategory(selectedRelease) !== 'DONE' && (
                 <div style={{ ...btnOutlined, cursor: 'pointer' }} onClick={() => setAddSprintsModalOpen(true)}>
                   <span style={{ fontFamily: F.sans, fontSize: 11, color: C.btnText, lineHeight: '14px' }}>
                     + Добавить спринт
@@ -724,7 +744,7 @@ export default function ReleasesPage() {
               <span style={{ fontFamily: F.display, fontSize: 13, fontWeight: 700, color: C.t1 }}>
                 Задачи
               </span>
-              {canManage && selectedRelease.state !== 'RELEASED' && (
+              {canManage && getReleaseCategory(selectedRelease) !== 'DONE' && (
                 <div style={{ ...btnOutlined, cursor: 'pointer' }} onClick={() => setAddModalOpen(true)}>
                   <span style={{ fontFamily: F.sans, fontSize: 11, color: C.btnText, lineHeight: '14px' }}>
                     <UserOutlined style={{ marginRight: 4 }} />Добавить задачи
@@ -740,6 +760,125 @@ export default function ReleasesPage() {
               pagination={false}
             />
           </div>
+        </div>
+      )}
+
+      {/* Integration releases section (TTMP-212) */}
+      {integrationReleases.length > 0 && (
+        <div style={{
+          backgroundColor: C.bgCard, border: `1px solid ${C.border}`,
+          borderRadius: 12, overflow: 'hidden', marginBottom: 16,
+        }}>
+          {/* Section header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            backgroundColor: C.bgHeaderRow,
+            borderBottom: `1px solid ${C.border}`,
+            paddingInline: 20, paddingBlock: 10,
+          }}>
+            <span style={{ fontFamily: F.display, fontSize: 13, fontWeight: 700, color: C.t1 }}>
+              Интеграционные релизы
+            </span>
+            <div style={{
+              backgroundColor: isDark ? '#A78BFA26' : '#7C3AED1A',
+              borderRadius: 4, paddingBlock: 2, paddingInline: 7,
+            }}>
+              <span style={{ fontFamily: F.sans, fontSize: 10, fontWeight: 600, color: isDark ? '#A78BFA' : '#7C3AED' }}>
+                {integrationReleases.length}
+              </span>
+            </div>
+            <span style={{ fontFamily: F.sans, fontSize: 11, color: C.t3 }}>
+              Только просмотр · Управление в разделе{' '}
+              <Link to="/releases" style={{ color: C.acc }}>Релизы</Link>
+            </span>
+          </div>
+
+          {/* Rows */}
+          {integrationReleases.map((r, idx) => {
+            const statusCfg = getStatusBadge(r);
+            const isLast = idx === integrationReleases.length - 1;
+            return (
+              <div
+                key={r.id}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  paddingInline: 20, paddingBlock: 10,
+                  borderBottom: isLast ? undefined : `1px solid ${isDark ? C.border : '#EAEEF2'}`,
+                }}
+              >
+                {/* Name */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: F.display, fontSize: 13, fontWeight: 700,
+                    letterSpacing: '-0.01em', color: C.t1, lineHeight: '16px',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {r.name}
+                  </div>
+                  {r.description && (
+                    <div style={{
+                      fontFamily: F.sans, fontSize: 11, color: C.t3,
+                      lineHeight: '14px', marginTop: 2,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {r.description}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status badge */}
+                <div style={{ flexShrink: 0, marginLeft: 16 }}>
+                  <div style={{
+                    display: 'inline-block',
+                    backgroundColor: statusCfg.bg,
+                    borderRadius: 20, paddingBlock: 3, paddingInline: 10,
+                  }}>
+                    <span style={{
+                      fontFamily: F.sans, fontSize: 10, fontWeight: 600,
+                      letterSpacing: '0.3px', color: statusCfg.text,
+                    }}>
+                      {statusCfg.label}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Integration badge */}
+                <div style={{ flexShrink: 0, marginLeft: 8 }}>
+                  <div style={{
+                    display: 'inline-block',
+                    backgroundColor: isDark ? '#A78BFA26' : '#7C3AED1A',
+                    borderRadius: 4, paddingBlock: 3, paddingInline: 8,
+                  }}>
+                    <span style={{
+                      fontFamily: F.sans, fontSize: 10, fontWeight: 600,
+                      color: isDark ? '#A78BFA' : '#7C3AED',
+                    }}>
+                      Интеграционный
+                    </span>
+                  </div>
+                </div>
+
+                {/* Planned date */}
+                <div style={{
+                  flexShrink: 0, width: 130, marginLeft: 16,
+                  fontFamily: F.sans, fontSize: 12, color: C.t3, textAlign: 'right',
+                }}>
+                  {r.plannedDate ? formatDate(r.plannedDate) : '—'}
+                </div>
+
+                {/* Link to /releases */}
+                <div style={{ flexShrink: 0, marginLeft: 12 }}>
+                  <Link to="/releases" style={{ textDecoration: 'none' }}>
+                    <div style={{ ...btnOutlined }}>
+                      <span style={{ fontFamily: F.sans, fontSize: 11, color: C.t3, lineHeight: '14px' }}>
+                        Подробнее
+                      </span>
+                    </div>
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

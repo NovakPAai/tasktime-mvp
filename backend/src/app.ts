@@ -36,6 +36,8 @@ import workflowsRouter from './modules/workflows/workflows.router.js';
 import workflowSchemesRouter from './modules/workflow-schemes/workflow-schemes.router.js';
 import transitionScreensRouter from './modules/transition-screens/transition-screens.router.js';
 import workflowEngineRouter from './modules/workflow-engine/workflow-engine.router.js';
+import releaseStatusesRouter from './modules/releases/release-statuses.router.js';
+import releaseWorkflowsAdminRouter from './modules/releases/release-workflows-admin.router.js';
 import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
 import { authenticate } from './shared/middleware/auth.js';
 import { requireRole } from './shared/middleware/rbac.js';
@@ -130,6 +132,8 @@ export function createApp() {
   app.use('/api/admin/workflows', workflowsRouter);
   app.use('/api/admin/workflow-schemes', workflowSchemesRouter);
   app.use('/api/admin/transition-screens', transitionScreensRouter);
+  app.use('/api/admin/release-statuses', releaseStatusesRouter);
+  app.use('/api/admin/release-workflows', releaseWorkflowsAdminRouter);
   app.use('/api', workflowEngineRouter);
 
   // Public: project workflow scheme

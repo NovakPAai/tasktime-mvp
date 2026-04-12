@@ -1,0 +1,11 @@
+{
+  "TTMP-180": {
+    "id": "d64f5cec-ff93-4f4c-a1f0-2804111fb764",
+    "number": 180,
+    "title": "[RM-07] Визуальный редактор workflow релизов (frontend)",
+    "description": "## Цель\nВизуальный drag-n-drop редактор workflow релизов на @xyflow/react в админке. Узлы = статусы, рёбра = переходы. Панель свойств, валидация в реальном времени.\n\n## Acceptance Criteria\n- Интеграция @xyflow/react (React Flow)\n- Узлы = статусы (перетаскиваемые, с цветами по категории)\n- Рёбра = переходы (кликабельные, с названием)\n- Панель свойств при клике на переход (conditions, isGlobal)\n- Валидация графа в реальном времени (подсветка ошибок)\n- Привязка workflow к типу релиза (ATOMIC/INTEGRATION/универсальный)\n- Сохранение изменений через admin API\n- Dual-theme",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  }
+}

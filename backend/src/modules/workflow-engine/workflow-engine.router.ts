@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { ExecuteTransitionDto } from './workflow-engine.dto.js';
-import { getAvailableTransitions, executeTransition } from './workflow-engine.service.js';
+import { getAvailableTransitions, executeTransition, getBatchTransitions } from './workflow-engine.service.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 
 const router = Router();
@@ -35,6 +35,21 @@ router.post('/issues/:id/transitions', validate(ExecuteTransitionDto), async (re
       dto.screenFieldValues,
     );
     res.json(issue);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/issues/batch-transitions — get transitions for multiple issues at once
+router.post('/issues/batch-transitions', async (req: AuthRequest, res, next) => {
+  try {
+    const { issueIds } = req.body as { issueIds: string[] };
+    if (!Array.isArray(issueIds) || issueIds.length === 0) {
+      res.status(400).json({ error: 'issueIds must be a non-empty array' });
+      return;
+    }
+    const result = await getBatchTransitions(issueIds, req.user!.userId, req.user!.role);
+    res.json(result);
   } catch (err) {
     next(err);
   }

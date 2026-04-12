@@ -38,6 +38,8 @@ import AdminWorkflowSchemesPage from './pages/admin/AdminWorkflowSchemesPage';
 import AdminWorkflowSchemeEditorPage from './pages/admin/AdminWorkflowSchemeEditorPage';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
+import AdminReleaseWorkflowsPage from './pages/admin/AdminReleaseWorkflowsPage';
+import AdminReleaseWorkflowEditorPage from './pages/admin/AdminReleaseWorkflowEditorPage';
 import AdminSystemPage from './pages/admin/AdminSystemPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import SettingsPage from './pages/SettingsPage';
@@ -194,9 +196,12 @@ export default function App() {
             <Route path="admin/workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
             <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
             <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
+            <Route path="admin/release-workflows" element={<AdminReleaseWorkflowsPage />} />
+            <Route path="admin/release-workflows/:id" element={<AdminReleaseWorkflowEditorPage />} />
             <Route path="admin/system" element={<AdminSystemPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="pipeline" element={<PipelineDashboardPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

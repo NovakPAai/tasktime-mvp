@@ -31,10 +31,21 @@ export interface AvailableTransitionsResponse {
   transitions: TransitionOption[];
 }
 
+export interface BatchTransitionsItem {
+  issueId: string;
+  issueKey: string;
+  title: string;
+  currentStatus: WorkflowStatus | null;
+  transitions: TransitionOption[];
+}
+
 export const workflowEngineApi = {
   getTransitions: (issueId: string) =>
     api.get<AvailableTransitionsResponse>(`/issues/${issueId}/transitions`).then(r => r.data),
 
   executeTransition: (issueId: string, data: { transitionId: string; screenFieldValues?: Record<string, unknown> }) =>
     api.post<{ id: string; status: string }>(`/issues/${issueId}/transitions`, data).then(r => r.data),
+
+  getBatchTransitions: (issueIds: string[]) =>
+    api.post<BatchTransitionsItem[]>('/issues/batch-transitions', { issueIds }).then(r => r.data),
 };
