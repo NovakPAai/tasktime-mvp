@@ -50,16 +50,21 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// PUT /api/admin/release-workflows/:id
-router.put('/:id', validate(updateReleaseWorkflowDto), async (req: AuthRequest, res, next) => {
-  try {
-    const wf = await service.updateReleaseWorkflow(req.params['id'] as string, req.body);
-    await logAudit(req, 'release_workflow.updated', 'release_workflow', req.params['id'] as string, req.body);
-    res.json(wf);
-  } catch (err) {
-    next(err);
-  }
-});
+// PATCH /api/admin/release-workflows/:id (PUT kept as alias for backwards compatibility)
+const updateReleaseWorkflowHandler = [
+  validate(updateReleaseWorkflowDto),
+  async (req: AuthRequest, res: import('express').Response, next: import('express').NextFunction) => {
+    try {
+      const wf = await service.updateReleaseWorkflow(req.params['id'] as string, req.body);
+      await logAudit(req, 'release_workflow.updated', 'release_workflow', req.params['id'] as string, req.body);
+      res.json(wf);
+    } catch (err) {
+      next(err);
+    }
+  },
+];
+router.patch('/:id', ...updateReleaseWorkflowHandler);
+router.put('/:id', ...updateReleaseWorkflowHandler);
 
 // DELETE /api/admin/release-workflows/:id
 router.delete('/:id', async (req: AuthRequest, res, next) => {
@@ -136,20 +141,25 @@ router.post('/:id/transitions', validate(createReleaseWorkflowTransitionDto), as
   }
 });
 
-// PUT /api/admin/release-workflows/:id/transitions/:tid
-router.put('/:id/transitions/:tid', validate(updateReleaseWorkflowTransitionDto), async (req: AuthRequest, res, next) => {
-  try {
-    const t = await service.updateReleaseWorkflowTransition(
-      req.params['id'] as string,
-      req.params['tid'] as string,
-      req.body,
-    );
-    await logAudit(req, 'release_workflow_transition.updated', 'release_workflow_transition', req.params['tid'] as string, req.body);
-    res.json(t);
-  } catch (err) {
-    next(err);
-  }
-});
+// PATCH /api/admin/release-workflows/:id/transitions/:tid (PUT kept as alias)
+const updateReleaseWorkflowTransitionHandler = [
+  validate(updateReleaseWorkflowTransitionDto),
+  async (req: AuthRequest, res: import('express').Response, next: import('express').NextFunction) => {
+    try {
+      const t = await service.updateReleaseWorkflowTransition(
+        req.params['id'] as string,
+        req.params['tid'] as string,
+        req.body,
+      );
+      await logAudit(req, 'release_workflow_transition.updated', 'release_workflow_transition', req.params['tid'] as string, req.body);
+      res.json(t);
+    } catch (err) {
+      next(err);
+    }
+  },
+];
+router.patch('/:id/transitions/:tid', ...updateReleaseWorkflowTransitionHandler);
+router.put('/:id/transitions/:tid', ...updateReleaseWorkflowTransitionHandler);
 
 // DELETE /api/admin/release-workflows/:id/transitions/:tid
 router.delete('/:id/transitions/:tid', async (req: AuthRequest, res, next) => {

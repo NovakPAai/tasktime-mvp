@@ -1,8 +1,8 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma, UserRole } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
-import { resolveWorkflowForRelease } from './release-workflow-engine.service.js';
+import { resolveWorkflowForRelease, getAvailableTransitions } from './release-workflow-engine.service.js';
 import type {
   CreateReleaseDto,
   UpdateReleaseDto,
@@ -31,11 +31,17 @@ export async function listReleasesGlobal(query: ListReleasesQueryDto) {
   const where: Prisma.ReleaseWhereInput = {};
 
   if (type) where.type = type;
-  if (statusId) where.statusId = statusId;
+  if (statusId) {
+    const ids = statusId.split(',').map((s) => s.trim()).filter(Boolean);
+    where.statusId = ids.length === 1 ? ids[0] : { in: ids };
+  }
   if (statusCategory) where.status = { category: statusCategory };
   if (projectId) where.projectId = projectId;
   if (search) {
-    where.name = { contains: search, mode: 'insensitive' };
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+    ];
   }
   if (from || to) {
     where.createdAt = {
@@ -60,7 +66,7 @@ export async function listReleasesGlobal(query: ListReleasesQueryDto) {
   }
   const cacheKey = releasesListCacheKey((hash >>> 0).toString(36));
 
-  const cached = await getCachedJson<{ data: unknown[]; total: number; page: number; limit: number }>(cacheKey);
+  const cached = await getCachedJson<{ data: unknown[]; meta: { page: number; limit: number; total: number; totalPages: number } }>(cacheKey);
   if (cached) return cached;
 
   const [releases, total] = await Promise.all([
@@ -95,7 +101,10 @@ export async function listReleasesGlobal(query: ListReleasesQueryDto) {
     }),
   );
 
-  const result = { data: enriched, total, page, limit };
+  const result = {
+    data: enriched,
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
   await setCachedJson(cacheKey, result, RELEASES_LIST_CACHE_TTL);
   return result;
 }
@@ -338,8 +347,15 @@ export async function addReleaseItems(releaseId: string, dto: ReleaseItemsAddDto
 }
 
 export async function removeReleaseItems(releaseId: string, issueIds: string[]) {
-  const release = await prisma.release.findUnique({ where: { id: releaseId } });
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    include: { status: true },
+  });
   if (!release) throw new AppError(404, 'Release not found');
+
+  if (release.status?.category === 'DONE' || release.status?.category === 'CANCELLED') {
+    throw new AppError(422, 'Cannot remove items from a release in DONE/CANCELLED status');
+  }
 
   await prisma.releaseItem.deleteMany({
     where: { releaseId, issueId: { in: issueIds } },
@@ -387,12 +403,15 @@ export async function listReleaseItems(releaseId: string, query: ListReleaseItem
     prisma.releaseItem.count({ where }),
   ]);
 
-  return { data: items, total, page, limit };
+  return {
+    data: items,
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 }
 
 // ─── RM-03.7: GET /releases/:id/readiness — extended metrics ─────────────────
 
-export async function getReleaseReadiness(id: string) {
+export async function getReleaseReadiness(id: string, actorId?: string, actorRole?: UserRole) {
   const release = await prisma.release.findUnique({ where: { id } });
   if (!release) throw new AppError(404, 'Release not found');
 
@@ -440,17 +459,18 @@ export async function getReleaseReadiness(id: string) {
     totalItems > 0 ? Math.round(((doneItems + cancelledItems) / totalItems) * 100) : 0;
 
   // byProject — breakdown for INTEGRATION releases
-  let byProject: Array<{ projectId: string; key: string; name: string; total: number; done: number }> = [];
+  let byProject: Array<{ project: { id: string; key: string; name: string }; total: number; done: number; inProgress: number }> = [];
   if (release.type === 'INTEGRATION') {
     const projectBreakdown = await prisma.$queryRaw<
-      Array<{ project_id: string; project_key: string; project_name: string; total: bigint; done: bigint }>
+      Array<{ project_id: string; project_key: string; project_name: string; total: bigint; done: bigint; in_progress: bigint }>
     >`
       SELECT
         p.id as project_id,
         p.key as project_key,
         p.name as project_name,
         COUNT(ri.id) as total,
-        COUNT(CASE WHEN ws.category = 'DONE' THEN 1 END) as done
+        COUNT(CASE WHEN ws.category = 'DONE' THEN 1 END) as done,
+        COUNT(CASE WHEN ws.category = 'IN_PROGRESS' THEN 1 END) as in_progress
       FROM release_items ri
       JOIN issues i ON i.id = ri.issue_id
       JOIN projects p ON p.id = i.project_id
@@ -459,12 +479,22 @@ export async function getReleaseReadiness(id: string) {
       GROUP BY p.id, p.key, p.name
     `;
     byProject = projectBreakdown.map((row) => ({
-      projectId: row.project_id,
-      key: row.project_key,
-      name: row.project_name,
+      project: { id: row.project_id, key: row.project_key, name: row.project_name },
       total: Number(row.total),
       done: Number(row.done),
+      inProgress: Number(row.in_progress ?? 0),
     }));
+  }
+
+  // availableTransitions — only when caller is authenticated
+  let availableTransitions = undefined;
+  if (actorId && actorRole) {
+    try {
+      const transitionsResult = await getAvailableTransitions(id, actorId, actorRole);
+      availableTransitions = transitionsResult.transitions;
+    } catch {
+      // If no workflow configured — omit the field
+    }
   }
 
   return {
@@ -476,6 +506,7 @@ export async function getReleaseReadiness(id: string) {
     inProgressItems,
     completionPercent,
     byProject,
+    ...(availableTransitions !== undefined && { availableTransitions }),
   };
 }
 

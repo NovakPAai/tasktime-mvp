@@ -1,0 +1,196 @@
+{
+  "key": "TTMP-223",
+  "title": "[Release Mgmt] Исправление несоответствий реализации спеке RELEASE_MANAGEMENT_SPEC",
+  "generatedAt": "2026-04-12T00:00:00Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "apiUrl": "https://flowuniverse.ru/api",
+    "issueId": "b85c80f9-b862-43ab-ab6c-62d96fd295e0",
+    "fetchedAt": "2026-04-12T00:00:00Z"
+  },
+  "issue": {
+    "type": "TASK",
+    "status": "OPEN",
+    "priority": "HIGH",
+    "project": "TTMP",
+    "assignee": null,
+    "creator": "Claude Code",
+    "estimatedHours": 8.5,
+    "description": "Аудит выявил 14 несоответствий между реализацией и RELEASE_MANAGEMENT_SPEC.md v1.0",
+    "acceptanceCriteria": "RELEASE_MANAGER имеет доступ к CRUD; MANAGER не может удалять; removeReleaseItems защищён; 409 для CONDITION_NOT_MET; meta.totalPages в списках; availableTransitions в readiness"
+  },
+  "dependencies": {
+    "backendModules": ["releases"],
+    "frontendComponents": [],
+    "prismaModels": [],
+    "externalPackages": [],
+    "blockers": []
+  },
+  "risks": [
+    {
+      "id": 1,
+      "description": "Смена метода PUT → PATCH в admin workflow ломает старых клиентов",
+      "probability": "LOW",
+      "impact": "405 Method Not Allowed для клиентов использующих PUT",
+      "mitigation": "Оставить PUT как алиас с тем же обработчиком"
+    },
+    {
+      "id": 2,
+      "description": "Переименование minCount → min ломает существующие conditions в БД",
+      "probability": "MEDIUM",
+      "impact": "Переходы с MIN_ITEMS_COUNT перестают работать",
+      "mitigation": "Проверить seed и данные в БД; при необходимости SQL-патч или поддержать оба поля"
+    },
+    {
+      "id": 3,
+      "description": "Добавление RELEASE_MANAGER расширяет права доступа",
+      "probability": "LOW",
+      "impact": "Непреднамеренное расширение прав если роль уже назначена пользователям",
+      "mitigation": "Добавить E2E-тест матрицы доступа"
+    }
+  ],
+  "findings": [
+    {
+      "id": 1,
+      "severity": "CRITICAL",
+      "file": "releases.router.ts",
+      "description": "RELEASE_MANAGER отсутствует во всех requireRole мутаций",
+      "affectedEndpoints": [
+        "POST /releases",
+        "PATCH /releases/:id",
+        "DELETE /releases/:id",
+        "POST /releases/:id/items",
+        "POST /releases/:id/items/remove",
+        "POST /releases/:id/clone",
+        "POST /releases/:id/transitions/:id",
+        "POST /releases/:id/sprints",
+        "POST /releases/:id/sprints/remove"
+      ]
+    },
+    {
+      "id": 2,
+      "severity": "CRITICAL",
+      "file": "releases.router.ts",
+      "description": "DELETE /releases/:id доступен MANAGER — по спеке должен быть только ADMIN + RELEASE_MANAGER"
+    },
+    {
+      "id": 3,
+      "severity": "CRITICAL",
+      "file": "releases.service.ts",
+      "description": "removeReleaseItems не проверяет статус DONE/CANCELLED (нарушение BR-8)"
+    },
+    {
+      "id": 4,
+      "severity": "CRITICAL",
+      "file": "release-workflow-engine.service.ts",
+      "description": "CONDITION_NOT_MET возвращает 403 вместо 409"
+    },
+    {
+      "id": 5,
+      "severity": "CRITICAL",
+      "file": "release-workflow-engine.service.ts",
+      "description": "Поле minCount в MIN_ITEMS_COUNT condition вместо min по спеке"
+    },
+    {
+      "id": 6,
+      "severity": "IMPORTANT",
+      "file": "releases.service.ts",
+      "description": "listReleasesGlobal и listReleaseItems не оборачивают пагинацию в meta объект и нет totalPages"
+    },
+    {
+      "id": 7,
+      "severity": "IMPORTANT",
+      "file": "releases.service.ts",
+      "description": "getReleaseReadiness не возвращает availableTransitions"
+    },
+    {
+      "id": 8,
+      "severity": "IMPORTANT",
+      "file": "releases.service.ts",
+      "description": "byProject в readiness имеет неверный shape: нет вложенного объекта project и нет поля inProgress"
+    },
+    {
+      "id": 9,
+      "severity": "IMPORTANT",
+      "file": "releases.service.ts",
+      "description": "search фильтрует только по name, не по description"
+    },
+    {
+      "id": 10,
+      "severity": "IMPORTANT",
+      "file": "releases.service.ts",
+      "description": "statusId фильтр не поддерживает множественный выбор через запятую"
+    },
+    {
+      "id": 11,
+      "severity": "IMPORTANT",
+      "file": "release-workflows-admin.router.ts",
+      "description": "PUT вместо PATCH для PATCH /admin/release-workflows/:id и transitions/:tid"
+    },
+    {
+      "id": 12,
+      "severity": "MINOR",
+      "file": "release-workflow-engine.service.ts",
+      "description": "Audit action 'release.transitioned' вместо 'release.transition' по спеке"
+    },
+    {
+      "id": 13,
+      "severity": "MINOR",
+      "file": "releases.service.ts",
+      "description": "listReleaseItems фильтр status работает по имени workflowStatus, спека подразумевает enum Issue.status"
+    },
+    {
+      "id": 14,
+      "severity": "MINOR",
+      "file": "release-workflows-admin.router.ts",
+      "description": "PATCH /steps/:stepId присутствует в реализации, но отсутствует в спеке"
+    }
+  ],
+  "requirements": {
+    "functional": [
+      "FR-1: RELEASE_MANAGER имеет доступ ко всем мутациям релизов",
+      "FR-2: MANAGER не может удалять релизы",
+      "FR-3: removeReleaseItems защищён от DONE/CANCELLED статуса",
+      "FR-4: CONDITION_NOT_MET возвращает HTTP 409",
+      "FR-5: Списки релизов возвращают meta.totalPages",
+      "FR-6: readiness содержит availableTransitions и корректный byProject",
+      "FR-7: Поиск по name и description",
+      "FR-8: statusId фильтр поддерживает multiple UUID через запятую",
+      "FR-9: Admin workflow эндпоинты используют PATCH"
+    ],
+    "nonFunctional": [
+      "API response < 200ms p95",
+      "PUT на admin workflow работает как алиас для обратной совместимости"
+    ],
+    "security": [
+      "SEC-1: MANAGER не может удалять релизы",
+      "SEC-2: RELEASE_MANAGER не имеет доступа к /admin/release-statuses и /admin/release-workflows"
+    ]
+  },
+  "acceptanceCriteria": [
+    "AC-1: POST /api/releases с ролью RELEASE_MANAGER → 201",
+    "AC-2: DELETE /api/releases/:id с ролью MANAGER → 403",
+    "AC-3: POST /api/releases/:id/items/remove на DONE-релизе → 422",
+    "AC-4: POST /api/releases/:id/transitions/:tid с нарушенным condition → 409",
+    "AC-5: GET /api/releases → ответ содержит meta.totalPages",
+    "AC-6: GET /api/releases?search=test находит записи по description",
+    "AC-7: GET /api/releases/:id/readiness содержит availableTransitions и byProject[].inProgress",
+    "AC-8: PATCH /api/admin/release-workflows/:id → 200",
+    "AC-9: GET /api/releases/:id/transitions доступен для роли VIEWER",
+    "AC-10: Все существующие тесты зелёные"
+  ],
+  "estimation": {
+    "analysis": 0.5,
+    "backend": 5.0,
+    "frontend": 0,
+    "testing": 2.0,
+    "review": 1.0,
+    "total": 8.5
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [],
+    "blocks": [],
+    "dependsOn": []
+  }
+}

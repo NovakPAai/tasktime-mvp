@@ -37,7 +37,7 @@ type ReleaseConditionRule =
   // are checking issue workflow statuses, not release statuses.
   | { type: 'ALL_ITEMS_IN_STATUS_CATEGORY'; category: StatusCategory }
   | { type: 'ALL_SPRINTS_CLOSED' }
-  | { type: 'MIN_ITEMS_COUNT'; minCount: number };
+  | { type: 'MIN_ITEMS_COUNT'; min: number };
 
 // ─── Condition evaluator (async, release-specific) ────────────────────────────
 
@@ -76,7 +76,7 @@ async function evaluateReleaseCondition(
       const total = await prisma.releaseItem.count({
         where: { releaseId: ctx.releaseId },
       });
-      return total >= rule.minCount;
+      return total >= rule.min;
     }
 
     default:
@@ -257,7 +257,7 @@ export async function executeTransition(
       releaseId,
     });
     if (!allowed) {
-      throw new AppError(403, 'CONDITION_NOT_MET', {
+      throw new AppError(409, 'CONDITION_NOT_MET', {
         details: { conditionType: failedCondition ?? 'UNKNOWN' },
       });
     }
@@ -285,7 +285,7 @@ export async function executeTransition(
     }),
     prisma.auditLog.create({
       data: {
-        action: 'release.transitioned',
+        action: 'release.transition',
         entityType: 'release',
         entityId: releaseId,
         userId: actorId,

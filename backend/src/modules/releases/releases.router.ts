@@ -37,7 +37,7 @@ router.get('/releases', async (req: AuthRequest, res, next) => {
 
 router.post(
   '/releases',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(createReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -80,7 +80,7 @@ router.get('/releases/:id/history', async (req: AuthRequest, res, next) => {
 
 router.patch(
   '/releases/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(updateReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -97,7 +97,7 @@ router.patch(
 
 router.delete(
   '/releases/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   async (req: AuthRequest, res, next) => {
     try {
       await releasesService.deleteRelease(req.params.id as string);
@@ -123,7 +123,7 @@ router.get('/releases/:id/items', async (req: AuthRequest, res, next) => {
 
 router.post(
   '/releases/:id/items',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(releaseItemsAddDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -144,7 +144,7 @@ router.post(
 
 router.post(
   '/releases/:id/items/remove',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(releaseItemsRemoveDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -166,7 +166,6 @@ router.post(
 
 router.get(
   '/releases/:id/transitions',
-  requireRole('ADMIN', 'MANAGER', 'USER'),
   async (req: AuthRequest, res, next) => {
     try {
       const result = await releaseWorkflowEngine.getAvailableTransitions(
@@ -183,7 +182,7 @@ router.get(
 
 router.post(
   '/releases/:id/transitions/:transitionId',
-  requireRole('ADMIN', 'MANAGER', 'USER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(executeTransitionDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -204,9 +203,13 @@ router.post(
 
 // ─── RM-03.7: GET /releases/:id/readiness — extended ─────────────────────────
 
-router.get('/releases/:id/readiness', async (req, res, next) => {
+router.get('/releases/:id/readiness', async (req: AuthRequest, res, next) => {
   try {
-    const readiness = await releasesService.getReleaseReadiness(req.params.id as string);
+    const readiness = await releasesService.getReleaseReadiness(
+      req.params.id as string,
+      req.user?.userId,
+      req.user?.role,
+    );
     res.json(readiness);
   } catch (err) {
     next(err);
@@ -217,7 +220,7 @@ router.get('/releases/:id/readiness', async (req, res, next) => {
 
 router.post(
   '/releases/:id/clone',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(cloneReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -262,7 +265,7 @@ router.get('/projects/:projectId/releases', async (req, res, next) => {
 
 router.post(
   '/projects/:projectId/releases',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(createReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -301,7 +304,7 @@ router.get('/releases/:id/sprints', async (req, res, next) => {
 
 router.post(
   '/releases/:id/sprints',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(manageSprintsInReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -318,7 +321,7 @@ router.post(
 
 router.post(
   '/releases/:id/sprints/remove',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
   validate(manageSprintsInReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
