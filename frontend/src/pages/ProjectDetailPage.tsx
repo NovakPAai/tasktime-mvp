@@ -306,7 +306,7 @@ export default function ProjectDetailPage() {
       ),
       dataIndex: 'status',
       width: 120,
-      render: (s: IssueStatus, _r: Issue) => (
+      render: (s: IssueStatus) => (
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           background: getStatusBg(s, C),
