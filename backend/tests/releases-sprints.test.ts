@@ -152,107 +152,25 @@ describe('POST /releases/:id/sprints/remove', () => {
 });
 
 // =============================================
-// markReleaseReady guards
+// Deprecated endpoints → 410 Gone
+// (markReleaseReady / markReleaseReleased replaced by workflow transitions)
 // =============================================
 
-describe('POST /releases/:id/ready — guards', () => {
-  it('400 if no sprints in release', async () => {
+describe('POST /releases/:id/ready — deprecated', () => {
+  it('returns 410 Gone', async () => {
     const res = await request.post(`/api/releases/${releaseId}/ready`)
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/sprint/i);
-  });
-
-  it('400 if sprints are empty (no issues)', async () => {
-    await request.post(`/api/releases/${releaseId}/sprints`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ sprintIds: [sprintId] });
-
-    const res = await request.post(`/api/releases/${releaseId}/ready`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/issue/i);
-  });
-
-  it('200 OK when sprint has issues', async () => {
-    // Add sprint and issue to it
-    await request.post(`/api/releases/${releaseId}/sprints`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ sprintIds: [sprintId] });
-    await request.post(`/api/sprints/${sprintId}/issues`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ issueIds: [issueId] });
-
-    const res = await request.post(`/api/releases/${releaseId}/ready`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.status).toBe(200);
-    expect(res.body.state).toBe('READY');
+    expect(res.status).toBe(410);
+    expect(res.body.error).toBe('Deprecated');
   });
 });
 
-// =============================================
-// markReleaseReleased guards
-// =============================================
-
-describe('POST /releases/:id/released — guards', () => {
-  it('400 if sprints are not CLOSED', async () => {
-    await request.post(`/api/releases/${releaseId}/sprints`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ sprintIds: [sprintId] });
-    await request.post(`/api/sprints/${sprintId}/issues`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ issueIds: [issueId] });
-    await request.post(`/api/releases/${releaseId}/ready`)
-      .set('Authorization', `Bearer ${adminToken}`);
-
-    // Sprint is PLANNED, not CLOSED
+describe('POST /releases/:id/released — deprecated', () => {
+  it('returns 410 Gone', async () => {
     const res = await request.post(`/api/releases/${releaseId}/released`)
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/sprint/i);
-  });
-
-  it('400 if sprint is ACTIVE (not CLOSED)', async () => {
-    // NOTE: closeSprint moves incomplete issues to backlog, so it's impossible
-    // to have a CLOSED sprint with open issues. The guard for open issues is
-    // triggered when sprints are still ACTIVE/PLANNED.
-    await request.post(`/api/releases/${releaseId}/sprints`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ sprintIds: [sprintId] });
-    await request.post(`/api/sprints/${sprintId}/issues`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ issueIds: [issueId] });
-    await request.post(`/api/releases/${releaseId}/ready`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    // Sprint is PLANNED (not yet CLOSED)
-    const res = await request.post(`/api/releases/${releaseId}/released`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/sprint/i);
-  });
-
-  it('200 OK when all sprints CLOSED and issues DONE', async () => {
-    await request.post(`/api/releases/${releaseId}/sprints`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ sprintIds: [sprintId] });
-    await request.post(`/api/sprints/${sprintId}/issues`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ issueIds: [issueId] });
-    await request.post(`/api/releases/${releaseId}/ready`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    await request.post(`/api/sprints/${sprintId}/start`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    await request.post(`/api/sprints/${sprintId}/close`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    // Mark issue DONE
-    await request.patch(`/api/issues/${issueId}/status`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ status: 'DONE' });
-
-    const res = await request.post(`/api/releases/${releaseId}/released`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(res.status).toBe(200);
-    expect(res.body.state).toBe('RELEASED');
+    expect(res.status).toBe(410);
+    expect(res.body.error).toBe('Deprecated');
   });
 });
 
@@ -268,27 +186,32 @@ describe('GET /releases/:id/readiness', () => {
     expect(res.body).toMatchObject({
       totalSprints: 0,
       closedSprints: 0,
-      totalIssues: 0,
-      doneIssues: 0,
-      canMarkReady: false,
-      canRelease: false,
+      totalItems: 0,
+      doneItems: 0,
+      completionPercent: 0,
     });
   });
 
-  it('reflects added sprint and issue', async () => {
+  it('reflects added sprint', async () => {
     await request.post(`/api/releases/${releaseId}/sprints`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ sprintIds: [sprintId] });
-    await request.post(`/api/sprints/${sprintId}/issues`)
+
+    const res = await request.get(`/api/releases/${releaseId}/readiness`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalSprints).toBe(1);
+    expect(res.body.closedSprints).toBe(0);
+  });
+
+  it('reflects added release item', async () => {
+    await request.post(`/api/releases/${releaseId}/items`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ issueIds: [issueId] });
 
     const res = await request.get(`/api/releases/${releaseId}/readiness`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.totalSprints).toBe(1);
-    expect(res.body.totalIssues).toBe(1);
-    expect(res.body.canMarkReady).toBe(true);
-    expect(res.body.canRelease).toBe(false);
+    expect(res.body.totalItems).toBe(1);
   });
 });
