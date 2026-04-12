@@ -36,7 +36,7 @@ export const updateReleaseDto = z.object({
 
 export const listReleasesQueryDto = z.object({
   type: z.enum(['ATOMIC', 'INTEGRATION']).optional(),
-  statusId: z.string().uuid().optional(),
+  statusId: z.string().optional(), // supports comma-separated UUIDs: "uuid1,uuid2"
   statusCategory: z.enum(['PLANNING', 'IN_PROGRESS', 'DONE', 'CANCELLED']).optional(),
   projectId: z.string().uuid().optional(),
   from: isoDate.optional(),
