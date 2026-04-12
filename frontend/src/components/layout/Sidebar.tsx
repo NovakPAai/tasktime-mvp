@@ -222,6 +222,9 @@ export default function Sidebar({
     { type: 'link', path: '/admin/workflow-schemes',     label: 'Схемы workflow' },
     { type: 'link', path: '/admin/transition-screens',   label: 'Экраны переходов' },
 
+    { type: 'divider', label: 'Релизы' },
+    { type: 'link', path: '/admin/release-workflows',    label: 'Workflow релизов' },
+
     ...(isSuperAdmin ? [
       { type: 'divider' as const, label: 'Администрирование' },
       { type: 'link' as const, path: '/admin/system', label: 'Система' },
