@@ -99,7 +99,8 @@ class GitHubIssueReporter implements Reporter {
     let existingNumber: string | null = null;
     try {
       const result = execSync(searchCmd, { encoding: 'utf-8' }).trim();
-      if (result && result !== 'null') {
+      // Validate strictly numeric to prevent shell injection
+      if (result && /^\d+$/.test(result)) {
         existingNumber = result;
       }
     } catch {

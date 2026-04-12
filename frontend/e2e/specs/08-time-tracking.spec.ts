@@ -52,7 +52,7 @@ test.describe('Time Tracking', () => {
     const timerStop = page.locator('[data-testid="timer-stop"]');
     const hasTimerTestids = (await timerStart.isVisible({ timeout: 3_000 }).catch(() => false))
       || (await timerStop.isVisible({ timeout: 1_000 }).catch(() => false));
-    if (!hasTimerTestids) test.skip();
+    if (!hasTimerTestids) { test.skip(); return; }
   });
 
   test('start and stop timer via UI', async ({ page }) => {
@@ -81,6 +81,7 @@ test.describe('Time Tracking', () => {
       await page.keyboard.press('Escape');
     } else {
       test.skip();
+      return;
     }
   });
 

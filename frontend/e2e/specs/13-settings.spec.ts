@@ -50,6 +50,7 @@ test.describe('Settings', () => {
       void htmlBefore; void htmlAfter;
     } else {
       test.skip();
+      return;
     }
   });
 
@@ -68,6 +69,7 @@ test.describe('Settings', () => {
     } else {
       // testid not deployed yet — skip gracefully
       test.skip();
+      return;
     }
   });
 });

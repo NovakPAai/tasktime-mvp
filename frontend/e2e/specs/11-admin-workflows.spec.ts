@@ -33,6 +33,7 @@ test.describe('Admin — Workflows', () => {
       await expect(page).toHaveURL(/\/admin\/workflows\//, { timeout: 10_000 });
     } else {
       test.skip();
+      return;
     }
   });
 
@@ -47,6 +48,7 @@ test.describe('Admin — Workflows', () => {
       await expect(stepsSection).toBeVisible({ timeout: 10_000 });
     } else {
       test.skip();
+      return;
     }
   });
 
@@ -64,9 +66,11 @@ test.describe('Admin — Workflows', () => {
         await expect(page.locator('h1, h2, [class*="heading"]').first()).toBeVisible({ timeout: 5_000 });
       } else {
         test.skip();
+        return;
       }
     } else {
       test.skip();
+      return;
     }
   });
 

@@ -19,8 +19,9 @@ test.describe('Auth', () => {
   });
 
   test('login with valid credentials redirects to dashboard', async ({ page }) => {
-    const email = process.env.E2E_ADMIN_EMAIL || 'admin@tasktime.ru';
-    const password = process.env.E2E_ADMIN_PASSWORD || 'password123';
+    const email = process.env.E2E_ADMIN_EMAIL || 'e2e-bot@tasktime.ru';
+    const password = process.env.E2E_ADMIN_PASSWORD;
+    if (!password) throw new Error('E2E_ADMIN_PASSWORD env var is required');
 
     await page.goto(`${BASE}/login`);
     await page.locator(SEL_EMAIL).first().fill(email);

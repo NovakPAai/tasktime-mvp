@@ -48,6 +48,7 @@ test.describe('Releases', () => {
         await expect(page.locator('h1, h2, [class*="heading"]').first()).toBeVisible({ timeout: 5_000 });
       } else {
         test.skip();
+        return;
       }
     }
   });

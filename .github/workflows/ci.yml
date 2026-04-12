@@ -273,8 +273,8 @@ jobs:
     env:
       E2E_BASE_URL: ${{ secrets.STAGING_APP_URL || 'http://5.129.242.171:8080' }}
       E2E_API_BASE_URL: ${{ secrets.STAGING_API_URL || 'http://5.129.242.171:8080/api' }}
-      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'admin@tasktime.ru' }}
-      E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'password123' }}
+      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CI: 'true'
     steps:

@@ -76,6 +76,7 @@ test.describe('Teams', () => {
       await page.keyboard.press('Escape');
     } else {
       test.skip();
+      return;
     }
   });
 });

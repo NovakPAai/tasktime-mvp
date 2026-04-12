@@ -97,6 +97,7 @@ test.describe('Board', () => {
       await page.keyboard.press('Escape');
     } else {
       test.skip();
+      return;
     }
   });
 

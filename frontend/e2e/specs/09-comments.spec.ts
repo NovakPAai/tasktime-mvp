@@ -41,6 +41,7 @@ test.describe('Comments', () => {
     const hasTestid = await gotoIssueAndCheckTestid(page);
     if (!hasTestid) {
       test.skip(); // testid not yet deployed
+      return;
     }
   });
 
