@@ -26,6 +26,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { hasAnyRequiredRole, hasRequiredRole } from '../lib/roles';
 import { getProjectIssueTypes } from '../api/issue-type-configs';
 import { IssueTypeBadge } from '../lib/issue-kit';
+import BulkStatusWizardModal from '../components/issues/BulkStatusWizardModal';
 
 // ─── Tokens Dark (Paper FW-0) ────────────────────────────────
 const DARK_C = {
@@ -117,6 +118,24 @@ function getStatusDot(s: IssueStatus, C: typeof DARK_C): string {
     default:            return C.sOpen;
   }
 }
+function getStatusBg(s: IssueStatus, C: typeof DARK_C): string {
+  switch (s) {
+    case 'DONE':        return C.sdDone;
+    case 'IN_PROGRESS': return C.sdProgress;
+    case 'REVIEW':      return C.sdReview;
+    case 'CANCELLED':   return C.sdCancelled;
+    default:            return C.sdOpen;
+  }
+}
+function getStatusLabel(s: IssueStatus): string {
+  switch (s) {
+    case 'IN_PROGRESS': return 'In Progress';
+    case 'DONE':        return 'Done';
+    case 'REVIEW':      return 'Review';
+    case 'CANCELLED':   return 'Cancelled';
+    default:            return 'Open';
+  }
+}
 function getPriorityColor(p: IssuePriority, C: typeof DARK_C): string {
   switch (p) {
     case 'CRITICAL': return C.pCritical;
@@ -160,8 +179,8 @@ export default function ProjectDetailPage() {
   const [form] = Form.useForm();
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
-  const [bulkStatus, setBulkStatus] = useState<IssueStatus | undefined>(undefined);
   const [bulkAssigneeId, setBulkAssigneeId] = useState<string | undefined>(undefined);
+  const [bulkStatusWizardOpen, setBulkStatusWizardOpen] = useState(false);
   const [treeMode, setTreeMode] = useState(true);
   const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
 
@@ -192,37 +211,22 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleStatusChange = async (issueId: string, status: IssueStatus) => {
-    try {
-      await issuesApi.updateStatus(issueId, status);
-      if (id) fetchIssues(id);
-    } catch {
-      message.error('Failed to update status');
-    }
-  };
-
   const handleApplyFilters = () => { if (id) fetchIssues(id); };
   const handleResetFilters  = () => { if (id) { resetFilters(); fetchIssues(id); } };
 
-  const handleBulkUpdate = async () => {
-    if (!id || selectedIssueIds.length === 0) return;
-    if (!bulkStatus && bulkAssigneeId === undefined) {
-      message.warning('Select status and/or assignee to update');
-      return;
-    }
+  const handleBulkAssigneeUpdate = async () => {
+    if (!id || selectedIssueIds.length === 0 || bulkAssigneeId === undefined) return;
     try {
       await issuesApi.bulkUpdateIssues(id, {
         issueIds:   selectedIssueIds,
-        status:     bulkStatus,
         assigneeId: bulkAssigneeId === 'UNASSIGNED' ? null : bulkAssigneeId,
       });
-      message.success('Issues updated');
+      message.success('Исполнитель обновлён');
       setSelectedIssueIds([]);
-      setBulkStatus(undefined);
       setBulkAssigneeId(undefined);
       fetchIssues(id);
     } catch {
-      message.error('Failed to update issues');
+      message.error('Failed to update assignee');
     }
   };
 
@@ -301,21 +305,19 @@ export default function ProjectDetailPage() {
         </span>
       ),
       dataIndex: 'status',
-      width: 138,
-      render: (s: IssueStatus, r: Issue) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: getStatusDot(s, C), flexShrink: 0 }} />
-          <Select
-            value={s}
-            size="small"
-            variant="borderless"
-            onChange={(v) => handleStatusChange(r.id, v)}
-            options={(['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'] as IssueStatus[]).map((v) => ({
-              value: v, label: v,
-            }))}
-            style={{ fontFamily: F.sans, fontSize: 11 }}
-          />
-        </div>
+      width: 120,
+      render: (s: IssueStatus, _r: Issue) => (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          background: getStatusBg(s, C),
+          borderRadius: 6,
+          padding: '2px 8px',
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: getStatusDot(s, C), flexShrink: 0 }} />
+          <span style={{ fontFamily: F.sans, fontSize: 11, fontWeight: 500, color: getStatusDot(s, C) }}>
+            {getStatusLabel(s)}
+          </span>
+        </span>
       ),
     },
     {
@@ -675,17 +677,13 @@ export default function ProjectDetailPage() {
           <>
             <span style={{ width: 1, height: 14, background: C.border }} />
             <Space size={6}>
-              <Select<IssueStatus>
-                allowClear
-                placeholder="Set status"
-                value={bulkStatus}
-                onChange={(value) => setBulkStatus(value)}
-                options={(['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'] as IssueStatus[]).map((v) => ({
-                  value: v, label: v,
-                }))}
+              <Button
                 size="small"
-                style={{ minWidth: 120, fontFamily: F.sans, fontSize: 11 }}
-              />
+                onClick={() => setBulkStatusWizardOpen(true)}
+                style={{ fontFamily: F.sans, fontSize: 11, background: C.bgCard, border: `1px solid ${C.border}`, color: C.t2 }}
+              >
+                Изменить статус ({selectedIssueIds.length})
+              </Button>
               <Select
                 allowClear
                 placeholder="Set assignee"
@@ -698,15 +696,16 @@ export default function ProjectDetailPage() {
                 size="small"
                 style={{ minWidth: 130, fontFamily: F.sans, fontSize: 11 }}
               />
-              <Button
-                type="primary"
-                size="small"
-                disabled={!bulkStatus && bulkAssigneeId === undefined}
-                onClick={handleBulkUpdate}
-                style={{ fontFamily: F.sans, fontSize: 11 }}
-              >
-                Apply to {selectedIssueIds.length}
-              </Button>
+              {bulkAssigneeId !== undefined && (
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={handleBulkAssigneeUpdate}
+                  style={{ fontFamily: F.sans, fontSize: 11 }}
+                >
+                  Назначить
+                </Button>
+              )}
               {hasRequiredRole(user?.role, 'ADMIN') && (
                 <Popconfirm
                   title={`Удалить ${selectedIssueIds.length} задач?`}
@@ -825,6 +824,20 @@ export default function ProjectDetailPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* ── Bulk Status Wizard ── */}
+      {bulkStatusWizardOpen && (
+        <BulkStatusWizardModal
+          open={bulkStatusWizardOpen}
+          issueIds={selectedIssueIds}
+          onSuccess={() => {
+            setBulkStatusWizardOpen(false);
+            setSelectedIssueIds([]);
+            if (id) fetchIssues(id);
+          }}
+          onCancel={() => setBulkStatusWizardOpen(false)}
+        />
+      )}
     </div>
   );
 }
