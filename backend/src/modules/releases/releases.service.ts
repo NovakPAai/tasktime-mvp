@@ -69,6 +69,7 @@ export async function listReleasesGlobal(query: ListReleasesQueryDto) {
       include: {
         status: { select: { id: true, name: true, category: true, color: true } },
         project: { select: { id: true, name: true, key: true } },
+        createdBy: { select: { id: true, name: true } },
         _count: { select: { items: true, sprints: true } },
       },
       orderBy,
@@ -251,6 +252,35 @@ export async function deleteRelease(id: string): Promise<void> {
   await invalidateReleasesListCache();
 }
 
+// ─── GET /releases/:id — single release ──────────────────────────────────────
+
+export async function getRelease(id: string) {
+  const release = await prisma.release.findUnique({
+    where: { id },
+    include: {
+      status: { select: { id: true, name: true, category: true, color: true } },
+      project: { select: { id: true, name: true, key: true } },
+      createdBy: { select: { id: true, name: true } },
+      _count: { select: { items: true, sprints: true } },
+    },
+  });
+  if (!release) throw new AppError(404, 'Release not found');
+  return release;
+}
+
+// ─── GET /releases/:id/history — audit log ────────────────────────────────────
+
+export async function getReleaseHistory(id: string) {
+  const release = await prisma.release.findUnique({ where: { id } });
+  if (!release) throw new AppError(404, 'Release not found');
+  return prisma.auditLog.findMany({
+    where: { entityType: 'release', entityId: id },
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+}
+
 // ─── RM-03.5: ReleaseItem CRUD ────────────────────────────────────────────────
 
 export async function addReleaseItems(releaseId: string, dto: ReleaseItemsAddDto, addedById: string) {
@@ -334,7 +364,8 @@ export async function listReleaseItems(releaseId: string, query: ListReleaseItem
             projectId: true,
             project: { select: { id: true, name: true, key: true } },
             assignee: { select: { id: true, name: true } },
-            issueTypeConfig: true,
+            issueTypeConfig: { select: { id: true, name: true, systemKey: true, iconColor: true } },
+            workflowStatus: { select: { id: true, name: true, category: true, color: true } },
           },
         },
       },

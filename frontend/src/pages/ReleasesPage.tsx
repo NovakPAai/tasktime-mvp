@@ -163,7 +163,7 @@ export default function ReleasesPage() {
 
   const loadSelectedRelease = useCallback(async (releaseId: string) => {
     const full = await releasesApi.getReleaseWithIssues(releaseId);
-    setSelectedRelease(full);
+    setSelectedRelease(full as typeof full & { issues?: Issue[] });
     const r = await releasesApi.getReleaseReadiness(releaseId);
     setReadiness(r);
   }, []);
@@ -302,8 +302,10 @@ export default function ReleasesPage() {
     const parts: string[] = [];
     if (readiness.totalSprints > readiness.closedSprints)
       parts.push(`${readiness.totalSprints - readiness.closedSprints} спринт(ов) не закрыто`);
-    if (readiness.totalIssues > readiness.doneIssues)
-      parts.push(`${readiness.totalIssues - readiness.doneIssues} задач(и) не выполнено`);
+    const totalIssues = readiness.totalIssues ?? readiness.totalItems ?? 0;
+    const doneIssues = readiness.doneIssues ?? readiness.doneItems ?? 0;
+    if (totalIssues > doneIssues)
+      parts.push(`${totalIssues - doneIssues} задач(и) не выполнено`);
     return parts.join(', ');
   };
 
@@ -682,12 +684,12 @@ export default function ReleasesPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: F.sans, fontSize: 11, color: C.t3, marginBottom: 4 }}>
-                    Задачи выполнены: {readiness.doneIssues}/{readiness.totalIssues}
+                    Задачи выполнены: {(readiness.doneIssues ?? readiness.doneItems ?? 0)}/{(readiness.totalIssues ?? readiness.totalItems ?? 0)}
                   </div>
                   <Progress
-                    percent={readiness.totalIssues > 0 ? Math.round((readiness.doneIssues / readiness.totalIssues) * 100) : 0}
+                    percent={(readiness.totalIssues ?? readiness.totalItems ?? 0) > 0 ? Math.round(((readiness.doneIssues ?? readiness.doneItems ?? 0) / (readiness.totalIssues ?? readiness.totalItems ?? 0)) * 100) : 0}
                     size="small"
-                    status={readiness.doneIssues === readiness.totalIssues && readiness.totalIssues > 0 ? 'success' : 'active'}
+                    status={(readiness.doneIssues ?? readiness.doneItems ?? 0) === (readiness.totalIssues ?? readiness.totalItems ?? 0) && (readiness.totalIssues ?? readiness.totalItems ?? 0) > 0 ? 'success' : 'active'}
                   />
                 </div>
               </div>

@@ -54,6 +54,28 @@ router.post(
   },
 );
 
+// ─── GET /releases/:id — single release ──────────────────────────────────────
+
+router.get('/releases/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const release = await releasesService.getRelease(req.params.id as string);
+    res.json(release);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /releases/:id/history — audit log ───────────────────────────────────
+
+router.get('/releases/:id/history', async (req: AuthRequest, res, next) => {
+  try {
+    const history = await releasesService.getReleaseHistory(req.params.id as string);
+    res.json(history);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── RM-03.3: PATCH /releases/:id — update (immutable: type, projectId) ─────
 
 router.patch(
