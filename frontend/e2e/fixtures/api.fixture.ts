@@ -37,10 +37,24 @@ export async function login(
   return { accessToken: data.accessToken, userId: data.user.id, userEmail: data.user.email };
 }
 
+/** e2e-bot (MANAGER) — creates test data, logs in via browser */
 export async function getAdminSession(request: APIRequestContext): Promise<AuthSession> {
   const email = process.env.E2E_ADMIN_EMAIL || 'e2e-bot@tasktime.ru';
   const password = process.env.E2E_ADMIN_PASSWORD;
   if (!password) throw new Error('E2E_ADMIN_PASSWORD env var is required');
+  return login(request, email, password);
+}
+
+/**
+ * Cleanup account (ADMIN) — used ONLY in afterAll to delete test data.
+ * Requires DELETE /api/projects/:id which is ADMIN-only.
+ * Uses E2E_CLEANUP_EMAIL / E2E_CLEANUP_PASSWORD env vars.
+ * Defaults to admin@tasktime.ru + E2E_CLEANUP_PASSWORD (separate CI secret).
+ */
+export async function getCleanupSession(request: APIRequestContext): Promise<AuthSession> {
+  const email = process.env.E2E_CLEANUP_EMAIL || 'admin@tasktime.ru';
+  const password = process.env.E2E_CLEANUP_PASSWORD;
+  if (!password) throw new Error('E2E_CLEANUP_PASSWORD env var is required for cleanup operations');
   return login(request, email, password);
 }
 

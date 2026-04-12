@@ -36,16 +36,17 @@ test.describe('Projects', () => {
     // Project card should appear
     await expect(page.getByText(projectName)).toBeVisible({ timeout: 15_000 });
 
-    // Cleanup
+    // Cleanup (needs ADMIN for deleteProject)
     try {
-      const session = await api.getAdminSession(request);
+      const session = await api.getCleanupSession(request);
       await api.cleanupProjects(request, session.accessToken, prefix);
     } catch { /* ignore cleanup errors */ }
   });
 
   test('clicking project card navigates to project detail', async ({ page, prefix, request }) => {
-    // Create project via API
+    // Create project via API (MANAGER sufficient)
     const { accessToken } = await api.getAdminSession(request);
+    const { accessToken: cleanupToken } = await api.getCleanupSession(request);
     const key = `N${Date.now().toString().slice(-5)}`;
     const project = await api.createProject(request, accessToken, `${prefix}NavProject`, key);
 
@@ -61,14 +62,14 @@ test.describe('Projects', () => {
       }
       await nameLink.click();
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`), { timeout: 10_000 });
-      await api.deleteProject(request, accessToken, project.id);
+      await api.deleteProject(request, cleanupToken, project.id);
       return;
     }
     await card.click();
 
     await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`), { timeout: 10_000 });
 
-    // Cleanup
-    await api.deleteProject(request, accessToken, project.id);
+    // Cleanup (needs ADMIN for delete)
+    await api.deleteProject(request, cleanupToken, project.id);
   });
 });

@@ -17,8 +17,8 @@ test.describe('Teams', () => {
   });
 
   test.afterAll(async ({ request }) => {
-    const session = await api.getAdminSession(request);
-    // Delete any teams created
+    // Cleanup needs ADMIN (deleteTeam is ADMIN-only)
+    const session = await api.getCleanupSession(request);
     if (teamId) {
       try {
         await api.deleteTeam(request, session.accessToken, teamId);

@@ -26,7 +26,7 @@ test.describe('Time Tracking', () => {
   });
 
   test.afterAll(async ({ request }) => {
-    const session = await api.getAdminSession(request);
+    const session = await api.getCleanupSession(request);
     await api.cleanupProjects(request, session.accessToken, prefix);
   });
 
