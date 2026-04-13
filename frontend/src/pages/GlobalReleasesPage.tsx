@@ -212,6 +212,9 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
   const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([]);
   const [issueSearch, setIssueSearch] = useState('');
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [issueProjectFilter, setIssueProjectFilter] = useState<string | undefined>();
+  const [loadingModalIssues, setLoadingModalIssues] = useState(false);
 
   const loadItems = useCallback(async (id: string, page = 1) => {
     setLoadingItems(true);
@@ -343,16 +346,44 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
   };
 
   const openAddIssues = async () => {
-    if (!release?.projectId) return;
-    const issues = await issuesApi.listIssues(release.projectId);
-    setAllIssues(issues);
-    setAddIssuesOpen(true);
+    if (release?.type === 'INTEGRATION') {
+      const projects = await projectsApi.listProjects();
+      setAllProjects(projects);
+      setIssueProjectFilter(undefined);
+      setAllIssues([]);
+      setAddIssuesOpen(true);
+    } else {
+      if (!release?.projectId) return;
+      const issues = await issuesApi.listIssues(release.projectId);
+      setAllIssues(issues);
+      setAddIssuesOpen(true);
+    }
+  };
+
+  const handleIssueProjectFilterChange = async (projectId: string | undefined) => {
+    setIssueProjectFilter(projectId);
+    setAllIssues([]);
+    if (!projectId) return;
+    setLoadingModalIssues(true);
+    try {
+      const issues = await issuesApi.listIssues(projectId);
+      setAllIssues(issues);
+    } catch {
+      void message.error('Не удалось загрузить задачи проекта');
+    } finally {
+      setLoadingModalIssues(false);
+    }
   };
 
   const openAddSprints = async () => {
-    if (!release?.projectId) return;
-    const res = await sprintsApi.listSprints(release.projectId);
-    setAllSprints(res.data);
+    if (release?.type === 'INTEGRATION') {
+      const res = await sprintsApi.listAllSprints({}, { limit: 200 });
+      setAllSprints(res.data);
+    } else {
+      if (!release?.projectId) return;
+      const res = await sprintsApi.listSprints(release.projectId);
+      setAllSprints(res.data);
+    }
     setAddSprintsOpen(true);
   };
 
@@ -483,7 +514,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
         {/* ── Issues tab ─────────────────────────────── */}
         {tab === 'issues' && (
           <div>
-            {canManage && release.type === 'ATOMIC' && release.projectId && (
+            {canManage && (
               <div style={{ marginBottom: 12 }}>
                 <button
                   onClick={openAddIssues}
@@ -554,7 +585,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
         {/* ── Sprints tab ─────────────────────────────── */}
         {tab === 'sprints' && (
           <div>
-            {canManage && release.type === 'ATOMIC' && release.projectId && (
+            {canManage && (
               <div style={{ marginBottom: 12 }}>
                 <button
                   onClick={openAddSprints}
@@ -762,13 +793,25 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
       <Modal
         open={addIssuesOpen}
         title="Добавить задачи в релиз"
-        onCancel={() => { setAddIssuesOpen(false); setSelectedIssueIds([]); setIssueSearch(''); }}
+        onCancel={() => { setAddIssuesOpen(false); setSelectedIssueIds([]); setIssueSearch(''); setIssueProjectFilter(undefined); setAllIssues([]); }}
         onOk={handleAddIssues}
         okText="Добавить"
         cancelText="Отмена"
         okButtonProps={{ disabled: selectedIssueIds.length === 0 }}
         width={600}
       >
+        {release?.type === 'INTEGRATION' && (
+          <Select
+            placeholder="Выберите проект..."
+            style={{ width: '100%', marginBottom: 12 }}
+            value={issueProjectFilter}
+            onChange={(v) => void handleIssueProjectFilterChange(v)}
+            allowClear
+            showSearch
+            filterOption={(input, opt) => (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+            options={allProjects.map(p => ({ value: p.id, label: `${p.key}: ${p.name}` }))}
+          />
+        )}
         <Input
           placeholder="Поиск задач..."
           prefix={<SearchOutlined />}
@@ -776,6 +819,13 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
           onChange={e => setIssueSearch(e.target.value)}
           style={{ marginBottom: 12 }}
         />
+        {loadingModalIssues ? (
+          <div style={{ textAlign: 'center', padding: 24 }}><Spin size="small" /></div>
+        ) : release?.type === 'INTEGRATION' && !issueProjectFilter ? (
+          <div style={{ color: C.t3, fontSize: 13, textAlign: 'center', padding: 24 }}>
+            Выберите проект для загрузки задач
+          </div>
+        ) : (
         <div style={{ maxHeight: 400, overflow: 'auto' }}>
           {filteredIssues.map(issue => (
             <div key={issue.id} style={{
@@ -802,6 +852,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
             </div>
           ))}
         </div>
+        )}
       </Modal>
 
       {/* Add Sprints Modal */}
@@ -931,7 +982,7 @@ export default function GlobalReleasesPage() {
   const { mode } = useThemeStore();
   const isDark = mode !== 'light';
   const C = isDark ? DARK_C : LIGHT_C;
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManage = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'RELEASE_MANAGER';
 
   // ─── State ───────────────────────────────────────────────
   const [releases, setReleases] = useState<Release[]>([]);

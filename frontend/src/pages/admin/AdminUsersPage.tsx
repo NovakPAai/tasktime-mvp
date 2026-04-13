@@ -17,6 +17,7 @@ const ROLE_COLORS: Record<string, string> = {
   SUPER_ADMIN: 'red',
   ADMIN: 'orange',
   MANAGER: 'blue',
+  RELEASE_MANAGER: 'purple',
   USER: 'green',
   VIEWER: 'default',
 };
@@ -92,6 +93,9 @@ export default function AdminUsersPage() {
   const [addingRole, setAddingRole] = useState(false);
   const [newRoleProjectId, setNewRoleProjectId] = useState<string | undefined>();
   const [newRoleRole, setNewRoleRole] = useState<string | undefined>();
+
+  // Global role change
+  const [changingGlobalRole, setChangingGlobalRole] = useState(false);
 
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
@@ -188,10 +192,26 @@ export default function AdminUsersPage() {
 
   const openEdit = async (user: AdminUser) => {
     setEditUser(user);
-    editForm.setFieldsValue({ name: user.name, email: user.email, isActive: user.isActive });
+    editForm.setFieldsValue({ name: user.name, email: user.email, isActive: user.isActive, globalRole: user.role });
     setUserRoles(user.projectRoles ?? []);
     setEditOpen(true);
     await loadProjects();
+  };
+
+  const handleChangeGlobalRole = async (role: string) => {
+    if (!editUser) return;
+    setChangingGlobalRole(true);
+    try {
+      const updated = await adminApi.changeGlobalRole(editUser.id, role);
+      setEditUser(updated);
+      void loadUsers();
+      void message.success('Глобальная роль обновлена');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } };
+      void message.error(err?.response?.data?.error || 'Ошибка смены роли');
+    } finally {
+      setChangingGlobalRole(false);
+    }
   };
 
   const handleSave = async () => {
@@ -307,10 +327,12 @@ export default function AdminUsersPage() {
     {
       title: 'Системная роль',
       key: 'role',
-      render: (_: unknown, u: AdminUser) =>
-        u.role === 'SUPER_ADMIN'
-          ? <Tag color="red">SUPERADMIN</Tag>
-          : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
+      render: (_: unknown, u: AdminUser) => {
+        if (!u.role || u.role === 'USER' || u.role === 'VIEWER') {
+          return <Text type="secondary" style={{ fontSize: 12 }}>—</Text>;
+        }
+        return <Tag color={ROLE_COLORS[u.role] ?? 'default'} style={{ fontSize: 11 }}>{u.role}</Tag>;
+      },
     },
     {
       title: 'Проектные роли',
@@ -447,6 +469,28 @@ export default function AdminUsersPage() {
             <Switch checkedChildren="Активен" unCheckedChildren="Неактивен" />
           </Form.Item>
         </Form>
+
+        <Typography.Title level={5}>Глобальная роль</Typography.Title>
+        <Space style={{ marginBottom: 16 }}>
+          <Select
+            style={{ width: 220 }}
+            value={editUser?.role}
+            loading={changingGlobalRole}
+            disabled={changingGlobalRole || editUser?.isSystem}
+            onChange={(role) => void handleChangeGlobalRole(role)}
+            options={[
+              { value: 'SUPER_ADMIN', label: 'SUPER_ADMIN' },
+              { value: 'ADMIN', label: 'ADMIN' },
+              { value: 'MANAGER', label: 'MANAGER' },
+              { value: 'RELEASE_MANAGER', label: 'RELEASE_MANAGER' },
+              { value: 'USER', label: 'USER' },
+              { value: 'VIEWER', label: 'VIEWER' },
+            ]}
+          />
+          {editUser?.isSystem && (
+            <Text type="secondary" style={{ fontSize: 12 }}>Системный пользователь — роль менять нельзя</Text>
+          )}
+        </Space>
 
         <Typography.Title level={5}>Проектные роли</Typography.Title>
         <Table

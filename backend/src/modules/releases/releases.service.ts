@@ -36,7 +36,16 @@ export async function listReleasesGlobal(query: ListReleasesQueryDto) {
     where.statusId = ids.length === 1 ? ids[0] : { in: ids };
   }
   if (statusCategory) where.status = { category: statusCategory };
-  if (projectId) where.projectId = projectId;
+  if (projectId) {
+    // For INTEGRATION releases (projectId=null), filter by items belonging to this project
+    // For ATOMIC releases (projectId=value), filter by projectId directly
+    const isIntegrationQuery = type === 'INTEGRATION';
+    if (isIntegrationQuery) {
+      where.items = { some: { issue: { projectId } } };
+    } else {
+      where.projectId = projectId;
+    }
+  }
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },

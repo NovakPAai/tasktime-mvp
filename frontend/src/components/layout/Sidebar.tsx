@@ -223,6 +223,7 @@ export default function Sidebar({
     { type: 'link', path: '/admin/transition-screens',   label: 'Экраны переходов' },
 
     { type: 'divider', label: 'Релизы' },
+    { type: 'link', path: '/admin/release-statuses',     label: 'Статусы релизов' },
     { type: 'link', path: '/admin/release-workflows',    label: 'Workflow релизов' },
 
     ...(isSuperAdmin ? [

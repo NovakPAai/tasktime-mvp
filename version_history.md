@@ -2,7 +2,44 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.7**
+**Last version: 2.9**
+
+---
+
+## [2.9] [2026-04-13] feat(releases): RELEASE_MANAGER role + INTEGRATION release UI fixes
+
+**PR:** [#32](https://github.com/NovakPAai/tasktime-mvp/pull/32)
+**Ветка:** `claude/alex-release-manager-ui-fixes`
+
+### Что изменилось
+- `frontend/src/types/auth.types.ts`: добавлена роль `RELEASE_MANAGER` в union type `UserRole`
+- `frontend/src/api/admin.ts`: добавлен метод `changeGlobalRole` для смены глобальной роли пользователя
+- `backend/src/modules/users/users.dto.ts`: `RELEASE_MANAGER` добавлен в `changeRoleDto` Zod enum
+- `frontend/src/pages/admin/AdminUsersPage.tsx`: добавлен раздел "Глобальная роль" в модал редактирования, поддержка RELEASE_MANAGER в цветах и отображении
+- `frontend/src/pages/admin/AdminRolesPage.tsx`: `RELEASE_MANAGER` добавлен в выпадающие списки ролей
+- `frontend/src/pages/admin/AdminReleaseStatusesPage.tsx`: новая страница CRUD для управления статусами релизов
+- `frontend/src/App.tsx`: добавлен маршрут `/admin/release-statuses`
+- `frontend/src/components/layout/Sidebar.tsx`: добавлена ссылка "Статусы релизов" в секцию администрирования
+- `frontend/src/pages/GlobalReleasesPage.tsx`: `canManage` расширен для RELEASE_MANAGER; INTEGRATION релизы теперь поддерживают выбор проекта при добавлении задач и используют `listAllSprints` для добавления спринтов
+- `frontend/src/pages/ReleasesPage.tsx`: `canManage` расширен для RELEASE_MANAGER и SUPER_ADMIN; исправлена загрузка INTEGRATION релизов через `projectId` query param
+- `backend/src/modules/releases/releases.service.ts`: `listReleasesGlobal` — при `type=INTEGRATION&projectId=X` фильтрация через `items.some.issue.projectId` вместо `where.projectId` (INTEGRATION релизы имеют `projectId=null`)
+
+---
+
+## [2.8] [2026-04-12] fix(releases): align implementation with RELEASE_MANAGEMENT_SPEC
+
+**Задача:** [TTMP-223](https://github.com/NovakPAai/tasktime-mvp/issues/223)
+**PR:** [#31](https://github.com/NovakPAai/tasktime-mvp/pull/31)
+**Ветка:** `claude/alex-ttmp-223-release-mgmt-fixes`
+
+### Что изменилось
+- `releases.router.ts`: RELEASE_MANAGER добавлен во все мутации релизов; MANAGER убран из `DELETE /releases/:id`; `GET /releases/:id/transitions` теперь требует только authenticate (доступен VIEWER)
+- `releases.service.ts` `removeReleaseItems`: добавлена защита DONE/CANCELLED → 422
+- `release-workflow-engine.service.ts`: CONDITION_NOT_MET 403 → 409; поле `minCount → min`; audit action `release.transitioned → release.transition`
+- `releases.service.ts` `listReleasesGlobal` + `listReleaseItems`: ответ обёрнут в `{ data, meta: { page, limit, total, totalPages } }`
+- `releases.service.ts` `getReleaseReadiness`: `byProject` shape изменён на `{ project, total, done, inProgress }`; добавлен `availableTransitions` для авторизованных пользователей
+- `releases.service.ts`: поиск по `name OR description`; `statusId` принимает comma-separated UUIDs
+- `release-workflows-admin.router.ts`: добавлен `PATCH` для `/:id` и `/:id/transitions/:tid`; `PUT` сохранён как alias
 
 ---
 

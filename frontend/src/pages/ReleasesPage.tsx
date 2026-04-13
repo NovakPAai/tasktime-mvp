@@ -151,7 +151,7 @@ export default function ReleasesPage() {
   const [loadingTransitions, setLoadingTransitions] = useState(false);
   const [integrationReleases, setIntegrationReleases] = useState<Release[]>([]);
   const [form] = Form.useForm();
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'SUPER_ADMIN';
+  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'RELEASE_MANAGER' || user?.role === 'SUPER_ADMIN';
 
   // ─── Load ─────────────────────────────────────────────────
   const loadReleases = useCallback(async () => {
@@ -202,10 +202,9 @@ export default function ReleasesPage() {
   const loadIntegrationReleases = useCallback(async () => {
     if (!projectId) return;
     try {
-      const r = await releasesApi.listReleasesGlobal({ type: 'INTEGRATION', limit: 50 });
-      setIntegrationReleases(r.data.filter(rel =>
-        !rel._projects || rel._projects.includes(projectId) || rel._projects.length === 0
-      ));
+      // Backend filters by projectId — returns only INTEGRATION releases containing issues from this project
+      const r = await releasesApi.listReleasesGlobal({ type: 'INTEGRATION', projectId, limit: 50 });
+      setIntegrationReleases(r.data);
     } catch {
       setIntegrationReleases([]);
     }
