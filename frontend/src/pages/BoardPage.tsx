@@ -332,6 +332,7 @@ export default function BoardPage() {
           {/* + Задача */}
           {canCreate && (
             <div
+              data-testid="board-create-issue-btn"
               onClick={() => setCreateOpen(true)}
               style={{
                 backgroundImage: LOGO_GRAD, borderRadius: 8,
@@ -360,7 +361,7 @@ export default function BoardPage() {
             const showPlus = status !== 'DONE' && status !== 'CANCELLED';
 
             return (
-              <div key={status} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: 160, gap: 8 }}>
+              <div key={status} data-testid={`board-column-${status}`} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: 160, gap: 8 }}>
 
                 {/* Column header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px 8px' }}>
@@ -424,6 +425,7 @@ export default function BoardPage() {
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
+                                data-testid={`board-card-${issue.id}`}
                                 onClick={() => {}}
                                 style={{
                                   background: isCancelled ? C.bgCardCancel : C.bgCard,

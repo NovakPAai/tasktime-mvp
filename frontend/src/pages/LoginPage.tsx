@@ -283,7 +283,7 @@ function LogoIcon() {
 
 // ─── Input field ─────────────────────────────────────────────────────────────
 function Field({
-  label, rightLabel, rightColor, type, value, onChange, placeholder, autoComplete, minLength, C,
+  label, rightLabel, rightColor, type, value, onChange, placeholder, autoComplete, minLength, testId, C,
 }: {
   label: string;
   rightLabel?: string;
@@ -294,6 +294,7 @@ function Field({
   placeholder: string;
   autoComplete?: string;
   minLength?: number;
+  testId?: string;
   C: typeof DARK;
 }) {
   const [focused, setFocused] = useState(false);
@@ -347,6 +348,7 @@ function Field({
           autoComplete={autoComplete}
           minLength={minLength}
           required
+          data-testid={testId}
           style={{
             flex: 1, background: 'none', border: 'none', outline: 'none',
             color: value ? C.inputText : C.inputPlaceholder,
@@ -481,7 +483,7 @@ export default function LoginPage() {
             )}
             <Field
               label="Email" type="email" value={email} onChange={setEmail}
-              placeholder="p.novak@tasktime.ru" autoComplete="email" C={CWithFocus}
+              placeholder="p.novak@tasktime.ru" autoComplete="email" testId="login-email" C={CWithFocus}
             />
             <div style={{ marginBottom: 24 }}>
               <Field
@@ -491,6 +493,7 @@ export default function LoginPage() {
                 type="password" value={password} onChange={setPassword}
                 placeholder="••••••••" autoComplete={showRegister ? 'new-password' : 'current-password'}
                 minLength={showRegister ? 8 : undefined}
+                testId="login-password"
                 C={CWithFocus}
               />
             </div>
@@ -498,6 +501,7 @@ export default function LoginPage() {
             {/* Submit button */}
             <button
               type="submit"
+              data-testid="login-submit"
               disabled={loading}
               style={{
                 width: '100%', borderRadius: 8, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
