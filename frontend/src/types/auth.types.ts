@@ -1,6 +1,6 @@
 /** Auth domain types — TTUI-125 */
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RELEASE_MANAGER' | 'USER' | 'VIEWER';
 
 export interface User {
   id: string;

@@ -7,7 +7,7 @@ import { adminApi, type AdminUser, type ProjectRole } from '../../api/admin';
 import api from '../../api/client';
 
 const ROLE_COLORS: Record<string, string> = {
-  ADMIN: 'orange', MANAGER: 'blue', USER: 'green', VIEWER: 'default',
+  ADMIN: 'orange', MANAGER: 'blue', RELEASE_MANAGER: 'purple', USER: 'green', VIEWER: 'default',
 };
 
 type ViewMode = 'by-user' | 'by-project';
@@ -289,7 +289,7 @@ export default function AdminRolesPage() {
               options={projects.map(p => ({ value: p.id, label: `${p.key}: ${p.name}` }))} showSearch
               filterOption={(input, opt) => (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())} />
             <Select placeholder="Роль" style={{ width: 130 }} value={newRole} onChange={setNewRole}
-              options={['ADMIN','MANAGER','USER','VIEWER'].map(r => ({ value: r, label: r }))} />
+              options={['ADMIN','MANAGER','RELEASE_MANAGER','USER','VIEWER'].map(r => ({ value: r, label: r }))} />
             <Button type="primary" icon={<PlusOutlined />} loading={adding}
               disabled={!newProjectId || !newRole} onClick={() => void handleAddRole()}>
               Добавить
@@ -328,7 +328,7 @@ export default function AdminRolesPage() {
               options={users.map(u => ({ value: u.id, label: `${u.name} <${u.email}>` }))} showSearch
               filterOption={(input, opt) => (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())} />
             <Select placeholder="Роль" style={{ width: 130 }} value={newRole} onChange={setNewRole}
-              options={['ADMIN','MANAGER','USER','VIEWER'].map(r => ({ value: r, label: r }))} />
+              options={['ADMIN','MANAGER','RELEASE_MANAGER','USER','VIEWER'].map(r => ({ value: r, label: r }))} />
             <Button type="primary" icon={<PlusOutlined />} loading={adding}
               disabled={!newUserId || !newRole} onClick={() => void handleAddRole()}>
               Добавить
