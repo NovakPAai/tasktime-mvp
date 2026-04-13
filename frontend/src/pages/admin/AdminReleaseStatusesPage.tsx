@@ -111,7 +111,12 @@ export default function AdminReleaseStatusesPage() {
       void load();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
-      void message.error(err?.response?.data?.error || 'Нельзя удалить статус, который используется');
+      const errorCode = err?.response?.data?.error;
+      void message.error(
+        errorCode === 'RELEASE_STATUS_IN_USE'
+          ? 'Нельзя удалить статус, который используется в релизах или workflow'
+          : (errorCode || 'Ошибка удаления'),
+      );
     }
   };
 
@@ -182,8 +187,13 @@ export default function AdminReleaseStatusesPage() {
       <Form.Item name="category" label="Категория" rules={[{ required: true, message: 'Выберите категорию' }]}>
         <Select options={categoryOptions} placeholder="Выберите категорию" />
       </Form.Item>
-      <Form.Item name="color" label="Цвет (HEX)" initialValue="#888888">
-        <Input placeholder="#888888" maxLength={9} />
+      <Form.Item
+        name="color"
+        label="Цвет (HEX)"
+        initialValue="#888888"
+        rules={[{ pattern: /^#[0-9A-Fa-f]{6}$/, message: 'Используйте формат #RRGGBB, например #FF5500' }]}
+      >
+        <Input placeholder="#888888" maxLength={7} />
       </Form.Item>
       <Form.Item name="description" label="Описание">
         <Input.TextArea rows={2} placeholder="Описание статуса (необязательно)" />

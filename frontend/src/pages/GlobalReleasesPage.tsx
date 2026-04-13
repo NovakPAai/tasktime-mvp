@@ -362,11 +362,14 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
 
   const handleIssueProjectFilterChange = async (projectId: string | undefined) => {
     setIssueProjectFilter(projectId);
-    if (!projectId) { setAllIssues([]); return; }
+    setAllIssues([]);
+    if (!projectId) return;
     setLoadingModalIssues(true);
     try {
       const issues = await issuesApi.listIssues(projectId);
       setAllIssues(issues);
+    } catch {
+      void message.error('Не удалось загрузить задачи проекта');
     } finally {
       setLoadingModalIssues(false);
     }
@@ -979,7 +982,7 @@ export default function GlobalReleasesPage() {
   const { mode } = useThemeStore();
   const isDark = mode !== 'light';
   const C = isDark ? DARK_C : LIGHT_C;
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'RELEASE_MANAGER';
+  const canManage = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'RELEASE_MANAGER';
 
   // ─── State ───────────────────────────────────────────────
   const [releases, setReleases] = useState<Release[]>([]);
