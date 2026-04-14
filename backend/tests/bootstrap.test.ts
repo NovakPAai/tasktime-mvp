@@ -65,7 +65,7 @@ describe('bootstrapDefaultUsers', () => {
     expect(users.at(-1)).toEqual({
       email: 'novak.pavel@tasktime.ru',
       name: 'Owner Admin',
-      role: 'ADMIN',
+      systemRoles: ['ADMIN', 'USER'],
     });
     expect(BOOTSTRAP_USERS.some((user) => user.email === 'novak.pavel@tasktime.ru')).toBe(false);
   });

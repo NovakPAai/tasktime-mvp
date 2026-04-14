@@ -18,13 +18,20 @@ export async function createTestUser(
   };
 }
 
-export async function createAdminUser() {
-  const { user, accessToken } = await createTestUser('admin@test.com', 'Password123', 'Admin');
-  // Directly update role in DB
+async function addSystemRole(userId: string, role: string) {
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
-  await prisma.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
+  await prisma.userSystemRole.upsert({
+    where: { userId_role: { userId, role: role as never } },
+    create: { userId, role: role as never },
+    update: {},
+  });
   await prisma.$disconnect();
+}
+
+export async function createAdminUser() {
+  const { user } = await createTestUser('admin@test.com', 'Password123', 'Admin');
+  await addSystemRole(user.id, 'ADMIN');
 
   // Re-login to get updated token with ADMIN role
   const res = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'Password123' });
@@ -36,11 +43,9 @@ export async function createAdminUser() {
 }
 
 export async function createManagerUser() {
-  const { user, accessToken } = await createTestUser('manager@test.com', 'Password123', 'Manager');
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
-  await prisma.user.update({ where: { id: user.id }, data: { role: 'MANAGER' } });
-  await prisma.$disconnect();
+  const { user } = await createTestUser('manager@test.com', 'Password123', 'Manager');
+  // MANAGER no longer exists as a system role; grant ADMIN as a close equivalent for tests
+  await addSystemRole(user.id, 'ADMIN');
 
   const res = await request.post('/api/auth/login').send({ email: 'manager@test.com', password: 'Password123' });
   return {
@@ -51,11 +56,8 @@ export async function createManagerUser() {
 }
 
 export async function createSuperAdminUser() {
-  const { user, accessToken } = await createTestUser('super-admin@test.com', 'Password123', 'Super Admin');
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
-  await prisma.$executeRawUnsafe(`UPDATE users SET role = 'SUPER_ADMIN' WHERE id = '${user.id}'`);
-  await prisma.$disconnect();
+  const { user } = await createTestUser('super-admin@test.com', 'Password123', 'Super Admin');
+  await addSystemRole(user.id, 'SUPER_ADMIN');
 
   const res = await request.post('/api/auth/login').send({ email: 'super-admin@test.com', password: 'Password123' });
   return {
@@ -69,7 +71,7 @@ export function signSuperAdminToken(user: { id: string; email: string }) {
   return signAccessToken({
     userId: user.id,
     email: user.email,
-    role: 'SUPER_ADMIN',
+    systemRoles: ['SUPER_ADMIN'],
   });
 }
 

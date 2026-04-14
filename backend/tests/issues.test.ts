@@ -18,7 +18,7 @@ beforeEach(async () => {
   const reg = await request.post('/api/auth/register').send({
     email: 'admin@test.com', password: 'Password123', name: 'Admin',
   });
-  await prisma.user.update({ where: { id: reg.body.user.id }, data: { role: 'ADMIN' } });
+  await prisma.userSystemRole.upsert({ where: { userId_role: { userId: reg.body.user.id, role: 'ADMIN' } }, create: { userId: reg.body.user.id, role: 'ADMIN' }, update: {} });
   const login = await request.post('/api/auth/login').send({ email: 'admin@test.com', password: 'Password123' });
   adminToken = login.body.accessToken;
 
