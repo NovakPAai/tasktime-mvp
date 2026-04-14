@@ -44,8 +44,8 @@ export async function createAdminUser() {
 
 export async function createManagerUser() {
   const { user } = await createTestUser('manager@test.com', 'Password123', 'Manager');
-  // MANAGER no longer exists as a system role; grant ADMIN as a close equivalent for tests
-  await addSystemRole(user.id, 'ADMIN');
+  // MANAGER system role removed; AUDITOR is the closest equivalent (read-only admin access)
+  await addSystemRole(user.id, 'AUDITOR');
 
   const res = await request.post('/api/auth/login').send({ email: 'manager@test.com', password: 'Password123' });
   return {
