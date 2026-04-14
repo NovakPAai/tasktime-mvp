@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import type { UserRole, IssueStatus } from '@prisma/client';
+import type { SystemRoleType, IssueStatus } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, deleteCachedByPattern, delCacheByPrefix } from '../../shared/redis.js';
@@ -131,7 +131,7 @@ function mapToLegacyStatus(systemKey: string | null, category: string): IssueSta
 export async function getAvailableTransitions(
   issueId: string,
   actorId: string,
-  actorRole: UserRole,
+  actorRoles: SystemRoleType[],
 ): Promise<AvailableTransitionsResponse> {
   const issue = await prisma.issue.findUnique({
     where: { id: issueId },
@@ -153,7 +153,7 @@ export async function getAvailableTransitions(
       if (conditionRules.length > 0) {
         const allowed = evaluateConditions(conditionRules, {
           actorId,
-          actorRole,
+          actorRoles,
           issue: { assigneeId: issue.assigneeId, creatorId: issue.creatorId },
         });
         if (!allowed) continue;
@@ -220,7 +220,7 @@ export async function executeTransition(
   issueId: string,
   transitionId: string,
   actorId: string,
-  actorRole: UserRole,
+  actorRoles: SystemRoleType[],
   screenFieldValues?: Record<string, unknown>,
   bypassConditions = false,
 ) {
@@ -257,7 +257,7 @@ export async function executeTransition(
     if (conditionRules.length > 0) {
       const allowed = evaluateConditions(conditionRules, {
         actorId,
-        actorRole,
+        actorRoles,
         issue: { assigneeId: issue.assigneeId, creatorId: issue.creatorId },
       });
       if (!allowed) {
@@ -386,7 +386,7 @@ export interface BatchTransitionsItem {
 export async function getBatchTransitions(
   issueIds: string[],
   actorId: string,
-  actorRole: UserRole,
+  actorRoles: SystemRoleType[],
 ): Promise<BatchTransitionsItem[]> {
   const issues = await prisma.issue.findMany({
     where: { id: { in: issueIds } },
@@ -413,7 +413,7 @@ export async function getBatchTransitions(
         if (conditionRules.length > 0) {
           const allowed = evaluateConditions(conditionRules, {
             actorId,
-            actorRole,
+            actorRoles,
             issue: { assigneeId: issue.assigneeId, creatorId: issue.creatorId },
           });
           if (!allowed) continue;

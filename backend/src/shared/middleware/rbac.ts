@@ -1,16 +1,16 @@
 import type { Response, NextFunction } from 'express';
-import type { UserRole } from '@prisma/client';
+import type { SystemRoleType } from '@prisma/client';
 import { AppError } from './error-handler.js';
 import type { AuthRequest } from '../types/index.js';
-import { hasAnyRequiredRole, isSuperAdmin } from '../auth/roles.js';
+import { hasAnySystemRole, isSuperAdmin, hasGlobalProjectReadAccess } from '../auth/roles.js';
 import { prisma } from '../../prisma/client.js';
 
-export function requireRole(...roles: UserRole[]) {
+export function requireRole(...roles: SystemRoleType[]) {
   return (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError(401, 'Authentication required'));
     }
-    if (!hasAnyRequiredRole(req.user.role, roles)) {
+    if (!hasAnySystemRole(req.user.systemRoles, roles)) {
       return next(new AppError(403, 'Insufficient permissions'));
     }
     next();
@@ -22,7 +22,7 @@ export function requireSuperAdmin() {
     if (!req.user) {
       return next(new AppError(401, 'Authentication required'));
     }
-    if (!isSuperAdmin(req.user.role)) {
+    if (!isSuperAdmin(req.user.systemRoles)) {
       return next(new AppError(403, 'Insufficient permissions'));
     }
     next();
@@ -34,7 +34,12 @@ export function requireProjectRole(getProjectId: (req: AuthRequest) => string, .
     if (!req.user) {
       return next(new AppError(401, 'Authentication required'));
     }
-    if (isSuperAdmin(req.user.role)) {
+    // SUPER_ADMIN bypasses all project checks
+    if (isSuperAdmin(req.user.systemRoles)) {
+      return next();
+    }
+    // ADMIN, RELEASE_MANAGER, AUDITOR have global read access to all projects
+    if (hasGlobalProjectReadAccess(req.user.systemRoles)) {
       return next();
     }
     const projectId = getProjectId(req);

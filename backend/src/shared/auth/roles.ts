@@ -1,13 +1,31 @@
-import type { UserRole } from '@prisma/client';
+import type { SystemRoleType } from '@prisma/client';
 
-export function hasRequiredRole(userRole: UserRole, requiredRole: UserRole): boolean {
-  return userRole === 'SUPER_ADMIN' || userRole === requiredRole;
+export function hasSystemRole(userRoles: SystemRoleType[], requiredRole: SystemRoleType): boolean {
+  return userRoles.includes('SUPER_ADMIN') || userRoles.includes(requiredRole);
 }
 
-export function hasAnyRequiredRole(userRole: UserRole, requiredRoles: readonly UserRole[]): boolean {
-  return requiredRoles.some((requiredRole) => hasRequiredRole(userRole, requiredRole));
+export function hasAnySystemRole(userRoles: SystemRoleType[], requiredRoles: readonly SystemRoleType[]): boolean {
+  return requiredRoles.some((role) => hasSystemRole(userRoles, role));
 }
 
-export function isSuperAdmin(userRole: UserRole): boolean {
-  return userRole === 'SUPER_ADMIN';
+export function isSuperAdmin(userRoles: SystemRoleType[]): boolean {
+  return userRoles.includes('SUPER_ADMIN');
 }
+
+/** Returns true if the user has global read access to all projects. */
+export function hasGlobalProjectReadAccess(userRoles: SystemRoleType[]): boolean {
+  return hasAnySystemRole(userRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR']);
+}
+
+// ─── Legacy aliases — kept so callers using old names compile until renamed ───
+/** @deprecated Use hasSystemRole */
+export const hasRequiredRole = (
+  userRoles: SystemRoleType[],
+  requiredRole: SystemRoleType,
+): boolean => hasSystemRole(userRoles, requiredRole);
+
+/** @deprecated Use hasAnySystemRole */
+export const hasAnyRequiredRole = (
+  userRoles: SystemRoleType[],
+  requiredRoles: readonly SystemRoleType[],
+): boolean => hasAnySystemRole(userRoles, requiredRoles);

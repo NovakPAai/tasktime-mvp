@@ -1,12 +1,30 @@
-import type { UserRole } from '../types';
+import type { SystemRoleType } from '../types';
 
-export function hasRequiredRole(userRole: UserRole | null | undefined, requiredRole: UserRole): boolean {
-  return Boolean(userRole) && (userRole === 'SUPER_ADMIN' || userRole === requiredRole);
+export function hasSystemRole(userRoles: SystemRoleType[] | null | undefined, requiredRole: SystemRoleType): boolean {
+  if (!userRoles || userRoles.length === 0) return false;
+  return userRoles.includes('SUPER_ADMIN') || userRoles.includes(requiredRole);
 }
 
-export function hasAnyRequiredRole(
-  userRole: UserRole | null | undefined,
-  requiredRoles: readonly UserRole[],
+export function hasAnySystemRole(
+  userRoles: SystemRoleType[] | null | undefined,
+  requiredRoles: readonly SystemRoleType[],
 ): boolean {
-  return requiredRoles.some((requiredRole) => hasRequiredRole(userRole, requiredRole));
+  return requiredRoles.some((role) => hasSystemRole(userRoles, role));
+}
+
+export function hasGlobalProjectReadAccess(userRoles: SystemRoleType[] | null | undefined): boolean {
+  return hasAnySystemRole(userRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR']);
+}
+
+/** @deprecated Use hasSystemRole */
+export function hasRequiredRole(userRoles: SystemRoleType[] | null | undefined, requiredRole: SystemRoleType): boolean {
+  return hasSystemRole(userRoles, requiredRole);
+}
+
+/** @deprecated Use hasAnySystemRole */
+export function hasAnyRequiredRole(
+  userRoles: SystemRoleType[] | null | undefined,
+  requiredRoles: readonly SystemRoleType[],
+): boolean {
+  return hasAnySystemRole(userRoles, requiredRoles);
 }

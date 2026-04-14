@@ -1,31 +1,38 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { isSuperAdmin } from '../../shared/auth/roles.js';
-import type { UpdateUserDto, ChangeRoleDto } from './users.dto.js';
+import type { SystemRoleType } from '@prisma/client';
+import type { UpdateUserDto } from './users.dto.js';
 
 const userSelect = {
   id: true,
   email: true,
   name: true,
-  role: true,
   isActive: true,
   isSystem: true,
   createdAt: true,
   updatedAt: true,
+  systemRoles: { select: { role: true } },
 };
 
+function formatUser(raw: { systemRoles: { role: SystemRoleType }[]; [key: string]: unknown }) {
+  const { systemRoles, ...rest } = raw;
+  return { ...rest, systemRoles: systemRoles.map((sr) => sr.role) };
+}
+
 export async function listUsers() {
-  return prisma.user.findMany({
+  const users = await prisma.user.findMany({
     where: { isSystem: false, isActive: true },
     select: userSelect,
     orderBy: { createdAt: 'desc' },
   });
+  return users.map(formatUser);
 }
 
 export async function getUser(id: string) {
   const user = await prisma.user.findUnique({ where: { id }, select: userSelect });
   if (!user) throw new AppError(404, 'User not found');
-  return user;
+  return formatUser(user);
 }
 
 export async function updateUser(id: string, dto: UpdateUserDto) {
@@ -40,39 +47,165 @@ export async function updateUser(id: string, dto: UpdateUserDto) {
     }
   }
 
-  return prisma.user.update({ where: { id }, data: dto, select: userSelect });
+  const updated = await prisma.user.update({ where: { id }, data: dto, select: userSelect });
+  return formatUser(updated);
 }
 
 type RoleChangeActor = {
   userId: string;
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RELEASE_MANAGER' | 'USER' | 'VIEWER';
+  systemRoles: SystemRoleType[];
 };
 
-export async function changeRole(actor: RoleChangeActor, id: string, dto: ChangeRoleDto) {
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) throw new AppError(404, 'User not found');
+/**
+ * Set the complete list of system roles for a user.
+ * - Only SUPER_ADMIN can assign/remove SUPER_ADMIN or ADMIN roles.
+ * - USER role cannot be removed (it's the mandatory base role).
+ * - Exactly the provided set of roles will be stored.
+ */
+export async function setSystemRoles(actor: RoleChangeActor, targetId: string, roles: SystemRoleType[]) {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, systemRoles: { select: { role: true } } },
+  });
+  if (!target) throw new AppError(404, 'User not found');
 
-  const actorIsSuperAdmin = isSuperAdmin(actor.role);
+  const actorIsSuperAdmin = isSuperAdmin(actor.systemRoles);
+  const targetCurrentRoles = target.systemRoles.map((sr) => sr.role);
 
+  // Guard: only SUPER_ADMIN can assign/remove SUPER_ADMIN or ADMIN
   if (!actorIsSuperAdmin) {
-    if (dto.role === 'SUPER_ADMIN') {
-      throw new AppError(403, 'Only super admins can assign SUPER_ADMIN');
+    if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN')) {
+      throw new AppError(403, 'Only super admins can assign SUPER_ADMIN or ADMIN');
     }
-
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
-      throw new AppError(403, 'Only super admins can manage ADMIN or SUPER_ADMIN users');
+    if (targetCurrentRoles.includes('SUPER_ADMIN') || targetCurrentRoles.includes('ADMIN')) {
+      throw new AppError(403, 'Only super admins can manage SUPER_ADMIN or ADMIN users');
     }
   }
 
-  if (actor.userId === id && actor.role === 'SUPER_ADMIN' && dto.role !== 'SUPER_ADMIN') {
+  // Guard: a SUPER_ADMIN cannot remove their own SUPER_ADMIN role
+  if (actor.userId === targetId && actor.systemRoles.includes('SUPER_ADMIN') && !roles.includes('SUPER_ADMIN')) {
     throw new AppError(403, 'Super admin cannot remove their own SUPER_ADMIN role');
   }
 
-  return prisma.user.update({
-    where: { id },
-    data: { role: dto.role },
+  // Guard: USER role is mandatory
+  if (!roles.includes('USER')) {
+    throw new AppError(400, 'USER role is mandatory and cannot be removed');
+  }
+
+  // Reconcile: delete removed roles, create added roles
+  const toDelete = targetCurrentRoles.filter((r) => !roles.includes(r));
+  const toAdd = roles.filter((r) => !targetCurrentRoles.includes(r));
+
+  await prisma.$transaction([
+    ...toDelete.map((r) =>
+      prisma.userSystemRole.delete({ where: { userId_role: { userId: targetId, role: r } } }),
+    ),
+    ...toAdd.map((r) =>
+      prisma.userSystemRole.create({ data: { userId: targetId, role: r, createdBy: actor.userId } }),
+    ),
+  ]);
+
+  const updated = await prisma.user.findUniqueOrThrow({
+    where: { id: targetId },
     select: userSelect,
   });
+  return formatUser(updated);
+}
+
+/**
+ * Add a single system role to a user.
+ */
+export async function addSystemRole(actor: RoleChangeActor, targetId: string, role: SystemRoleType) {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, systemRoles: { select: { role: true } } },
+  });
+  if (!target) throw new AppError(404, 'User not found');
+
+  const actorIsSuperAdmin = isSuperAdmin(actor.systemRoles);
+  const targetCurrentRoles = target.systemRoles.map((sr) => sr.role);
+
+  if (!actorIsSuperAdmin) {
+    if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+      throw new AppError(403, 'Only super admins can assign SUPER_ADMIN or ADMIN');
+    }
+    if (targetCurrentRoles.includes('SUPER_ADMIN') || targetCurrentRoles.includes('ADMIN')) {
+      throw new AppError(403, 'Only super admins can manage SUPER_ADMIN or ADMIN users');
+    }
+  }
+
+  if (targetCurrentRoles.includes(role)) {
+    throw new AppError(409, 'Role already assigned');
+  }
+
+  const entry = await prisma.userSystemRole.create({
+    data: { userId: targetId, role, createdBy: actor.userId },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.system_role_added',
+      entityType: 'user',
+      entityId: targetId,
+      userId: actor.userId,
+      details: { role },
+    },
+  });
+
+  return entry;
+}
+
+/**
+ * Remove a single system role from a user.
+ * USER role cannot be removed.
+ */
+export async function removeSystemRole(actor: RoleChangeActor, targetId: string, role: SystemRoleType) {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, systemRoles: { select: { role: true } } },
+  });
+  if (!target) throw new AppError(404, 'User not found');
+
+  const actorIsSuperAdmin = isSuperAdmin(actor.systemRoles);
+  const targetCurrentRoles = target.systemRoles.map((sr) => sr.role);
+
+  if (role === 'USER') {
+    throw new AppError(400, 'USER role is mandatory and cannot be removed. Use deactivation instead.');
+  }
+
+  if (!actorIsSuperAdmin) {
+    if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+      throw new AppError(403, 'Only super admins can remove SUPER_ADMIN or ADMIN');
+    }
+    if (targetCurrentRoles.includes('SUPER_ADMIN') || targetCurrentRoles.includes('ADMIN')) {
+      throw new AppError(403, 'Only super admins can manage SUPER_ADMIN or ADMIN users');
+    }
+  }
+
+  if (actor.userId === targetId && role === 'SUPER_ADMIN') {
+    throw new AppError(403, 'Super admin cannot remove their own SUPER_ADMIN role');
+  }
+
+  await prisma.userSystemRole.delete({ where: { userId_role: { userId: targetId, role } } });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.system_role_removed',
+      entityType: 'user',
+      entityId: targetId,
+      userId: actor.userId,
+      details: { role },
+    },
+  });
+}
+
+export async function getSystemRoles(userId: string): Promise<SystemRoleType[]> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { systemRoles: { select: { role: true } } },
+  });
+  if (!user) throw new AppError(404, 'User not found');
+  return user.systemRoles.map((sr) => sr.role);
 }
 
 const NA_SUFFIX = ' (N/A)';
@@ -90,9 +223,10 @@ export async function deactivateUser(id: string) {
     newName = base + NA_SUFFIX;
   }
 
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id },
     data: { isActive: false, name: newName },
     select: userSelect,
   });
+  return formatUser(updated);
 }

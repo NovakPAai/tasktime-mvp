@@ -1,12 +1,15 @@
 /** Auth domain types — TTUI-125 */
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RELEASE_MANAGER' | 'USER' | 'VIEWER';
+export type SystemRoleType = 'SUPER_ADMIN' | 'ADMIN' | 'RELEASE_MANAGER' | 'USER' | 'AUDITOR';
+
+/** @deprecated Use SystemRoleType. Kept for legacy compatibility. */
+export type UserRole = SystemRoleType;
 
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
+  systemRoles: SystemRoleType[];
   isActive: boolean;
   mustChangePassword?: boolean;
   createdAt: string;

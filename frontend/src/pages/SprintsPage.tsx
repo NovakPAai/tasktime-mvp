@@ -189,7 +189,7 @@ export default function SprintsPage() {
   const [estimating, setEstimating] = useState(false);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
-  const canManage = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+  const canManage = hasAnyRequiredRole(user?.systemRoles, ['ADMIN']);
 
   const BACKLOG_PAGE_SIZE = 20;
   const backlogReqSeq = useRef(0);

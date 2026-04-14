@@ -72,11 +72,11 @@ export async function createLink(
 }
 
 /** Удалить связь. */
-export async function deleteLink(linkId: string, requesterId: string, requesterRole: string) {
+export async function deleteLink(linkId: string, requesterId: string, requesterRoles: string[]) {
   const link = await prisma.issueLink.findUnique({ where: { id: linkId }, select: { id: true, createdById: true } });
   if (!link) throw Object.assign(new Error('Связь не найдена'), { status: 404 });
 
-  const canDelete = link.createdById === requesterId || ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(requesterRole);
+  const canDelete = link.createdById === requesterId || requesterRoles.some(r => ['ADMIN', 'SUPER_ADMIN'].includes(r));
   if (!canDelete) throw Object.assign(new Error('Недостаточно прав'), { status: 403 });
 
   await prisma.issueLink.delete({ where: { id: linkId } });

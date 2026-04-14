@@ -13,7 +13,7 @@ async function main() {
     email: PROMOTE_SUPER_ADMIN_EMAIL,
   });
 
-  console.log(`Promoted ${user.email} to ${user.role}`);
+  console.log(`Promoted ${user.email} to ${user.systemRoles.join(', ')}`);
 }
 
 main().catch((error) => {

@@ -1,4 +1,4 @@
-import type { UserRole, StatusCategory, ReleaseStatusCategory, Prisma } from '@prisma/client';
+import type { SystemRoleType, StatusCategory, ReleaseStatusCategory, Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
@@ -32,7 +32,7 @@ async function loadReleaseWorkflowFull(workflowId: string) {
 // ─── Release-specific condition types ────────────────────────────────────────
 
 type ReleaseConditionRule =
-  | { type: 'USER_HAS_GLOBAL_ROLE'; roles: UserRole[] }
+  | { type: 'USER_HAS_GLOBAL_ROLE'; roles: SystemRoleType[] }
   // category is a StatusCategory (TODO | IN_PROGRESS | DONE) because we
   // are checking issue workflow statuses, not release statuses.
   | { type: 'ALL_ITEMS_IN_STATUS_CATEGORY'; category: StatusCategory }
@@ -43,11 +43,11 @@ type ReleaseConditionRule =
 
 async function evaluateReleaseCondition(
   rule: ReleaseConditionRule,
-  ctx: { actorRole: UserRole; releaseId: string },
+  ctx: { actorRoles: SystemRoleType[]; releaseId: string },
 ): Promise<boolean> {
   switch (rule.type) {
     case 'USER_HAS_GLOBAL_ROLE':
-      return rule.roles.includes(ctx.actorRole);
+      return rule.roles.some((r) => ctx.actorRoles.includes(r));
 
     case 'ALL_ITEMS_IN_STATUS_CATEGORY': {
       // All issues linked via ReleaseItem must be in the given workflow status category.
@@ -86,7 +86,7 @@ async function evaluateReleaseCondition(
 
 async function evaluateReleaseConditions(
   rules: ReleaseConditionRule[],
-  ctx: { actorRole: UserRole; releaseId: string },
+  ctx: { actorRoles: SystemRoleType[]; releaseId: string },
 ): Promise<{ allowed: boolean; failedCondition?: string }> {
   for (const rule of rules) {
     const passed = await evaluateReleaseCondition(rule, ctx);
@@ -166,7 +166,7 @@ export interface ReleaseAvailableTransitionsResponse {
 export async function getAvailableTransitions(
   releaseId: string,
   actorId: string,
-  actorRole: UserRole,
+  actorRoles: SystemRoleType[],
 ): Promise<ReleaseAvailableTransitionsResponse> {
   const release = await prisma.release.findUnique({
     where: { id: releaseId },
@@ -186,7 +186,7 @@ export async function getAvailableTransitions(
     const conditionRules = t.conditions ? (t.conditions as unknown as ReleaseConditionRule[]) : [];
     if (conditionRules.length > 0) {
       const { allowed } = await evaluateReleaseConditions(conditionRules, {
-        actorRole,
+        actorRoles,
         releaseId,
       });
       if (!allowed) continue;
@@ -223,7 +223,7 @@ export async function executeTransition(
   releaseId: string,
   transitionId: string,
   actorId: string,
-  actorRole: UserRole,
+  actorRoles: SystemRoleType[],
   comment?: string,
 ): Promise<void> {
   const release = await prisma.release.findUnique({
@@ -253,7 +253,7 @@ export async function executeTransition(
   const conditionRules = transition.conditions ? (transition.conditions as unknown as ReleaseConditionRule[]) : [];
   if (conditionRules.length > 0) {
     const { allowed, failedCondition } = await evaluateReleaseConditions(conditionRules, {
-      actorRole,
+      actorRoles,
       releaseId,
     });
     if (!allowed) {

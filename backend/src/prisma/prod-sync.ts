@@ -289,7 +289,6 @@ async function loadSnapshot(prisma: SyncPrismaClient, projectKey: string): Promi
       select: {
         email: true,
         name: true,
-        role: true,
         isActive: true,
       },
     });
@@ -305,7 +304,6 @@ async function loadSnapshot(prisma: SyncPrismaClient, projectKey: string): Promi
     users: users.map((user) => ({
       email: user.email,
       name: user.name,
-      role: user.role,
       isActive: user.isActive,
     })),
     sprints: sprints.map((sprint) => ({
@@ -359,13 +357,11 @@ async function upsertUsers(targetPrisma: SyncPrismaClient, users: ProdSyncDataSn
       where: { email: user.email },
       update: {
         name: user.name,
-        role: user.role as never,
         isActive: user.isActive,
       },
       create: {
         email: user.email,
         name: user.name,
-        role: user.role as never,
         isActive: user.isActive,
         passwordHash: passwordHash ?? '',
       },

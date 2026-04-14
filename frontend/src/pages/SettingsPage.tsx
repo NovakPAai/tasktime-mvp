@@ -458,7 +458,7 @@ export default function SettingsPage() {
               {[
                 { label: 'Имя', value: user?.name?.split(' ')[0] ?? '' },
                 { label: 'Фамилия', value: user?.name?.split(' ')[1] ?? '' },
-                { label: 'Должность', value: user?.role ?? '' },
+                { label: 'Должность', value: (user?.systemRoles ?? []).join(', ') || '' },
               ].map((f) => (
                 <div key={f.label} style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: 6 }}>
                   <div style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, lineHeight: '14px' }}>
@@ -545,7 +545,7 @@ export default function SettingsPage() {
                   }}
                 >
                   <span style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 13, lineHeight: '16px' }}>
-                    {user?.role ?? '—'}
+                    {(user?.systemRoles ?? []).join(', ') || '—'}
                   </span>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M9 4.5L6 7.5L3 4.5" stroke={C.t4} strokeWidth="1.3" strokeLinecap="round" />

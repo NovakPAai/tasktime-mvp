@@ -17,9 +17,9 @@ export default function UatTestsPage() {
   const startTest = useUatOnboardingStore((s) => s.startTest);
   const [loading, setLoading] = useState(false);
   const [tests, setTests] = useState<UatTest[]>([]);
-  const initialRoleFilter = hasRequiredRole(user?.role, 'ADMIN')
+  const initialRoleFilter = hasRequiredRole(user?.systemRoles, 'ADMIN')
     ? 'ADMIN'
-    : (user?.role as UatRole | undefined) ?? 'ALL';
+    : ((user?.systemRoles?.[0] ?? 'USER') as UatRole | undefined) ?? 'ALL';
   const [roleFilter, setRoleFilter] = useState<RoleFilter>(initialRoleFilter);
   const [completedIds, setCompletedIds] = useState<string[]>([]);
 
@@ -39,10 +39,10 @@ export default function UatTestsPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const roleParam = hasRequiredRole(user?.role, 'ADMIN')
+        const roleParam = hasRequiredRole(user?.systemRoles, 'ADMIN')
           ? 'ADMIN'
-          : hasAnyRequiredRole(user?.role, ['MANAGER', 'USER', 'VIEWER'])
-            ? (user!.role as uatApi.UatRole)
+          : hasAnyRequiredRole(user?.systemRoles, ['USER', 'AUDITOR'])
+            ? ((user!.systemRoles[0] ?? 'USER') as uatApi.UatRole)
             : undefined;
         const data = await uatApi.listUatTests({ role: roleParam });
         setTests(data);
@@ -52,7 +52,7 @@ export default function UatTestsPage() {
     };
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.role]);
+  }, [user?.systemRoles]);
 
   useEffect(() => {
     if (!user?.id || typeof window === 'undefined') {

@@ -15,6 +15,7 @@ beforeEach(async () => {
   await prisma.issue.deleteMany();
   await prisma.project.deleteMany();
   await prisma.refreshToken.deleteMany();
+  await prisma.userSystemRole.deleteMany();
   await prisma.user.deleteMany();
 
   const admin = await createAdminUser();
@@ -27,55 +28,60 @@ beforeEach(async () => {
   regularUserId = regularUser.user.id;
 
   const adminTarget = await createTestUser('target-admin@test.com', 'Password123', 'Target Admin');
-  await prisma.user.update({ where: { id: adminTarget.user.id }, data: { role: 'ADMIN' } });
+  await prisma.userSystemRole.create({ data: { userId: adminTarget.user.id, role: 'ADMIN' } });
   adminTargetId = adminTarget.user.id;
 });
 
-describe('Users API role management', () => {
-  it('PATCH /api/users/:id/role - admin cannot assign SUPER_ADMIN', async () => {
+describe('Users API — deprecated role endpoint', () => {
+  it('PATCH /api/users/:id/role - returns 410 Gone', async () => {
     const res = await request.patch(`/api/users/${regularUserId}/role`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ role: 'SUPER_ADMIN' });
-
-    expect(res.status).toBe(403);
-  });
-
-  it('PATCH /api/users/:id/role - admin cannot change another admin role', async () => {
-    const res = await request.patch(`/api/users/${adminTargetId}/role`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ role: 'MANAGER' });
-
-    expect(res.status).toBe(403);
-  });
-
-  it('PATCH /api/users/:id/role - super admin can assign SUPER_ADMIN', async () => {
-    const res = await request.patch(`/api/users/${regularUserId}/role`)
-      .set('Authorization', `Bearer ${superAdminToken}`)
-      .send({ role: 'SUPER_ADMIN' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.role).toBe('SUPER_ADMIN');
-  });
-
-  it('PATCH /api/users/:id/role - super admin can change an admin role', async () => {
-    const res = await request.patch(`/api/users/${adminTargetId}/role`)
-      .set('Authorization', `Bearer ${superAdminToken}`)
-      .send({ role: 'MANAGER' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.role).toBe('MANAGER');
-  });
-
-  it('PATCH /api/users/:id/role - super admin cannot remove their own SUPER_ADMIN role', async () => {
-    const currentSuperAdmin = await prisma.user.findUniqueOrThrow({
-      where: { email: 'super-admin@test.com' },
-      select: { id: true },
-    });
-
-    const res = await request.patch(`/api/users/${currentSuperAdmin.id}/role`)
-      .set('Authorization', `Bearer ${superAdminToken}`)
       .send({ role: 'ADMIN' });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(410);
+  });
+});
+
+describe('System roles API', () => {
+  it('PUT /api/admin/users/:id/system-roles - super admin can set roles', async () => {
+    const res = await request.put(`/api/admin/users/${regularUserId}/system-roles`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ roles: ['USER', 'ADMIN'] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.systemRoles).toContain('ADMIN');
+    expect(res.body.systemRoles).toContain('USER');
+  });
+
+  it('PUT /api/admin/users/:id/system-roles - admin can set roles (non-SUPER_ADMIN)', async () => {
+    const res = await request.put(`/api/admin/users/${regularUserId}/system-roles`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ roles: ['USER', 'RELEASE_MANAGER'] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.systemRoles).toContain('RELEASE_MANAGER');
+  });
+
+  it('POST /api/admin/users/:id/system-roles - add a role', async () => {
+    const res = await request.post(`/api/admin/users/${regularUserId}/system-roles`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ role: 'AUDITOR' });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('DELETE /api/admin/users/:id/system-roles/:role - remove a role', async () => {
+    const res = await request.delete(`/api/admin/users/${adminTargetId}/system-roles/ADMIN`)
+      .set('Authorization', `Bearer ${superAdminToken}`);
+
+    expect(res.status).toBe(204);
+  });
+
+  it('GET /api/admin/users/:id/system-roles - returns systemRoles array', async () => {
+    const res = await request.get(`/api/admin/users/${regularUserId}/system-roles`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.systemRoles)).toBe(true);
   });
 });

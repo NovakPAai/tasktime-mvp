@@ -55,7 +55,7 @@ router.get('/users/:userId/time/summary', async (req: AuthRequest, res, next) =>
     const requester = req.user!;
     const targetUserId = req.params.userId as string;
     const canReadOtherUsers =
-      requester.role === 'ADMIN' || requester.role === 'MANAGER';
+      requester.systemRoles.includes('ADMIN') || requester.systemRoles.includes('SUPER_ADMIN');
 
     if (targetUserId !== requester.userId && !canReadOtherUsers) {
       throw new AppError(403, 'Insufficient permissions');

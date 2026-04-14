@@ -12,7 +12,7 @@ router.use(authenticate);
 // Для регистрации сессий ИИ считаем, что нужны права не ниже MANAGER
 router.post(
   '/ai-sessions',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(createAiSessionDto),
   async (req: AuthRequest, res, next) => {
     try {

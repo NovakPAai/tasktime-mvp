@@ -131,7 +131,7 @@ export default function BoardPage() {
   const [pendingTransition, setPendingTransition] = useState<{ issueId: string; transition: TransitionOption } | null>(null);
   const watchIssueTypeConfigId = Form.useWatch('issueTypeConfigId', form);
 
-  const canCreate = user?.role !== 'VIEWER';
+  const canCreate = !user?.systemRoles?.includes('AUDITOR');
 
   const load = useCallback(async () => {
     if (!projectId) return;

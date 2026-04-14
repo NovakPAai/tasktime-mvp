@@ -1,9 +1,9 @@
-import type { UserRole, StatusCategory } from '@prisma/client';
+import type { SystemRoleType, StatusCategory } from '@prisma/client';
 
 // ─── Conditions ───────────────────────────────────────────────────────────────
 
 export type ConditionRule =
-  | { type: 'USER_HAS_GLOBAL_ROLE'; roles: UserRole[] }
+  | { type: 'USER_HAS_GLOBAL_ROLE'; roles: SystemRoleType[] }
   | { type: 'USER_IS_ASSIGNEE' }
   | { type: 'USER_IS_REPORTER' }
   | { type: 'ANY_OF'; conditions: ConditionRule[] }

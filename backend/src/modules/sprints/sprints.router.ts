@@ -64,7 +64,7 @@ router.get('/projects/:projectId/backlog', async (req, res, next) => {
 });
 
 // Create sprint
-router.post('/projects/:projectId/sprints', requireRole('ADMIN', 'MANAGER'), validate(createSprintDto), async (req: AuthRequest, res, next) => {
+router.post('/projects/:projectId/sprints', requireRole('ADMIN'), validate(createSprintDto), async (req: AuthRequest, res, next) => {
   try {
     const sprint = await sprintsService.createSprint(req.params.projectId as string, req.body);
     await logAudit(req, 'sprint.created', 'sprint', sprint.id, { name: sprint.name });
@@ -73,7 +73,7 @@ router.post('/projects/:projectId/sprints', requireRole('ADMIN', 'MANAGER'), val
 });
 
 // Update sprint
-router.patch('/sprints/:id', requireRole('ADMIN', 'MANAGER'), validate(updateSprintDto), async (req: AuthRequest, res, next) => {
+router.patch('/sprints/:id', requireRole('ADMIN'), validate(updateSprintDto), async (req: AuthRequest, res, next) => {
   try {
     const sprint = await sprintsService.updateSprint(req.params.id as string, req.body);
     await logAudit(req, 'sprint.updated', 'sprint', sprint.id, req.body);
@@ -82,7 +82,7 @@ router.patch('/sprints/:id', requireRole('ADMIN', 'MANAGER'), validate(updateSpr
 });
 
 // Start sprint
-router.post('/sprints/:id/start', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res, next) => {
+router.post('/sprints/:id/start', requireRole('ADMIN'), async (req: AuthRequest, res, next) => {
   try {
     const sprint = await sprintsService.startSprint(req.params.id as string);
     await logAudit(req, 'sprint.started', 'sprint', sprint.id);
@@ -91,7 +91,7 @@ router.post('/sprints/:id/start', requireRole('ADMIN', 'MANAGER'), async (req: A
 });
 
 // Close sprint
-router.post('/sprints/:id/close', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res, next) => {
+router.post('/sprints/:id/close', requireRole('ADMIN'), async (req: AuthRequest, res, next) => {
   try {
     const sprint = await sprintsService.closeSprint(req.params.id as string);
     await logAudit(req, 'sprint.closed', 'sprint', sprint.id);
@@ -100,7 +100,7 @@ router.post('/sprints/:id/close', requireRole('ADMIN', 'MANAGER'), async (req: A
 });
 
 // Move issues to sprint (or backlog if sprintId=null in body)
-router.post('/sprints/:id/issues', requireRole('ADMIN', 'MANAGER'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
+router.post('/sprints/:id/issues', requireRole('ADMIN'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
   try {
     await sprintsService.moveIssuesToSprint(req.params.id as string, req.body.issueIds);
     await logAudit(req, 'sprint.issues_moved', 'sprint', req.params.id as string, { issueIds: req.body.issueIds });
@@ -109,7 +109,7 @@ router.post('/sprints/:id/issues', requireRole('ADMIN', 'MANAGER'), validate(mov
 });
 
 // Move issues to backlog
-router.post('/projects/:projectId/backlog/issues', requireRole('ADMIN', 'MANAGER'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
+router.post('/projects/:projectId/backlog/issues', requireRole('ADMIN'), validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
   try {
     await sprintsService.moveIssuesToSprint(null, req.body.issueIds);
     await logAudit(req, 'sprint.issues_moved_to_backlog', 'project', req.params.projectId as string, { issueIds: req.body.issueIds });
@@ -118,7 +118,7 @@ router.post('/projects/:projectId/backlog/issues', requireRole('ADMIN', 'MANAGER
 });
 
 // Bulk AI estimate all issues in a sprint
-router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN', 'MANAGER'), async (req: AuthRequest, res, next) => {
+router.post('/sprints/:id/ai/estimate-all', requireRole('ADMIN'), async (req: AuthRequest, res, next) => {
   try {
     const sprintId = req.params.id as string;
     const result = await sprintsService.bulkEstimateIssues(sprintId);

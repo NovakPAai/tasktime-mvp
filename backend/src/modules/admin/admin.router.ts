@@ -8,12 +8,15 @@ import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { rotateUserPassword } from '../users/password-rotation.service.js';
 import type { UatRole } from './uat-tests.data.js';
+import * as usersService from '../users/users.service.js';
+import { assignSystemRoleDto, setSystemRolesDto } from '../users/users.dto.js';
+import type { SystemRoleType } from '@prisma/client';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/admin/stats', requireRole('ADMIN', 'MANAGER', 'VIEWER'), async (_req, res, next) => {
+router.get('/admin/stats', requireRole('ADMIN', 'AUDITOR'), async (_req, res, next) => {
   try {
     const stats = await adminService.getStats();
     res.json(stats);
@@ -88,6 +91,72 @@ router.post('/admin/users/:id/reset-password', requireRole('ADMIN', 'SUPER_ADMIN
   }
 });
 
+// ─── System Roles endpoints ───────────────────────────────────────────────────
+
+router.get('/admin/users/:id/system-roles', requireRole('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const systemRoles = await usersService.getSystemRoles(req.params.id as string);
+    res.json({ systemRoles });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/admin/users/:id/system-roles',
+  requireRole('ADMIN', 'SUPER_ADMIN'),
+  validate(assignSystemRoleDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const entry = await usersService.addSystemRole(
+        { userId: req.user!.userId, systemRoles: req.user!.systemRoles as SystemRoleType[] },
+        req.params.id as string,
+        req.body.role as SystemRoleType,
+      );
+      res.status(201).json(entry);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/admin/users/:id/system-roles/:role',
+  requireRole('ADMIN', 'SUPER_ADMIN'),
+  async (req: AuthRequest, res, next) => {
+    try {
+      await usersService.removeSystemRole(
+        { userId: req.user!.userId, systemRoles: req.user!.systemRoles as SystemRoleType[] },
+        req.params.id as string,
+        req.params.role as SystemRoleType,
+      );
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/admin/users/:id/system-roles',
+  requireRole('ADMIN', 'SUPER_ADMIN'),
+  validate(setSystemRolesDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      const user = await usersService.setSystemRoles(
+        { userId: req.user!.userId, systemRoles: req.user!.systemRoles as SystemRoleType[] },
+        req.params.id as string,
+        req.body.roles as SystemRoleType[],
+      );
+      res.json(user);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Project Roles endpoints ──────────────────────────────────────────────────
+
 router.get('/admin/users/:id/roles', requireRole('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const roles = await adminService.getUserProjectRoles(req.params.id as string);
@@ -115,7 +184,9 @@ router.delete('/admin/users/:id/roles/:roleId', requireSuperAdmin(), async (req:
   }
 });
 
-router.get('/admin/activity', requireRole('ADMIN', 'MANAGER', 'VIEWER'), async (_req, res, next) => {
+// ─── Reports & Activity ───────────────────────────────────────────────────────
+
+router.get('/admin/activity', requireRole('ADMIN', 'AUDITOR'), async (_req, res, next) => {
   try {
     const activity = await adminService.getActivity();
     res.json(activity);
@@ -124,7 +195,7 @@ router.get('/admin/activity', requireRole('ADMIN', 'MANAGER', 'VIEWER'), async (
   }
 });
 
-router.get('/admin/settings/registration', requireRole('ADMIN', 'MANAGER', 'USER', 'VIEWER', 'SUPER_ADMIN'), async (_req, res, next) => {
+router.get('/admin/settings/registration', requireRole('ADMIN', 'SUPER_ADMIN', 'USER', 'AUDITOR', 'RELEASE_MANAGER'), async (_req, res, next) => {
   try {
     const registrationEnabled = await adminService.getRegistrationSetting();
     res.json({ registrationEnabled });
@@ -167,7 +238,7 @@ router.patch('/admin/settings/system', requireSuperAdmin(), validate(updateSyste
   }
 });
 
-router.get('/admin/uat-tests', requireRole('ADMIN', 'MANAGER', 'USER', 'VIEWER'), async (req, res, next) => {
+router.get('/admin/uat-tests', requireRole('ADMIN', 'USER', 'AUDITOR'), async (req, res, next) => {
   try {
     const { role } = req.query as { role?: UatRole };
     const tests = await adminService.listUatTests({ role });
@@ -179,7 +250,7 @@ router.get('/admin/uat-tests', requireRole('ADMIN', 'MANAGER', 'USER', 'VIEWER')
 
 router.get(
   '/admin/reports/issues-by-status',
-  requireRole('ADMIN', 'MANAGER', 'VIEWER'),
+  requireRole('ADMIN', 'AUDITOR'),
   async (req, res, next) => {
     try {
       const { projectId, sprintId, from, to } = req.query as {
@@ -204,7 +275,7 @@ router.get(
 
 router.get(
   '/admin/reports/issues-by-assignee',
-  requireRole('ADMIN', 'MANAGER', 'VIEWER'),
+  requireRole('ADMIN', 'AUDITOR'),
   async (req, res, next) => {
     try {
       const { projectId, sprintId, from, to } = req.query as {

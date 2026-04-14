@@ -18,7 +18,7 @@ export async function getTeam(id: string) {
       members: {
         include: {
           user: {
-            select: { id: true, name: true, email: true, role: true },
+            select: { id: true, name: true, email: true, systemRoles: { select: { role: true } } },
           },
         },
       },

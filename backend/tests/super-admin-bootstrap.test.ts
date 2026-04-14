@@ -36,6 +36,6 @@ describe('promoteUserToSuperAdmin', () => {
       password: 'Password123',
     });
     expect(newLogin.status).toBe(200);
-    expect(newLogin.body.user.role).toBe('SUPER_ADMIN');
+    expect(newLogin.body.user.systemRoles).toContain('SUPER_ADMIN');
   });
 });

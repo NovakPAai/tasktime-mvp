@@ -7,7 +7,7 @@ import { hashPassword } from '../shared/utils/password.js';
 
 const prisma = new PrismaClient();
 
-export function resolveSeedActors(users: Pick<User, 'id' | 'email' | 'name' | 'role'>[], ownerAdminEmail?: string) {
+export function resolveSeedActors(users: Pick<User, 'id' | 'email' | 'name'>[], ownerAdminEmail?: string) {
   const usersByEmail = new Map(users.map((user) => [user.email.toLowerCase(), user]));
 
   const admin = usersByEmail.get('admin@tasktime.ru');
@@ -59,16 +59,20 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   // Falls back to a random string so login is impossible if the var is not set.
   const agentRawPassword = process.env.AGENT_MCP_PASSWORD ?? Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
   const agentPasswordHash = await hashPassword(agentRawPassword);
-  await client.user.upsert({
+  const agentUser = await client.user.upsert({
     where: { email: 'agent@flow-universe.internal' },
     create: {
       email: 'agent@flow-universe.internal',
       name: 'Flow Universe Agent',
       passwordHash: agentPasswordHash,
-      role: 'MANAGER',
       isActive: true,
     },
-    update: { passwordHash: agentPasswordHash, role: 'MANAGER' },
+    update: { passwordHash: agentPasswordHash },
+  });
+  await client.userSystemRole.upsert({
+    where: { userId_role: { userId: agentUser.id, role: 'USER' } },
+    update: {},
+    create: { userId: agentUser.id, role: 'USER' },
   });
 
   const seededUsers = await Promise.all(

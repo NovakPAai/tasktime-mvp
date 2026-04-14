@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { hasRequiredRole } from '../../lib/roles';
-import type { UserRole, User } from '../../types';
+import type { SystemRoleType, User } from '../../types';
 
 // ─── Design tokens (Paper 1KR-0 dark + computed light) ───────────────────────
 const T = {
@@ -70,7 +70,7 @@ interface SidebarProps {
   mobileOpen: boolean;
   collapsed?: boolean;
   openKeys: string[];
-  userRole?: UserRole;
+  userRole?: SystemRoleType[];
   user?: User | null;
   animatingTheme?: boolean;
   onClose: () => void;
@@ -105,7 +105,7 @@ export default function Sidebar({
   const isPlanningOpen = openKeys.includes('planning-submenu');
   const isAdminOpen = openKeys.includes('admin-submenu');
   const isAdmin = hasRequiredRole(userRole, 'ADMIN');
-  const isSuperAdmin = userRole === 'SUPER_ADMIN';
+  const isSuperAdmin = userRole?.includes('SUPER_ADMIN') ?? false;
 
   function toggleSubmenu(key: string) {
     onOpenKeysChange(
@@ -476,7 +476,7 @@ export default function Sidebar({
                     {user.name}
                   </span>
                   <span style={{ fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, color: tokens.textMuted, lineHeight: '14px' }}>
-                    {user.role}
+                    {(user.systemRoles ?? []).filter(r => r !== 'USER').join(', ') || 'USER'}
                   </span>
                 </div>
               )}

@@ -9,7 +9,7 @@ const router = Router();
 router.use(authenticate);
 
 // GET /admin/issue-type-configs
-router.get('/admin/issue-type-configs', requireRole('ADMIN', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+router.get('/admin/issue-type-configs', requireRole('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const includeDisabled = req.query.includeDisabled === 'true';
     res.json(await service.listIssueTypeConfigs(includeDisabled));

@@ -106,11 +106,11 @@ export async function listUsersWithMeta(params?: { search?: string; isActive?: b
         id: true,
         email: true,
         name: true,
-        role: true,
         isActive: true,
         isSystem: true,
         mustChangePassword: true,
         createdAt: true,
+        systemRoles: { select: { role: true } },
         _count: {
           select: {
             createdIssues: true,
@@ -151,19 +151,24 @@ export async function createUser(dto: CreateUserDto) {
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
 
+  const systemRolesToCreate: { role: 'SUPER_ADMIN' | 'USER' }[] = dto.isSuperAdmin
+    ? [{ role: 'SUPER_ADMIN' }, { role: 'USER' }]
+    : [{ role: 'USER' }];
+
   const user = await prisma.user.create({
     data: {
       email,
       name: dto.name,
       passwordHash,
-      role: dto.isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
       mustChangePassword: true,
+      systemRoles: { create: systemRolesToCreate },
     },
     select: {
-      id: true, email: true, name: true, role: true,
+      id: true, email: true, name: true,
       isActive: true, mustChangePassword: true, createdAt: true,
+      systemRoles: { select: { role: true } },
     },
-  } as const);
+  });
 
   await prisma.auditLog.create({
     data: {
@@ -245,8 +250,9 @@ export async function deactivateUserAdmin(actorId: string, userId: string) {
     where: { id: userId },
     data: { isActive: false, name: newName },
     select: {
-      id: true, email: true, name: true, role: true,
+      id: true, email: true, name: true,
       isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true,
+      systemRoles: { select: { role: true } },
     },
   });
 
@@ -287,8 +293,9 @@ export async function updateUserAdmin(actorId: string, userId: string, dto: Upda
     where: { id: userId },
     data: dto,
     select: {
-      id: true, email: true, name: true, role: true,
+      id: true, email: true, name: true,
       isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true,
+      systemRoles: { select: { role: true } },
     },
   });
 

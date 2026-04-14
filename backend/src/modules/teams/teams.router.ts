@@ -31,7 +31,7 @@ router.get('/teams/:id', async (req, res, next) => {
 
 router.post(
   '/teams',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(createTeamDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -46,7 +46,7 @@ router.post(
 
 router.patch(
   '/teams/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(updateTeamDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -71,7 +71,7 @@ router.delete('/teams/:id', requireRole('ADMIN'), async (req: AuthRequest, res, 
 
 router.put(
   '/teams/:id/members',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(updateMembersDto),
   async (req: AuthRequest, res, next) => {
     try {

@@ -14,7 +14,6 @@ model User {
   email              String   @unique
   passwordHash       String   @map("password_hash")
   name               String
-  role               UserRole @default(USER)
   isActive           Boolean  @default(true) @map("is_active")
   isSystem           Boolean  @default(false) @map("is_system")
   mustChangePassword Boolean  @default(false) @map("must_change_password")
@@ -32,6 +31,7 @@ model User {
   createdLinks       IssueLink[]
   ownedProjects      Project[]               @relation("project_owner")
   projectRoles       UserProjectRole[]
+  systemRoles        UserSystemRole[]
   customFieldUpdates IssueCustomFieldValue[]
   createdReleases    Release[]               @relation("releaseCreator")
   addedReleaseItems  ReleaseItem[]           @relation("releaseItemAdder")
@@ -39,13 +39,26 @@ model User {
   @@map("users")
 }
 
-enum UserRole {
+enum SystemRoleType {
   SUPER_ADMIN
   ADMIN
-  MANAGER
   RELEASE_MANAGER
   USER
-  VIEWER
+  AUDITOR
+}
+
+model UserSystemRole {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  role      SystemRoleType
+  createdAt DateTime       @default(now()) @map("created_at")
+  createdBy String?        @map("created_by")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId])
+  @@map("user_system_roles")
 }
 
 model RefreshToken {

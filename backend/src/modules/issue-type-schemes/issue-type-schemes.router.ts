@@ -14,14 +14,14 @@ const router = Router();
 router.use(authenticate);
 
 // GET /admin/issue-type-schemes
-router.get('/admin/issue-type-schemes', requireRole('ADMIN', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+router.get('/admin/issue-type-schemes', requireRole('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     res.json(await service.listSchemes());
   } catch (err) { next(err); }
 });
 
 // GET /admin/issue-type-schemes/:id
-router.get('/admin/issue-type-schemes/:id', requireRole('ADMIN', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+router.get('/admin/issue-type-schemes/:id', requireRole('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     res.json(await service.getScheme(req.params.id as string));
   } catch (err) { next(err); }

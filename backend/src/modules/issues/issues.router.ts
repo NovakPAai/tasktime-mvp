@@ -19,7 +19,6 @@ import { getKanbanFieldsForIssues } from '../issue-custom-fields/issue-custom-fi
 import { logAudit } from '../../shared/middleware/audit.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { AuthRequest } from '../../shared/types/index.js';
-import { isSuperAdmin } from '../../shared/auth/roles.js';
 import { prisma } from '../../prisma/client.js';
 
 const router = Router();
@@ -33,7 +32,9 @@ router.use(authenticate);
  */
 async function requireIssueAccess(req: AuthRequest, issueProjectId: string): Promise<void> {
   if (!req.user) return; // authenticate middleware already handles this
-  if (isSuperAdmin(req.user.role) || req.user.role === 'ADMIN' || req.user.role === 'MANAGER') return;
+  // SUPER_ADMIN, ADMIN, RELEASE_MANAGER, AUDITOR have global read access
+  const { hasGlobalProjectReadAccess } = await import('../../shared/auth/roles.js');
+  if (hasGlobalProjectReadAccess(req.user.systemRoles)) return;
 
   const membership = await prisma.userProjectRole.findFirst({
     where: { userId: req.user.userId, projectId: issueProjectId },
@@ -51,9 +52,10 @@ router.get('/issues/search', async (req: AuthRequest, res, next) => {
       res.json([]);
       return;
     }
-    // Filter by accessible projects unless ADMIN/SUPER_ADMIN
+    // Filter by accessible projects unless user has global read access
     let projectIds: string[] | undefined;
-    if (req.user && !isSuperAdmin(req.user.role) && req.user.role !== 'ADMIN') {
+    const { hasGlobalProjectReadAccess: canReadAll } = await import('../../shared/auth/roles.js');
+    if (req.user && !canReadAll(req.user.systemRoles)) {
       const memberships = await prisma.userProjectRole.findMany({
         where: { userId: req.user.userId },
         select: { projectId: true },
@@ -193,7 +195,7 @@ router.patch('/issues/:id/status', validate(updateStatusDto), async (req: AuthRe
   try {
     const existing = await issuesService.getIssue(req.params.id as string);
     await requireIssueAccess(req, existing.projectId);
-    const issue = await issuesService.updateStatus(req.params.id as string, req.body, req.user?.userId, req.user?.role);
+    const issue = await issuesService.updateStatus(req.params.id as string, req.body, req.user?.userId, req.user?.systemRoles);
     await logAudit(req, 'issue.status_changed', 'issue', req.params.id as string, req.body);
     res.json(issue);
   } catch (err) {
@@ -204,7 +206,7 @@ router.patch('/issues/:id/status', validate(updateStatusDto), async (req: AuthRe
 // Assign issue
 router.patch(
   '/issues/:id/assign',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(assignDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -220,7 +222,7 @@ router.patch(
 // Update AI flags (eligibility and assignee type)
 router.patch(
   '/issues/:id/ai-flags',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(updateAiFlagsDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -236,7 +238,7 @@ router.patch(
 // Update AI execution status
 router.patch(
   '/issues/:id/ai-status',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(updateAiStatusDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -252,7 +254,7 @@ router.patch(
 // Bulk operations on issues (status / assignee)
 router.post(
   '/projects/:projectId/issues/bulk',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   async (req: AuthRequest, res, next) => {
     try {
       const { issueIds, status, assigneeId } = req.body as {
@@ -303,7 +305,7 @@ router.post(
         issueIds,
         transitionId,
         req.user!.userId,
-        req.user!.role,
+        req.user!.systemRoles,
       );
       const status = result.failed.length > 0 && result.succeeded.length > 0 ? 207 : 200;
       await logAudit(req, 'issues.bulk_transitioned', 'project', req.params.projectId as string, {

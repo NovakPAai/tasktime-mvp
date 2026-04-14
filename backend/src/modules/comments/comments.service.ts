@@ -1,3 +1,4 @@
+import type { SystemRoleType } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateCommentDto, UpdateCommentDto } from './comments.dto.js';
@@ -20,10 +21,10 @@ export async function createComment(issueId: string, authorId: string, dto: Crea
   });
 }
 
-export async function updateComment(id: string, userId: string, userRole: string, dto: UpdateCommentDto) {
+export async function updateComment(id: string, userId: string, userRoles: SystemRoleType[], dto: UpdateCommentDto) {
   const comment = await prisma.comment.findUnique({ where: { id } });
   if (!comment) throw new AppError(404, 'Comment not found');
-  if (comment.authorId !== userId && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+  if (comment.authorId !== userId && !userRoles.includes('ADMIN') && !userRoles.includes('SUPER_ADMIN')) {
     throw new AppError(403, 'Not allowed');
   }
 
@@ -34,10 +35,10 @@ export async function updateComment(id: string, userId: string, userRole: string
   });
 }
 
-export async function deleteComment(id: string, userId: string, userRole: string) {
+export async function deleteComment(id: string, userId: string, userRoles: SystemRoleType[]) {
   const comment = await prisma.comment.findUnique({ where: { id } });
   if (!comment) throw new AppError(404, 'Comment not found');
-  if (comment.authorId !== userId && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+  if (comment.authorId !== userId && !userRoles.includes('ADMIN') && !userRoles.includes('SUPER_ADMIN')) {
     throw new AppError(403, 'Not allowed');
   }
 

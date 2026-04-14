@@ -1,4 +1,4 @@
-import type { UserRole } from '@prisma/client';
+import type { SystemRoleType } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import type { GitLabMergeRequestPayload, GitLabPushPayload, GitLabPipelinePayload } from './webhooks.dto.js';
 import { parseIssueKeys } from './webhooks.dto.js';
@@ -46,13 +46,21 @@ async function logGitLabAudit(action: string, entityType: string, entityId: stri
 
 /** Get system actor for GitLab webhook transitions.
  *  Tries GITLAB_SYSTEM_USER_ID env var first, falls back to any ADMIN user. */
-async function getSystemActor(): Promise<{ id: string; role: UserRole } | null> {
+async function getSystemActor(): Promise<{ id: string; systemRoles: SystemRoleType[] } | null> {
   const envId = process.env.GITLAB_SYSTEM_USER_ID;
   if (envId) {
-    const user = await prisma.user.findUnique({ where: { id: envId }, select: { id: true, role: true } });
-    if (user) return user;
+    const user = await prisma.user.findUnique({
+      where: { id: envId },
+      select: { id: true, systemRoles: { select: { role: true } } },
+    });
+    if (user) return { id: user.id, systemRoles: user.systemRoles.map((r) => r.role) };
   }
-  return prisma.user.findFirst({ where: { role: 'ADMIN' }, select: { id: true, role: true } });
+  const adminUser = await prisma.user.findFirst({
+    where: { systemRoles: { some: { role: 'ADMIN' } } },
+    select: { id: true, systemRoles: { select: { role: true } } },
+  });
+  if (!adminUser) return null;
+  return { id: adminUser.id, systemRoles: adminUser.systemRoles.map((r) => r.role) };
 }
 
 /** Transition issue to the workflow status matching targetSystemKey via workflow engine.
@@ -103,7 +111,7 @@ async function transitionIssueBySystemKey(
     return null;
   }
 
-  await executeTransition(issue.id, transition.id, actor.id, actor.role, undefined, true);
+  await executeTransition(issue.id, transition.id, actor.id, actor.systemRoles, undefined, true);
 
   await logGitLabAudit('issue.gitlab_webhook_transition', 'issue', issue.id, {
     transitionId: transition.id,

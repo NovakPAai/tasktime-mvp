@@ -1,4 +1,4 @@
-import type { Prisma, UserRole } from '@prisma/client';
+import type { Prisma, SystemRoleType } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
@@ -420,7 +420,7 @@ export async function listReleaseItems(releaseId: string, query: ListReleaseItem
 
 // ─── RM-03.7: GET /releases/:id/readiness — extended metrics ─────────────────
 
-export async function getReleaseReadiness(id: string, actorId?: string, actorRole?: UserRole) {
+export async function getReleaseReadiness(id: string, actorId?: string, actorRoles?: SystemRoleType[]) {
   const release = await prisma.release.findUnique({ where: { id } });
   if (!release) throw new AppError(404, 'Release not found');
 
@@ -497,9 +497,9 @@ export async function getReleaseReadiness(id: string, actorId?: string, actorRol
 
   // availableTransitions — only when caller is authenticated
   let availableTransitions = undefined;
-  if (actorId && actorRole) {
+  if (actorId && actorRoles) {
     try {
-      const transitionsResult = await getAvailableTransitions(id, actorId, actorRole);
+      const transitionsResult = await getAvailableTransitions(id, actorId, actorRoles);
       availableTransitions = transitionsResult.transitions;
     } catch {
       // If no workflow configured — omit the field

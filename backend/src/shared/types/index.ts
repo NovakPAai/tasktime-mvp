@@ -1,10 +1,10 @@
 import type { Request } from 'express';
-import type { UserRole } from '@prisma/client';
+import type { SystemRoleType } from '@prisma/client';
 
 export interface AuthRequest extends Request {
   user?: {
     userId: string;
     email: string;
-    role: UserRole;
+    systemRoles: SystemRoleType[];
   };
 }

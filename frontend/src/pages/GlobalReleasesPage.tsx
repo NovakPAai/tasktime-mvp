@@ -44,6 +44,7 @@ import type {
   ReleaseTransition,
   ReleaseAuditEntry,
 } from '../types';
+import type { SystemRoleType } from '../types';
 import type { Project } from '../types/project.types';
 import type { Issue } from '../types/issue.types';
 import type { Sprint } from '../types/sprint.types';
@@ -982,7 +983,7 @@ export default function GlobalReleasesPage() {
   const { mode } = useThemeStore();
   const isDark = mode !== 'light';
   const C = isDark ? DARK_C : LIGHT_C;
-  const canManage = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'RELEASE_MANAGER';
+  const canManage = (['SUPER_ADMIN','ADMIN','RELEASE_MANAGER'] as SystemRoleType[]).some(r => user?.systemRoles?.includes(r));
 
   // ─── State ───────────────────────────────────────────────
   const [releases, setReleases] = useState<Release[]>([]);

@@ -54,7 +54,7 @@ export default function TopBar({
 
         <Typography.Text className="tt-topbar-user">
           <span className="tt-topbar-user-name">{user?.name}</span>
-          <span className="tt-topbar-role">{user?.role}</span>
+          <span className="tt-topbar-role">{(user?.systemRoles ?? []).filter(r => r !== 'USER').join(', ') || 'USER'}</span>
         </Typography.Text>
 
         <Button

@@ -21,7 +21,7 @@ describe('Auth API', () => {
     });
     expect(res.status).toBe(201);
     expect(res.body.user.email).toBe('new@test.com');
-    expect(res.body.user.role).toBe('USER');
+    expect(res.body.user.systemRoles).toContain('USER');
     expect(res.body.accessToken).toBeDefined();
     expect(res.body.refreshToken).toBeDefined();
   });
@@ -87,7 +87,7 @@ describe('Auth API', () => {
       email: 'super-auth@test.com', password: 'Password123',
     });
     expect(login.status).toBe(200);
-    expect(login.body.user.role).toBe('SUPER_ADMIN');
+    expect(login.body.user.systemRoles).toContain('SUPER_ADMIN');
 
     const me = await request.get('/api/auth/me')
       .set('Authorization', `Bearer ${login.body.accessToken}`);

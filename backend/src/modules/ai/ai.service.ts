@@ -82,7 +82,7 @@ export async function suggestAssignee(dto: { issueId?: string; issueKey?: string
     : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const users = await prisma.user.findMany({
-    where: { isActive: true, role: { in: ['USER', 'MANAGER'] } },
+    where: { isActive: true, systemRoles: { some: { role: 'USER' } } },
     select: {
       id: true,
       name: true,

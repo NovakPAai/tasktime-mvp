@@ -5,9 +5,14 @@ export const updateUserDto = z.object({
   email: z.string().email().optional(),
 });
 
-export const changeRoleDto = z.object({
-  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'RELEASE_MANAGER', 'USER', 'VIEWER']),
+export const assignSystemRoleDto = z.object({
+  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'USER', 'AUDITOR']),
+});
+
+export const setSystemRolesDto = z.object({
+  roles: z.array(z.enum(['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'USER', 'AUDITOR'])).min(1),
 });
 
 export type UpdateUserDto = z.infer<typeof updateUserDto>;
-export type ChangeRoleDto = z.infer<typeof changeRoleDto>;
+export type AssignSystemRoleDto = z.infer<typeof assignSystemRoleDto>;
+export type SetSystemRolesDto = z.infer<typeof setSystemRolesDto>;

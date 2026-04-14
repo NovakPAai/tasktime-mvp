@@ -13,7 +13,7 @@ interface AdminUserRow {
   id: string;
   email: string;
   name: string;
-  role: string;
+  systemRoles: string[];
   isActive: boolean;
   createdAt: string;
   createdIssues: number;
@@ -54,7 +54,7 @@ export default function AdminDashboardPage() {
             id: u.id,
             email: u.email,
             name: u.name,
-            role: u.role,
+            systemRoles: u.systemRoles,
             isActive: u.isActive,
             createdAt: u.createdAt,
             createdIssues: u._count.createdIssues,
@@ -136,9 +136,9 @@ export default function AdminDashboardPage() {
     { title: 'Email', dataIndex: 'email', key: 'email' },
     {
       title: 'Role',
-      dataIndex: 'role',
-      key: 'role',
-      render: (role: string) => <Tag className="tt-admin-role-tag">{role}</Tag>,
+      dataIndex: 'systemRoles',
+      key: 'systemRoles',
+      render: (roles: string[]) => <>{(roles ?? []).map(r => <Tag key={r} className="tt-admin-role-tag">{r}</Tag>)}</>,
     },
     {
       title: 'Status',

@@ -1,13 +1,13 @@
 import { pathToFileURL } from 'node:url';
 
-import { PrismaClient, type UserRole } from '@prisma/client';
+import { PrismaClient, type SystemRoleType } from '@prisma/client';
 
 import { hashPassword } from '../shared/utils/password.js';
 
 type BootstrapUser = {
   email: string;
   name: string;
-  role: UserRole;
+  systemRoles: SystemRoleType[];
   isSystem?: boolean;
 };
 
@@ -18,18 +18,13 @@ type BootstrapEnv = Partial<Record<
 
 export const AI_DEVELOPER_EMAIL = 'ai-developer@tasktime.ru';
 
-export const BOOTSTRAP_USERS: ReadonlyArray<{
-  email: string;
-  name: string;
-  role: UserRole;
-  isSystem?: boolean;
-}> = [
-  { email: 'admin@tasktime.ru', name: 'Admin User', role: 'ADMIN' },
-  { email: 'manager@tasktime.ru', name: 'Project Manager', role: 'MANAGER' },
-  { email: 'dev@tasktime.ru', name: 'Developer', role: 'USER' },
-  { email: 'viewer@tasktime.ru', name: 'CIO Viewer', role: 'VIEWER' },
-  { email: 'georgi.dubovik@tasktime.ru', name: 'Георгий Дубовик', role: 'SUPER_ADMIN' },
-  { email: AI_DEVELOPER_EMAIL, name: 'AI Developer', role: 'USER', isSystem: true },
+export const BOOTSTRAP_USERS: ReadonlyArray<BootstrapUser> = [
+  { email: 'admin@tasktime.ru', name: 'Admin User', systemRoles: ['ADMIN', 'USER'] },
+  { email: 'manager@tasktime.ru', name: 'Project Manager', systemRoles: ['USER'] },
+  { email: 'dev@tasktime.ru', name: 'Developer', systemRoles: ['USER'] },
+  { email: 'viewer@tasktime.ru', name: 'CIO Viewer', systemRoles: ['AUDITOR', 'USER'] },
+  { email: 'georgi.dubovik@tasktime.ru', name: 'Георгий Дубовик', systemRoles: ['SUPER_ADMIN', 'USER'] },
+  { email: AI_DEVELOPER_EMAIL, name: 'AI Developer', systemRoles: ['USER'], isSystem: true },
 ];
 
 type BootstrapPrismaClient = Pick<PrismaClient, 'user' | 'issueLinkType'>;
@@ -77,7 +72,7 @@ export function getBootstrapUsers(env: BootstrapEnv = process.env): BootstrapUse
   users.push({
     email: ownerAdminEmail,
     name: 'Owner Admin',
-    role: 'ADMIN',
+    systemRoles: ['ADMIN', 'USER'],
   });
 
   return users;
@@ -110,9 +105,11 @@ export async function bootstrapDefaultUsers(
       create: {
         email: user.email,
         name: user.name,
-        role: user.role,
         passwordHash,
         isSystem: user.isSystem ?? false,
+        systemRoles: {
+          create: user.systemRoles.map((role) => ({ role })),
+        },
       },
     });
   }

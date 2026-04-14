@@ -214,8 +214,8 @@ export default function IssueDetailPage() {
   const [editCustomValues, setEditCustomValues] = useState<Record<string, unknown>>({});
   const [customFieldsVersion, setCustomFieldsVersion] = useState(0);
   const customFieldsRef = useRef<HTMLDivElement>(null);
-  const canEditAi = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
-  const canAssign = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+  const canEditAi = hasAnyRequiredRole(user?.systemRoles, ['ADMIN']);
+  const canAssign = hasAnyRequiredRole(user?.systemRoles, ['ADMIN']);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -501,7 +501,7 @@ export default function IssueDetailPage() {
             >
               Перенести
             </button>
-            {hasRequiredRole(user?.role, 'ADMIN') && (
+            {hasRequiredRole(user?.systemRoles, 'ADMIN') && (
               <Popconfirm
                 title={`Удалить задачу ${issueKey}?`}
                 description="Это действие нельзя отменить."
@@ -628,7 +628,7 @@ export default function IssueDetailPage() {
                     <span style={{ color: C.t4, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '14px' }}>
                       {new Date(c.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    {(c.authorId === user?.id || hasRequiredRole(user?.role, 'ADMIN')) && (
+                    {(c.authorId === user?.id || hasRequiredRole(user?.systemRoles, 'ADMIN')) && (
                       <Popconfirm title="Удалить комментарий?" onConfirm={() => handleDeleteComment(c.id)}>
                         <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: C.t4, fontSize: 11, padding: 0 }}>
                           ✕

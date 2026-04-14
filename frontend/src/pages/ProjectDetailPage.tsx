@@ -194,8 +194,8 @@ export default function ProjectDetailPage() {
     }
   }, [id, fetchIssues]);
 
-  const canCreate  = user?.role !== 'VIEWER';
-  const canBulkEdit = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+  const canCreate  = !user?.systemRoles?.includes('AUDITOR');
+  const canBulkEdit = hasAnyRequiredRole(user?.systemRoles, ['ADMIN']);
 
   const handleCreate = async (values: issuesApi.CreateIssueBody) => {
     if (!id) return;
@@ -707,7 +707,7 @@ export default function ProjectDetailPage() {
                   Назначить
                 </Button>
               )}
-              {hasRequiredRole(user?.role, 'ADMIN') && (
+              {hasRequiredRole(user?.systemRoles, 'ADMIN') && (
                 <Popconfirm
                   title={`Удалить ${selectedIssueIds.length} задач?`}
                   description="Это действие нельзя отменить."
