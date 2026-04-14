@@ -865,9 +865,9 @@ export default function ReleasesPage() {
                   {r.plannedDate ? formatDate(r.plannedDate) : '—'}
                 </div>
 
-                {/* Link to /releases */}
+                {/* Link to /releases?releaseId=... — opens detail panel for this release */}
                 <div style={{ flexShrink: 0, marginLeft: 12 }}>
-                  <Link to="/releases" style={{ textDecoration: 'none' }}>
+                  <Link to={`/releases?releaseId=${r.id}`} style={{ textDecoration: 'none' }}>
                     <div style={{ ...btnOutlined }}>
                       <span style={{ fontFamily: F.sans, fontSize: 11, color: C.t3, lineHeight: '14px' }}>
                         Подробнее
