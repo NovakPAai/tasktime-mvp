@@ -79,9 +79,11 @@ describe('Auth API', () => {
       email: 'super-auth@test.com', password: 'Password123', name: 'Super Auth',
     });
 
-    await prisma.$executeRawUnsafe(
-      `UPDATE users SET role = 'SUPER_ADMIN' WHERE id = '${reg.body.user.id}'`,
-    );
+    await prisma.userSystemRole.upsert({
+      where: { userId_role: { userId: reg.body.user.id, role: 'SUPER_ADMIN' } },
+      create: { userId: reg.body.user.id, role: 'SUPER_ADMIN' },
+      update: {},
+    });
 
     const login = await request.post('/api/auth/login').send({
       email: 'super-auth@test.com', password: 'Password123',
