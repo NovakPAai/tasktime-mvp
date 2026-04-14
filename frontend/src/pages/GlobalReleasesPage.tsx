@@ -3,6 +3,7 @@
  * Artboards: 4EO-0 (Dark) + 4JG-0 (Light). Zero CSS classes, zero Ant Design layout.
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import {
   Modal,
@@ -933,9 +934,12 @@ function IssueTable({
               background: prioColor[issue.priority] || C.t4,
               flexShrink: 0,
             }} />
-            <span style={{ color: C.t3, fontSize: 11, fontFamily: 'monospace', flexShrink: 0 }}>
+            <Link
+              to={`/issues/${issue.id}`}
+              style={{ color: C.acc, fontSize: 11, fontFamily: 'monospace', flexShrink: 0, textDecoration: 'none', fontWeight: 600 }}
+            >
               {issue.project.key}-{issue.number}
-            </span>
+            </Link>
             <span style={{ color: C.t1, fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {issue.title}
             </span>
@@ -984,6 +988,7 @@ export default function GlobalReleasesPage() {
   const isDark = mode !== 'light';
   const C = isDark ? DARK_C : LIGHT_C;
   const canManage = (['SUPER_ADMIN','ADMIN','RELEASE_MANAGER'] as SystemRoleType[]).some(r => user?.systemRoles?.includes(r));
+  const [searchParams] = useSearchParams();
 
   // ─── State ───────────────────────────────────────────────
   const [releases, setReleases] = useState<Release[]>([]);
@@ -1045,6 +1050,14 @@ export default function GlobalReleasesPage() {
   useEffect(() => {
     projectsApi.listProjects().then(setProjects).catch(() => {});
   }, []);
+
+  // Auto-open release from ?releaseId= query param (e.g. linked from project releases page)
+  useEffect(() => {
+    const releaseId = searchParams.get('releaseId');
+    if (!releaseId || releases.length === 0) return;
+    const release = releases.find(r => r.id === releaseId);
+    if (release) setSelectedRelease(release);
+  }, [releases, searchParams]);
 
   // ─── Handlers ─────────────────────────────────────────────
   const handleCreate = async (vals: {

@@ -100,11 +100,11 @@ export default function AdminProjectsTab() {
       const [p, c, u] = await Promise.all([
         projectsApi.listProjects(),
         categoriesApi.listCategories(),
-        adminApi.listAdminUsers(),
+        adminApi.listAdminUsers({ pageSize: 500 }),
       ]);
       setProjects(p);
       setCategories(c);
-      setUsers(u.data);
+      setUsers(u.users);
     } catch {
       void message.error('Ошибка загрузки данных');
     } finally {
@@ -117,8 +117,8 @@ export default function AdminProjectsTab() {
   // Reload categories/users fresh every time the modal opens so edits
   // made in the Categories tab are reflected without a full page refresh.
   const refreshSelectData = () => {
-    Promise.all([categoriesApi.listCategories(), adminApi.listAdminUsers()])
-      .then(([c, u]) => { setCategories(c); setUsers(u.data); })
+    Promise.all([categoriesApi.listCategories(), adminApi.listAdminUsers({ pageSize: 500 })])
+      .then(([c, u]) => { setCategories(c); setUsers(u.users); })
       .catch(() => {});
   };
 

@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateTeamDto, UpdateTeamDto } from './teams.dto.js';
+import type { SystemRoleType } from '@prisma/client';
 
 export async function listTeams() {
   return prisma.team.findMany({
@@ -25,7 +26,16 @@ export async function getTeam(id: string) {
     },
   });
   if (!team) throw new AppError(404, 'Team not found');
-  return team;
+  return {
+    ...team,
+    members: team.members.map((m) => ({
+      ...m,
+      user: {
+        ...m.user,
+        systemRoles: m.user.systemRoles.map((sr: { role: SystemRoleType }) => sr.role),
+      },
+    })),
+  };
 }
 
 export async function createTeam(dto: CreateTeamDto) {

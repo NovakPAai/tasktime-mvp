@@ -41,7 +41,7 @@ export default function AdminDashboardPage() {
       try {
         const [statsData, adminUsers, allUsers, allProjects] = await Promise.all([
           adminApi.getStats(),
-          adminApi.listAdminUsers(),
+          adminApi.listAdminUsers({ pageSize: 500 }),
           authApi.listUsers(),
           projectsApi.listProjects(),
         ]);
@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
         allUsers.forEach((u) => { userMap[u.id] = u; });
         setUsersMap(userMap);
         setUsers(
-          adminUsers.data.map((u) => ({
+          adminUsers.users.map((u) => ({
             id: u.id,
             email: u.email,
             name: u.name,

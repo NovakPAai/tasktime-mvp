@@ -1,5 +1,5 @@
 import api from './client';
-import type { PaginatedResponse, SystemRoleType } from '../types';
+import type { SystemRoleType } from '../types';
 
 export interface SystemSettings {
   sessionLifetimeMinutes: number;
@@ -124,9 +124,9 @@ export async function getStats(): Promise<AdminStats> {
 }
 
 export async function listAdminUsers(
-  pagination?: { page?: number; limit?: number },
-): Promise<PaginatedResponse<AdminUser>> {
-  const { data } = await api.get<PaginatedResponse<AdminUser>>('/admin/users', {
+  pagination?: { page?: number; pageSize?: number },
+): Promise<AdminUsersResponse> {
+  const { data } = await api.get<AdminUsersResponse>('/admin/users', {
     params: pagination,
   });
   return data;

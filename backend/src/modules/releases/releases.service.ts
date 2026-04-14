@@ -468,7 +468,7 @@ export async function getReleaseReadiness(id: string, actorId?: string, actorRol
     totalItems > 0 ? Math.round(((doneItems + cancelledItems) / totalItems) * 100) : 0;
 
   // byProject — breakdown for INTEGRATION releases
-  let byProject: Array<{ project: { id: string; key: string; name: string }; total: number; done: number; inProgress: number }> = [];
+  let byProject: Array<{ projectId: string; key: string; name: string; total: number; done: number; inProgress: number }> = [];
   if (release.type === 'INTEGRATION') {
     const projectBreakdown = await prisma.$queryRaw<
       Array<{ project_id: string; project_key: string; project_name: string; total: bigint; done: bigint; in_progress: bigint }>
@@ -488,7 +488,9 @@ export async function getReleaseReadiness(id: string, actorId?: string, actorRol
       GROUP BY p.id, p.key, p.name
     `;
     byProject = projectBreakdown.map((row) => ({
-      project: { id: row.project_id, key: row.project_key, name: row.project_name },
+      projectId: row.project_id,
+      key: row.project_key,
+      name: row.project_name,
       total: Number(row.total),
       done: Number(row.done),
       inProgress: Number(row.in_progress ?? 0),

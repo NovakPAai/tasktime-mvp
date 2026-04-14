@@ -115,7 +115,7 @@ export default function AdminPage() {
       try {
         const [statsData, adminUsersPage, allUsers, allProjects] = await Promise.all([
           adminApi.getStats(),
-          adminApi.listAdminUsers(),
+          adminApi.listAdminUsers({ pageSize: 500 }),
           authApi.listUsers(),
           projectsApi.listProjects(),
         ]);
@@ -124,7 +124,7 @@ export default function AdminPage() {
         allUsers.forEach((u) => { userMap[u.id] = u; });
         setUsersMap(userMap);
         setUsers(
-          adminUsersPage.data.map((u) => ({
+          adminUsersPage.users.map((u) => ({
             id: u.id,
             email: u.email,
             name: u.name,
