@@ -57,7 +57,7 @@ export const adminApi = {
     api.post<{ tempPassword: string }>(`/admin/users/${id}/reset-password`).then(r => r.data),
 
   /** @deprecated Use setSystemRoles or addSystemRole instead */
-  changeGlobalRole: (_id: string, _role: string) =>
+  changeGlobalRole: () =>
     Promise.reject(new Error('Deprecated: use system-roles endpoints')),
 
   // System roles

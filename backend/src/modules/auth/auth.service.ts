@@ -41,21 +41,7 @@ function generateRefreshExpiry(): Date {
   return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 }
 
-/** Fetch user with systemRoles array. Returns null if not found. */
-async function getUserWithRoles(id: string) {
-  return prisma.user.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      isActive: true,
-      mustChangePassword: true,
-      createdAt: true,
-      systemRoles: { select: { role: true } },
-    },
-  });
-}
+
 
 function extractRoles(systemRoles: { role: SystemRoleType }[]): SystemRoleType[] {
   return systemRoles.map((sr) => sr.role);
