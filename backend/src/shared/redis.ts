@@ -108,7 +108,7 @@ export async function delCacheByPrefix(prefix: string): Promise<void> {
 export type UserSession = {
   userId: string;
   email: string;
-  role: string;
+  systemRoles: string[];
   createdAt: string;
   lastSeenAt: string;
   userAgent?: string;

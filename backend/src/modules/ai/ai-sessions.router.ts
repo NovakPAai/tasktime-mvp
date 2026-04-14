@@ -9,10 +9,10 @@ import type { AuthRequest } from '../../shared/types/index.js';
 const router = Router();
 router.use(authenticate);
 
-// Для регистрации сессий ИИ считаем, что нужны права не ниже MANAGER
+// AI session creation requires ADMIN (system agent has ADMIN role via seed)
 router.post(
   '/ai-sessions',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN'),
   validate(createAiSessionDto),
   async (req: AuthRequest, res, next) => {
     try {

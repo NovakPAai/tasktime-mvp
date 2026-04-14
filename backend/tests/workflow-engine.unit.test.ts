@@ -343,7 +343,7 @@ describe('ensureWorkflowEditable', () => {
 describe('evaluateConditions', () => {
   const ctx = {
     actorId: 'user-1',
-    actorRole: 'USER' as const,
+    actorRoles: ['USER'] as const,
     issue: { assigneeId: 'user-1', creatorId: 'user-2' },
   };
 

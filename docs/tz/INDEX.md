@@ -6,3 +6,4 @@
 | [TTSEC-1](./TTSEC-1.md) | ИБ: Устранение уязвимостей безопасности v0.1 (17 CVE) | 2026-03-26 | OPEN | 21ч (local) / 5ч (api) |
 | [TTADM-68](./TTADM-68.md) | [Workflow Editor] null в conditions/validators/postFunctions не проходит Zod | 2026-04-07 | DONE (не закрыта на проде) | ~1.5ч |
 | [TTMP-171](./TTMP-171.md) | Сессия пользователя (sliding session + настройка в Системе) | 2026-04-07 | IN_PROGRESS | 9ч |
+| [TTMP-223](./TTMP-223.md) | [Release Mgmt] Исправление несоответствий реализации спеке | 2026-04-12 | OPEN | 8.5ч |

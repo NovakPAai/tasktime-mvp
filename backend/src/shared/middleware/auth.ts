@@ -1,5 +1,5 @@
 import type { Response, NextFunction } from 'express';
-import type { UserRole } from '@prisma/client';
+import type { SystemRoleType } from '@prisma/client';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { AppError } from './error-handler.js';
 import type { AuthRequest } from '../types/index.js';
@@ -46,7 +46,7 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
   req.user = {
     userId: payload.userId,
     email: payload.email,
-    role: payload.role as UserRole,
+    systemRoles: payload.systemRoles as SystemRoleType[],
   };
 
   // Sliding session check — skip for system accounts

@@ -57,7 +57,7 @@ beforeEach(async () => {
     name: 'GL Admin',
   });
   adminUserId = adminReg.body.user.id;
-  await prisma.user.update({ where: { id: adminUserId }, data: { role: 'ADMIN' } });
+  await prisma.userSystemRole.upsert({ where: { userId_role: { userId: adminUserId, role: 'ADMIN' } }, create: { userId: adminUserId, role: 'ADMIN' }, update: {} });
   const adminLogin = await request
     .post('/api/auth/login')
     .send({ email: 'admin@gl-test.com', password: 'Password123' });

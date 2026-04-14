@@ -15,7 +15,7 @@ async function main() {
     newPassword: ROTATE_PASSWORD_NEW_PASSWORD,
   });
 
-  console.log(`Password rotated for ${user.email} (${user.role})`);
+  console.log(`Password rotated for ${user.email}`);
 }
 
 main().catch((error) => {

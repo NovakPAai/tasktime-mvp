@@ -27,7 +27,7 @@ beforeEach(async () => {
   const adminReg = await request.post('/api/auth/register').send({
     email: 'admin-rel@test.com', password: 'Password123', name: 'Admin Rel',
   });
-  await prisma.user.update({ where: { id: adminReg.body.user.id }, data: { role: 'ADMIN' } });
+  await prisma.userSystemRole.upsert({ where: { userId_role: { userId: adminReg.body.user.id, role: 'ADMIN' } }, create: { userId: adminReg.body.user.id, role: 'ADMIN' }, update: {} });
   const adminLogin = await request.post('/api/auth/login').send({ email: 'admin-rel@test.com', password: 'Password123' });
   adminToken = adminLogin.body.accessToken;
 
@@ -35,7 +35,7 @@ beforeEach(async () => {
   const mgrReg = await request.post('/api/auth/register').send({
     email: 'mgr-rel@test.com', password: 'Password123', name: 'Mgr Rel',
   });
-  await prisma.user.update({ where: { id: mgrReg.body.user.id }, data: { role: 'MANAGER' } });
+  await prisma.userSystemRole.upsert({ where: { userId_role: { userId: mgrReg.body.user.id, role: 'ADMIN' } }, create: { userId: mgrReg.body.user.id, role: 'ADMIN' }, update: {} });
   const mgrLogin = await request.post('/api/auth/login').send({ email: 'mgr-rel@test.com', password: 'Password123' });
   managerToken = mgrLogin.body.accessToken;
 

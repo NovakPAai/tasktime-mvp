@@ -1,12 +1,12 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import type { UserRole } from '@prisma/client';
+import type { SystemRoleType } from '@prisma/client';
 import { config } from '../../config.js';
 
 export interface TokenPayload {
   userId: string;
   email: string;
-  role: UserRole;
+  systemRoles: SystemRoleType[];
 }
 
 export function signAccessToken(payload: TokenPayload): string {

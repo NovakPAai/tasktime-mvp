@@ -129,7 +129,7 @@ export default function ProjectsPage() {
   const [hoveredFilter, setHoveredFilter] = useState<FilterType | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
-  const canCreate = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+  const canCreate = hasAnyRequiredRole(user?.systemRoles, ['ADMIN']);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 

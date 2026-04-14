@@ -77,7 +77,7 @@ export default function TeamsPage() {
   const { user } = useAuthStore();
   const { mode } = useThemeStore();
   const C = mode === 'light' ? LIGHT_C : DARK_C;
-  const canManageTeams = hasAnyRequiredRole(user?.role, ['ADMIN', 'MANAGER']);
+  const canManageTeams = hasAnyRequiredRole(user?.systemRoles, ['ADMIN']);
 
   const load = async () => {
     setLoading(true);

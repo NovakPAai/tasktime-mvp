@@ -1,5 +1,5 @@
 import api from './client';
-import type { PaginatedResponse } from '../types';
+import type { PaginatedResponse, SystemRoleType } from '../types';
 
 export interface SystemSettings {
   sessionLifetimeMinutes: number;
@@ -20,7 +20,7 @@ export interface AdminUser {
   id: string;
   email: string;
   name: string;
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RELEASE_MANAGER' | 'USER' | 'VIEWER';
+  systemRoles: SystemRoleType[];
   isActive: boolean;
   isSystem: boolean;
   mustChangePassword: boolean;
@@ -56,8 +56,22 @@ export const adminApi = {
   resetPassword: (id: string) =>
     api.post<{ tempPassword: string }>(`/admin/users/${id}/reset-password`).then(r => r.data),
 
-  changeGlobalRole: (id: string, role: string) =>
-    api.patch<AdminUser>(`/users/${id}/role`, { role }).then(r => r.data),
+  /** @deprecated Use setSystemRoles or addSystemRole instead */
+  changeGlobalRole: () =>
+    Promise.reject(new Error('Deprecated: use system-roles endpoints')),
+
+  // System roles
+  getSystemRoles: (userId: string) =>
+    api.get<{ systemRoles: SystemRoleType[] }>(`/admin/users/${userId}/system-roles`).then(r => r.data),
+
+  addSystemRole: (userId: string, role: SystemRoleType) =>
+    api.post(`/admin/users/${userId}/system-roles`, { role }).then(r => r.data),
+
+  removeSystemRole: (userId: string, role: SystemRoleType) =>
+    api.delete(`/admin/users/${userId}/system-roles/${role}`).then(r => r.data),
+
+  setSystemRoles: (userId: string, roles: SystemRoleType[]) =>
+    api.put<AdminUser>(`/admin/users/${userId}/system-roles`, { roles }).then(r => r.data),
 
   // Project roles
   getUserRoles: (userId: string) =>

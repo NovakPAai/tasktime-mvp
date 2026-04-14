@@ -28,7 +28,7 @@ import * as projectsApi from '../api/projects';
 import * as sprintsApi from '../api/sprints';
 import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
-import type { Release, Issue, ReleaseLevel, ReleaseState, SprintInRelease, ReleaseReadiness, Sprint, ReleaseTransition, ReleaseStatus } from '../types';
+import type { Release, Issue, ReleaseLevel, ReleaseState, SprintInRelease, ReleaseReadiness, Sprint, ReleaseTransition, ReleaseStatus, SystemRoleType } from '../types';
 
 // ─── Tokens Dark (Paper 4EO-0) ──────────────────────────
 const DARK_C = {
@@ -151,7 +151,7 @@ export default function ReleasesPage() {
   const [loadingTransitions, setLoadingTransitions] = useState(false);
   const [integrationReleases, setIntegrationReleases] = useState<Release[]>([]);
   const [form] = Form.useForm();
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'RELEASE_MANAGER' || user?.role === 'SUPER_ADMIN';
+  const canManage = (['ADMIN','RELEASE_MANAGER','SUPER_ADMIN'] as SystemRoleType[]).some(r => user?.systemRoles?.includes(r));
 
   // ─── Load ─────────────────────────────────────────────────
   const loadReleases = useCallback(async () => {

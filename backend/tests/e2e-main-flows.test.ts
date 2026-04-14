@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { request, createAdminUser, createManagerUser, getIssueTypeConfigId } from './helpers.js';
+import { request, createAdminUser, createTestUser, getIssueTypeConfigId } from './helpers.js';
 
 const prisma = new PrismaClient();
 
@@ -23,8 +23,15 @@ beforeEach(async () => {
   const admin = await createAdminUser();
   adminToken = admin.accessToken;
 
-  const manager = await createManagerUser();
-  managerToken = manager.accessToken;
+  // Manager needs ADMIN system role to create/manage projects in the new RBAC
+  const { user: mgr } = await createTestUser('manager@test.com', 'Password123', 'Manager');
+  await prisma.userSystemRole.upsert({
+    where: { userId_role: { userId: mgr.id, role: 'ADMIN' } },
+    create: { userId: mgr.id, role: 'ADMIN' },
+    update: {},
+  });
+  const mgrLogin = await request.post('/api/auth/login').send({ email: 'manager@test.com', password: 'Password123' });
+  managerToken = mgrLogin.body.accessToken as string;
 
   typeConfigIds = {
     EPIC: await getIssueTypeConfigId('EPIC'),

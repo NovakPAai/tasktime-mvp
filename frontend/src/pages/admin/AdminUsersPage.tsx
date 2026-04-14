@@ -10,17 +10,19 @@ import {
 import { adminApi, type AdminUser, type ProjectRole } from '../../api/admin';
 import api from '../../api/client';
 import { useAuthStore } from '../../store/auth.store';
+import type { SystemRoleType } from '../../types';
 
 const { Text } = Typography;
 
 const ROLE_COLORS: Record<string, string> = {
   SUPER_ADMIN: 'red',
   ADMIN: 'orange',
-  MANAGER: 'blue',
   RELEASE_MANAGER: 'purple',
+  AUDITOR: 'cyan',
   USER: 'green',
-  VIEWER: 'default',
 };
+
+const SYSTEM_ROLES: SystemRoleType[] = ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR', 'USER'];
 
 function RoleTags({ roles }: { roles: ProjectRole[] }) {
   const shown = roles.slice(0, 3);
@@ -94,8 +96,8 @@ export default function AdminUsersPage() {
   const [newRoleProjectId, setNewRoleProjectId] = useState<string | undefined>();
   const [newRoleRole, setNewRoleRole] = useState<string | undefined>();
 
-  // Global role change
-  const [changingGlobalRole, setChangingGlobalRole] = useState(false);
+  // System roles change
+  const [changingSystemRoles, setChangingSystemRoles] = useState(false);
 
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
@@ -192,25 +194,25 @@ export default function AdminUsersPage() {
 
   const openEdit = async (user: AdminUser) => {
     setEditUser(user);
-    editForm.setFieldsValue({ name: user.name, email: user.email, isActive: user.isActive, globalRole: user.role });
+    editForm.setFieldsValue({ name: user.name, email: user.email, isActive: user.isActive });
     setUserRoles(user.projectRoles ?? []);
     setEditOpen(true);
     await loadProjects();
   };
 
-  const handleChangeGlobalRole = async (role: string) => {
+  const handleSetSystemRoles = async (roles: SystemRoleType[]) => {
     if (!editUser) return;
-    setChangingGlobalRole(true);
+    setChangingSystemRoles(true);
     try {
-      const updated = await adminApi.changeGlobalRole(editUser.id, role);
+      const updated = await adminApi.setSystemRoles(editUser.id, roles);
       setEditUser(updated);
       void loadUsers();
-      void message.success('Глобальная роль обновлена');
+      void message.success('Системные роли обновлены');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
-      void message.error(err?.response?.data?.error || 'Ошибка смены роли');
+      void message.error(err?.response?.data?.error || 'Ошибка смены ролей');
     } finally {
-      setChangingGlobalRole(false);
+      setChangingSystemRoles(false);
     }
   };
 
@@ -325,13 +327,16 @@ export default function AdminUsersPage() {
       ),
     },
     {
-      title: 'Системная роль',
+      title: 'Системные роли',
       key: 'role',
       render: (_: unknown, u: AdminUser) => {
-        if (!u.role || u.role === 'USER' || u.role === 'VIEWER') {
-          return <Text type="secondary" style={{ fontSize: 12 }}>—</Text>;
-        }
-        return <Tag color={ROLE_COLORS[u.role] ?? 'default'} style={{ fontSize: 11 }}>{u.role}</Tag>;
+        const notable = (u.systemRoles ?? []).filter(r => r !== 'USER');
+        if (notable.length === 0) return <Text type="secondary" style={{ fontSize: 12 }}>USER</Text>;
+        return (
+          <Space wrap size={2}>
+            {notable.map(r => <Tag key={r} color={ROLE_COLORS[r] ?? 'default'} style={{ fontSize: 11 }}>{r}</Tag>)}
+          </Space>
+        );
       },
     },
     {
@@ -386,7 +391,7 @@ export default function AdminUsersPage() {
         <Space>
           {registrationEnabled !== null && (
             <Tooltip title={
-              currentUser?.role === 'SUPER_ADMIN'
+              currentUser?.systemRoles?.includes('SUPER_ADMIN')
                 ? 'Разрешить новым пользователям самостоятельно регистрироваться через форму входа'
                 : 'Только SUPER_ADMIN может изменить эту настройку'
             }>
@@ -395,7 +400,7 @@ export default function AdminUsersPage() {
                 <Switch
                   checked={registrationEnabled}
                   loading={togglingReg}
-                  disabled={currentUser?.role !== 'SUPER_ADMIN'}
+                  disabled={!currentUser?.systemRoles?.includes('SUPER_ADMIN')}
                   onChange={handleToggleRegistration}
                   checkedChildren="Вкл"
                   unCheckedChildren="Выкл"
@@ -470,25 +475,19 @@ export default function AdminUsersPage() {
           </Form.Item>
         </Form>
 
-        <Typography.Title level={5}>Глобальная роль</Typography.Title>
+        <Typography.Title level={5}>Системные роли</Typography.Title>
         <Space style={{ marginBottom: 16 }}>
           <Select
-            style={{ width: 220 }}
-            value={editUser?.role}
-            loading={changingGlobalRole}
-            disabled={changingGlobalRole || editUser?.isSystem}
-            onChange={(role) => void handleChangeGlobalRole(role)}
-            options={[
-              { value: 'SUPER_ADMIN', label: 'SUPER_ADMIN' },
-              { value: 'ADMIN', label: 'ADMIN' },
-              { value: 'MANAGER', label: 'MANAGER' },
-              { value: 'RELEASE_MANAGER', label: 'RELEASE_MANAGER' },
-              { value: 'USER', label: 'USER' },
-              { value: 'VIEWER', label: 'VIEWER' },
-            ]}
+            mode="multiple"
+            style={{ minWidth: 320 }}
+            value={editUser?.systemRoles ?? []}
+            loading={changingSystemRoles}
+            disabled={changingSystemRoles || editUser?.isSystem}
+            onChange={(roles) => void handleSetSystemRoles(roles as SystemRoleType[])}
+            options={SYSTEM_ROLES.map(r => ({ value: r, label: r }))}
           />
           {editUser?.isSystem && (
-            <Text type="secondary" style={{ fontSize: 12 }}>Системный пользователь — роль менять нельзя</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>Системный пользователь — роли менять нельзя</Text>
           )}
         </Space>
 

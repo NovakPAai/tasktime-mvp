@@ -2,7 +2,29 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.9**
+**Last version: 2.10**
+
+---
+
+## [2.10] [2026-04-14] feat(rbac): multi-role RBAC — junction table UserSystemRole
+
+**PR:** [#33](https://github.com/NovakPAai/tasktime-mvp/pull/33)
+**Ветка:** `claude/alex-rbac-multi-role`
+
+### Что изменилось
+- `backend/src/prisma/schema.prisma`: новый enum `SystemRoleType` (SUPER_ADMIN, ADMIN, RELEASE_MANAGER, USER, AUDITOR), новая модель `UserSystemRole` (junction table), поле `role: UserRole` удалено из User; добавлена Prisma-миграция
+- `backend/src/shared/auth/roles.ts`: полная перезапись — `hasSystemRole()`, `hasAnySystemRole()`, `isSuperAdmin()`, `hasGlobalProjectReadAccess()` работают с массивами ролей
+- `backend/src/shared/types/index.ts`, `jwt.ts`, `auth.ts`, `rbac.ts`, `redis.ts`: везде `role: UserRole` → `systemRoles: SystemRoleType[]`
+- `backend/src/modules/admin/admin.router.ts`: 4 новых эндпоинта для управления системными ролями (`GET/POST/DELETE /users/:id/system-roles`, `PUT /users/:id/system-roles`)
+- `backend/src/modules/users/`, `bootstrap.ts`, `seed.ts`, `prod-sync.*`, `rotate-password.*`: все ссылки на `role` обновлены до `systemRoles`
+- Модульные сервисы (`issues`, `comments`, `releases`, `gitlab`, `links`, `ai`, `teams`): `actorRole: UserRole` → `actorRoles: SystemRoleType[]`, проверки через `.some()`/`.includes()`
+- `frontend/src/types/auth.types.ts`, `types/index.ts`: `User.role: UserRole` → `User.systemRoles: SystemRoleType[]`, добавлен `SystemRoleType`
+- `frontend/src/lib/roles.ts`: `hasSystemRole()`, `hasAnySystemRole()`, `hasGlobalProjectReadAccess()` работают с массивами
+- `frontend/src/api/admin.ts`: `AdminUser.role` → `AdminUser.systemRoles[]`, новые методы `getSystemRoles`, `addSystemRole`, `removeSystemRole`, `setSystemRoles`
+- `frontend/src/pages/admin/AdminUsersPage.tsx`: multi-select для системных ролей вместо одиночного select
+- `frontend/src/pages/admin/AdminRolesPage.tsx`: RELEASE_MANAGER убран из project-role dropdown
+- Все остальные страницы и компоненты: массовая замена проверок ролей
+- `backend/tests/users.test.ts`, `auth.test.ts`, `super-admin-bootstrap.test.ts`: обновлены под новый API
 
 ---
 

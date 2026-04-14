@@ -53,7 +53,7 @@ interface AdminUserRow {
   id: string;
   email: string;
   name: string;
-  role: string;
+  systemRoles: string[];
   isActive: boolean;
   createdAt: string;
   createdIssues: number;
@@ -128,7 +128,7 @@ export default function AdminPage() {
             id: u.id,
             email: u.email,
             name: u.name,
-            role: u.role,
+            systemRoles: u.systemRoles,
             isActive: u.isActive,
             createdAt: u.createdAt,
             createdIssues: u._count.createdIssues,
@@ -449,7 +449,7 @@ export default function AdminPage() {
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {pagedUsers.map((user, rowIdx) => {
               const globalIdx = users.findIndex(u => u.id === user.id);
-              const roleCfg = ROLE_CFG[user.role] ?? ROLE_CFG['USER'];
+              const primaryRole = (user.systemRoles ?? []).find(r => r !== 'USER') ?? 'USER'; const roleCfg = ROLE_CFG[primaryRole] ?? ROLE_CFG['USER'];
               return (
                 <div key={user.id} style={{ display: 'flex', alignItems: 'center', paddingInline: 20, borderBottom: `1px solid ${C.borderRow}`, background: rowIdx % 4 === 3 ? C.rowHighlight : 'transparent' }}>
                   {/* User */}
@@ -468,7 +468,7 @@ export default function AdminPage() {
                   {/* Role */}
                   <div style={{ width: 100, flexShrink: 0 }}>
                     <span style={{ background: roleCfg.bg, borderRadius: 4, padding: '3px 8px', color: roleCfg.text, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 10, fontWeight: 600, letterSpacing: '0.3px' }}>
-                      {user.role}
+                      {primaryRole}
                     </span>
                   </div>
                   {/* Last activity */}

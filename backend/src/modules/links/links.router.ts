@@ -36,7 +36,7 @@ router.post('/issues/:id/links', validate(createLinkDto), async (req: AuthReques
 // DELETE /issues/:id/links/:linkId — удалить связь
 router.delete('/issues/:id/links/:linkId', async (req: AuthRequest, res, next) => {
   try {
-    await linksService.deleteLink(req.params.linkId as string, req.user!.userId, req.user!.role);
+    await linksService.deleteLink(req.params.linkId as string, req.user!.userId, req.user!.systemRoles);
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -58,7 +58,7 @@ router.get('/link-types', async (req, res, next) => {
 // ===== Link Types (Admin) =====
 
 // GET /admin/link-types — список всех типов связей
-router.get('/admin/link-types', requireRole('MANAGER', 'ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+router.get('/admin/link-types', requireRole('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const includeInactive = req.query.includeInactive === 'true';
     const types = await linksService.listLinkTypes(includeInactive);

@@ -11,7 +11,7 @@ router.use(authenticate);
 
 router.post(
   '/ai/estimate',
-  requireRole('ADMIN', 'MANAGER', 'USER'),
+  requireRole('ADMIN', 'USER'),
   validate(aiEstimateDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -25,7 +25,7 @@ router.post(
 
 router.post(
   '/ai/decompose',
-  requireRole('ADMIN', 'MANAGER', 'USER'),
+  requireRole('ADMIN', 'USER'),
   validate(aiDecomposeDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -39,7 +39,7 @@ router.post(
 
 router.post(
   '/ai/suggest-assignee',
-  requireRole('ADMIN', 'MANAGER', 'USER'),
+  requireRole('ADMIN', 'USER'),
   validate(aiSuggestAssigneeDto),
   async (req: AuthRequest, res, next) => {
     try {

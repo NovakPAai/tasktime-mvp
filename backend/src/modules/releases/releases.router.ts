@@ -37,7 +37,7 @@ router.get('/releases', async (req: AuthRequest, res, next) => {
 
 router.post(
   '/releases',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(createReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -80,7 +80,7 @@ router.get('/releases/:id/history', async (req: AuthRequest, res, next) => {
 
 router.patch(
   '/releases/:id',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(updateReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -123,7 +123,7 @@ router.get('/releases/:id/items', async (req: AuthRequest, res, next) => {
 
 router.post(
   '/releases/:id/items',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(releaseItemsAddDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -144,7 +144,7 @@ router.post(
 
 router.post(
   '/releases/:id/items/remove',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(releaseItemsRemoveDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -171,7 +171,7 @@ router.get(
       const result = await releaseWorkflowEngine.getAvailableTransitions(
         req.params.id as string,
         req.user!.userId,
-        req.user!.role,
+        req.user!.systemRoles,
       );
       res.json(result);
     } catch (err) {
@@ -182,7 +182,7 @@ router.get(
 
 router.post(
   '/releases/:id/transitions/:transitionId',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(executeTransitionDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -190,7 +190,7 @@ router.post(
         req.params.id as string,
         req.params.transitionId as string,
         req.user!.userId,
-        req.user!.role,
+        req.user!.systemRoles,
         (req.body as { comment?: string }).comment,
       );
       // audit is written inside executeTransition via prisma.$transaction
@@ -208,7 +208,7 @@ router.get('/releases/:id/readiness', async (req: AuthRequest, res, next) => {
     const readiness = await releasesService.getReleaseReadiness(
       req.params.id as string,
       req.user?.userId,
-      req.user?.role,
+      req.user?.systemRoles,
     );
     res.json(readiness);
   } catch (err) {
@@ -220,7 +220,7 @@ router.get('/releases/:id/readiness', async (req: AuthRequest, res, next) => {
 
 router.post(
   '/releases/:id/clone',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(cloneReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -265,7 +265,7 @@ router.get('/projects/:projectId/releases', async (req, res, next) => {
 
 router.post(
   '/projects/:projectId/releases',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(createReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -304,7 +304,7 @@ router.get('/releases/:id/sprints', async (req, res, next) => {
 
 router.post(
   '/releases/:id/sprints',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(manageSprintsInReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -321,7 +321,7 @@ router.post(
 
 router.post(
   '/releases/:id/sprints/remove',
-  requireRole('ADMIN', 'MANAGER', 'RELEASE_MANAGER'),
+  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(manageSprintsInReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {

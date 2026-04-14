@@ -15,7 +15,7 @@ router.get('/issues/:id/transitions', async (req: AuthRequest, res, next) => {
     const result = await getAvailableTransitions(
       req.params['id'] as string,
       req.user!.userId,
-      req.user!.role,
+      req.user!.systemRoles,
     );
     res.json(result);
   } catch (err) {
@@ -31,7 +31,7 @@ router.post('/issues/:id/transitions', validate(ExecuteTransitionDto), async (re
       req.params['id'] as string,
       dto.transitionId,
       req.user!.userId,
-      req.user!.role,
+      req.user!.systemRoles,
       dto.screenFieldValues,
     );
     res.json(issue);
@@ -48,7 +48,7 @@ router.post('/issues/batch-transitions', async (req: AuthRequest, res, next) => 
       res.status(400).json({ error: 'issueIds must be a non-empty array' });
       return;
     }
-    const result = await getBatchTransitions(issueIds, req.user!.userId, req.user!.role);
+    const result = await getBatchTransitions(issueIds, req.user!.userId, req.user!.systemRoles);
     res.json(result);
   } catch (err) {
     next(err);

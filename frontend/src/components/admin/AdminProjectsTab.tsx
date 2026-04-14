@@ -15,7 +15,7 @@ interface AdminUser {
   id: string;
   name: string;
   email: string;
-  role: string;
+  systemRoles: string[];
 }
 
 // ─── Delete confirmation modal with 5-second countdown ───────────────────────

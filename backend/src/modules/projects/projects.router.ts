@@ -20,7 +20,7 @@ router.get('/', async (_req, res, next) => {
   }
 });
 
-router.post('/', requireRole('ADMIN', 'MANAGER'), validate(createProjectDto), async (req: AuthRequest, res, next) => {
+router.post('/', requireRole('ADMIN'), validate(createProjectDto), async (req: AuthRequest, res, next) => {
   try {
     const project = await projectsService.createProject(req.body);
     await logAudit(req, 'project.created', 'project', project.id, req.body);
@@ -48,7 +48,7 @@ router.get('/:id/dashboard', async (req, res, next) => {
   }
 });
 
-router.patch('/:id', requireRole('ADMIN', 'MANAGER'), validate(updateProjectDto), async (req: AuthRequest, res, next) => {
+router.patch('/:id', requireRole('ADMIN'), validate(updateProjectDto), async (req: AuthRequest, res, next) => {
   try {
     const project = await projectsService.updateProject(req.params.id as string, req.body);
     await logAudit(req, 'project.updated', 'project', req.params.id as string, req.body);

@@ -22,7 +22,7 @@ export interface PaginatedResponse<T> {
   meta: PaginationMeta;
 }
 
-export type { UserRole, User, AuthResponse } from './auth.types';
+export type { SystemRoleType, UserRole, User, AuthResponse } from './auth.types';
 
 export type {
   IssueType,

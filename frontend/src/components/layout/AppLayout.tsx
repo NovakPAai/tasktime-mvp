@@ -111,7 +111,7 @@ export default function AppLayout() {
         mobileOpen={mobileOpen}
         collapsed={!isMobile && sidebarCollapsed}
         openKeys={openKeys}
-        userRole={user?.role}
+        userRole={user?.systemRoles}
         user={user}
         animatingTheme={animatingTheme}
         onClose={() => setMobileOpen(false)}

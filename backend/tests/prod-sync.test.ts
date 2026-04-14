@@ -27,10 +27,10 @@ describe('buildProdSyncPlan', () => {
           { key: 'DEMO', name: 'Ignore me', description: 'Non-TTMP data must stay untouched' },
         ],
         users: [
-          { email: 'manager@tasktime.ru', name: 'Manager', role: 'MANAGER', isActive: true },
-          { email: 'dev@tasktime.ru', name: 'Developer', role: 'USER', isActive: true },
-          { email: 'new@tasktime.ru', name: 'New User', role: 'USER', isActive: true },
-          { email: 'outsider@tasktime.ru', name: 'Outsider', role: 'VIEWER', isActive: true },
+          { email: 'manager@tasktime.ru', name: 'Manager', isActive: true },
+          { email: 'dev@tasktime.ru', name: 'Developer', isActive: true },
+          { email: 'new@tasktime.ru', name: 'New User', isActive: true },
+          { email: 'outsider@tasktime.ru', name: 'Outsider', isActive: true },
         ],
         sprints: [
           {
@@ -157,9 +157,9 @@ describe('buildProdSyncPlan', () => {
       target: {
         projects: [{ key: 'TTMP', name: 'Flow Universe MVP', description: 'Old local copy' }],
         users: [
-          { email: 'manager@tasktime.ru', name: 'Manager', role: 'MANAGER', isActive: true },
-          { email: 'dev@tasktime.ru', name: 'Developer', role: 'USER', isActive: true },
-          { email: 'viewer@tasktime.ru', name: 'Viewer', role: 'VIEWER', isActive: true },
+          { email: 'manager@tasktime.ru', name: 'Manager', isActive: true },
+          { email: 'dev@tasktime.ru', name: 'Developer', isActive: true },
+          { email: 'viewer@tasktime.ru', name: 'Viewer', isActive: true },
         ],
         sprints: [
           {

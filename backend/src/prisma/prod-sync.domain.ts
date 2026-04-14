@@ -7,7 +7,6 @@ export type ProdSyncProjectRecord = {
 export type ProdSyncUserRecord = {
   email: string;
   name: string;
-  role: string;
   isActive: boolean;
 };
 
@@ -198,7 +197,6 @@ function normalizeUser(user: ProdSyncUserRecord) {
   return {
     email: user.email,
     name: user.name,
-    role: user.role,
     isActive: user.isActive,
   };
 }

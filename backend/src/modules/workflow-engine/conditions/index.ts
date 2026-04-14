@@ -1,9 +1,9 @@
-import type { UserRole } from '@prisma/client';
+import type { SystemRoleType } from '@prisma/client';
 import type { ConditionRule } from '../types.js';
 
 interface ConditionContext {
   actorId: string;
-  actorRole: UserRole;
+  actorRoles: SystemRoleType[];
   issue: {
     assigneeId: string | null;
     creatorId: string;
@@ -17,7 +17,7 @@ export function evaluateConditions(rules: ConditionRule[], ctx: ConditionContext
 function evaluateCondition(rule: ConditionRule, ctx: ConditionContext): boolean {
   switch (rule.type) {
     case 'USER_HAS_GLOBAL_ROLE':
-      return rule.roles.includes(ctx.actorRole);
+      return rule.roles.some((r) => ctx.actorRoles.includes(r));
 
     case 'USER_IS_ASSIGNEE':
       return ctx.actorId === ctx.issue.assigneeId;

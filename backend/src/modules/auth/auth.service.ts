@@ -5,6 +5,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../sha
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { setUserSession, deleteUserSession, getCachedJson, setCachedJson } from '../../shared/redis.js';
 import type { RegisterDto, LoginDto } from './auth.dto.js';
+import type { SystemRoleType } from '@prisma/client';
 
 // CVE-06: Brute force protection
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -40,6 +41,10 @@ function generateRefreshExpiry(): Date {
   return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 }
 
+function extractRoles(systemRoles: { role: SystemRoleType }[]): SystemRoleType[] {
+  return systemRoles.map((sr) => sr.role);
+}
+
 export async function register(dto: RegisterDto) {
   const email = dto.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -49,11 +54,23 @@ export async function register(dto: RegisterDto) {
 
   const passwordHash = await hashPassword(dto.password);
   const user = await prisma.user.create({
-    data: { email, passwordHash, name: dto.name },
-    select: { id: true, email: true, name: true, role: true },
+    data: {
+      email,
+      passwordHash,
+      name: dto.name,
+      // New users automatically get USER system role
+      systemRoles: { create: { role: 'USER' } },
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      systemRoles: { select: { role: true } },
+    },
   });
 
-  const tokenPayload = { userId: user.id, email: user.email, role: user.role };
+  const roles = extractRoles(user.systemRoles);
+  const tokenPayload = { userId: user.id, email: user.email, systemRoles: roles };
   const accessToken = signAccessToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
 
@@ -68,12 +85,12 @@ export async function register(dto: RegisterDto) {
   const nowIso = new Date().toISOString();
   void setUserSession(user.id, {
     email: user.email,
-    role: user.role,
+    systemRoles: roles,
     createdAt: nowIso,
     lastSeenAt: nowIso,
   });
 
-  return { user, accessToken, refreshToken };
+  return { user: { id: user.id, email: user.email, name: user.name, systemRoles: roles }, accessToken, refreshToken };
 }
 
 export async function login(dto: LoginDto) {
@@ -82,7 +99,18 @@ export async function login(dto: LoginDto) {
   // CVE-06: check brute force lockout before attempting login
   await checkBruteForce(normalizedEmail);
 
-  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      passwordHash: true,
+      isActive: true,
+      mustChangePassword: true,
+      systemRoles: { select: { role: true } },
+    },
+  });
   if (!user || user.isActive === false) {
     await recordFailedAttempt(normalizedEmail);
     throw new AppError(401, 'Invalid credentials');
@@ -97,7 +125,8 @@ export async function login(dto: LoginDto) {
   // CVE-06: clear failed attempts on successful login
   await clearFailedAttempts(normalizedEmail);
 
-  const tokenPayload = { userId: user.id, email: user.email, role: user.role };
+  const roles = extractRoles(user.systemRoles);
+  const tokenPayload = { userId: user.id, email: user.email, systemRoles: roles };
   const accessToken = signAccessToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
 
@@ -114,13 +143,19 @@ export async function login(dto: LoginDto) {
   const nowIso = new Date().toISOString();
   void setUserSession(user.id, {
     email: user.email,
-    role: user.role,
+    systemRoles: roles,
     createdAt: nowIso,
     lastSeenAt: nowIso,
   });
 
   return {
-    user: { id: user.id, email: user.email, name: user.name, role: user.role, mustChangePassword: user.mustChangePassword },
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      systemRoles: roles,
+      mustChangePassword: user.mustChangePassword,
+    },
     accessToken,
     refreshToken,
   };
@@ -140,7 +175,15 @@ export async function refresh(refreshToken: string) {
     throw new AppError(401, 'Refresh token expired or revoked');
   }
 
-  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: {
+      id: true,
+      email: true,
+      isActive: true,
+      systemRoles: { select: { role: true } },
+    },
+  });
   if (!user || user.isActive === false) {
     throw new AppError(401, 'User not found or deactivated');
   }
@@ -157,7 +200,8 @@ export async function refresh(refreshToken: string) {
     throw new AppError(401, 'Refresh token expired or revoked');
   }
 
-  const newPayload = { userId: user.id, email: user.email, role: user.role };
+  const roles = extractRoles(user.systemRoles);
+  const newPayload = { userId: user.id, email: user.email, systemRoles: roles };
   const newAccessToken = signAccessToken(newPayload);
   const newRefreshToken = signRefreshToken(newPayload);
 
@@ -172,8 +216,8 @@ export async function refresh(refreshToken: string) {
   const nowIso = new Date().toISOString();
   void setUserSession(user.id, {
     email: user.email,
-    role: user.role,
-    createdAt: stored.createdAt.toISOString?.() ?? nowIso,
+    systemRoles: roles,
+    createdAt: stored.createdAt.toISOString(),
     lastSeenAt: nowIso,
   });
 
@@ -195,10 +239,21 @@ export async function logout(refreshToken: string) {
 export async function getMe(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true, mustChangePassword: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      isActive: true,
+      createdAt: true,
+      mustChangePassword: true,
+      systemRoles: { select: { role: true } },
+    },
   });
   if (!user) throw new AppError(404, 'User not found');
-  return user;
+  return {
+    ...user,
+    systemRoles: extractRoles(user.systemRoles),
+  };
 }
 
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {

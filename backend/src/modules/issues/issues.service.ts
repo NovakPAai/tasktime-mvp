@@ -3,7 +3,7 @@ import type {
   IssueStatus,
   Prisma,
   AiAssigneeType,
-  UserRole,
+  SystemRoleType,
 } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
@@ -500,7 +500,7 @@ async function validateRequiredFieldsForDone(issueId: string): Promise<void> {
   }
 }
 
-export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: string, actorRole?: UserRole) {
+export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: string, actorRoles?: SystemRoleType[]) {
   const issue = await prisma.issue.findUnique({ where: { id } });
   if (!issue) throw new AppError(404, 'Issue not found');
 
@@ -514,7 +514,7 @@ export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: s
         (t.isGlobal || t.fromStatusId === issue.workflowStatusId),
     );
     if (transition) {
-      return executeTransition(id, transition.id, actorId ?? 'system', actorRole ?? 'USER', undefined, true);
+      return executeTransition(id, transition.id, actorId ?? 'system', actorRoles ?? ['USER'], undefined, true);
     }
     // No matching transition in workflow — fall through to legacy direct update
   }
@@ -969,7 +969,7 @@ export async function moveIssue(id: string, dto: MoveIssueDto) {
  * @param issueIds - Array of issue IDs to process (max 50)
  * @param transitionId - Workflow transition identifier to apply to each issue
  * @param actorId - ID of the user performing the transition (or system actor)
- * @param actorRole - Role of the actor performing the transition
+ * @param actorRoles - System roles of the actor performing the transition
  * @throws AppError If more than 50 issue IDs are provided (`TOO_MANY_ISSUES`)
  * @returns An object with `succeeded` containing IDs that transitioned successfully and `failed` containing `{ id, error }` entries for each failure; `error` is the thrown error message or `'UNKNOWN_ERROR'`
  */
@@ -978,7 +978,7 @@ export async function bulkTransitionIssues(
   issueIds: string[],
   transitionId: string,
   actorId: string,
-  actorRole: UserRole,
+  actorRoles: SystemRoleType[],
 ): Promise<{ succeeded: string[]; failed: Array<{ id: string; error: string }> }> {
   if (issueIds.length > 50) {
     throw new AppError(400, 'TOO_MANY_ISSUES', { max: 50 });
@@ -989,7 +989,7 @@ export async function bulkTransitionIssues(
 
   for (const id of issueIds) {
     try {
-      await executeTransition(id, transitionId, actorId, actorRole, undefined, true);
+      await executeTransition(id, transitionId, actorId, actorRoles, undefined, true);
       succeeded.push(id);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'UNKNOWN_ERROR';

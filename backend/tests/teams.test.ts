@@ -21,9 +21,10 @@ beforeEach(async () => {
     password: 'Password123',
     name: 'Admin Teams',
   });
-  await prisma.user.update({
-    where: { id: adminReg.body.user.id },
-    data: { role: 'ADMIN' },
+  await prisma.userSystemRole.upsert({
+    where: { userId_role: { userId: adminReg.body.user.id, role: 'ADMIN' } },
+    create: { userId: adminReg.body.user.id, role: 'ADMIN' },
+    update: {},
   });
   const adminLogin = await request
     .post('/api/auth/login')

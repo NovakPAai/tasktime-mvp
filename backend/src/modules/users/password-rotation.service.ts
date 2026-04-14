@@ -22,7 +22,7 @@ export async function rotateUserPassword({ email, newPassword }: RotateUserPassw
 
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: { id: true, email: true, role: true },
+    select: { id: true, email: true },
   });
 
   if (!user) {
