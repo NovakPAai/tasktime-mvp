@@ -42,7 +42,6 @@ describe('bootstrapDefaultUsers', () => {
       orderBy: { email: 'asc' },
       select: {
         email: true,
-        role: true,
         isActive: true,
         passwordHash: true,
       },

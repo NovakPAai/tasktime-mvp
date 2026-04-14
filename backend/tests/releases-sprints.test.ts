@@ -35,7 +35,7 @@ beforeEach(async () => {
   const mgrReg = await request.post('/api/auth/register').send({
     email: 'mgr-rel@test.com', password: 'Password123', name: 'Mgr Rel',
   });
-  await prisma.userSystemRole.upsert({ where: { userId_role: { userId: mgrReg.body.user.id, role: 'MANAGER' } }, create: { userId: mgrReg.body.user.id, role: 'MANAGER' }, update: {} });
+  await prisma.userSystemRole.upsert({ where: { userId_role: { userId: mgrReg.body.user.id, role: 'ADMIN' } }, create: { userId: mgrReg.body.user.id, role: 'ADMIN' }, update: {} });
   const mgrLogin = await request.post('/api/auth/login').send({ email: 'mgr-rel@test.com', password: 'Password123' });
   managerToken = mgrLogin.body.accessToken;
 
