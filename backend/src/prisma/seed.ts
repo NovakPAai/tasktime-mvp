@@ -74,6 +74,12 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     update: {},
     create: { userId: agentUser.id, role: 'USER' },
   });
+  // Agent needs ADMIN role to create AI sessions (POST /api/ai-sessions requires ADMIN)
+  await client.userSystemRole.upsert({
+    where: { userId_role: { userId: agentUser.id, role: 'ADMIN' } },
+    update: {},
+    create: { userId: agentUser.id, role: 'ADMIN' },
+  });
 
   const seededUsers = await Promise.all(
     bootstrapUsers.map((user) =>

@@ -10,7 +10,10 @@ export const assignSystemRoleDto = z.object({
 });
 
 export const setSystemRolesDto = z.object({
-  roles: z.array(z.enum(['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'USER', 'AUDITOR'])).min(1),
+  roles: z
+    .array(z.enum(['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'USER', 'AUDITOR']))
+    .min(1)
+    .refine((roles) => roles.includes('USER'), { message: 'USER role is mandatory and must be included' }),
 });
 
 export type UpdateUserDto = z.infer<typeof updateUserDto>;

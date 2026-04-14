@@ -108,12 +108,12 @@ router.post(
   validate(assignSystemRoleDto),
   async (req: AuthRequest, res, next) => {
     try {
-      const entry = await usersService.addSystemRole(
+      const systemRoles = await usersService.addSystemRole(
         { userId: req.user!.userId, systemRoles: req.user!.systemRoles as SystemRoleType[] },
         req.params.id as string,
         req.body.role as SystemRoleType,
       );
-      res.status(201).json(entry);
+      res.status(201).json({ systemRoles });
     } catch (err) {
       next(err);
     }
@@ -238,7 +238,7 @@ router.patch('/admin/settings/system', requireSuperAdmin(), validate(updateSyste
   }
 });
 
-router.get('/admin/uat-tests', requireRole('ADMIN', 'USER', 'AUDITOR'), async (req, res, next) => {
+router.get('/admin/uat-tests', requireRole('ADMIN', 'USER', 'AUDITOR', 'RELEASE_MANAGER'), async (req, res, next) => {
   try {
     const { role } = req.query as { role?: UatRole };
     const tests = await adminService.listUatTests({ role });

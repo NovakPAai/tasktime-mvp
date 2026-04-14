@@ -17,15 +17,3 @@ export function hasGlobalProjectReadAccess(userRoles: SystemRoleType[]): boolean
   return hasAnySystemRole(userRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR']);
 }
 
-// ─── Legacy aliases — kept so callers using old names compile until renamed ───
-/** @deprecated Use hasSystemRole */
-export const hasRequiredRole = (
-  userRoles: SystemRoleType[],
-  requiredRole: SystemRoleType,
-): boolean => hasSystemRole(userRoles, requiredRole);
-
-/** @deprecated Use hasAnySystemRole */
-export const hasAnyRequiredRole = (
-  userRoles: SystemRoleType[],
-  requiredRoles: readonly SystemRoleType[],
-): boolean => hasAnySystemRole(userRoles, requiredRoles);

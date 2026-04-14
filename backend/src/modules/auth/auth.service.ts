@@ -41,8 +41,6 @@ function generateRefreshExpiry(): Date {
   return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 }
 
-
-
 function extractRoles(systemRoles: { role: SystemRoleType }[]): SystemRoleType[] {
   return systemRoles.map((sr) => sr.role);
 }

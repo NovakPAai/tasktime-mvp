@@ -109,6 +109,17 @@ export async function setSystemRoles(actor: RoleChangeActor, targetId: string, r
     where: { id: targetId },
     select: userSelect,
   });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'user.system_roles_set',
+      entityType: 'user',
+      entityId: targetId,
+      userId: actor.userId,
+      details: { added: toAdd, removed: toDelete, result: roles },
+    },
+  });
+
   return formatUser(updated);
 }
 
@@ -138,7 +149,7 @@ export async function addSystemRole(actor: RoleChangeActor, targetId: string, ro
     throw new AppError(409, 'Role already assigned');
   }
 
-  const entry = await prisma.userSystemRole.create({
+  await prisma.userSystemRole.create({
     data: { userId: targetId, role, createdBy: actor.userId },
   });
 
@@ -152,7 +163,11 @@ export async function addSystemRole(actor: RoleChangeActor, targetId: string, ro
     },
   });
 
-  return entry;
+  const updated = await prisma.user.findUniqueOrThrow({
+    where: { id: targetId },
+    select: { systemRoles: { select: { role: true } } },
+  });
+  return updated.systemRoles.map((sr) => sr.role);
 }
 
 /**
