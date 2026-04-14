@@ -1,0 +1,65 @@
+{
+  "TTMP-204": {
+    "id": "0383eed4-6936-4105-a9b1-dada523c459a",
+    "number": 204,
+    "title": "[RM-05.1] Таблица релизов с фильтрами, пагинацией, сортировкой",
+    "description": "Основной вид GlobalReleasesPage: таблица с колонками (имя, тип, проекты, статус, уровень, задачи/прогресс, плановая дата, дата выпуска, автор). Фильтры: тип (tabs), статус (multi-select), период (DateRangePicker), проект (select), поиск. Пагинация, сортировка. Dual-theme, inline-styles.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  },
+  "TTMP-205": {
+    "id": "1e9235a7-f636-4327-910c-b3843f7e17b4",
+    "number": 205,
+    "title": "[RM-05.2] Модальное окно создания релиза (тип, проект, workflow)",
+    "description": "Форма: Radio тип (ATOMIC/INTEGRATION), Select проект (показывается для ATOMIC), Input название, Textarea описание, Radio уровень (Minor/Major), Select workflow, DatePicker плановая дата. Валидация на фронте. Вызов POST /api/releases.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  },
+  "TTMP-206": {
+    "id": "0d8eb228-fe2a-4e01-acae-d7011ba98029",
+    "number": 206,
+    "title": "[RM-05.3] Детальная карточка релиза — вкладка Задачи",
+    "description": "Слайд-панель или страница. Шапка: название, тип, статус, кнопки переходов. Вкладка «Задачи»: таблица с группировкой по проектам (для INTEGRATION), колонки (ключ, название, статус, приоритет, тип, исполнитель, проект). Кнопки «Добавить задачи» и «Убрать из релиза». Модальное окно поиска задач.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  },
+  "TTMP-207": {
+    "id": "cb367699-5e6e-42a5-8e09-9bf3c10c440f",
+    "number": 207,
+    "title": "[RM-05.4] Детальная карточка — вкладка Спринты",
+    "description": "Список спринтов в релизе: название, статус, кол-во задач, прогресс. Кнопки «Добавить спринт» / «Убрать спринт». Модальное окно выбора спринтов.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  },
+  "TTMP-208": {
+    "id": "5efe6dc5-c34e-44b6-80fc-513a377b3ba7",
+    "number": 208,
+    "title": "[RM-05.5] Детальная карточка — вкладка Готовность",
+    "description": "Метрики из GET /releases/:id/readiness. Круговая диаграмма задач по статусам. Для INTEGRATION: разбивка по проектам (таблица). Процент завершённости. Визуализация блокеров.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  },
+  "TTMP-209": {
+    "id": "56869ca0-0a9a-4f89-933b-4bb1b2dcb208",
+    "number": 209,
+    "title": "[RM-05.6] Детальная карточка — вкладка История",
+    "description": "Хронологический список из audit_log по entityType=release. Показ: кто, когда, какое действие (создание, переход, добавление/удаление задач). Форматирование для каждого типа action.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  },
+  "TTMP-210": {
+    "id": "1694b2e9-159e-4daa-8a3d-6e34fdac7b15",
+    "number": 210,
+    "title": "[RM-05.7] Кнопки переходов по статусам (workflow transitions UI)",
+    "description": "Компонент ReleaseTransitionButtons: загрузка доступных переходов из GET /releases/:id/transitions. Кнопки с цветами toStatus. Подтверждение перехода (modal). Показ ошибок conditions. Обновление карточки после перехода.",
+    "status": "IN_PROGRESS",
+    "aiExecutionStatus": "NOT_STARTED",
+    "projectKey": "TTMP"
+  }
+}
