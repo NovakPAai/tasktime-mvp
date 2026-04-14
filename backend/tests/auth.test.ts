@@ -94,7 +94,7 @@ describe('Auth API', () => {
     const me = await request.get('/api/auth/me')
       .set('Authorization', `Bearer ${login.body.accessToken}`);
     expect(me.status).toBe(200);
-    expect(me.body.role).toBe('SUPER_ADMIN');
+    expect(me.body.systemRoles).toContain('SUPER_ADMIN');
   });
 
   it('GET /api/auth/me - should reject without token', async () => {

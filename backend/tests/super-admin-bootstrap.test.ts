@@ -22,9 +22,9 @@ describe('promoteUserToSuperAdmin', () => {
 
     const promoted = await prisma.user.findUniqueOrThrow({
       where: { email: admin.user.email },
-      select: { role: true },
+      select: { systemRoles: { select: { role: true } } },
     });
-    expect(promoted.role).toBe('SUPER_ADMIN');
+    expect(promoted.systemRoles.map((r) => r.role)).toContain('SUPER_ADMIN');
 
     const oldRefresh = await request.post('/api/auth/refresh').send({
       refreshToken: admin.refreshToken,
