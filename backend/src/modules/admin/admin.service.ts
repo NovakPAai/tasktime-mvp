@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma, SystemRoleType } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { config } from '../../config.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
@@ -6,6 +6,13 @@ import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
 import { hashPassword } from '../../shared/utils/password.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateUserDto, UpdateUserAdminDto, AssignProjectRoleDto } from './admin.dto.js';
+
+function flattenRoles<T extends { systemRoles: { role: SystemRoleType }[] }>(
+  user: T,
+): Omit<T, 'systemRoles'> & { systemRoles: SystemRoleType[] } {
+  const { systemRoles, ...rest } = user;
+  return { ...rest, systemRoles: systemRoles.map((sr) => sr.role) } as Omit<T, 'systemRoles'> & { systemRoles: SystemRoleType[] };
+}
 
 type AdminStats = {
   counts: {
@@ -131,7 +138,7 @@ export async function listUsersWithMeta(params?: { search?: string; isActive?: b
     prisma.user.count({ where }),
   ]);
 
-  return { users, total, page, pageSize };
+  return { users: users.map(flattenRoles), total, page, pageSize };
 }
 
 function generateTempPassword(): string {
@@ -179,7 +186,7 @@ export async function createUser(dto: CreateUserDto) {
     },
   });
 
-  return { user, tempPassword };
+  return { user: flattenRoles(user), tempPassword };
 }
 
 async function checkUserDependencies(userId: string) {
@@ -266,7 +273,7 @@ export async function deactivateUserAdmin(actorId: string, userId: string) {
     },
   });
 
-  return updated;
+  return flattenRoles(updated);
 }
 
 export async function updateUserAdmin(actorId: string, userId: string, dto: UpdateUserAdminDto) {
@@ -309,7 +316,7 @@ export async function updateUserAdmin(actorId: string, userId: string, dto: Upda
     },
   });
 
-  return updated;
+  return flattenRoles(updated);
 }
 
 export async function resetUserPassword(actorId: string, userId: string) {
