@@ -217,7 +217,7 @@ export async function refresh(refreshToken: string) {
   void setUserSession(user.id, {
     email: user.email,
     systemRoles: roles,
-    createdAt: stored.createdAt.toISOString?.() ?? nowIso,
+    createdAt: stored.createdAt.toISOString(),
     lastSeenAt: nowIso,
   });
 

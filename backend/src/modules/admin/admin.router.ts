@@ -120,15 +120,22 @@ router.post(
   },
 );
 
+const VALID_SYSTEM_ROLES: SystemRoleType[] = ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'USER', 'AUDITOR'];
+
 router.delete(
   '/admin/users/:id/system-roles/:role',
   requireRole('ADMIN', 'SUPER_ADMIN'),
   async (req: AuthRequest, res, next) => {
     try {
+      const role = req.params.role as SystemRoleType;
+      if (!VALID_SYSTEM_ROLES.includes(role)) {
+        res.status(400).json({ error: `Invalid system role: ${role}` });
+        return;
+      }
       await usersService.removeSystemRole(
         { userId: req.user!.userId, systemRoles: req.user!.systemRoles as SystemRoleType[] },
         req.params.id as string,
-        req.params.role as SystemRoleType,
+        role,
       );
       res.status(204).send();
     } catch (err) {

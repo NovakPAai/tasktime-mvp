@@ -201,6 +201,10 @@ export async function removeSystemRole(actor: RoleChangeActor, targetId: string,
     throw new AppError(403, 'Super admin cannot remove their own SUPER_ADMIN role');
   }
 
+  if (!targetCurrentRoles.includes(role)) {
+    throw new AppError(404, 'User does not have the specified role');
+  }
+
   await prisma.userSystemRole.delete({ where: { userId_role: { userId: targetId, role } } });
 
   await prisma.auditLog.create({
