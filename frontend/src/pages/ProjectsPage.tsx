@@ -7,12 +7,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Modal, Form, Input, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { useProjectsStore } from '../store/projects.store';
 import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
 import * as projectsApi from '../api/projects';
 import type { Project } from '../types';
-import type { ProjectDashboard } from '../api/projects';
+import type { ProjectDashboardSummary } from '../api/projects';
 import { hasAnyRequiredRole } from '../lib/roles';
 
 // ─── Tokens Dark (Paper 1-0) ─────────────────────────────────────────────
@@ -100,13 +99,12 @@ function timeAgo(d?: string): string {
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface CardData {
   project: Project;
-  dashboard: ProjectDashboard | null;
+  dashboard: ProjectDashboardSummary | null;
   loading: boolean;
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 export default function ProjectsPage() {
-  const { projects, loading, fetchProjects } = useProjectsStore();
   const { user } = useAuthStore();
   const { mode } = useThemeStore();
   const C = mode === 'light' ? LIGHT_C : DARK_C;
@@ -125,31 +123,29 @@ export default function ProjectsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [cards, setCards] = useState<CardData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>('all');
   const [hoveredFilter, setHoveredFilter] = useState<FilterType | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   const canCreate = hasAnyRequiredRole(user?.systemRoles, ['ADMIN']);
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
-
-  const loadDashboards = useCallback(async (ps: Project[]) => {
-    setCards(ps.map((p) => ({ project: p, dashboard: null, loading: true })));
-    const results = await Promise.allSettled(
-      ps.map((p) => projectsApi.getProjectDashboard(p.id)),
-    );
-    setCards(
-      ps.map((p, i) => ({
-        project: p,
-        dashboard: results[i].status === 'fulfilled' ? results[i].value : null,
-        loading: false,
-      })),
-    );
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const data = await projectsApi.listProjectsWithDashboards();
+      setCards(data.map((item) => ({ project: item, dashboard: item.dashboard, loading: false })));
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      setFetchError(e.response?.data?.error ?? e.message ?? 'Не удалось загрузить проекты');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    if (projects.length > 0) loadDashboards(projects);
-  }, [projects, loadDashboards]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const handleCreate = async (values: { name: string; key: string; description?: string }) => {
     try {
@@ -157,14 +153,14 @@ export default function ProjectsPage() {
       message.success('Проект создан');
       setModalOpen(false);
       form.resetFields();
-      fetchProjects();
+      fetchAll();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
       message.error(error.response?.data?.error || 'Ошибка создания проекта');
     }
   };
 
-  const getStatus = (d: ProjectDashboard | null): ProjectStatus => {
+  const getStatus = (d: ProjectDashboardSummary | null): ProjectStatus => {
     if (!d) return 'active';
     if (d.activeSprint) return 'active';
     if (d.totals.totalIssues === 0) return 'archived';
@@ -390,7 +386,7 @@ export default function ProjectsPage() {
           </div>
           {/* Inter 12px #3D4D6B */}
           <div style={{ color: C.t3, fontFamily: F.sans, fontSize: 12, lineHeight: '16px', marginTop: 1 }}>
-            {loading ? '…' : `${projects.length} projects · ${activeCount} active`}
+            {loading ? '…' : `${cards.length} projects · ${activeCount} active`}
           </div>
         </div>
         {/* Search — 240px, bg #0F1320, border #1E2640, px-3.5 py-2 */}
@@ -452,6 +448,13 @@ export default function ProjectsPage() {
             );
           })}
         </div>
+
+        {/* Error banner */}
+        {fetchError && (
+          <div style={{ marginBottom: 20, padding: '10px 16px', borderRadius: 8, backgroundColor: mode === 'light' ? '#FEF2F2' : '#7F1D1D33', border: `1px solid ${mode === 'light' ? '#FECACA' : '#7F1D1D'}`, color: mode === 'light' ? '#DC2626' : '#FCA5A5', fontFamily: F.sans, fontSize: 13 }}>
+            {fetchError}
+          </div>
+        )}
 
         {/* Card grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>

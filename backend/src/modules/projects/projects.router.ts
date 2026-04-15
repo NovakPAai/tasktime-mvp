@@ -14,8 +14,13 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const user = req.user!;
-    const projects = await projectsService.listProjectsForUser(user.userId, user.systemRoles);
-    res.json(projects);
+    if (req.query.withDashboard === 'true') {
+      const projects = await projectsService.listProjectsWithDashboardsForUser(user.userId, user.systemRoles);
+      res.json(projects);
+    } else {
+      const projects = await projectsService.listProjectsForUser(user.userId, user.systemRoles);
+      res.json(projects);
+    }
   } catch (err) {
     next(err);
   }

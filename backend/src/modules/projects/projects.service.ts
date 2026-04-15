@@ -78,6 +78,103 @@ export async function deleteProject(id: string) {
   await prisma.project.delete({ where: { id } });
 }
 
+async function fetchProjectsForUser(userId: string, systemRoles: SystemRoleType[]) {
+  if (hasGlobalProjectReadAccess(systemRoles)) {
+    return prisma.project.findMany({
+      include: projectInclude,
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+  }
+  const memberships = await prisma.userProjectRole.findMany({
+    where: { userId },
+    select: { projectId: true },
+  });
+  const projectIds = [...new Set(memberships.map((m) => m.projectId))];
+  return prisma.project.findMany({
+    where: { id: { in: projectIds } },
+    include: projectInclude,
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+  });
+}
+
+export async function listProjectsWithDashboardsForUser(userId: string, systemRoles: SystemRoleType[]) {
+  const projects = await fetchProjectsForUser(userId, systemRoles);
+
+  if (projects.length === 0) return [];
+
+  const projectIds = projects.map((p) => p.id);
+
+  const [totalCounts, doneCounts, activeSprints] = await Promise.all([
+    prisma.issue.groupBy({
+      by: ['projectId'],
+      _count: { _all: true },
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.issue.groupBy({
+      by: ['projectId'],
+      _count: { _all: true },
+      where: { projectId: { in: projectIds }, status: 'DONE' },
+    }),
+    prisma.sprint.findMany({
+      where: { projectId: { in: projectIds }, state: 'ACTIVE' },
+      select: {
+        id: true,
+        name: true,
+        state: true,
+        projectId: true,
+        _count: { select: { issues: true } },
+      },
+    }),
+  ]);
+
+  const activeSprintIds = activeSprints.map((s) => s.id);
+  const doneInSprints =
+    activeSprintIds.length > 0
+      ? await prisma.issue.groupBy({
+          by: ['sprintId'],
+          _count: { _all: true },
+          where: { sprintId: { in: activeSprintIds }, status: 'DONE' },
+        })
+      : [];
+
+  const totalByProject: Record<string, number> = Object.fromEntries(
+    totalCounts.map((r) => [r.projectId, r._count._all]),
+  );
+  const doneByProject: Record<string, number> = Object.fromEntries(
+    doneCounts.map((r) => [r.projectId, r._count._all]),
+  );
+  const sprintByProject: Record<string, (typeof activeSprints)[number]> = Object.fromEntries(
+    activeSprints.map((s) => [s.projectId, s]),
+  );
+  const doneBySprintId: Record<string, number> = Object.fromEntries(
+    doneInSprints.map((r) => [r.sprintId as string, r._count._all]),
+  );
+
+  return projects.map((project) => {
+    const sprint = sprintByProject[project.id];
+    return {
+      ...project,
+      dashboard: {
+        totals: {
+          totalIssues: totalByProject[project.id] ?? 0,
+          doneIssues: doneByProject[project.id] ?? 0,
+        },
+        activeSprint: sprint
+          ? {
+              id: sprint.id,
+              name: sprint.name,
+              state: sprint.state,
+              totalIssues: sprint._count.issues,
+              doneIssues: doneBySprintId[sprint.id] ?? 0,
+            }
+          : null,
+      },
+    };
+  });
+}
+
 export async function getProjectDashboard(projectId: string) {
   const cacheKey = `project:dashboard:${projectId}`;
   const cached = await getCachedJson<{
