@@ -1,0 +1,77 @@
+name: Restart MCP Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart-mcp:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.PRODUCTION_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Restart MCP container with updated MCP_AGENT_PASSWORD
+        env:
+          MCP_AGENT_PASSWORD: ${{ secrets.MCP_AGENT_PASSWORD }}
+        run: |
+          MCP_PASS_B64=$(printf '%s' "$MCP_AGENT_PASSWORD" | base64 -w0)
+          ssh "${{ secrets.PRODUCTION_DEPLOY_USER }}@${{ secrets.PRODUCTION_DEPLOY_HOST }}" \
+            bash -s "$MCP_PASS_B64" << 'REMOTE'
+          set -e
+          NEW_PASS=$(echo "$1" | base64 -d)
+
+          CONTAINER=mcp-flow-universe
+
+          if ! docker inspect "$CONTAINER" > /dev/null 2>&1; then
+            echo "ERROR: container $CONTAINER not found"
+            exit 1
+          fi
+
+          # Extract current env vars from running container
+          IMAGE=$(docker inspect --format='{{.Config.Image}}' "$CONTAINER")
+          DB_URL=$(docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER" | grep '^DATABASE_URL=' | cut -d= -f2-)
+          SVC_TOKEN=$(docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER" | grep '^MCP_SERVICE_TOKEN=' | cut -d= -f2-)
+          BACKEND_URL=$(docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER" | grep '^BACKEND_INTERNAL_URL=' | cut -d= -f2-)
+          AGENT_EMAIL=$(docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER" | grep '^MCP_AGENT_EMAIL=' | cut -d= -f2-)
+          NETWORK=$(docker inspect --format='{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$CONTAINER")
+
+          echo "Image:          $IMAGE"
+          echo "Network:        $NETWORK"
+          echo "BACKEND_URL:    $BACKEND_URL"
+          echo "AGENT_EMAIL:    $AGENT_EMAIL"
+
+          # Stop and remove old container
+          echo "Stopping old container..."
+          docker stop "$CONTAINER"
+          docker rm "$CONTAINER"
+
+          # Start new container with updated password
+          echo "Starting new container..."
+          docker run -d --name "$CONTAINER" \
+            --network "$NETWORK" \
+            -p 3002:3002 \
+            -e MCP_TRANSPORT=http \
+            -e MCP_HTTP_PORT=3002 \
+            -e DATABASE_URL="$DB_URL" \
+            -e MCP_SERVICE_TOKEN="$SVC_TOKEN" \
+            -e BACKEND_INTERNAL_URL="$BACKEND_URL" \
+            -e MCP_AGENT_EMAIL="$AGENT_EMAIL" \
+            -e MCP_AGENT_PASSWORD="$NEW_PASS" \
+            "$IMAGE" node dist/mcp/server.js
+
+          # Wait and verify
+          sleep 5
+          if docker ps --filter "name=$CONTAINER" --filter "status=running" | grep -q "$CONTAINER"; then
+            echo "MCP container started successfully"
+            docker logs --tail=20 "$CONTAINER"
+          else
+            echo "ERROR: container failed to start"
+            docker logs "$CONTAINER"
+            exit 1
+          fi
+          REMOTE
