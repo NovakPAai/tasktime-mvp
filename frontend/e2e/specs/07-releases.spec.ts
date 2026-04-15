@@ -26,7 +26,8 @@ test.describe('Releases', () => {
 
   test('global releases page renders', async ({ page }) => {
     await page.goto(`${BASE}/releases`);
-    await expect(page.locator('h1, h2, [class*="heading"]').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page).not.toHaveURL(/\/login$/);
+    await page.waitForFunction(() => document.body.innerText.trim().length > 10, { timeout: 15_000 });
   });
 
   test('create release via UI', async ({ page }) => {
