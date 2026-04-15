@@ -67,14 +67,43 @@ describe('Projects API', () => {
     expect(res.status).toBe(409);
   });
 
-  it('GET /api/projects - lists projects', async () => {
+  it('GET /api/projects - admin sees all projects', async () => {
+    await request.post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'P1', key: 'PONE' });
+    const res = await request.get('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+  });
+
+  it('GET /api/projects - USER without project role sees empty list', async () => {
     await request.post('/api/projects')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ name: 'P1', key: 'PONE' });
     const res = await request.get('/api/projects')
       .set('Authorization', `Bearer ${userToken}`);
     expect(res.status).toBe(200);
+    expect(res.body.length).toBe(0);
+  });
+
+  it('GET /api/projects - USER with project role sees only that project', async () => {
+    const create = await request.post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'P1', key: 'PONE' });
+    const projectId = create.body.id as string;
+
+    // get user id from DB and assign project role
+    const userRecord = await prisma.user.findFirstOrThrow({ where: { email: 'user@test.com' } });
+    await prisma.userProjectRole.create({
+      data: { userId: userRecord.id, projectId, role: 'USER' },
+    });
+
+    const res = await request.get('/api/projects')
+      .set('Authorization', `Bearer ${userToken}`);
+    expect(res.status).toBe(200);
     expect(res.body.length).toBe(1);
+    expect(res.body[0].id).toBe(projectId);
   });
 
   it('PATCH /api/projects/:id - admin can update', async () => {
