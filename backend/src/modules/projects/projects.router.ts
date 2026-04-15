@@ -11,9 +11,10 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', async (_req, res, next) => {
+router.get('/', async (req: AuthRequest, res, next) => {
   try {
-    const projects = await projectsService.listProjects();
+    const user = req.user!;
+    const projects = await projectsService.listProjectsForUser(user.userId, user.systemRoles);
     res.json(projects);
   } catch (err) {
     next(err);
@@ -30,8 +31,10 @@ router.post('/', requireRole('ADMIN'), validate(createProjectDto), async (req: A
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', async (req: AuthRequest, res, next) => {
   try {
+    const user = req.user!;
+    await projectsService.checkProjectAccess(req.params.id as string, user.userId, user.systemRoles);
     const project = await projectsService.getProject(req.params.id as string);
     res.json(project);
   } catch (err) {
@@ -39,8 +42,10 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-router.get('/:id/dashboard', async (req, res, next) => {
+router.get('/:id/dashboard', async (req: AuthRequest, res, next) => {
   try {
+    const user = req.user!;
+    await projectsService.checkProjectAccess(req.params.id as string, user.userId, user.systemRoles);
     const dashboard = await projectsService.getProjectDashboard(req.params.id as string);
     res.json(dashboard);
   } catch (err) {
