@@ -60,3 +60,24 @@ export async function getProjectDashboard(id: string): Promise<ProjectDashboard>
   const { data } = await api.get<ProjectDashboard>(`/projects/${id}/dashboard`);
   return data;
 }
+
+export interface ProjectDashboardSummary {
+  totals: {
+    totalIssues: number;
+    doneIssues: number;
+  };
+  activeSprint: {
+    id: string;
+    name: string;
+    state: string;
+    totalIssues: number;
+    doneIssues: number;
+  } | null;
+}
+
+export type ProjectWithDashboard = Project & { dashboard: ProjectDashboardSummary };
+
+export async function listProjectsWithDashboards(): Promise<ProjectWithDashboard[]> {
+  const { data } = await api.get<ProjectWithDashboard[]>('/projects?withDashboard=true');
+  return data;
+}
