@@ -313,8 +313,8 @@ jobs:
           exit 1
 
       - name: Run Playwright E2E tests
+        if: success()
         run: cd frontend && npm run test:e2e
-        continue-on-error: true
 
       - uses: actions/upload-artifact@v4
         if: always()
