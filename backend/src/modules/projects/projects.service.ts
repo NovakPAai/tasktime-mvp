@@ -1,6 +1,8 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { hasGlobalProjectReadAccess } from '../../shared/auth/roles.js';
+import type { SystemRoleType } from '@prisma/client';
 import type { CreateProjectDto, UpdateProjectDto } from './projects.dto.js';
 
 const projectInclude = {
@@ -15,6 +17,35 @@ export async function listProjects() {
     orderBy: { createdAt: 'desc' },
     take: 500,
   });
+}
+
+export async function listProjectsForUser(userId: string, systemRoles: SystemRoleType[]) {
+  if (hasGlobalProjectReadAccess(systemRoles)) {
+    return listProjects();
+  }
+
+  const memberships = await prisma.userProjectRole.findMany({
+    where: { userId },
+    select: { projectId: true },
+  });
+
+  const projectIds = [...new Set(memberships.map((m) => m.projectId))];
+
+  return prisma.project.findMany({
+    where: { id: { in: projectIds } },
+    include: projectInclude,
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+  });
+}
+
+export async function checkProjectAccess(projectId: string, userId: string, systemRoles: SystemRoleType[]) {
+  if (hasGlobalProjectReadAccess(systemRoles)) return;
+
+  const membership = await prisma.userProjectRole.findFirst({
+    where: { userId, projectId },
+  });
+  if (!membership) throw new AppError(403, 'You do not have access to this project');
 }
 
 export async function getProject(id: string) {
