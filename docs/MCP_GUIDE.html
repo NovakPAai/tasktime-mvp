@@ -419,14 +419,14 @@
       <span class="key">"type"</span>: <span class="string">"streamable-http"</span>,
       <span class="key">"url"</span>: <span class="string">"http://5.129.242.171:3002/mcp"</span>,
       <span class="key">"headers"</span>: {
-        <span class="key">"Authorization"</span>: <span class="string">"Bearer &lt;STAGING_TOKEN&gt;"</span>
+        <span class="key">"Authorization"</span>: <span class="string">"Bearer nhObrQUoBgdVA02EESGGb7K0Lrr/K/sh/Ay8xgTNjRI="</span>
       }
     },
     <span class="key">"flow-universe-prod"</span>: {
-      <span class="key">"type"</span>: <span class="string">"streamable-http"</span>,
+      <span class="key">"type"</span>: <span class="string">"http"</span>,
       <span class="key">"url"</span>: <span class="string">"http://72.56.7.218:3002/mcp"</span>,
       <span class="key">"headers"</span>: {
-        <span class="key">"Authorization"</span>: <span class="string">"Bearer &lt;PROD_TOKEN&gt;"</span>
+        <span class="key">"Authorization"</span>: <span class="string">"Bearer Z86wUmyaQXMsw2YK5ajEC+RZ1suWpyF4Kmi+gDA1bEw="</span>
       }
     }
   }
@@ -463,7 +463,7 @@
       <span class="key">"type"</span>: <span class="string">"streamable-http"</span>,
       <span class="key">"url"</span>: <span class="string">"http://5.129.242.171:3002/mcp"</span>,
       <span class="key">"headers"</span>: {
-        <span class="key">"Authorization"</span>: <span class="string">"Bearer &lt;STAGING_TOKEN&gt;"</span>
+        <span class="key">"Authorization"</span>: <span class="string">"Bearer nhObrQUoBgdVA02EESGGb7K0Lrr/K/sh/Ay8xgTNjRI="</span>
       }
     }
   }
@@ -476,7 +476,7 @@
   <p>Для проверки инструментов без IDE:</p>
   <pre><code>npx @modelcontextprotocol/inspector \
   --url http://5.129.242.171:3002/mcp \
-  --header "Authorization: Bearer <STAGING_TOKEN>"</code></pre>
+  --header "Authorization: Bearer nhObrQUoBgdVA02EESGGb7K0Lrr/K/sh/Ay8xgTNjRI="</code></pre>
 
   <!-- ── Среды ── -->
   <h2 id="envs"><span class="icon">🌐</span>Среды: Dev / Staging / Production</h2>
@@ -777,7 +777,7 @@ docker logs mcp-flow-universe --tail 50
 
 <span class="comment"># Проверка токена (должен вернуть список инструментов)</span>
 curl -s -X POST http://localhost:3002/mcp \
-  -H "Authorization: Bearer <STAGING_TOKEN>" \
+  -H "Authorization: Bearer nhObrQUoBgdVA02EESGGb7K0Lrr/K/sh/Ay8xgTNjRI=" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}'</code></pre>
