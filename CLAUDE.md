@@ -377,7 +377,10 @@ MCP-сервер реализован на StreamableHTTP транспорте. 
 
 **14 инструментов:** чтение задач/спринтов/проектов, смена статусов (через workflow engine), комментарии, создание подзадач, учёт AI-времени и стоимости токенов.
 
-**Подключение (`.mcp.json` в корне проекта):**
+**Подключение:** файл `.mcp.json` в корне проекта (в `.gitignore`, не коммитить).
+
+Получи готовый `.mcp.json` у администратора — он содержит реальные Bearer-токены для staging и prod. Шаблон (для справки, токены не вставлять в репо):
+
 ```json
 {
   "mcpServers": {
@@ -386,12 +389,12 @@ MCP-сервер реализован на StreamableHTTP транспорте. 
       "env": { "MCP_ENV": "development" }
     },
     "flow-universe-staging": {
-      "type": "streamable-http",
+      "type": "http",
       "url": "http://5.129.242.171:3002/mcp",
       "headers": { "Authorization": "Bearer <STAGING_TOKEN>" }
     },
     "flow-universe-prod": {
-      "type": "streamable-http",
+      "type": "http",
       "url": "http://72.56.7.218:3002/mcp",
       "headers": { "Authorization": "Bearer <PROD_TOKEN>" }
     }
@@ -399,7 +402,7 @@ MCP-сервер реализован на StreamableHTTP транспорте. 
 }
 ```
 
-Токены запрашивать у администратора. **Не коммитить `.mcp.json` с реальными токенами** (репо публичный).
+**Не коммитить `.mcp.json` с реальными токенами** (репо публичный).
 
 **Полная документация:** `docs/MCP_GUIDE.html`
 
