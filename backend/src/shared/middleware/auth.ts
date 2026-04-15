@@ -4,7 +4,7 @@ import { verifyAccessToken } from '../utils/jwt.js';
 import { AppError } from './error-handler.js';
 import type { AuthRequest } from '../types/index.js';
 import { getUserSession, touchUserSession, isRedisAvailable } from '../redis.js';
-import { getSessionLifetimeMinutes } from '../utils/session-settings.js';
+import { getSessionLifetimeMinutes, SYSTEM_ACCOUNT_DOMAIN } from '../utils/session-settings.js';
 
 // In-process counter — exported so health/metrics endpoints can expose it.
 export const sessionFallbackCounter = { total: 0, redis_unavailable: 0, session_missing: 0 };
@@ -59,7 +59,7 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
       // Redis is up — session key is gone, meaning it expired or was never created.
       // System accounts (agent@) never get a session key; allow them through.
       // Regular users with an expired key must re-authenticate.
-      const isSystemAccount = payload.email.endsWith('@flow-universe.internal');
+      const isSystemAccount = payload.email.endsWith(SYSTEM_ACCOUNT_DOMAIN);
       if (!isSystemAccount) {
         sessionFallbackCounter.total += 1;
         sessionFallbackCounter['session_missing'] += 1;

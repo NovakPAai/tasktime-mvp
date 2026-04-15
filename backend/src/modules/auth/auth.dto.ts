@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SYSTEM_ACCOUNT_DOMAIN } from '../../shared/utils/session-settings.js';
 
 // CVE-11: Password must be 8+ chars with at least 1 uppercase and 1 digit
 const passwordSchema = z.string().min(8).max(128)
@@ -6,7 +7,10 @@ const passwordSchema = z.string().min(8).max(128)
   .refine((p) => /\d/.test(p), { message: 'Password must contain at least one digit' });
 
 export const registerDto = z.object({
-  email: z.string().email(),
+  email: z.string().email().refine(
+    (e) => !e.endsWith(SYSTEM_ACCOUNT_DOMAIN),
+    { message: 'Email domain is reserved' },
+  ),
   password: passwordSchema,
   name: z.string().min(1).max(255),
 });
