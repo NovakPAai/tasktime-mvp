@@ -125,7 +125,11 @@ export async function isRedisAvailable(): Promise<boolean> {
   return redis !== null;
 }
 
-export async function setUserSession(userId: string, session: Omit<UserSession, 'userId'>): Promise<void> {
+export async function setUserSession(
+  userId: string,
+  session: Omit<UserSession, 'userId'>,
+  ttlSeconds: number = SESSION_TTL_SECONDS,
+): Promise<void> {
   const redis = await getRedisClientInternal();
   if (!redis) return;
 
@@ -135,7 +139,7 @@ export async function setUserSession(userId: string, session: Omit<UserSession, 
   };
 
   try {
-    await redis.set(buildSessionKey(userId), JSON.stringify(fullSession), { EX: SESSION_TTL_SECONDS });
+    await redis.set(buildSessionKey(userId), JSON.stringify(fullSession), { EX: ttlSeconds });
   } catch (err) {
     console.error('Failed to write user session to Redis:', err);
   }

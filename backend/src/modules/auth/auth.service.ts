@@ -4,6 +4,7 @@ import { hashPassword, comparePassword } from '../../shared/utils/password.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../shared/utils/jwt.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { setUserSession, deleteUserSession, getCachedJson, setCachedJson } from '../../shared/redis.js';
+import { getSessionLifetimeMinutes } from '../../shared/utils/session-settings.js';
 import type { RegisterDto, LoginDto } from './auth.dto.js';
 import type { SystemRoleType } from '@prisma/client';
 
@@ -83,12 +84,13 @@ export async function register(dto: RegisterDto) {
   });
 
   const nowIso = new Date().toISOString();
+  const sessionTtl = await getSessionLifetimeMinutes();
   void setUserSession(user.id, {
     email: user.email,
     systemRoles: roles,
     createdAt: nowIso,
     lastSeenAt: nowIso,
-  });
+  }, sessionTtl * 60);
 
   return { user: { id: user.id, email: user.email, name: user.name, systemRoles: roles }, accessToken, refreshToken };
 }
@@ -141,12 +143,13 @@ export async function login(dto: LoginDto) {
   });
 
   const nowIso = new Date().toISOString();
+  const sessionTtl = await getSessionLifetimeMinutes();
   void setUserSession(user.id, {
     email: user.email,
     systemRoles: roles,
     createdAt: nowIso,
     lastSeenAt: nowIso,
-  });
+  }, sessionTtl * 60);
 
   return {
     user: {
@@ -214,12 +217,13 @@ export async function refresh(refreshToken: string) {
   });
 
   const nowIso = new Date().toISOString();
+  const sessionTtl = await getSessionLifetimeMinutes();
   void setUserSession(user.id, {
     email: user.email,
     systemRoles: roles,
     createdAt: stored.createdAt.toISOString(),
     lastSeenAt: nowIso,
-  });
+  }, sessionTtl * 60);
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }
