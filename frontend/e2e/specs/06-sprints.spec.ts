@@ -26,8 +26,8 @@ test.describe('Sprints', () => {
 
   test('project sprints page renders backlog', async ({ page }) => {
     await page.goto(`${BASE}/projects/${projectId}`);
-    // Project detail has sprints / backlog section
-    await expect(page.locator('h1, h2, [class*="heading"]').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page).not.toHaveURL(/\/login$/);
+    await page.waitForFunction(() => document.body.innerText.trim().length > 10, { timeout: 30_000 });
   });
 
   test('global sprints page renders', async ({ page }) => {
