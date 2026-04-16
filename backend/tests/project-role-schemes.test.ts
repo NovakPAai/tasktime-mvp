@@ -18,6 +18,30 @@ beforeEach(async () => {
   await prisma.refreshToken.deleteMany();
   await prisma.user.deleteMany();
 
+  // Ensure the default scheme exists with system roles (not seeded by setup.ts)
+  await prisma.projectRoleScheme.upsert({
+    where: { id: DEFAULT_SCHEME_ID },
+    update: {},
+    create: {
+      id: DEFAULT_SCHEME_ID,
+      name: 'Default',
+      description: 'Схема доступа по умолчанию',
+      isDefault: true,
+    },
+  });
+  for (const [key, name, color] of [
+    ['ADMIN', 'Администратор', '#fa8c16'],
+    ['MANAGER', 'Менеджер', '#1677ff'],
+    ['USER', 'Участник', '#52c41a'],
+    ['VIEWER', 'Наблюдатель', '#d9d9d9'],
+  ] as [string, string, string][]) {
+    await prisma.projectRoleDefinition.upsert({
+      where: { schemeId_key: { schemeId: DEFAULT_SCHEME_ID, key } },
+      update: {},
+      create: { schemeId: DEFAULT_SCHEME_ID, key, name, color, isSystem: true },
+    });
+  }
+
   const admin = await createAdminUser();
   adminToken = admin.accessToken;
 
