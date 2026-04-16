@@ -528,7 +528,8 @@ export default function IssueDetailPage() {
           lineHeight: 1.3,
           margin: 0,
           marginBottom: 20,
-        }}>
+        }}
+        data-testid="issue-title">
           {issue.title}
         </h1>
 

@@ -60,13 +60,8 @@ test.describe('Issues', () => {
 
     await page.goto(`${BASE}/issues/${issue.id}`);
     await expect(page).toHaveURL(new RegExp(`/issues/${issue.id}`));
-    await expect(page).not.toHaveURL(/\/login$/);
-    // Wait until the issue title appears in the DOM (may be in text node or input value)
-    await page.waitForFunction(
-      (title) => document.body.innerHTML.includes(title),
-      issue.title,
-      { timeout: 30_000 },
-    );
+    await expect(page.locator('[data-testid="issue-title"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-testid="issue-title"]')).toContainText(issue.title);
   });
 
   test('create EPIC hierarchy and STORY child via API', async ({ request }) => {
