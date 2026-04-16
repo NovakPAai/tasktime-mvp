@@ -64,6 +64,7 @@ jobs:
             -e BACKEND_INTERNAL_URL="$BACKEND_URL" \
             -e MCP_AGENT_EMAIL="$AGENT_EMAIL" \
             -e MCP_AGENT_PASSWORD="$NEW_PASS" \
+            -e BACKEND_INTERNAL_URL="https://flowuniverse.ru" \
             "$IMAGE" node dist/mcp/server.js
 
           # Wait and verify
