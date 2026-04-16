@@ -7,7 +7,7 @@
  * and .github/scripts/ai-review.mjs, then add OPENAI_API_KEY secret.
  *
  * Config via GitHub Repository Variables (Settings → Variables → Actions):
- *   AI_REVIEW_MODEL        gpt-4o-mini (default) | gpt-4o | gpt-4-turbo
+ *   AI_REVIEW_MODEL        gpt-5.4 (default) | gpt-4o | gpt-4o-mini
  *   AI_REVIEW_LANGUAGE     Russian (default) | English
  *   AI_REVIEW_MAX_CHARS    80000 (default) — max diff chars sent to LLM
  *   AI_REVIEW_FAIL_ON_CRITICAL  false (default) — fail CI on critical issues
@@ -107,7 +107,7 @@ function filterAndTruncateDiff(rawDiff, maxChars) {
 // ---------------------------------------------------------------------------
 // OpenAI review
 // ---------------------------------------------------------------------------
-async function reviewWithOpenAI(diff) {
+async function reviewWithOpenAI(diff, prTitle = PR_TITLE, prBody = PR_BODY) {
   const systemPrompt = `You are a senior software engineer doing a thorough code review.
 Analyze the provided git diff and return a JSON object with this exact structure:
 {
@@ -140,7 +140,7 @@ Rules:
 - For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
 - Verdict: "approve" if no critical/high issues; "request_changes" if critical/high exist; "comment" otherwise.`;
 
-  const userPrompt = `PR: ${PR_TITLE}${PR_BODY ? `\nDescription: ${PR_BODY}` : ''}
+  const userPrompt = `PR: ${prTitle}${prBody ? `\nDescription: ${prBody}` : ''}
 
 \`\`\`diff
 ${diff}
@@ -171,15 +171,36 @@ ${diff}
   const data = await res.json();
   const { usage } = data;
 
-  // Cost estimate (gpt-4o-mini: $0.15/1M in, $0.60/1M out)
-  const costIn = (usage.prompt_tokens / 1_000_000) * 0.15;
-  const costOut = (usage.completion_tokens / 1_000_000) * 0.60;
+  // Cost estimate — gpt-5.4: $7/1M in, $21/1M out (update when official pricing is published)
+  const COST_IN  = AI_MODEL.startsWith('gpt-5') ? 7.00 : AI_MODEL === 'gpt-4o' ? 2.50 : 0.15;
+  const COST_OUT = AI_MODEL.startsWith('gpt-5') ? 21.00 : AI_MODEL === 'gpt-4o' ? 10.00 : 0.60;
+  const costIn  = (usage.prompt_tokens  / 1_000_000) * COST_IN;
+  const costOut = (usage.completion_tokens / 1_000_000) * COST_OUT;
   console.log(
     `Tokens: ${usage.prompt_tokens} in + ${usage.completion_tokens} out` +
     ` ≈ $${(costIn + costOut).toFixed(4)}`
   );
 
-  return JSON.parse(data.choices[0].message.content);
+  const rawContent = data.choices?.[0]?.message?.content;
+
+  if (!rawContent) {
+    const finishReason = data.choices?.[0]?.finish_reason ?? 'unknown';
+    console.error(`Raw API response: ${JSON.stringify(data)}`);
+    throw new Error(`Model returned empty content (finish_reason: ${finishReason})`);
+  }
+
+  // Strip markdown code fences — some models wrap JSON in ```json ... ``` despite instructions
+  const cleaned = rawContent
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error(`Raw model content:\n${rawContent}`);
+    throw new Error(`Failed to parse model response as JSON: ${e.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -276,9 +297,26 @@ async function postComment(body) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+async function fetchPRMeta() {
+  const pr = await githubFetch(
+    `/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}`
+  );
+  return { title: pr.title ?? '', body: pr.body ?? '' };
+}
+
 async function main() {
   if (!OPENAI_API_KEY) throw new Error('Secret OPENAI_API_KEY is not set in repo settings');
   if (!GITHUB_TOKEN) throw new Error('GITHUB_TOKEN is missing');
+
+  // workflow_dispatch doesn't populate PR_TITLE/PR_BODY — fetch from API
+  let prTitle = PR_TITLE;
+  let prBody = PR_BODY;
+  if (!prTitle) {
+    console.log('PR_TITLE empty (manual dispatch) — fetching PR metadata from API');
+    const meta = await fetchPRMeta();
+    prTitle = meta.title;
+    prBody = meta.body;
+  }
 
   console.log(`Reviewing PR #${PR_NUMBER} (${REPO_OWNER}/${REPO_NAME}) with ${AI_MODEL}`);
 
@@ -292,7 +330,7 @@ async function main() {
 
   console.log(`Diff: ${diff.length} chars`);
 
-  const review = await reviewWithOpenAI(diff);
+  const review = await reviewWithOpenAI(diff, prTitle, prBody);
   const comment = formatComment(review);
 
   await postComment(comment);
