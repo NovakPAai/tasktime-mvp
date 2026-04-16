@@ -33,7 +33,7 @@ jobs:
           # AI_REVIEW_LANGUAGE   — default: Russian
           # AI_REVIEW_MAX_CHARS  — default: 80000
           # AI_REVIEW_FAIL_ON_CRITICAL — default: false
-          AI_MODEL: ${{ vars.AI_REVIEW_MODEL || 'gpt-4o' }}
+          AI_MODEL: ${{ vars.AI_REVIEW_MODEL || 'gpt-5.4' }}
           REVIEW_LANGUAGE: ${{ vars.AI_REVIEW_LANGUAGE || 'Russian' }}
           MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_CHARS || '80000' }}
           FAIL_ON_CRITICAL: ${{ vars.AI_REVIEW_FAIL_ON_CRITICAL || 'false' }}
