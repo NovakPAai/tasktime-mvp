@@ -163,12 +163,20 @@ ${diff}
     }),
   });
 
+  const rawBody = await res.text();
+
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI error: ${res.status} ${text}`);
+    throw new Error(`OpenAI error: ${res.status} ${rawBody}`);
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = JSON.parse(rawBody);
+  } catch (e) {
+    console.error(`Raw OpenAI response body:\n${rawBody}`);
+    throw new Error(`OpenAI returned non-JSON body: ${e.message}`);
+  }
+
   const { usage } = data;
 
   // Cost estimate — gpt-5.4: $7/1M in, $21/1M out (update when official pricing is published)
