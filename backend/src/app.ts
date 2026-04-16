@@ -42,7 +42,7 @@ import roleSchemesRouter from './modules/project-role-schemes/project-role-schem
 import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
 import { getSchemeForProject as getRoleSchemeForProject } from './modules/project-role-schemes/project-role-schemes.service.js';
 import { authenticate } from './shared/middleware/auth.js';
-import { requireRole } from './shared/middleware/rbac.js';
+import { requireRole, requireProjectPermission } from './shared/middleware/rbac.js';
 
 export function createApp() {
   const app = express();
@@ -148,14 +148,19 @@ export function createApp() {
     }
   });
 
-  // Public: project role scheme
-  app.get('/api/projects/:projectId/role-scheme', authenticate, async (req, res, next) => {
-    try {
-      res.json(await getRoleSchemeForProject(req.params.projectId as string));
-    } catch (err) {
-      next(err);
-    }
-  });
+  // Project role scheme — requires membership in the project (MEMBERS_VIEW) or global project-read role.
+  app.get(
+    '/api/projects/:projectId/role-scheme',
+    authenticate,
+    requireProjectPermission((req) => req.params.projectId as string, 'MEMBERS_VIEW'),
+    async (req, res, next) => {
+      try {
+        res.json(await getRoleSchemeForProject(req.params.projectId as string));
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   // Error handler (must be last)
   app.use(errorHandler);

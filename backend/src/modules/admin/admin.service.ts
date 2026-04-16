@@ -365,20 +365,27 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   if (!user) throw new AppError(404, 'User not found');
   if (!project) throw new AppError(404, 'Project not found');
 
-  // Determine legacy role enum value: from roleId lookup or direct dto.role.
-  // If roleId is provided, it MUST belong to the scheme attached to this project.
-  let legacyRole = dto.role as 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER' | undefined;
+  // Resolve legacy role enum value. When `roleId` is provided it is authoritative:
+  //   - if roleDef.key is a legacy enum value, derive legacyRole from it (and reject a conflicting dto.role);
+  //   - if roleDef.key is custom, fall back to dto.role for the legacy column — must be supplied explicitly.
+  const LEGACY_KEYS = ['ADMIN', 'MANAGER', 'USER', 'VIEWER'] as const;
+  type LegacyRole = typeof LEGACY_KEYS[number];
+  let legacyRole = dto.role as LegacyRole | undefined;
   if (dto.roleId) {
     const projectScheme = await getSchemeForProject(dto.projectId);
     const roleDef = projectScheme.roles.find(r => r.id === dto.roleId);
     if (!roleDef) {
       throw new AppError(400, 'roleId does not belong to the scheme attached to this project');
     }
-    if (['ADMIN', 'MANAGER', 'USER', 'VIEWER'].includes(roleDef.key)) {
-      legacyRole = roleDef.key as 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
+    const derivedKey = (LEGACY_KEYS as readonly string[]).includes(roleDef.key)
+      ? (roleDef.key as LegacyRole)
+      : undefined;
+    if (dto.role && derivedKey && dto.role !== derivedKey) {
+      throw new AppError(400, `roleId key "${roleDef.key}" does not match legacy role "${dto.role}"`);
     }
+    legacyRole = derivedKey ?? dto.role;
   }
-  if (!legacyRole) throw new AppError(400, 'role or roleId is required');
+  if (!legacyRole) throw new AppError(400, 'role or roleId is required (custom roles require legacy role mapping via "role")');
 
   const existing = await prisma.userProjectRole.findFirst({
     where: { userId, projectId: dto.projectId, role: legacyRole },

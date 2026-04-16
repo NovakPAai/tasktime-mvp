@@ -113,6 +113,7 @@ export async function attachProject(schemeId: string, projectId: string) {
     create: { schemeId, projectId },
   });
   await delCachedJson(PROJECT_SCHEME_KEY(projectId));
+  await delCacheByPrefix(`rbac:perm:${projectId}:`);
   return binding;
 }
 
@@ -121,6 +122,7 @@ export async function detachProject(schemeId: string, projectId: string) {
   if (!binding) throw new AppError(404, 'Project not attached to this scheme');
   await prisma.projectRoleSchemeProject.delete({ where: { projectId } });
   await delCachedJson(PROJECT_SCHEME_KEY(projectId));
+  await delCacheByPrefix(`rbac:perm:${projectId}:`);
   return { ok: true };
 }
 
@@ -168,6 +170,7 @@ export async function createRole(schemeId: string, dto: CreateRoleDefinitionDto)
     include: { permissions: true },
   });
   await invalidateSchemeCache(schemeId);
+  await invalidatePermissionCacheForScheme(schemeId);
   return role;
 }
 
@@ -184,6 +187,7 @@ export async function updateRole(schemeId: string, roleId: string, dto: UpdateRo
     include: { permissions: true },
   });
   await invalidateSchemeCache(schemeId);
+  await invalidatePermissionCacheForScheme(schemeId);
   return updated;
 }
 
@@ -195,6 +199,7 @@ export async function deleteRole(schemeId: string, roleId: string) {
   if (usageCount > 0) throw new AppError(400, `ROLE_IN_USE: ${usageCount} users have this role`);
   await prisma.projectRoleDefinition.delete({ where: { id: roleId } });
   await invalidateSchemeCache(schemeId);
+  await invalidatePermissionCacheForScheme(schemeId);
   return { ok: true };
 }
 
