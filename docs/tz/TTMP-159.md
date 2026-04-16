@@ -1137,7 +1137,7 @@ export default function PermissionMatrixDrawer({ schemeId, role, open, onClose, 
 
 ---
 
-### ЗАДАЧА 9 — Frontend: создать `AdminRoleSchemesPage.tsx`
+### ЗАДАЧА 9 ✅ — Frontend: создать `AdminRoleSchemesPage.tsx`
 
 **Файл:** `frontend/src/pages/admin/AdminRoleSchemesPage.tsx`
 
@@ -1160,7 +1160,7 @@ import { roleSchemesApi, type ProjectRoleScheme } from '../../api/role-schemes';
 
 ---
 
-### ЗАДАЧА 10 — Frontend: создать `AdminRoleSchemeDetailPage.tsx`
+### ЗАДАЧА 10 ✅ — Frontend: создать `AdminRoleSchemeDetailPage.tsx`
 
 **Файл:** `frontend/src/pages/admin/AdminRoleSchemeDetailPage.tsx`
 
@@ -1201,7 +1201,7 @@ const [editingRole, setEditingRole] = useState<ProjectRoleDefinition | null>(nul
 
 ---
 
-### ЗАДАЧА 11 — Frontend: добавить маршруты в `App.tsx`
+### ЗАДАЧА 11 ✅ — Frontend: добавить маршруты в `App.tsx`
 
 **Файл:** `frontend/src/App.tsx`
 
@@ -1219,7 +1219,7 @@ import AdminRoleSchemeDetailPage from './pages/admin/AdminRoleSchemeDetailPage';
 
 ---
 
-### ЗАДАЧА 12 — Frontend: добавить пункт в Sidebar
+### ЗАДАЧА 12 ✅ — Frontend: добавить пункт в Sidebar
 
 **Файл:** `frontend/src/components/layout/Sidebar.tsx`
 
@@ -1231,7 +1231,7 @@ import AdminRoleSchemeDetailPage from './pages/admin/AdminRoleSchemeDetailPage';
 
 ---
 
-### ЗАДАЧА 13 — Frontend: обновить `AdminRolesPage.tsx` — динамические роли
+### ЗАДАЧА 13 ✅ — Frontend: обновить `AdminRolesPage.tsx` — динамические роли
 
 **Файл:** `frontend/src/pages/admin/AdminRolesPage.tsx`
 
@@ -1275,7 +1275,7 @@ await adminApi.assignProjectRole(userId, { projectId, roleId });
 
 ---
 
-### ЗАДАЧА 14 — Тесты
+### ЗАДАЧА 14 ✅ — Тесты
 
 **Файл:** `backend/src/modules/project-role-schemes/__tests__/project-role-schemes.service.test.ts`
 

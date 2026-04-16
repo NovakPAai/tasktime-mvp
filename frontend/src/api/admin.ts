@@ -77,7 +77,7 @@ export const adminApi = {
   getUserRoles: (userId: string) =>
     api.get<ProjectRole[]>(`/admin/users/${userId}/roles`).then(r => r.data),
 
-  assignRole: (userId: string, data: { projectId: string; role: string }) =>
+  assignRole: (userId: string, data: { projectId: string; roleId?: string; role?: string }) =>
     api.post<ProjectRole>(`/admin/users/${userId}/roles`, data).then(r => r.data),
 
   removeRole: (userId: string, roleId: string) =>
