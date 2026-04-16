@@ -7,7 +7,7 @@
  * and .github/scripts/ai-review.mjs, then add OPENAI_API_KEY secret.
  *
  * Config via GitHub Repository Variables (Settings → Variables → Actions):
- *   AI_REVIEW_MODEL        gpt-4o-mini (default) | gpt-4o | gpt-4-turbo
+ *   AI_REVIEW_MODEL        gpt-5.4 (default) | gpt-4o | gpt-4o-mini
  *   AI_REVIEW_LANGUAGE     Russian (default) | English
  *   AI_REVIEW_MAX_CHARS    80000 (default) — max diff chars sent to LLM
  *   AI_REVIEW_FAIL_ON_CRITICAL  false (default) — fail CI on critical issues
@@ -171,15 +171,36 @@ ${diff}
   const data = await res.json();
   const { usage } = data;
 
-  // Cost estimate (gpt-4o-mini: $0.15/1M in, $0.60/1M out)
-  const costIn = (usage.prompt_tokens / 1_000_000) * 0.15;
-  const costOut = (usage.completion_tokens / 1_000_000) * 0.60;
+  // Cost estimate — gpt-5.4: $7/1M in, $21/1M out (update when official pricing is published)
+  const COST_IN  = AI_MODEL.startsWith('gpt-5') ? 7.00 : AI_MODEL === 'gpt-4o' ? 2.50 : 0.15;
+  const COST_OUT = AI_MODEL.startsWith('gpt-5') ? 21.00 : AI_MODEL === 'gpt-4o' ? 10.00 : 0.60;
+  const costIn  = (usage.prompt_tokens  / 1_000_000) * COST_IN;
+  const costOut = (usage.completion_tokens / 1_000_000) * COST_OUT;
   console.log(
     `Tokens: ${usage.prompt_tokens} in + ${usage.completion_tokens} out` +
     ` ≈ $${(costIn + costOut).toFixed(4)}`
   );
 
-  return JSON.parse(data.choices[0].message.content);
+  const rawContent = data.choices?.[0]?.message?.content;
+
+  if (!rawContent) {
+    const finishReason = data.choices?.[0]?.finish_reason ?? 'unknown';
+    console.error(`Raw API response: ${JSON.stringify(data)}`);
+    throw new Error(`Model returned empty content (finish_reason: ${finishReason})`);
+  }
+
+  // Strip markdown code fences — some models wrap JSON in ```json ... ``` despite instructions
+  const cleaned = rawContent
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error(`Raw model content:\n${rawContent}`);
+    throw new Error(`Failed to parse model response as JSON: ${e.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
