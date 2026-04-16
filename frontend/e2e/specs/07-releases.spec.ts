@@ -1,10 +1,13 @@
 import { test, expect } from '../fixtures/test';
 import * as api from '../fixtures/api.fixture';
+import { ADMIN_AUTH_FILE } from '../global-setup';
 
 const BASE = process.env.E2E_BASE_URL || 'http://localhost:5173';
 
 test.describe('Releases', () => {
   test.describe.configure({ mode: 'serial' });
+  // Release creation UI requires ADMIN/RELEASE_MANAGER role — use admin-cleanup session
+  test.use({ storageState: ADMIN_AUTH_FILE });
 
   let projectId: string;
   let accessToken: string;

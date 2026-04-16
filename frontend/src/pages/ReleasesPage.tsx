@@ -416,6 +416,7 @@ export default function ReleasesPage() {
         </div>
         {canManage && (
           <div
+            data-testid="release-create-btn"
             style={{ backgroundImage: LOGO_GRAD, borderRadius: 8, paddingBlock: 9, paddingInline: 18, cursor: 'pointer' }}
             onClick={() => setModalOpen(true)}
           >

@@ -12,47 +12,83 @@ if (!ADMIN_PASSWORD) throw new Error('E2E_ADMIN_PASSWORD env var is required');
 const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:5173';
 
 export const AUTH_FILE = path.join(__dirname, '.auth/admin.json');
+/**
+ * Admin (cleanup) auth state — used for tests that require ADMIN role
+ * (admin workflows, team creation, etc.).
+ * Falls back gracefully if E2E_CLEANUP_PASSWORD is not set.
+ */
+export const ADMIN_AUTH_FILE = path.join(__dirname, '.auth/admin-cleanup.json');
 
-async function globalSetup(_config: FullConfig) {
-  // Ensure .auth dir exists
-  const authDir = path.join(__dirname, '.auth');
-  if (!fs.existsSync(authDir)) {
-    fs.mkdirSync(authDir, { recursive: true });
-  }
-
+async function loginAndSave(
+  baseUrl: string,
+  email: string,
+  password: string,
+  outputPath: string,
+  label: string,
+): Promise<void> {
   const browser = await chromium.launch();
   const context = await browser.newContext();
   const page = await context.newPage();
 
   try {
-    await page.goto(`${BASE_URL}/login`);
+    await page.goto(`${baseUrl}/login`);
 
-    // Fill email
     const emailInput = page.locator('input[type="email"]').first();
     await emailInput.waitFor({ state: 'visible', timeout: 30_000 });
-    await emailInput.fill(ADMIN_EMAIL);
+    await emailInput.fill(email);
 
-    // Fill password
     const passwordInput = page.locator('input[type="password"]').first();
-    await passwordInput.fill(ADMIN_PASSWORD);
+    await passwordInput.fill(password);
 
-    // Submit
     await page.locator('button[type="submit"]').click();
 
-    // Wait for successful login (dashboard heading or redirect away from /login)
     await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 30_000 });
 
-    // Save storageState (captures localStorage with accessToken + refreshToken)
-    await context.storageState({ path: AUTH_FILE });
-    console.log(`[global-setup] Auth state saved to ${AUTH_FILE}`);
+    // Ensure sidebar is expanded so nav-logout / nav-theme-toggle testids are visible
+    await page.evaluate(() => {
+      const stored = localStorage.getItem('tt-ui');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as { state?: { sidebarCollapsed?: boolean } };
+          if (parsed.state) parsed.state.sidebarCollapsed = false;
+          localStorage.setItem('tt-ui', JSON.stringify(parsed));
+        } catch { /* ignore parse errors */ }
+      } else {
+        localStorage.setItem('tt-ui', JSON.stringify({ state: { sidebarCollapsed: false }, version: 0 }));
+      }
+    });
+
+    await context.storageState({ path: outputPath });
+    console.log(`[global-setup] Auth state (${label}) saved to ${outputPath}`);
   } catch (err) {
-    console.error('[global-setup] Login failed:', err);
+    console.error(`[global-setup] Login failed for ${label}:`, err);
     throw new Error(
-      `E2E global-setup: failed to login as ${ADMIN_EMAIL}. ` +
-      `Is staging reachable at ${BASE_URL}? Check E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD env vars.`
+      `E2E global-setup: failed to login as ${email}. ` +
+      `Is staging reachable at ${baseUrl}? Check env vars.`
     );
   } finally {
     await browser.close();
+  }
+}
+
+async function globalSetup(_config: FullConfig) {
+  const authDir = path.join(__dirname, '.auth');
+  if (!fs.existsSync(authDir)) {
+    fs.mkdirSync(authDir, { recursive: true });
+  }
+
+  // Primary session (e2e-bot / MANAGER role)
+  await loginAndSave(BASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, AUTH_FILE, 'e2e-bot');
+
+  // Admin session (admin@tasktime.ru / ADMIN role) — needed for admin-only pages
+  const cleanupEmail = process.env.E2E_CLEANUP_EMAIL || 'admin@tasktime.ru';
+  const cleanupPassword = process.env.E2E_CLEANUP_PASSWORD;
+  if (cleanupPassword) {
+    await loginAndSave(BASE_URL, cleanupEmail, cleanupPassword, ADMIN_AUTH_FILE, 'admin-cleanup');
+  } else {
+    // If no cleanup password, copy e2e-bot session as fallback (admin tests will skip gracefully)
+    console.warn('[global-setup] E2E_CLEANUP_PASSWORD not set — admin-cleanup auth will mirror e2e-bot session');
+    fs.copyFileSync(AUTH_FILE, ADMIN_AUTH_FILE);
   }
 }
 

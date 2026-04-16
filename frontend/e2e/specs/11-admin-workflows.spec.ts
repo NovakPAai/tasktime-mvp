@@ -1,9 +1,12 @@
 import { test, expect } from '../fixtures/test';
+import { ADMIN_AUTH_FILE } from '../global-setup';
 
 const BASE = process.env.E2E_BASE_URL || 'http://localhost:5173';
 
 test.describe('Admin — Workflows', () => {
   test.describe.configure({ mode: 'serial' });
+  // Admin workflow API requires ADMIN role — use admin-cleanup session
+  test.use({ storageState: ADMIN_AUTH_FILE });
 
   test('admin workflows list page renders', async ({ page }) => {
     await page.goto(`${BASE}/admin/workflows`);

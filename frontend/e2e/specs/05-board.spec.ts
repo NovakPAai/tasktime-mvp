@@ -39,8 +39,10 @@ test.describe('Board', () => {
     });
 
     await page.goto(`${BASE}/projects/${projectId}/board`);
+    // Wait for board to finish loading (columns appear after API call completes)
+    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 30_000 });
     const card = page.locator(`[data-testid="board-card-${issue.id}"]`);
-    if (!await card.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    if (!await card.isVisible({ timeout: 20_000 }).catch(() => false)) {
       test.skip(); // board-card testid not yet deployed
       return;
     }
@@ -91,7 +93,7 @@ test.describe('Board', () => {
   test('board create issue button opens modal', async ({ page }) => {
     await page.goto(`${BASE}/projects/${projectId}/board`);
     const createBtn = page.locator('[data-testid="board-create-issue-btn"]');
-    if (await createBtn.isVisible({ timeout: 5_000 })) {
+    if (await createBtn.isVisible({ timeout: 20_000 })) {
       await createBtn.click();
       await expect(page.locator('.ant-modal-content')).toBeVisible({ timeout: 5_000 });
       await page.keyboard.press('Escape');
@@ -104,7 +106,7 @@ test.describe('Board', () => {
   test('board columns display OPEN and DONE statuses', async ({ page }) => {
     await page.goto(`${BASE}/projects/${projectId}/board`);
     const openColumn = page.locator('[data-testid="board-column-OPEN"]');
-    if (!await openColumn.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    if (!await openColumn.isVisible({ timeout: 20_000 }).catch(() => false)) {
       test.skip(); // testid not yet deployed
       return;
     }

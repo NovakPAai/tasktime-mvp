@@ -87,4 +87,7 @@ export const workflowsApi = {
 
   deleteTransition: (id: string, transitionId: string) =>
     api.delete(`/admin/workflows/${id}/transitions/${transitionId}`).then(r => r.data),
+
+  validate: (id: string) =>
+    api.get<{ isValid: boolean; errors: string[]; warnings: string[] }>(`/admin/workflows/${id}/validate`).then(r => r.data),
 };

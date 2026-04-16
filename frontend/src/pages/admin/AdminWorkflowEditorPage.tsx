@@ -44,6 +44,7 @@ export default function AdminWorkflowEditorPage() {
   const [allStatuses, setAllStatuses] = useState<WorkflowStatus[]>([]);
   const [allScreens, setAllScreens] = useState<TransitionScreen[]>([]);
   const [loading, setLoading] = useState(true);
+  const [validating, setValidating] = useState(false);
 
   const [stepDrawerOpen, setStepDrawerOpen] = useState(false);
   const [stepForm] = Form.useForm();
@@ -167,6 +168,23 @@ export default function AdminWorkflowEditorPage() {
     }
   };
 
+  const handleValidate = async () => {
+    if (!id) return;
+    setValidating(true);
+    try {
+      const report = await workflowsApi.validate(id);
+      if (report.isValid) {
+        message.success(`Воркфлоу валиден${report.warnings?.length ? ` (${report.warnings.length} предупреждений)` : ''}`);
+      } else {
+        message.error(`Ошибки: ${report.errors?.join(', ') ?? 'неизвестная ошибка'}`);
+      }
+    } catch {
+      message.error('Не удалось выполнить валидацию');
+    } finally {
+      setValidating(false);
+    }
+  };
+
   const handleDeleteTransition = async (transitionId: string) => {
     if (!id) return;
     try {
@@ -258,6 +276,16 @@ export default function AdminWorkflowEditorPage() {
         {workflow.isDefault && <Tag color="blue">По умолчанию</Tag>}
         {/* TTADM-67: визуальный индикатор системного воркфлоу */}
         {workflow.isSystem && <Tag color="red" icon={<LockOutlined />}>Системный (только чтение)</Tag>}
+        <div style={{ marginLeft: 'auto' }}>
+          <Button
+            data-testid="workflow-validate"
+            size="small"
+            loading={validating}
+            onClick={handleValidate}
+          >
+            Валидировать
+          </Button>
+        </div>
       </div>
 
       {/* Steps */}
