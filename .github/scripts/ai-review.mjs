@@ -107,7 +107,7 @@ function filterAndTruncateDiff(rawDiff, maxChars) {
 // ---------------------------------------------------------------------------
 // OpenAI review
 // ---------------------------------------------------------------------------
-async function reviewWithOpenAI(diff) {
+async function reviewWithOpenAI(diff, prTitle = PR_TITLE, prBody = PR_BODY) {
   const systemPrompt = `You are a senior software engineer doing a thorough code review.
 Analyze the provided git diff and return a JSON object with this exact structure:
 {
@@ -140,7 +140,7 @@ Rules:
 - For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
 - Verdict: "approve" if no critical/high issues; "request_changes" if critical/high exist; "comment" otherwise.`;
 
-  const userPrompt = `PR: ${PR_TITLE}${PR_BODY ? `\nDescription: ${PR_BODY}` : ''}
+  const userPrompt = `PR: ${prTitle}${prBody ? `\nDescription: ${prBody}` : ''}
 
 \`\`\`diff
 ${diff}
@@ -276,9 +276,26 @@ async function postComment(body) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+async function fetchPRMeta() {
+  const pr = await githubFetch(
+    `/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}`
+  );
+  return { title: pr.title ?? '', body: pr.body ?? '' };
+}
+
 async function main() {
   if (!OPENAI_API_KEY) throw new Error('Secret OPENAI_API_KEY is not set in repo settings');
   if (!GITHUB_TOKEN) throw new Error('GITHUB_TOKEN is missing');
+
+  // workflow_dispatch doesn't populate PR_TITLE/PR_BODY — fetch from API
+  let prTitle = PR_TITLE;
+  let prBody = PR_BODY;
+  if (!prTitle) {
+    console.log('PR_TITLE empty (manual dispatch) — fetching PR metadata from API');
+    const meta = await fetchPRMeta();
+    prTitle = meta.title;
+    prBody = meta.body;
+  }
 
   console.log(`Reviewing PR #${PR_NUMBER} (${REPO_OWNER}/${REPO_NAME}) with ${AI_MODEL}`);
 
@@ -292,7 +309,7 @@ async function main() {
 
   console.log(`Diff: ${diff.length} chars`);
 
-  const review = await reviewWithOpenAI(diff);
+  const review = await reviewWithOpenAI(diff, prTitle, prBody);
   const comment = formatComment(review);
 
   await postComment(comment);
