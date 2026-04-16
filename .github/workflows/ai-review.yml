@@ -1,0 +1,40 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    name: AI Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run AI Review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          # Configurable via GitHub Repository Variables (Settings → Variables):
+          # AI_REVIEW_MODEL      — default: gpt-4o-mini
+          # AI_REVIEW_LANGUAGE   — default: Russian
+          # AI_REVIEW_MAX_CHARS  — default: 80000
+          # AI_REVIEW_FAIL_ON_CRITICAL — default: false
+          AI_MODEL: ${{ vars.AI_REVIEW_MODEL || 'gpt-4o-mini' }}
+          REVIEW_LANGUAGE: ${{ vars.AI_REVIEW_LANGUAGE || 'Russian' }}
+          MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_CHARS || '80000' }}
+          FAIL_ON_CRITICAL: ${{ vars.AI_REVIEW_FAIL_ON_CRITICAL || 'false' }}
+        run: node .github/scripts/ai-review.mjs
