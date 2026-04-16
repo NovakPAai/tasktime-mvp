@@ -104,8 +104,8 @@ test.describe('Issues', () => {
       type: 'TASK',
     });
 
-    // Update status via API
-    await api.updateIssue(request, accessToken, issue.id, { status: 'IN_PROGRESS' });
+    // Update status via workflow engine transitions API
+    await api.transitionIssueToCategory(request, accessToken, issue.id, 'IN_PROGRESS');
 
     await page.goto(`${BASE}/issues/${issue.id}`);
     await expect(page).not.toHaveURL(/\/login$/);
