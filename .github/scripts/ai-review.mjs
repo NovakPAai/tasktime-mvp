@@ -174,6 +174,11 @@ ${diff}
     throw new Error(`OpenAI error: ${res.status} ${rawBody.slice(0, 200)}`);
   }
 
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    throw new Error(`OpenAI returned unexpected content-type: ${ct} — body: ${rawBody.slice(0, 200)}`);
+  }
+
   let data;
   try {
     data = JSON.parse(rawBody);
