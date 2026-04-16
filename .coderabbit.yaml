@@ -69,7 +69,7 @@ reviews:
   # Auto Review — ФИКС проблемы PR #160
   # ---------------------------------------------------------------------------
   auto_review:
-    enabled: true
+    enabled: false  # Отключено — используем собственный AI Code Review (.github/workflows/ai-review.yml)
     auto_incremental_review: true
     auto_pause_after_reviewed_commits: 7
     drafts: false
