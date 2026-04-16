@@ -50,12 +50,13 @@ export function requireProjectPermission(
     if (!projectId) return next(new AppError(400, 'Project ID required'));
 
     const cacheKey = `rbac:perm:${projectId}:${req.user.userId}:${permission}`;
-    const cachedResult = await getCachedJson<boolean>(cacheKey);
-    if (cachedResult !== null) {
-      return cachedResult ? next() : next(new AppError(403, 'Insufficient project permissions'));
-    }
 
     try {
+      const cachedResult = await getCachedJson<boolean>(cacheKey);
+      if (cachedResult !== null) {
+        return cachedResult ? next() : next(new AppError(403, 'Insufficient project permissions'));
+      }
+
       const scheme = await getSchemeForProject(projectId);
       const userRole = await prisma.userProjectRole.findFirst({
         where: { userId: req.user.userId, projectId },
@@ -64,10 +65,13 @@ export function requireProjectPermission(
 
       let granted = false;
       if (userRole) {
-        // Prefer roleId; fall back to legacy `role` enum (key-based lookup) for pre-backfill rows.
-        const roleDef = userRole.roleId
-          ? scheme.roles.find(r => r.id === userRole.roleId)
-          : scheme.roles.find(r => r.key === userRole.role);
+        // Prefer roleId. If it's missing OR points to a role outside the active scheme
+        // (e.g. the project was recently re-attached to a different scheme and the migration
+        // hasn't caught up yet), fall back to matching by the legacy `role` key.
+        let roleDef = userRole.roleId ? scheme.roles.find(r => r.id === userRole.roleId) : undefined;
+        if (!roleDef) {
+          roleDef = scheme.roles.find(r => r.key === userRole.role);
+        }
         granted = roleDef?.permissions.find(p => p.permission === permission)?.granted ?? false;
       }
 
