@@ -63,11 +63,18 @@ async function githubFetch(path, options = {}) {
       ...options.headers,
     },
   });
+  const body = await res.text();
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`GitHub ${path}: ${res.status} ${text}`);
+    throw new Error(`GitHub ${path}: ${res.status} ${body.slice(0, 500)}`);
   }
-  return res.json();
+  if (!body || res.status === 204) return null;
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) return body;
+  try {
+    return JSON.parse(body);
+  } catch (e) {
+    throw new Error(`GitHub ${path}: non-JSON response: ${e.message} — body: ${body.slice(0, 200)}`);
+  }
 }
 
 async function fetchPRDiff() {
@@ -163,12 +170,25 @@ ${diff}
     }),
   });
 
+  const rawBody = await res.text();
+
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI error: ${res.status} ${text}`);
+    throw new Error(`OpenAI error: ${res.status} ${rawBody.slice(0, 200)}`);
   }
 
-  const data = await res.json();
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    throw new Error(`OpenAI returned unexpected content-type: ${ct} — body: ${rawBody.slice(0, 200)}`);
+  }
+
+  let data;
+  try {
+    data = JSON.parse(rawBody);
+  } catch (e) {
+    console.error(`Raw OpenAI response body (first 500 chars):\n${rawBody.slice(0, 500)}`);
+    throw new Error(`OpenAI returned non-JSON body: ${e.message}`);
+  }
+
   const { usage } = data;
 
   // Cost estimate — gpt-5.4: $7/1M in, $21/1M out (update when official pricing is published)
