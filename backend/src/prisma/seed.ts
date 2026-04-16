@@ -97,10 +97,10 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
 
   // ===== DEFAULT PROJECT ROLE SCHEME =====
   const defaultRoleScheme = await client.projectRoleScheme.upsert({
-    where: { id: 'default-role-scheme-0000-000000000000' },
+    where: { id: '00000000-0000-0000-0000-000000000001' },
     update: {},
     create: {
-      id: 'default-role-scheme-0000-000000000000',
+      id: '00000000-0000-0000-0000-000000000001',
       name: 'Default',
       description: 'Схема доступа по умолчанию',
       isDefault: true,

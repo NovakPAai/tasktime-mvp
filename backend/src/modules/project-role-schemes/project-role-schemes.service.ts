@@ -1,4 +1,4 @@
-import type { ProjectPermission } from '@prisma/client';
+import type { Prisma, ProjectPermission } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson, delCacheByPrefix } from '../../shared/redis.js';
@@ -102,34 +102,42 @@ export async function deleteScheme(id: string) {
   return { ok: true };
 }
 
+/**
+ * Remap all UserProjectRole rows of a project to the target scheme by matching the legacy `role`
+ * enum to a role key in that scheme. Rows whose key has no match are reset to (roleId=NULL,
+ * schemeId=NULL); requireProjectPermission falls back to the legacy `role` enum for those.
+ *
+ * Batched: 4 `updateMany` queries — one per legacy enum value (ADMIN, MANAGER, USER, VIEWER).
+ * Must be called inside a transaction so the composite FK stays consistent.
+ */
+async function remapProjectUserRolesToScheme(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  targetSchemeId: string,
+) {
+  const targetRoles = await tx.projectRoleDefinition.findMany({
+    where: { schemeId: targetSchemeId },
+    select: { id: true, key: true },
+  });
+  const keyToId = new Map(targetRoles.map(r => [r.key, r.id]));
+  const legacyKeys = ['ADMIN', 'MANAGER', 'USER', 'VIEWER'] as const;
+  for (const key of legacyKeys) {
+    const roleId = keyToId.get(key);
+    await tx.userProjectRole.updateMany({
+      where: { projectId, role: key },
+      data: roleId ? { roleId, schemeId: targetSchemeId } : { roleId: null, schemeId: null },
+    });
+  }
+}
+
 export async function attachProject(schemeId: string, projectId: string) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id: schemeId } });
   if (!scheme) throw new AppError(404, 'Role scheme not found');
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  // When the project switches schemes, existing UserProjectRole rows may reference roles from
-  // the previous scheme. Remap them to the new scheme by `role` key inside a single transaction
-  // so the composite FK (roleId, schemeId) -> ProjectRoleDefinition stays consistent and users
-  // do not lose access. Rows whose legacy `role` key does not exist in the new scheme are reset
-  // to roleId=NULL/schemeId=NULL; requireProjectPermission falls back to the legacy `role` enum.
   const binding = await prisma.$transaction(async (tx) => {
-    const newSchemeRoles = await tx.projectRoleDefinition.findMany({
-      where: { schemeId },
-      select: { id: true, key: true },
-    });
-    const keyToId = new Map(newSchemeRoles.map(r => [r.key, r.id]));
-    const existing = await tx.userProjectRole.findMany({
-      where: { projectId },
-      select: { id: true, role: true },
-    });
-    for (const upr of existing) {
-      const newRoleId = keyToId.get(upr.role as string);
-      await tx.userProjectRole.update({
-        where: { id: upr.id },
-        data: newRoleId ? { roleId: newRoleId, schemeId } : { roleId: null, schemeId: null },
-      });
-    }
+    await remapProjectUserRolesToScheme(tx, projectId, schemeId);
     return tx.projectRoleSchemeProject.upsert({
       where: { projectId },
       update: { schemeId },
@@ -143,9 +151,17 @@ export async function attachProject(schemeId: string, projectId: string) {
 }
 
 export async function detachProject(schemeId: string, projectId: string) {
-  const binding = await prisma.projectRoleSchemeProject.findFirst({ where: { schemeId, projectId } });
-  if (!binding) throw new AppError(404, 'Project not attached to this scheme');
-  await prisma.projectRoleSchemeProject.delete({ where: { projectId } });
+  await prisma.$transaction(async (tx) => {
+    const binding = await tx.projectRoleSchemeProject.findFirst({ where: { schemeId, projectId } });
+    if (!binding) throw new AppError(404, 'Project not attached to this scheme');
+    await tx.projectRoleSchemeProject.delete({ where: { projectId } });
+    // After detach the project falls back to the default scheme — remap UserProjectRole rows
+    // so their roleId/schemeId stop referencing the now-unrelated previous scheme.
+    const defaultScheme = await tx.projectRoleScheme.findFirst({ where: { isDefault: true }, select: { id: true } });
+    if (defaultScheme) {
+      await remapProjectUserRolesToScheme(tx, projectId, defaultScheme.id);
+    }
+  });
   await delCachedJson(PROJECT_SCHEME_KEY(projectId));
   await delCacheByPrefix(`rbac:perm:${projectId}:`);
   return { ok: true };

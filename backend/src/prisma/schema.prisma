@@ -87,12 +87,14 @@ model UserProjectRole {
   projectId String      @map("project_id")
   role      ProjectRole
   roleId    String?     @map("role_id")         // nullable на фазе 1
-  schemeId  String?     @map("scheme_id")       // must match the scheme of roleId — enforced via composite FK and CHECK constraint
+  schemeId  String?     @map("scheme_id")       // must match the scheme of roleId (see migration 20260417000000_user_project_role_scheme_fk)
   createdAt DateTime    @default(now()) @map("created_at")
 
   user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // Composite FK guarantees roleId belongs to schemeId at the DB level.
+  // A CHECK constraint (`(role_id IS NULL) = (scheme_id IS NULL)`) is added in the migration above
+  // and cannot be expressed declaratively in Prisma schema.
   roleDefinition ProjectRoleDefinition? @relation(fields: [roleId, schemeId], references: [id, schemeId], onDelete: SetNull)
 
   @@unique([userId, projectId, role])

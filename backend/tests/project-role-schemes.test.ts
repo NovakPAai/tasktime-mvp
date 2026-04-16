@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 let adminToken: string;
 let userToken: string;
 
-const DEFAULT_SCHEME_ID = 'default-role-scheme-0000-000000000000';
+const DEFAULT_SCHEME_ID = '00000000-0000-0000-0000-000000000001';
 
 beforeEach(async () => {
   // Clean up only user-created schemes; keep seeded default
