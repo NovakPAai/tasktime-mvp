@@ -212,6 +212,8 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   const userProjectRoles = await client.userProjectRole.findMany({
     where: { roleId: null },
   });
+  let backfilled = 0;
+  const unmapped: string[] = [];
   for (const upr of userProjectRoles) {
     const roleId = roleKeyToId[upr.role as string];
     if (roleId) {
@@ -219,9 +221,16 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
         where: { id: upr.id },
         data: { roleId },
       });
+      backfilled += 1;
+    } else {
+      unmapped.push(upr.role as string);
     }
   }
-  console.log(`Backfilled ${userProjectRoles.length} UserProjectRole records.`);
+  console.log(`Backfilled ${backfilled}/${userProjectRoles.length} UserProjectRole records.`);
+  if (unmapped.length > 0) {
+    const unique = Array.from(new Set(unmapped));
+    console.warn(`Unmapped legacy role values (no matching key in default scheme): ${unique.join(', ')}`);
+  }
   // ===== END DEFAULT PROJECT ROLE SCHEME =====
 
   // Create projects (DEMO/BACK/LIVE only when not TTMP_ONLY)

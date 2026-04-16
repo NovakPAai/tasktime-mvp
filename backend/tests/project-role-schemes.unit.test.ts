@@ -6,8 +6,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock('../src/prisma/client.js', () => ({
-  prisma: {
+const { mockPrisma } = vi.hoisted(() => {
+  const mockPrisma = {
     projectRoleScheme: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -40,14 +40,20 @@ vi.mock('../src/prisma/client.js', () => ({
       count: vi.fn(),
     },
     project: { findUnique: vi.fn() },
-    $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
-  },
-}));
+    $transaction: vi.fn((arg: unknown) =>
+      typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(mockPrisma) : Promise.all(arg as unknown[]),
+    ),
+  };
+  return { mockPrisma };
+});
+
+vi.mock('../src/prisma/client.js', () => ({ prisma: mockPrisma }));
 
 vi.mock('../src/shared/redis.js', () => ({
   getCachedJson: vi.fn(),
   setCachedJson: vi.fn(),
   delCachedJson: vi.fn(),
+  delCacheByPrefix: vi.fn(),
 }));
 
 // ─── Imports after mocks ──────────────────────────────────────────────────────

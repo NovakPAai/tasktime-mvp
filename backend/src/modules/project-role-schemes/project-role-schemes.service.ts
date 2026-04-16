@@ -215,18 +215,20 @@ export async function getPermissions(schemeId: string, roleId: string) {
 export async function updatePermissions(schemeId: string, roleId: string, dto: UpdatePermissionsDto) {
   const role = await prisma.projectRoleDefinition.findFirst({ where: { id: roleId, schemeId } });
   if (!role) throw new AppError(404, 'Role not found');
-  const ops = (Object.entries(dto.permissions) as [ProjectPermission, boolean][]).map(([permission, granted]) =>
-    prisma.projectRolePermission.upsert({
-      where: { roleId_permission: { roleId, permission } },
-      update: { granted },
-      create: { roleId, permission, granted },
-    }),
-  );
-  await prisma.$transaction(ops);
+  const result = await prisma.$transaction(async (tx) => {
+    for (const [permission, granted] of Object.entries(dto.permissions) as [ProjectPermission, boolean][]) {
+      await tx.projectRolePermission.upsert({
+        where: { roleId_permission: { roleId, permission } },
+        update: { granted },
+        create: { roleId, permission, granted },
+      });
+    }
+    return tx.projectRoleDefinition.findUnique({
+      where: { id: roleId },
+      include: { permissions: true },
+    });
+  });
   await invalidateSchemeCache(schemeId);
   await invalidatePermissionCacheForScheme(schemeId);
-  return prisma.projectRoleDefinition.findUnique({
-    where: { id: roleId },
-    include: { permissions: true },
-  });
+  return result;
 }
