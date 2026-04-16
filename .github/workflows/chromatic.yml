@@ -29,8 +29,6 @@ jobs:
   chromatic:
     name: Visual Regression (Chromatic)
     runs-on: ubuntu-latest
-    # Пропускать, если секрет не настроен (не блокировать CI при первом пуше)
-    if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
     defaults:
       run:
         working-directory: frontend
