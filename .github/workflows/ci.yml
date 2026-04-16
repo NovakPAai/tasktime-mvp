@@ -225,6 +225,12 @@ jobs:
             ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
               "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
 
+      - name: Login Docker Hub on staging server
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
+            ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+              "docker login docker.io -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin"
+
       - name: Write pipeline env file
         run: |
           cat > deploy/env/pipeline.staging.env << 'ENVEOF'
