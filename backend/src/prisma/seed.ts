@@ -219,7 +219,7 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     if (roleId) {
       await client.userProjectRole.update({
         where: { id: upr.id },
-        data: { roleId },
+        data: { roleId, schemeId: defaultRoleScheme.id },
       });
       backfilled += 1;
     } else {

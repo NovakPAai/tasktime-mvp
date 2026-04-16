@@ -371,12 +371,14 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   const LEGACY_KEYS = ['ADMIN', 'MANAGER', 'USER', 'VIEWER'] as const;
   type LegacyRole = typeof LEGACY_KEYS[number];
   let legacyRole = dto.role as LegacyRole | undefined;
+  let resolvedSchemeId: string | undefined;
   if (dto.roleId) {
     const projectScheme = await getSchemeForProject(dto.projectId);
     const roleDef = projectScheme.roles.find(r => r.id === dto.roleId);
     if (!roleDef) {
       throw new AppError(400, 'roleId does not belong to the scheme attached to this project');
     }
+    resolvedSchemeId = projectScheme.id;
     const derivedKey = (LEGACY_KEYS as readonly string[]).includes(roleDef.key)
       ? (roleDef.key as LegacyRole)
       : undefined;
@@ -397,7 +399,8 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
       userId,
       projectId: dto.projectId,
       role: legacyRole,
-      ...(dto.roleId ? { roleId: dto.roleId } : {}),
+      // roleId and schemeId must be set together (enforced by CHECK constraint on the DB side).
+      ...(dto.roleId && resolvedSchemeId ? { roleId: dto.roleId, schemeId: resolvedSchemeId } : {}),
     },
     include: { project: { select: { id: true, name: true, key: true } } },
   });
