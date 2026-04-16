@@ -214,6 +214,7 @@ export default function TeamsPage() {
         </div>
         {canManageTeams && (
           <div
+            data-testid="team-create-btn"
             onClick={openCreate}
             style={{
               backgroundImage: LOGO_GRAD,

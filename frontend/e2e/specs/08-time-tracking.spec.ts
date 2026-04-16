@@ -44,23 +44,24 @@ test.describe('Time Tracking', () => {
 
   test('issue detail page shows timer controls', async ({ page }) => {
     await page.goto(`${BASE}/issues/${issueId}`);
-    // Issue detail page needs to load
-    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    // Wait for issue to fully load (title visible = data arrived, not just loading spinner)
+    await expect(page.locator('[data-testid="issue-title"]')).toBeVisible({ timeout: 30_000 });
     await expect(page).not.toHaveURL(/\/login$/);
     // Timer controls (testid-based) — skip if testids not yet deployed
     const timerStart = page.locator('[data-testid="timer-start"]');
     const timerStop = page.locator('[data-testid="timer-stop"]');
-    const hasTimerTestids = (await timerStart.isVisible({ timeout: 3_000 }).catch(() => false))
-      || (await timerStop.isVisible({ timeout: 1_000 }).catch(() => false));
+    const hasTimerTestids = (await timerStart.isVisible({ timeout: 5_000 }).catch(() => false))
+      || (await timerStop.isVisible({ timeout: 2_000 }).catch(() => false));
     if (!hasTimerTestids) { test.skip(); return; }
   });
 
   test('start and stop timer via UI', async ({ page }) => {
     await page.goto(`${BASE}/issues/${issueId}`);
-    await page.waitForFunction(() => document.body.innerText.trim().length > 0, { timeout: 15_000 });
+    // Wait for issue to fully load (title visible = data arrived, not just loading spinner)
+    await expect(page.locator('[data-testid="issue-title"]')).toBeVisible({ timeout: 30_000 });
 
     const startBtn = page.locator('[data-testid="timer-start"]');
-    if (!await startBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    if (!await startBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       test.skip(); // testids not yet deployed
       return;
     }

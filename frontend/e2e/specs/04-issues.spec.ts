@@ -34,8 +34,10 @@ test.describe('Issues', () => {
 
   test('create TASK via New Issue button', async ({ page }) => {
     await page.goto(`${BASE}/projects/${projectId}`);
+    // Wait for page to fully render before looking for the create button
+    await page.waitForFunction(() => document.body.innerText.trim().length > 10, { timeout: 30_000 });
     const createBtn = page.locator('[data-testid="issue-create-btn"]');
-    if (!await createBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    if (!await createBtn.isVisible({ timeout: 15_000 }).catch(() => false)) {
       test.skip(); // testid not yet deployed
       return;
     }
@@ -85,6 +87,8 @@ test.describe('Issues', () => {
     });
 
     await page.goto(`${BASE}/issues/${issue.id}`);
+    // Wait for issue to fully load before checking for comment input
+    await page.locator('[data-testid="issue-title"]').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null);
     const commentInput = page.locator('[data-testid="comment-input"]');
     if (!await commentInput.isVisible({ timeout: 10_000 }).catch(() => false)) {
       test.skip(); // testid not yet deployed

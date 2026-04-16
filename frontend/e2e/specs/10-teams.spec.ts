@@ -1,10 +1,13 @@
 import { test, expect } from '../fixtures/test';
 import * as api from '../fixtures/api.fixture';
+import { ADMIN_AUTH_FILE } from '../global-setup';
 
 const BASE = process.env.E2E_BASE_URL || 'http://localhost:5173';
 
 test.describe('Teams', () => {
   test.describe.configure({ mode: 'serial' });
+  // Team creation UI requires ADMIN role — use admin-cleanup session for browser
+  test.use({ storageState: ADMIN_AUTH_FILE });
 
   let accessToken: string;
   let prefix: string;

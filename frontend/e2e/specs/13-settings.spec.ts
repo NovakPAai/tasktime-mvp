@@ -36,7 +36,7 @@ test.describe('Settings', () => {
   test('theme toggle on settings page (if present)', async ({ page }) => {
     await page.goto(`${BASE}/settings`);
     const themeToggle = page.locator('[data-testid="nav-theme-toggle"]');
-    if (await themeToggle.isVisible({ timeout: 5_000 })) {
+    if (await themeToggle.isVisible({ timeout: 10_000 })) {
       const htmlBefore = await page.locator('html').getAttribute('class') ?? '';
       await themeToggle.click();
       await page.waitForTimeout(300);
@@ -61,7 +61,7 @@ test.describe('Settings', () => {
     await expect(page).not.toHaveURL(/\/login$/);
 
     const toggle = page.locator('[data-testid="nav-theme-toggle"]');
-    if (await toggle.isVisible({ timeout: 5_000 })) {
+    if (await toggle.isVisible({ timeout: 10_000 })) {
       await toggle.click();
       await page.waitForTimeout(300);
       await expect(page).not.toHaveURL(/\/login$/);

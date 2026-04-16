@@ -58,7 +58,7 @@ test.describe('Auth — authenticated', () => {
 
     // Try testid-based logout first, fall back to text search
     const logoutTestid = page.locator('[data-testid="nav-logout"]');
-    const hasTestid = await logoutTestid.isVisible({ timeout: 3_000 }).catch(() => false);
+    const hasTestid = await logoutTestid.isVisible({ timeout: 10_000 }).catch(() => false);
 
     if (hasTestid) {
       await logoutTestid.click();
@@ -66,7 +66,7 @@ test.describe('Auth — authenticated', () => {
       // Fallback: look for logout button by text
       const logoutByText = page.getByRole('button', { name: /logout|выйти/i })
         .or(page.getByText(/logout|выйти/i));
-      if (!await logoutByText.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
+      if (!await logoutByText.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
         test.skip();
         return;
       }
