@@ -68,6 +68,8 @@ async function githubFetch(path, options = {}) {
     throw new Error(`GitHub ${path}: ${res.status} ${body.slice(0, 500)}`);
   }
   if (!body || res.status === 204) return null;
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) return body;
   try {
     return JSON.parse(body);
   } catch (e) {
