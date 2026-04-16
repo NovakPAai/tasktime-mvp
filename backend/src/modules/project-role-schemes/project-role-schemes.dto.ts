@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProjectPermission } from '@prisma/client';
 
 export const createSchemeDto = z.object({
   name: z.string().min(1).max(200),
@@ -26,7 +27,7 @@ export const updateRoleDefinitionDto = z.object({
 });
 
 export const updatePermissionsDto = z.object({
-  permissions: z.record(z.string(), z.boolean()),
+  permissions: z.record(z.nativeEnum(ProjectPermission), z.boolean()),
 });
 
 export const attachProjectDto = z.object({

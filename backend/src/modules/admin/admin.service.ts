@@ -5,6 +5,8 @@ import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
 import { hashPassword } from '../../shared/utils/password.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
+import { getSchemeForProject } from '../project-role-schemes/project-role-schemes.service.js';
 import type { CreateUserDto, UpdateUserAdminDto, AssignProjectRoleDto } from './admin.dto.js';
 
 function flattenRoles<T extends { systemRoles: { role: SystemRoleType }[] }>(
@@ -363,11 +365,16 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   if (!user) throw new AppError(404, 'User not found');
   if (!project) throw new AppError(404, 'Project not found');
 
-  // Determine legacy role enum value: from roleId lookup or direct dto.role
+  // Determine legacy role enum value: from roleId lookup or direct dto.role.
+  // If roleId is provided, it MUST belong to the scheme attached to this project.
   let legacyRole = dto.role as 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER' | undefined;
-  if (!legacyRole && dto.roleId) {
-    const roleDef = await prisma.projectRoleDefinition.findUnique({ where: { id: dto.roleId }, select: { key: true } });
-    if (roleDef && ['ADMIN', 'MANAGER', 'USER', 'VIEWER'].includes(roleDef.key)) {
+  if (dto.roleId) {
+    const projectScheme = await getSchemeForProject(dto.projectId);
+    const roleDef = projectScheme.roles.find(r => r.id === dto.roleId);
+    if (!roleDef) {
+      throw new AppError(400, 'roleId does not belong to the scheme attached to this project');
+    }
+    if (['ADMIN', 'MANAGER', 'USER', 'VIEWER'].includes(roleDef.key)) {
       legacyRole = roleDef.key as 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
     }
   }
@@ -387,6 +394,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
     },
     include: { project: { select: { id: true, name: true, key: true } } },
   });
+  await invalidateProjectPermissionCache(dto.projectId, userId);
 
   await prisma.auditLog.create({
     data: {
@@ -408,6 +416,7 @@ export async function removeProjectRole(actorId: string, userId: string, roleId:
   if (!roleEntry) throw new AppError(404, 'Role assignment not found');
 
   await prisma.userProjectRole.delete({ where: { id: roleId } });
+  await invalidateProjectPermissionCache(roleEntry.projectId, userId);
 
   await prisma.auditLog.create({
     data: {

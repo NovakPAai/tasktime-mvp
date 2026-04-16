@@ -5,7 +5,13 @@ import type { AuthRequest } from '../types/index.js';
 import { hasAnySystemRole, isSuperAdmin, hasGlobalProjectReadAccess } from '../auth/roles.js';
 import { prisma } from '../../prisma/client.js';
 import { getSchemeForProject } from '../../modules/project-role-schemes/project-role-schemes.service.js';
-import { getCachedJson, setCachedJson } from '../redis.js';
+import { getCachedJson, setCachedJson, delCacheByPrefix } from '../redis.js';
+
+/** Invalidate cached permission results for a user+project pair.
+ * Call this whenever a UserProjectRole is created, updated, or deleted. */
+export async function invalidateProjectPermissionCache(projectId: string, userId: string): Promise<void> {
+  await delCacheByPrefix(`rbac:perm:${projectId}:${userId}:`);
+}
 
 export function requireRole(...roles: SystemRoleType[]) {
   return (req: AuthRequest, _res: Response, next: NextFunction) => {
@@ -38,7 +44,7 @@ export function requireProjectPermission(
   return async (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) return next(new AppError(401, 'Authentication required'));
     if (isSuperAdmin(req.user.systemRoles)) return next();
-    if (hasGlobalProjectReadAccess(req.user.systemRoles)) return next();
+    if (permission.endsWith('_VIEW') && hasGlobalProjectReadAccess(req.user.systemRoles)) return next();
 
     const projectId = getProjectId(req);
     if (!projectId) return next(new AppError(400, 'Project ID required'));
