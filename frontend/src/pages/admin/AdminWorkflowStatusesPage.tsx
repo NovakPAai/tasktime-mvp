@@ -141,7 +141,7 @@ export default function AdminWorkflowStatusesPage() {
       <Modal
         title={editing ? 'Редактировать статус' : 'Новый статус'}
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); void load(); }}
         onOk={() => form.submit()}
         okText="Сохранить"
         cancelText="Отмена"

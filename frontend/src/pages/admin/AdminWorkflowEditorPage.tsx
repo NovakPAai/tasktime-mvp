@@ -329,7 +329,7 @@ export default function AdminWorkflowEditorPage() {
       </div>
 
       {/* Step drawer */}
-      <Drawer title="Добавить шаг" open={stepDrawerOpen} onClose={() => setStepDrawerOpen(false)} width={400}>
+      <Drawer title="Добавить шаг" open={stepDrawerOpen} onClose={() => { setStepDrawerOpen(false); void load(); }} width={400}>
         <Form form={stepForm} layout="vertical" onFinish={handleAddStep}>
           <Form.Item name="statusId" label="Статус" rules={[{ required: true }]}>
             <Select
@@ -349,7 +349,7 @@ export default function AdminWorkflowEditorPage() {
       <Drawer
         title={editingTransition ? 'Редактировать переход' : 'Добавить переход'}
         open={transitionDrawerOpen}
-        onClose={() => setTransitionDrawerOpen(false)}
+        onClose={() => { setTransitionDrawerOpen(false); void load(); }}
         width={480}
       >
         <Form form={transitionForm} layout="vertical" onFinish={handleSaveTransition}>

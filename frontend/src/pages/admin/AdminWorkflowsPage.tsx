@@ -124,7 +124,7 @@ export default function AdminWorkflowsPage() {
       <Modal
         title={editing ? 'Редактировать workflow' : 'Новый workflow'}
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); void load(); }}
         onOk={() => form.submit()}
         okText="Сохранить"
         cancelText="Отмена"

@@ -762,7 +762,7 @@ export default function ProjectDetailPage() {
       <Modal
         title="New Issue"
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); if (id) void fetchIssues(id); }}
         onOk={() => form.submit()}
         okText="Create"
         width={600}
@@ -836,7 +836,7 @@ export default function ProjectDetailPage() {
             setSelectedIssueIds([]);
             if (id) fetchIssues(id);
           }}
-          onCancel={() => setBulkStatusWizardOpen(false)}
+          onCancel={() => { setBulkStatusWizardOpen(false); if (id) void fetchIssues(id); }}
         />
       )}
     </div>

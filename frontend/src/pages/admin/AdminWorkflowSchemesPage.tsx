@@ -106,7 +106,7 @@ export default function AdminWorkflowSchemesPage() {
       <Modal
         title={editing ? 'Редактировать схему' : 'Новая схема'}
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); void load(); }}
         onOk={() => form.submit()}
         okText="Сохранить"
         cancelText="Отмена"

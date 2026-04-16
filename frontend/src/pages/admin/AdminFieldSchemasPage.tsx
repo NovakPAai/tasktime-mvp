@@ -313,7 +313,7 @@ export default function AdminFieldSchemasPage() {
         title="Новая схема полей"
         open={createOpen}
         onOk={handleCreate}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={() => { setCreateOpen(false); void load(); }}
         confirmLoading={saving}
         okText="Создать"
         cancelText="Отмена"
@@ -334,7 +334,7 @@ export default function AdminFieldSchemasPage() {
         title={`Копировать схему «${copySource?.name}»`}
         open={copyOpen}
         onOk={handleCopy}
-        onCancel={() => setCopyOpen(false)}
+        onCancel={() => { setCopyOpen(false); void load(); }}
         confirmLoading={saving}
         okText="Скопировать"
         cancelText="Отмена"
@@ -360,7 +360,7 @@ export default function AdminFieldSchemasPage() {
           schemaId={conflictsSchemaId}
           schemaName={conflictsSchemaName}
           result={conflictsResult}
-          onCancel={() => setConflictsOpen(false)}
+          onCancel={() => { setConflictsOpen(false); void load(); }}
           onPublishWithWarnings={handlePublishWithWarnings}
           publishing={publishing}
         />

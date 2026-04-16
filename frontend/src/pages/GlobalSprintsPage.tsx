@@ -2,7 +2,7 @@
  * GlobalSprintsPage — rebuilt from Paper artboards 2HH-0 (Dark) + 2MD-0 (Light).
  * Zero CSS classes, zero Ant Design layout. Dual-theme pattern.
  */
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Select } from 'antd';
 import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
@@ -127,17 +127,18 @@ export default function GlobalSprintsPage() {
     loadLookups();
   }, []);
 
-  useEffect(() => {
-    async function loadSprints() {
-      const page = await sprintsApi.listAllSprints({
-        state:     stateFilter === 'ALL' ? undefined : stateFilter,
-        projectId: projectFilter,
-        teamId:    teamFilter,
-      });
-      setSprints(page.data);
-    }
-    loadSprints();
+  const loadSprints = useCallback(async () => {
+    const page = await sprintsApi.listAllSprints({
+      state:     stateFilter === 'ALL' ? undefined : stateFilter,
+      projectId: projectFilter,
+      teamId:    teamFilter,
+    });
+    setSprints(page.data);
   }, [stateFilter, projectFilter, teamFilter]);
+
+  useEffect(() => {
+    void loadSprints();
+  }, [loadSprints]);
 
   const grouped = useMemo(() => {
     const byState: Record<'PLANNED' | 'ACTIVE' | 'CLOSED', Sprint[]> = {
@@ -464,7 +465,7 @@ export default function GlobalSprintsPage() {
       <SprintIssuesDrawer
         open={detailsOpen}
         sprintId={selectedSprintId}
-        onClose={() => setDetailsOpen(false)}
+        onClose={() => { setDetailsOpen(false); void loadSprints(); }}
       />
     </div>
   );

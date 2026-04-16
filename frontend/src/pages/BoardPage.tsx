@@ -557,7 +557,7 @@ export default function BoardPage() {
       <Modal
         title="New Issue"
         open={createOpen}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={() => { setCreateOpen(false); void load(); }}
         onOk={() => form.submit()}
         okText="Create"
         confirmLoading={createLoading}
@@ -635,7 +635,7 @@ export default function BoardPage() {
           transitionName={pendingTransition.transition.name}
           screenFields={pendingTransition.transition.screenFields}
           onSuccess={() => { setPendingTransition(null); load(); }}
-          onCancel={() => setPendingTransition(null)}
+          onCancel={() => { setPendingTransition(null); void load(); }}
         />
       )}
     </div>

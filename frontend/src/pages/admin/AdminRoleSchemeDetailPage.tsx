@@ -275,7 +275,7 @@ export default function AdminRoleSchemeDetailPage() {
       <Modal
         title={editingRole ? 'Редактировать роль' : 'Новая роль'}
         open={roleModalOpen}
-        onCancel={() => setRoleModalOpen(false)}
+        onCancel={() => { setRoleModalOpen(false); void load(); }}
         onOk={() => roleForm.submit()}
         okText="Сохранить"
         cancelText="Отмена"
@@ -311,7 +311,7 @@ export default function AdminRoleSchemeDetailPage() {
         schemeId={scheme.id}
         role={matrixRole}
         open={matrixOpen}
-        onClose={() => setMatrixOpen(false)}
+        onClose={() => { setMatrixOpen(false); void load(); }}
         onSaved={load}
       />
     </div>

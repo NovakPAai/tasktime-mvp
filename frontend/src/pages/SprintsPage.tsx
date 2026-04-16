@@ -745,14 +745,14 @@ export default function SprintsPage() {
       <SprintIssuesDrawer
         open={detailsOpen}
         sprintId={selectedSprintId}
-        onClose={() => setDetailsOpen(false)}
+        onClose={() => { setDetailsOpen(false); void load(); }}
       />
 
       {/* ── Backlog modal ────────────────────────────────────────────────────── */}
       <Modal
         title="Добавить задачи из беклога"
         open={backlogOpen}
-        onCancel={() => { setBacklogOpen(false); setSelectedBacklog([]); setBacklogPage(1); }}
+        onCancel={() => { setBacklogOpen(false); setSelectedBacklog([]); setBacklogPage(1); void load(); }}
         onOk={() => void handleMoveToSprint()}
         okText={`Добавить в спринт${selectedBacklog.length ? ` (${selectedBacklog.length})` : ''}`}
         okButtonProps={{ disabled: selectedBacklog.length === 0 }}
@@ -881,7 +881,7 @@ export default function SprintsPage() {
       <Modal
         title="Новый спринт"
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); form.resetFields(); }}
+        onCancel={() => { setModalOpen(false); form.resetFields(); void load(); }}
         onOk={() => form.submit()}
         okText="Создать"
         cancelText="Отмена"
@@ -917,7 +917,7 @@ export default function SprintsPage() {
       <Modal
         title="Редактировать спринт"
         open={editOpen}
-        onCancel={() => { setEditOpen(false); editForm.resetFields(); }}
+        onCancel={() => { setEditOpen(false); editForm.resetFields(); void load(); }}
         onOk={() => editForm.submit()}
         okText="Сохранить"
         cancelText="Отмена"

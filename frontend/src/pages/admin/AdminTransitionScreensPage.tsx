@@ -111,7 +111,7 @@ export default function AdminTransitionScreensPage() {
       <Modal
         title={editing ? 'Редактировать экран' : 'Новый экран'}
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); void load(); }}
         onOk={() => form.submit()}
         okText="Сохранить"
         cancelText="Отмена"
