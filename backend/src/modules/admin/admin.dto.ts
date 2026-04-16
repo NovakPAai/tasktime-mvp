@@ -14,7 +14,8 @@ export const updateUserAdminDto = z.object({
 
 export const assignProjectRoleDto = z.object({
   projectId: z.string().uuid(),
-  role: z.enum(['ADMIN', 'MANAGER', 'USER', 'VIEWER']),
+  roleId: z.string().uuid(),                                              // FK на ProjectRoleDefinition
+  role: z.enum(['ADMIN', 'MANAGER', 'USER', 'VIEWER']).optional(),       // обратная совместимость
 });
 
 export const updateSystemSettingsDto = z.object({

@@ -738,7 +738,7 @@ export default router;
 
 ---
 
-### ЗАДАЧА 4 — Backend: зарегистрировать роутер в `app.ts`
+### ЗАДАЧА 4 ✅ — Backend: зарегистрировать роутер в `app.ts`
 
 **Файл:** `backend/src/app.ts`
 
@@ -768,7 +768,7 @@ app.get('/api/projects/:projectId/role-scheme', authenticate, async (req, res, n
 
 ---
 
-### ЗАДАЧА 5 — Backend: обновить `rbac.ts` — добавить `requireProjectPermission`
+### ЗАДАЧА 5 ✅ — Backend: обновить `rbac.ts` — добавить `requireProjectPermission`
 
 **Файл:** `backend/src/shared/middleware/rbac.ts`
 
@@ -832,7 +832,7 @@ export function requireProjectPermission(
 
 ---
 
-### ЗАДАЧА 6 — Backend: обновить `admin.dto.ts`
+### ЗАДАЧА 6 ✅ — Backend: обновить `admin.dto.ts`
 
 **Файл:** `backend/src/modules/admin/admin.dto.ts`
 

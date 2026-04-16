@@ -363,13 +363,28 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   if (!user) throw new AppError(404, 'User not found');
   if (!project) throw new AppError(404, 'Project not found');
 
+  // Determine legacy role enum value: from roleId lookup or direct dto.role
+  let legacyRole = dto.role as 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER' | undefined;
+  if (!legacyRole && dto.roleId) {
+    const roleDef = await prisma.projectRoleDefinition.findUnique({ where: { id: dto.roleId }, select: { key: true } });
+    if (roleDef && ['ADMIN', 'MANAGER', 'USER', 'VIEWER'].includes(roleDef.key)) {
+      legacyRole = roleDef.key as 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
+    }
+  }
+  if (!legacyRole) throw new AppError(400, 'role or roleId is required');
+
   const existing = await prisma.userProjectRole.findFirst({
-    where: { userId, projectId: dto.projectId, role: dto.role },
+    where: { userId, projectId: dto.projectId, role: legacyRole },
   });
   if (existing) throw new AppError(409, 'Role already assigned');
 
   const roleEntry = await prisma.userProjectRole.create({
-    data: { userId, projectId: dto.projectId, role: dto.role },
+    data: {
+      userId,
+      projectId: dto.projectId,
+      role: legacyRole,
+      ...(dto.roleId ? { roleId: dto.roleId } : {}),
+    },
     include: { project: { select: { id: true, name: true, key: true } } },
   });
 
@@ -379,7 +394,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
       entityType: 'user',
       entityId: userId,
       userId: actorId,
-      details: { projectId: dto.projectId, role: dto.role },
+      details: { projectId: dto.projectId, role: legacyRole, roleId: dto.roleId },
     },
   });
 

@@ -38,7 +38,9 @@ import transitionScreensRouter from './modules/transition-screens/transition-scr
 import workflowEngineRouter from './modules/workflow-engine/workflow-engine.router.js';
 import releaseStatusesRouter from './modules/releases/release-statuses.router.js';
 import releaseWorkflowsAdminRouter from './modules/releases/release-workflows-admin.router.js';
+import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
 import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
+import { getSchemeForProject as getRoleSchemeForProject } from './modules/project-role-schemes/project-role-schemes.service.js';
 import { authenticate } from './shared/middleware/auth.js';
 import { requireRole } from './shared/middleware/rbac.js';
 
@@ -134,12 +136,22 @@ export function createApp() {
   app.use('/api/admin/transition-screens', transitionScreensRouter);
   app.use('/api/admin/release-statuses', releaseStatusesRouter);
   app.use('/api/admin/release-workflows', releaseWorkflowsAdminRouter);
+  app.use('/api/admin/role-schemes', roleSchemesRouter);
   app.use('/api', workflowEngineRouter);
 
   // Public: project workflow scheme
   app.get('/api/projects/:projectId/workflow-scheme', authenticate, async (req, res, next) => {
     try {
       res.json(await getSchemeForProject(req.params.projectId as string));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Public: project role scheme
+  app.get('/api/projects/:projectId/role-scheme', authenticate, async (req, res, next) => {
+    try {
+      res.json(await getRoleSchemeForProject(req.params.projectId as string));
     } catch (err) {
       next(err);
     }
