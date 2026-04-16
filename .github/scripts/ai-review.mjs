@@ -67,10 +67,11 @@ async function githubFetch(path, options = {}) {
   if (!res.ok) {
     throw new Error(`GitHub ${path}: ${res.status} ${body.slice(0, 500)}`);
   }
+  if (!body || res.status === 204) return null;
   try {
     return JSON.parse(body);
   } catch (e) {
-    throw new Error(`GitHub ${path}: non-JSON response: ${e.message} — body: ${body.slice(0, 500)}`);
+    throw new Error(`GitHub ${path}: non-JSON response: ${e.message} — body: ${body.slice(0, 200)}`);
   }
 }
 
