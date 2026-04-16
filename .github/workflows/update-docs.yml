@@ -155,6 +155,8 @@ jobs:
               '',
               '> Авто-генерируемые секции обновятся сами после мёрджа:',
               '> API reference · Data model · Backend modules · Frontend routes · Feature flags · Env vars · Stores · Makefile · Docker',
+              '>',
+              '> Подробнее: [docs/guides/doc-workflow.md](../blob/main/docs/guides/doc-workflow.md)',
             ].join('\n');
 
             await github.rest.issues.createComment({

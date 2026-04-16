@@ -173,7 +173,7 @@ ${diff}
   try {
     data = JSON.parse(rawBody);
   } catch (e) {
-    console.error(`Raw OpenAI response body:\n${rawBody}`);
+    console.error(`Raw OpenAI response body (first 500 chars):\n${rawBody.slice(0, 500)}`);
     throw new Error(`OpenAI returned non-JSON body: ${e.message}`);
   }
 
