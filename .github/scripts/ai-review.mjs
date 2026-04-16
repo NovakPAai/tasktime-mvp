@@ -170,7 +170,7 @@ ${diff}
   const rawBody = await res.text();
 
   if (!res.ok) {
-    throw new Error(`OpenAI error: ${res.status} ${rawBody}`);
+    throw new Error(`OpenAI error: ${res.status} ${rawBody.slice(0, 200)}`);
   }
 
   let data;
