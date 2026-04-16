@@ -95,6 +95,135 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     process.env.BOOTSTRAP_OWNER_ADMIN_EMAIL,
   );
 
+  // ===== DEFAULT PROJECT ROLE SCHEME =====
+  const defaultRoleScheme = await client.projectRoleScheme.upsert({
+    where: { id: 'default-role-scheme-0000-000000000000' },
+    update: {},
+    create: {
+      id: 'default-role-scheme-0000-000000000000',
+      name: 'Default',
+      description: 'Схема доступа по умолчанию',
+      isDefault: true,
+    },
+  });
+
+  const DEFAULT_ROLE_MATRIX: Record<string, { key: string; name: string; color: string; permissions: string[] }> = {
+    ADMIN: {
+      key: 'ADMIN', name: 'Администратор', color: '#fa8c16',
+      permissions: [
+        'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT', 'ISSUES_DELETE',
+        'ISSUES_ASSIGN', 'ISSUES_CHANGE_STATUS', 'ISSUES_CHANGE_TYPE',
+        'SPRINTS_VIEW', 'SPRINTS_MANAGE',
+        'RELEASES_VIEW', 'RELEASES_MANAGE',
+        'MEMBERS_VIEW', 'MEMBERS_MANAGE',
+        'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE', 'TIME_LOGS_MANAGE',
+        'COMMENTS_VIEW', 'COMMENTS_CREATE', 'COMMENTS_MANAGE',
+        'PROJECT_SETTINGS_VIEW', 'PROJECT_SETTINGS_EDIT',
+        'BOARDS_VIEW', 'BOARDS_MANAGE',
+      ],
+    },
+    MANAGER: {
+      key: 'MANAGER', name: 'Менеджер', color: '#1677ff',
+      permissions: [
+        'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT', 'ISSUES_DELETE',
+        'ISSUES_ASSIGN', 'ISSUES_CHANGE_STATUS', 'ISSUES_CHANGE_TYPE',
+        'SPRINTS_VIEW', 'SPRINTS_MANAGE',
+        'RELEASES_VIEW', 'RELEASES_MANAGE',
+        'MEMBERS_VIEW', 'MEMBERS_MANAGE',
+        'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE', 'TIME_LOGS_MANAGE',
+        'COMMENTS_VIEW', 'COMMENTS_CREATE', 'COMMENTS_MANAGE',
+        'PROJECT_SETTINGS_VIEW',
+        'BOARDS_VIEW', 'BOARDS_MANAGE',
+      ],
+    },
+    USER: {
+      key: 'USER', name: 'Участник', color: '#52c41a',
+      permissions: [
+        'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT',
+        'ISSUES_CHANGE_STATUS',
+        'SPRINTS_VIEW',
+        'RELEASES_VIEW',
+        'MEMBERS_VIEW',
+        'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE',
+        'COMMENTS_VIEW', 'COMMENTS_CREATE',
+        'PROJECT_SETTINGS_VIEW',
+        'BOARDS_VIEW',
+      ],
+    },
+    VIEWER: {
+      key: 'VIEWER', name: 'Наблюдатель', color: '#d9d9d9',
+      permissions: [
+        'ISSUES_VIEW',
+        'SPRINTS_VIEW',
+        'RELEASES_VIEW',
+        'MEMBERS_VIEW',
+        'TIME_LOGS_VIEW',
+        'COMMENTS_VIEW',
+        'PROJECT_SETTINGS_VIEW',
+        'BOARDS_VIEW',
+      ],
+    },
+  };
+
+  const ALL_PERMISSIONS = [
+    'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT', 'ISSUES_DELETE',
+    'ISSUES_ASSIGN', 'ISSUES_CHANGE_STATUS', 'ISSUES_CHANGE_TYPE',
+    'SPRINTS_VIEW', 'SPRINTS_MANAGE',
+    'RELEASES_VIEW', 'RELEASES_MANAGE',
+    'MEMBERS_VIEW', 'MEMBERS_MANAGE',
+    'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE', 'TIME_LOGS_MANAGE',
+    'COMMENTS_VIEW', 'COMMENTS_CREATE', 'COMMENTS_MANAGE',
+    'PROJECT_SETTINGS_VIEW', 'PROJECT_SETTINGS_EDIT',
+    'BOARDS_VIEW', 'BOARDS_MANAGE',
+  ] as const;
+
+  for (const [, roleDef] of Object.entries(DEFAULT_ROLE_MATRIX)) {
+    const role = await client.projectRoleDefinition.upsert({
+      where: { schemeId_key: { schemeId: defaultRoleScheme.id, key: roleDef.key } },
+      update: { name: roleDef.name, color: roleDef.color },
+      create: {
+        schemeId: defaultRoleScheme.id,
+        name: roleDef.name,
+        key: roleDef.key,
+        color: roleDef.color,
+        isSystem: true,
+      },
+    });
+    for (const perm of ALL_PERMISSIONS) {
+      await client.projectRolePermission.upsert({
+        where: { roleId_permission: { roleId: role.id, permission: perm as any } },
+        update: { granted: roleDef.permissions.includes(perm) },
+        create: {
+          roleId: role.id,
+          permission: perm as any,
+          granted: roleDef.permissions.includes(perm),
+        },
+      });
+    }
+  }
+  console.log('Default project role scheme seeded.');
+
+  // Backfill UserProjectRole.roleId
+  const schemeRoles = await client.projectRoleDefinition.findMany({
+    where: { schemeId: defaultRoleScheme.id },
+    select: { id: true, key: true },
+  });
+  const roleKeyToId = Object.fromEntries(schemeRoles.map(r => [r.key, r.id]));
+  const userProjectRoles = await client.userProjectRole.findMany({
+    where: { roleId: null },
+  });
+  for (const upr of userProjectRoles) {
+    const roleId = roleKeyToId[upr.role as string];
+    if (roleId) {
+      await client.userProjectRole.update({
+        where: { id: upr.id },
+        data: { roleId },
+      });
+    }
+  }
+  console.log(`Backfilled ${userProjectRoles.length} UserProjectRole records.`);
+  // ===== END DEFAULT PROJECT ROLE SCHEME =====
+
   // Create projects (DEMO/BACK/LIVE only when not TTMP_ONLY)
   let project: { id: string; key: string } | null = null;
   let backendProject: { id: string; key: string } | null = null;

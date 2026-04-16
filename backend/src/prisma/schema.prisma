@@ -86,10 +86,12 @@ model UserProjectRole {
   userId    String      @map("user_id")
   projectId String      @map("project_id")
   role      ProjectRole
+  roleId    String?     @map("role_id")         // nullable на фазе 1
   createdAt DateTime    @default(now()) @map("created_at")
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  roleDefinition ProjectRoleDefinition? @relation(fields: [roleId], references: [id])
 
   @@unique([userId, projectId, role])
   @@index([userId])
@@ -130,6 +132,7 @@ model Project {
   userRoles           UserProjectRole[]
   fieldSchemaBindings FieldSchemaBinding[]
   workflowScheme      WorkflowSchemeProject?
+  roleScheme          ProjectRoleSchemeProject?
 
   @@map("projects")
 }
@@ -934,4 +937,92 @@ model WorkflowSchemeProject {
 
   @@index([schemeId])
   @@map("workflow_scheme_projects")
+}
+
+// ===== PROJECT ROLE SCHEMES =====
+
+enum ProjectPermission {
+  ISSUES_VIEW
+  ISSUES_CREATE
+  ISSUES_EDIT
+  ISSUES_DELETE
+  ISSUES_ASSIGN
+  ISSUES_CHANGE_STATUS
+  ISSUES_CHANGE_TYPE
+  SPRINTS_VIEW
+  SPRINTS_MANAGE
+  RELEASES_VIEW
+  RELEASES_MANAGE
+  MEMBERS_VIEW
+  MEMBERS_MANAGE
+  TIME_LOGS_VIEW
+  TIME_LOGS_CREATE
+  TIME_LOGS_MANAGE
+  COMMENTS_VIEW
+  COMMENTS_CREATE
+  COMMENTS_MANAGE
+  PROJECT_SETTINGS_VIEW
+  PROJECT_SETTINGS_EDIT
+  BOARDS_VIEW
+  BOARDS_MANAGE
+}
+
+model ProjectRoleScheme {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  roles    ProjectRoleDefinition[]
+  projects ProjectRoleSchemeProject[]
+
+  @@map("project_role_schemes")
+}
+
+model ProjectRoleDefinition {
+  id          String   @id @default(uuid())
+  schemeId    String   @map("scheme_id")
+  name        String
+  key         String
+  description String?
+  color       String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  scheme           ProjectRoleScheme       @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  permissions      ProjectRolePermission[]
+  userProjectRoles UserProjectRole[]
+
+  @@unique([schemeId, key])
+  @@index([schemeId])
+  @@map("project_role_definitions")
+}
+
+model ProjectRolePermission {
+  id         String            @id @default(uuid())
+  roleId     String            @map("role_id")
+  permission ProjectPermission
+  granted    Boolean           @default(false)
+
+  role ProjectRoleDefinition @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@index([roleId])
+  @@map("project_role_permissions")
+}
+
+model ProjectRoleSchemeProject {
+  id        String   @id @default(uuid())
+  schemeId  String   @map("scheme_id")
+  projectId String   @unique @map("project_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scheme  ProjectRoleScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([schemeId])
+  @@map("project_role_scheme_projects")
 }
