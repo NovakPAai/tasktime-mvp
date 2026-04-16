@@ -13,6 +13,7 @@ export async function getAgentUserId(): Promise<string> {
 }
 
 const ISSUE_KEY_RE = /^([A-Z]{2,10})-(\d+)$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type ResolvedIssue = {
   id: string;
@@ -25,7 +26,19 @@ export type ResolvedIssue = {
 };
 
 export async function resolveKey(key: string): Promise<ResolvedIssue> {
-  const m = key.trim().toUpperCase().match(ISSUE_KEY_RE);
+  const trimmed = key.trim();
+
+  if (UUID_RE.test(trimmed)) {
+    const issue = await prisma.issue.findUnique({
+      where: { id: trimmed },
+      select: { id: true, title: true, status: true, projectId: true, number: true, project: { select: { key: true } } },
+    });
+    if (!issue) throw new Error(`Issue ${trimmed} not found`);
+    const projectKey = issue.project.key;
+    return { id: issue.id, key: `${projectKey}-${issue.number}`, projectKey, projectId: issue.projectId, title: issue.title, status: issue.status as string, number: issue.number };
+  }
+
+  const m = trimmed.toUpperCase().match(ISSUE_KEY_RE);
   if (!m) throw new Error(`Invalid issue key: ${key}`);
   const projectKey = m[1];
   const number = parseInt(m[2], 10);
@@ -39,7 +52,7 @@ export async function resolveKey(key: string): Promise<ResolvedIssue> {
   });
   if (!issue) throw new Error(`Issue ${key} not found`);
 
-  return { ...issue, key: key.toUpperCase(), projectKey, status: issue.status as string };
+  return { ...issue, key: trimmed.toUpperCase(), projectKey, status: issue.status as string };
 }
 
 export function text(content: string) {
