@@ -148,6 +148,27 @@ export async function updateIssue(
   return res.json() as Promise<E2EIssue>;
 }
 
+/** Transition issue to a status by category (e.g. 'IN_PROGRESS') via workflow engine */
+export async function transitionIssueToCategory(
+  request: APIRequestContext,
+  token: string,
+  issueId: string,
+  targetCategory: string,
+): Promise<void> {
+  const transRes = await request.get(apiUrl(`/issues/${issueId}/transitions`), {
+    headers: headers(token),
+  });
+  if (!transRes.ok()) throw new Error(`getTransitions failed: ${transRes.status()}`);
+  const data = await transRes.json() as { transitions: Array<{ id: string; toStatus: { category: string } }> };
+  const transition = data.transitions.find(t => t.toStatus.category === targetCategory);
+  if (!transition) throw new Error(`No transition to category ${targetCategory} found`);
+  const execRes = await request.post(apiUrl(`/issues/${issueId}/transitions`), {
+    headers: headers(token),
+    data: { transitionId: transition.id },
+  });
+  if (!execRes.ok()) throw new Error(`executeTransition failed: ${execRes.status()} — ${await execRes.text()}`);
+}
+
 export async function updateBoardStatus(
   request: APIRequestContext,
   token: string,
