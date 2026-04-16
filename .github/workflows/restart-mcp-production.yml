@@ -57,6 +57,8 @@ jobs:
             -p 3002:3002 \
             -e MCP_TRANSPORT=http \
             -e MCP_HTTP_PORT=3002 \
+            -e MCP_ENV=production \
+            -e NODE_ENV=production \
             -e DATABASE_URL="$DB_URL" \
             -e MCP_SERVICE_TOKEN="$SVC_TOKEN" \
             -e BACKEND_INTERNAL_URL="$BACKEND_URL" \
