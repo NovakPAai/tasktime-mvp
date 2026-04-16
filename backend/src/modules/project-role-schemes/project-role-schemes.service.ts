@@ -1,7 +1,7 @@
 import type { ProjectPermission } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
+import { getCachedJson, setCachedJson, delCachedJson, delCacheByPrefix } from '../../shared/redis.js';
 import type {
   CreateSchemeDto,
   UpdateSchemeDto,
@@ -20,6 +20,16 @@ async function invalidateSchemeCache(schemeId: string) {
     select: { projectId: true },
   });
   await Promise.all(bindings.map(b => delCachedJson(PROJECT_SCHEME_KEY(b.projectId))));
+}
+
+/** Invalidate per-user permission cache for all projects bound to a scheme.
+ * Call after any change that affects permission resolution (permissions matrix, role membership). */
+async function invalidatePermissionCacheForScheme(schemeId: string) {
+  const bindings = await prisma.projectRoleSchemeProject.findMany({
+    where: { schemeId },
+    select: { projectId: true },
+  });
+  await Promise.all(bindings.map(b => delCacheByPrefix(`rbac:perm:${b.projectId}:`)));
 }
 
 const schemeInclude = {
@@ -209,6 +219,7 @@ export async function updatePermissions(schemeId: string, roleId: string, dto: U
   );
   await prisma.$transaction(ops);
   await invalidateSchemeCache(schemeId);
+  await invalidatePermissionCacheForScheme(schemeId);
   return prisma.projectRoleDefinition.findUnique({
     where: { id: roleId },
     include: { permissions: true },

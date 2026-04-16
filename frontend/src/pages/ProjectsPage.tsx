@@ -470,7 +470,7 @@ export default function ProjectsPage() {
       <Modal
         title="New Project"
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); form.resetFields(); void fetchProjects(); }}
+        onCancel={() => { setModalOpen(false); form.resetFields(); void fetchAll(); }}
         onOk={() => form.submit()}
         okText="Create"
       >

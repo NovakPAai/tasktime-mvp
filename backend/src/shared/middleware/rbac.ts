@@ -59,12 +59,15 @@ export function requireProjectPermission(
       const scheme = await getSchemeForProject(projectId);
       const userRole = await prisma.userProjectRole.findFirst({
         where: { userId: req.user.userId, projectId },
-        select: { roleId: true },
+        select: { roleId: true, role: true },
       });
 
       let granted = false;
-      if (userRole?.roleId) {
-        const roleDef = scheme.roles.find(r => r.id === userRole.roleId);
+      if (userRole) {
+        // Prefer roleId; fall back to legacy `role` enum (key-based lookup) for pre-backfill rows.
+        const roleDef = userRole.roleId
+          ? scheme.roles.find(r => r.id === userRole.roleId)
+          : scheme.roles.find(r => r.key === userRole.role);
         granted = roleDef?.permissions.find(p => p.permission === permission)?.granted ?? false;
       }
 
