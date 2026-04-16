@@ -63,11 +63,15 @@ async function githubFetch(path, options = {}) {
       ...options.headers,
     },
   });
+  const body = await res.text();
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`GitHub ${path}: ${res.status} ${text}`);
+    throw new Error(`GitHub ${path}: ${res.status} ${body.slice(0, 500)}`);
   }
-  return res.json();
+  try {
+    return JSON.parse(body);
+  } catch (e) {
+    throw new Error(`GitHub ${path}: non-JSON response: ${e.message} — body: ${body.slice(0, 500)}`);
+  }
 }
 
 async function fetchPRDiff() {
