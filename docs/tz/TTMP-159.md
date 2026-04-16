@@ -852,7 +852,7 @@ export const assignProjectRoleDto = z.object({
 
 ---
 
-### ЗАДАЧА 7 — Frontend: создать `src/api/role-schemes.ts`
+### ЗАДАЧА 7 ✅ — Frontend: создать `src/api/role-schemes.ts`
 
 **Файл:** `frontend/src/api/role-schemes.ts`
 
@@ -942,7 +942,7 @@ export const roleSchemesApi = {
 
 ---
 
-### ЗАДАЧА 8 — Frontend: создать `PermissionMatrixDrawer.tsx`
+### ЗАДАЧА 8 ✅ — Frontend: создать `PermissionMatrixDrawer.tsx`
 
 **Файл:** `frontend/src/components/admin/PermissionMatrixDrawer.tsx`
 
