@@ -93,9 +93,12 @@ model UserProjectRole {
   user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // Composite FK guarantees roleId belongs to schemeId at the DB level.
-  // A CHECK constraint (`(role_id IS NULL) = (scheme_id IS NULL)`) is added in the migration above
-  // and cannot be expressed declaratively in Prisma schema.
-  roleDefinition ProjectRoleDefinition? @relation(fields: [roleId, schemeId], references: [id, schemeId], onDelete: SetNull)
+  // onDelete: Restrict — never orphan UserProjectRole rows by a cascading delete. Service
+  // deleteRole already enforces this at application level (usageCount check); Restrict makes
+  // the invariant a DB guarantee, so raw SQL / scripts cannot break it either.
+  // A CHECK constraint (`(role_id IS NULL) = (scheme_id IS NULL)`) is added in the migration
+  // 20260417000000_user_project_role_scheme_fk and cannot be expressed declaratively in Prisma.
+  roleDefinition ProjectRoleDefinition? @relation(fields: [roleId, schemeId], references: [id, schemeId], onDelete: Restrict)
 
   @@unique([userId, projectId]) // one role per user per project — switch from (userId, projectId, role) in migration 20260418000000_user_project_role_single
   @@index([userId])
