@@ -40,6 +40,7 @@ import AdminRoleSchemesPage from './pages/admin/AdminRoleSchemesPage';
 import AdminRoleSchemeDetailPage from './pages/admin/AdminRoleSchemeDetailPage';
 import AdminGroupsPage from './pages/admin/AdminGroupsPage';
 import AdminGroupDetailPage from './pages/admin/AdminGroupDetailPage';
+import AdminGate from './components/auth/AdminGate';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
 import AdminReleaseWorkflowsPage from './pages/admin/AdminReleaseWorkflowsPage';
@@ -201,8 +202,8 @@ export default function App() {
             <Route path="admin/workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
             <Route path="admin/role-schemes" element={<AdminRoleSchemesPage />} />
             <Route path="admin/role-schemes/:id" element={<AdminRoleSchemeDetailPage />} />
-            <Route path="admin/user-groups" element={<AdminGroupsPage />} />
-            <Route path="admin/user-groups/:id" element={<AdminGroupDetailPage />} />
+            <Route path="admin/user-groups" element={<AdminGate><AdminGroupsPage /></AdminGate>} />
+            <Route path="admin/user-groups/:id" element={<AdminGate><AdminGroupDetailPage /></AdminGate>} />
             <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
             <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
             <Route path="admin/release-workflows" element={<AdminReleaseWorkflowsPage />} />

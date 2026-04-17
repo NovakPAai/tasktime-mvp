@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Input, Space, Tag, message,
-  Popconfirm, Tabs, Select, Tooltip,
+  Popconfirm, Tabs, Select, Tooltip, Result,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
@@ -30,6 +30,7 @@ export default function AdminGroupDetailPage() {
 
   const [group, setGroup] = useState<UserGroupDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Edit header
   const [editOpen, setEditOpen] = useState(false);
@@ -57,11 +58,19 @@ export default function AdminGroupDetailPage() {
     // modals. Failing to load the reference lists should NOT hide the group page. Use
     // allSettled to keep partial degradation: group fails → fall back to error state; ref
     // lists fail → the page still renders, only the relevant modal shows an error on open.
+    setLoadError(null);
     try {
       const g = await userGroupsApi.get(id);
       setGroup(g);
-    } catch {
-      message.error('Не удалось загрузить группу');
+    } catch (e: unknown) {
+      // AI review #66 round 6 🟡 — keep error state separate from loading so the UI can show
+      // a real "group not available" screen instead of an eternal «Загрузка...».
+      const err = e as { response?: { status?: number; data?: { error?: string } } };
+      const msg = err?.response?.status === 404
+        ? 'Группа не найдена'
+        : err?.response?.data?.error ?? 'Не удалось загрузить группу';
+      message.error(msg);
+      setLoadError(msg);
       setLoading(false);
       return;
     }
@@ -234,8 +243,23 @@ export default function AdminGroupDetailPage() {
     }
   };
 
-  if (loading || !group) {
+  if (loading) {
     return <div className="tt-page"><div>Загрузка...</div></div>;
+  }
+  if (loadError || !group) {
+    return (
+      <div className="tt-page">
+        <Result
+          status="warning"
+          title={loadError ?? 'Группа недоступна'}
+          extra={
+            <Button type="primary" onClick={() => navigate('/admin/user-groups')}>
+              К списку групп
+            </Button>
+          }
+        />
+      </div>
+    );
   }
 
   return (
