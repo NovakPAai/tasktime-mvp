@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import { useAuthStore } from './store/auth.store';
 import { useThemeStore } from './store/theme.store';
@@ -183,47 +183,40 @@ export default function App() {
             <Route path="teams" element={<TeamsPage />} />
             <Route path="uat" element={<UatTestsPage />} />
             {/*
-              TTSEC-2 TODO — admin route protection migration.
-
-              Only /admin/user-groups/* routes are currently wrapped in <AdminGate>.
-              The remaining admin/* routes (dashboard, users, roles, role-schemes, projects,
-              categories, issue-type-configs, workflows, release-*, system, etc.) rely solely
-              on backend 403 — an unauthorised user can briefly see admin UI before the first
-              API call fails. Two ways forward:
-                (a) add <AdminGate> to each remaining element inline — trivial but 20+ edits,
-                (b) introduce a parent <Route element={<AdminGate><Outlet /></AdminGate>}> nested
-                    segment wrapping the whole admin/* group — one change, invariant for future
-                    admin pages. Preferred for a dedicated cleanup PR.
-              Tracking here as a visible anchor — see also components/auth/AdminGate.tsx.
+              TTSEC-2 round 15: every /admin/* route now passes through a single <AdminGate>
+              parent — unauthorised users get redirected before any admin page renders, and new
+              admin routes can be added to this nested segment without remembering to wrap them.
             */}
-            <Route path="admin" element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="admin/dashboard" element={<AdminDashboardPage />} />
-            <Route path="admin/monitoring" element={<AdminMonitoringPage />} />
-            <Route path="admin/projects" element={<AdminProjectsPage />} />
-            <Route path="admin/categories" element={<AdminCategoriesPage />} />
-            <Route path="admin/link-types" element={<AdminLinkTypesPage />} />
-            <Route path="admin/issue-type-configs" element={<AdminIssueTypeConfigsPage />} />
-            <Route path="admin/issue-type-schemes" element={<AdminIssueTypeSchemesPage />} />
-            <Route path="admin/users" element={<AdminUsersPage />} />
-            <Route path="admin/roles" element={<AdminRolesPage />} />
-            <Route path="admin/custom-fields" element={<AdminCustomFieldsPage />} />
-            <Route path="admin/field-schemas" element={<AdminFieldSchemasPage />} />
-            <Route path="admin/field-schemas/:id" element={<AdminFieldSchemaDetailPage />} />
-            <Route path="admin/workflow-statuses" element={<AdminWorkflowStatusesPage />} />
-            <Route path="admin/workflows" element={<AdminWorkflowsPage />} />
-            <Route path="admin/workflows/:id" element={<AdminWorkflowEditorPage />} />
-            <Route path="admin/workflow-schemes" element={<AdminWorkflowSchemesPage />} />
-            <Route path="admin/workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
-            <Route path="admin/role-schemes" element={<AdminRoleSchemesPage />} />
-            <Route path="admin/role-schemes/:id" element={<AdminRoleSchemeDetailPage />} />
-            <Route path="admin/user-groups" element={<AdminGate><AdminGroupsPage /></AdminGate>} />
-            <Route path="admin/user-groups/:id" element={<AdminGate><AdminGroupDetailPage /></AdminGate>} />
-            <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
-            <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
-            <Route path="admin/release-workflows" element={<AdminReleaseWorkflowsPage />} />
-            <Route path="admin/release-workflows/:id" element={<AdminReleaseWorkflowEditorPage />} />
-            <Route path="admin/release-statuses" element={<AdminReleaseStatusesPage />} />
-            <Route path="admin/system" element={<AdminSystemPage />} />
+            <Route path="admin" element={<AdminGate><Outlet /></AdminGate>}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="monitoring" element={<AdminMonitoringPage />} />
+              <Route path="projects" element={<AdminProjectsPage />} />
+              <Route path="categories" element={<AdminCategoriesPage />} />
+              <Route path="link-types" element={<AdminLinkTypesPage />} />
+              <Route path="issue-type-configs" element={<AdminIssueTypeConfigsPage />} />
+              <Route path="issue-type-schemes" element={<AdminIssueTypeSchemesPage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="roles" element={<AdminRolesPage />} />
+              <Route path="custom-fields" element={<AdminCustomFieldsPage />} />
+              <Route path="field-schemas" element={<AdminFieldSchemasPage />} />
+              <Route path="field-schemas/:id" element={<AdminFieldSchemaDetailPage />} />
+              <Route path="workflow-statuses" element={<AdminWorkflowStatusesPage />} />
+              <Route path="workflows" element={<AdminWorkflowsPage />} />
+              <Route path="workflows/:id" element={<AdminWorkflowEditorPage />} />
+              <Route path="workflow-schemes" element={<AdminWorkflowSchemesPage />} />
+              <Route path="workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
+              <Route path="role-schemes" element={<AdminRoleSchemesPage />} />
+              <Route path="role-schemes/:id" element={<AdminRoleSchemeDetailPage />} />
+              <Route path="user-groups" element={<AdminGroupsPage />} />
+              <Route path="user-groups/:id" element={<AdminGroupDetailPage />} />
+              <Route path="transition-screens" element={<AdminTransitionScreensPage />} />
+              <Route path="transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
+              <Route path="release-workflows" element={<AdminReleaseWorkflowsPage />} />
+              <Route path="release-workflows/:id" element={<AdminReleaseWorkflowEditorPage />} />
+              <Route path="release-statuses" element={<AdminReleaseStatusesPage />} />
+              <Route path="system" element={<AdminSystemPage />} />
+            </Route>
             <Route path="settings" element={<SettingsPage />} />
             <Route path="pipeline" element={<PipelineDashboardPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
