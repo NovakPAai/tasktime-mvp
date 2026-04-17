@@ -53,20 +53,34 @@ export default function AdminGroupDetailPage() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+    // AI review #66 round 3 🟠 — group is critical; projects/users are reference lists for
+    // modals. Failing to load the reference lists should NOT hide the group page. Use
+    // allSettled to keep partial degradation: group fails → fall back to error state; ref
+    // lists fail → the page still renders, only the relevant modal shows an error on open.
     try {
-      const [g, projects, usersResp] = await Promise.all([
-        userGroupsApi.get(id),
-        listProjects(),
-        adminApi.listUsers({ isActive: true, pageSize: 500 }),
-      ]);
+      const g = await userGroupsApi.get(id);
       setGroup(g);
-      setAllProjects(projects);
-      setAllUsers(usersResp.users);
     } catch {
       message.error('Не удалось загрузить группу');
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const [projectsResult, usersResult] = await Promise.allSettled([
+      listProjects(),
+      adminApi.listUsers({ isActive: true, pageSize: 500 }),
+    ]);
+    if (projectsResult.status === 'fulfilled') {
+      setAllProjects(projectsResult.value);
+    } else {
+      message.warning('Не удалось загрузить список проектов');
+    }
+    if (usersResult.status === 'fulfilled') {
+      setAllUsers(usersResult.value.users);
+    } else {
+      message.warning('Не удалось загрузить список пользователей');
+    }
+    setLoading(false);
   }, [id]);
 
   useEffect(() => { load(); }, [load]);

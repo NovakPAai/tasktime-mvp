@@ -75,12 +75,25 @@ export default function AdminGroupsPage() {
   };
 
   const openDelete = async (g: UserGroupListItem) => {
+    // Race guard (AI review #66 round 3 🟠) — if the admin quickly switches between groups,
+    // a slower in-flight response must NOT overwrite the impact for the currently-open group.
+    // We re-read `impactFor` inside the settled handlers and apply only when it's still `g`.
     setImpactFor(g);
+    setImpact(null); // clear whatever was there for the previous group while the new one loads
     try {
-      setImpact(await userGroupsApi.getImpact(g.id));
+      const result = await userGroupsApi.getImpact(g.id);
+      setImpactFor(current => {
+        if (current?.id === g.id) setImpact(result);
+        return current;
+      });
     } catch {
-      message.error('Не удалось получить impact группы');
-      setImpactFor(null);
+      setImpactFor(current => {
+        if (current?.id === g.id) {
+          message.error('Не удалось получить impact группы');
+          return null;
+        }
+        return current;
+      });
     }
   };
 
