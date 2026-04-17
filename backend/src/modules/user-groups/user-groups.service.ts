@@ -87,7 +87,13 @@ export async function updateGroup(id: string, dto: UpdateUserGroupDto) {
 /**
  * Delete a group. Returns affected user-project pairs so the caller can audit exactly which
  * permissions were revoked. The DB cascades UserGroupMember/ProjectGroupRole via FK ON DELETE CASCADE.
- * We invalidate caches per-user before the delete so stale positive-permission reads don't linger.
+ *
+ * Cache invalidation order: we invalidate AFTER the delete so the DB row (source of truth) is
+ * gone before we drop the cache. Any concurrent request reading between delete and invalidation
+ * can still see a cached `true`, producing at most a ~ms-scale stale-allow window. Inverting the
+ * order (invalidate then delete) doesn't help — a read after invalidation but before delete would
+ * recompute and re-cache the still-granted state. Accept the short window; the delete call is
+ * synchronous and completes in milliseconds.
  */
 export async function deleteGroup(id: string) {
   const group = await prisma.userGroup.findUnique({

@@ -224,7 +224,7 @@ export async function assertProjectPermission(
   const granted = await getEffectiveProjectPermissions(user.userId, projectId);
   const grantedSet = new Set(granted);
   if (!permissions.some(p => grantedSet.has(p))) {
-    throw new AppError(403, `Requires one of: ${permissions.join(', ')}`);
+    throw new AppError(403, `Требуется одно из прав: ${permissions.join(', ')}`);
   }
 }
 

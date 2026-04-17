@@ -54,7 +54,7 @@ async function assertReleasePermission(
   // INTEGRATION release — no single project; keep system-role gate until a multi-project perm
   // model is designed. ADMIN and RELEASE_MANAGER correspond to the existing requireRole set.
   if (!hasAnySystemRole(req.user!.systemRoles, ['ADMIN', 'RELEASE_MANAGER', 'SUPER_ADMIN'])) {
-    throw new AppError(403, 'Insufficient permissions for integration release');
+    throw new AppError(403, 'Недостаточно прав для межпроектного релиза');
   }
 }
 
