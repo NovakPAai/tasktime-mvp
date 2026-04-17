@@ -76,9 +76,15 @@ export async function updateScheme(id: string, dto: UpdateSchemeDto) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id } });
   if (!scheme) throw new AppError(404, 'Role scheme not found');
   // Protect the "at least one default scheme" invariant — getSchemeForProject and detachProject
-  // both assume one exists and fail with 500 otherwise.
+  // both assume one exists and fail with 500 otherwise. Only block the unset if this IS the last
+  // default scheme; if another default already exists (edge case or cleanup), allow it.
   if (scheme.isDefault && dto.isDefault === false) {
-    throw new AppError(400, 'Нельзя снять флаг isDefault у единственной дефолтной схемы — назначьте дефолтной другую схему');
+    const otherDefaultCount = await prisma.projectRoleScheme.count({
+      where: { isDefault: true, id: { not: id } },
+    });
+    if (otherDefaultCount === 0) {
+      throw new AppError(400, 'Нельзя снять флаг isDefault у единственной дефолтной схемы — назначьте дефолтной другую схему');
+    }
   }
   const defaultChanged = dto.isDefault === true && !scheme.isDefault;
   const updated = await prisma.$transaction(async (tx) => {
@@ -120,8 +126,10 @@ export async function deleteScheme(id: string) {
 
 /**
  * Remap all UserProjectRole rows of a project to the target scheme by matching the legacy `role`
- * enum to a role key in that scheme. Rows whose key has no match are reset to (roleId=NULL,
- * schemeId=NULL); requireProjectPermission falls back to the legacy `role` enum for those.
+ * enum to a role key in that scheme. Rejects the whole operation with 400 if any legacy role
+ * currently in use on the project has no matching key in the target scheme — callers get an
+ * explicit error with the list of incompatible keys instead of a silent "some users lost access"
+ * outcome.
  *
  * Batched: 4 `updateMany` queries — one per legacy enum value (ADMIN, MANAGER, USER, VIEWER).
  * Must be called inside a transaction so the composite FK stays consistent.
@@ -136,11 +144,28 @@ async function remapProjectUserRolesToScheme(
     select: { id: true, key: true },
   });
   const keyToId = new Map(targetRoles.map(r => [r.key, r.id]));
+
+  const usedKeys = await tx.userProjectRole.findMany({
+    where: { projectId },
+    select: { role: true },
+    distinct: ['role'],
+  });
+  const unmapped = usedKeys
+    .map(r => r.role as string)
+    .filter(key => !keyToId.has(key));
+  if (unmapped.length > 0) {
+    throw new AppError(
+      400,
+      `В целевой схеме нет ролей с ключами: ${unmapped.join(', ')}. Добавьте эти роли в схему или переназначьте пользователей перед сменой схемы.`,
+    );
+  }
+
   for (const key of Object.values(ProjectRole)) {
     const roleId = keyToId.get(key);
+    if (!roleId) continue;
     await tx.userProjectRole.updateMany({
       where: { projectId, role: key },
-      data: roleId ? { roleId, schemeId: targetSchemeId } : { roleId: null, schemeId: null },
+      data: { roleId, schemeId: targetSchemeId },
     });
   }
 }

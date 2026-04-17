@@ -425,7 +425,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
       entityType: 'user',
       entityId: userId,
       userId: actorId,
-      details: { projectId: dto.projectId, role: legacyRole, roleId: dto.roleId },
+      details: { projectId: dto.projectId, role: legacyRole, roleId: resolvedRoleId, schemeId: resolvedSchemeId },
     },
   });
 
