@@ -10,9 +10,10 @@ import { hasSystemRole } from '../../lib/roles';
  * hardening: unauthorised URL access redirects to `/` instead of flashing admin UI before the
  * first API call fails.
  *
- * Applied once as the parent element of the /admin/* nested route segment in App.tsx, so every
- * admin route — existing and future — passes through this single guard. No need to wrap new
- * pages inline (AI review #66 rounds 5-15 🟠 — consolidated in round 15).
+ * Currently applied ONLY to the new /admin/user-groups routes (TTSEC-2 Phase 3). Extending the
+ * gate to other /admin/* routes needs an access-matrix audit per page first — some existing
+ * admin views may be reachable by RELEASE_MANAGER / AUDITOR system roles and rely on backend
+ * 403, not ADMIN-only client-side gating (AI review #66 round 16 🟠 — consolidation rolled back).
  */
 export default function AdminGate({ children }: { children: ReactElement }) {
   const user = useAuthStore(s => s.user);
