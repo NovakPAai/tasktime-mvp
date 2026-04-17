@@ -109,8 +109,10 @@ export default function AdminGroupsPage() {
     try {
       await userGroupsApi.remove(impactFor.id);
       message.success('Группа удалена');
+      // AI review #66 round 9 🔵 — reset full delete-modal state symmetrically.
       setImpactFor(null);
       setImpact(null);
+      setImpactError(null);
       load();
     } catch {
       message.error('Не удалось удалить группу');

@@ -182,6 +182,20 @@ export default function App() {
             <Route path="time" element={<TimePage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="uat" element={<UatTestsPage />} />
+            {/*
+              TTSEC-2 TODO — admin route protection migration.
+
+              Only /admin/user-groups/* routes are currently wrapped in <AdminGate>.
+              The remaining admin/* routes (dashboard, users, roles, role-schemes, projects,
+              categories, issue-type-configs, workflows, release-*, system, etc.) rely solely
+              on backend 403 — an unauthorised user can briefly see admin UI before the first
+              API call fails. Two ways forward:
+                (a) add <AdminGate> to each remaining element inline — trivial but 20+ edits,
+                (b) introduce a parent <Route element={<AdminGate><Outlet /></AdminGate>}> nested
+                    segment wrapping the whole admin/* group — one change, invariant for future
+                    admin pages. Preferred for a dedicated cleanup PR.
+              Tracking here as a visible anchor — see also components/auth/AdminGate.tsx.
+            */}
             <Route path="admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="admin/monitoring" element={<AdminMonitoringPage />} />
