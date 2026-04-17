@@ -1,6 +1,6 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import { computeEffectiveRole } from '../../shared/middleware/rbac.js';
+import { computeEffectiveRolesForProjects } from '../../shared/middleware/rbac.js';
 
 /**
  * Build the payload for a user's «Безопасность» view (spec §5.6):
@@ -52,29 +52,27 @@ export async function getUserSecurity(userId: string) {
   });
   const projectById = new Map(projects.map(p => [p.id, p]));
 
-  // Parallelise effective-role computation across projects. True batched resolution (single
-  // scheme/role fetch for all projects) is TTSEC-16 territory — tracked in Phase 4 perf work.
-  // Until then Promise.all cuts wall-time from N sequential trips to `max(trip)`.
-  const effective = await Promise.all(
-    Array.from(projectIds).map(async (projectId) => {
-      const project = projectById.get(projectId);
-      if (!project) return null;
-      const eff = await computeEffectiveRole(userId, projectId);
-      if (!eff) return null;
-      return {
-        project,
-        role: {
-          id: eff.roleId,
-          name: eff.roleName,
-          key: eff.roleKey,
-          permissions: eff.permissions,
-        },
-        source: eff.source,
-        sourceGroups: eff.sourceGroups,
-      };
-    }),
-  );
-  const projectRoles = effective.filter((r): r is NonNullable<typeof r> => r !== null);
+  // Batched resolution: 2 DB queries total (direct + group) + N Redis-cached scheme reads,
+  // instead of 2N queries. See computeEffectiveRolesForProjects.
+  const effectiveByProject = await computeEffectiveRolesForProjects(userId, Array.from(projectIds));
+
+  const projectRoles = [];
+  for (const [projectId, eff] of effectiveByProject) {
+    if (!eff) continue;
+    const project = projectById.get(projectId);
+    if (!project) continue;
+    projectRoles.push({
+      project,
+      role: {
+        id: eff.roleId,
+        name: eff.roleName,
+        key: eff.roleKey,
+        permissions: eff.permissions,
+      },
+      source: eff.source,
+      sourceGroups: eff.sourceGroups,
+    });
+  }
 
   return {
     user: { id: user.id, name: user.name, email: user.email },

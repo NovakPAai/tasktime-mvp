@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { ProjectPermission } from '@prisma/client';
 import { authenticate } from '../../shared/middleware/auth.js';
 import {
-  requireRole,
   requireProjectPermission,
   assertProjectPermission,
 } from '../../shared/middleware/rbac.js';
@@ -70,17 +69,23 @@ router.get('/releases', async (req: AuthRequest, res, next) => {
   }
 });
 
-// ─── RM-03.2: POST /releases — create (INTEGRATION spans projects) ──────────
-// Global create retains requireRole — INTEGRATION releases may have no projectId to gate on.
-// ATOMIC releases with projectId additionally pass through the granular check below.
+// ─── RM-03.2: POST /releases — create (ATOMIC | INTEGRATION) ────────────────
+// TTSEC-2 Phase 2 (AI review #65 round 2): gate by context, not by one-size-fits-all role.
+//   - projectId in body  → ATOMIC release, project-scoped → `RELEASES_CREATE` granular check.
+//   - projectId omitted  → INTEGRATION release (multi-project), no single project to gate on →
+//     fall back to system-role `requireRole` equivalent until a multi-project perm model exists.
+// Combining both (requireRole AND granular) used to narrow access for users who had RELEASES_CREATE
+// in a project but no system ADMIN/RELEASE_MANAGER — they could not create project-scoped releases
+// through this endpoint, which contradicts the whole premise of granular permissions.
 router.post(
   '/releases',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(createReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
       if (req.body.projectId) {
         await assertProjectPermission(req.user!, req.body.projectId, ['RELEASES_CREATE']);
+      } else if (!hasAnySystemRole(req.user!.systemRoles, ['ADMIN', 'RELEASE_MANAGER', 'SUPER_ADMIN'])) {
+        throw new AppError(403, 'Недостаточно прав для межпроектного релиза');
       }
       const release = await releasesService.createReleaseGlobal(req.body, req.user!.userId);
       await logAudit(req, 'release.created', 'release', release.id, {
