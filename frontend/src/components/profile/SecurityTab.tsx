@@ -51,11 +51,15 @@ function downloadCsv(payload: UserSecurityPayload): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  // AI review #66 round 5 🟡 — filename from email could contain @ / whitespace / stray
-  // characters. Use the stable user id instead; it's already a UUID, guaranteed filesystem-safe.
+  // AI review #66 round 5 🟡 — user.id (UUID) is filesystem-safe; email could contain @/spaces.
   a.download = `security-${payload.user.id}.csv`;
+  // AI review #66 round 6 🟠 — Firefox/Safari sometimes miss the click on a detached <a>, and
+  // revoking the blob URL synchronously right after click can race the download fetch. Attach
+  // to DOM, click, detach, then revoke on the next tick.
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export default function SecurityTab() {
