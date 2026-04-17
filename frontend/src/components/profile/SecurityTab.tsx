@@ -20,21 +20,34 @@ import {
  * Shape is driven by the backend `UserSecurityPayload` type.
  */
 
+/**
+ * Proper CSV escaping per RFC 4180: wrap in double quotes, double any embedded quote.
+ * AI review #66 🟡 — previous version used JSON.stringify, which is NOT CSV and broke on
+ * values containing `;`, newlines, or quotes. Excel-friendly BOM prefix so Cyrillic renders
+ * correctly on Windows out of the box.
+ */
+function csvField(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
 function downloadCsv(payload: UserSecurityPayload): void {
-  const header = 'Проект;Ключ;Роль;Источник;Через группы\n';
-  const body = payload.projectRoles
-    .map(r => {
+  const rows: string[] = [
+    ['Проект', 'Ключ', 'Роль', 'Источник', 'Через группы']
+      .map(csvField)
+      .join(';'),
+    ...payload.projectRoles.map(r => {
       const via = r.sourceGroups.map(g => g.name).join(', ');
       return [
-        JSON.stringify(r.project.name),
-        JSON.stringify(r.project.key),
-        JSON.stringify(r.role.name),
-        r.source === 'DIRECT' ? 'Прямое' : 'Группа',
-        JSON.stringify(via),
+        csvField(r.project.name),
+        csvField(r.project.key),
+        csvField(r.role.name),
+        csvField(r.source === 'DIRECT' ? 'Прямое' : 'Группа'),
+        csvField(via),
       ].join(';');
-    })
-    .join('\n');
-  const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8' });
+    }),
+  ];
+  // `\uFEFF` = UTF-8 BOM — Excel needs it to auto-detect Cyrillic text.
+  const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -134,7 +147,13 @@ export default function SecurityTab() {
       )}
 
       <Table
-        rowKey={(r) => `${r.project.id}:${r.role.id}`}
+        // Defensive key: include source + sorted sourceGroup ids so two rows for the same
+        // (project, role) via different paths wouldn't collapse (AI review #66 🟠). Today
+        // the backend returns one row per project, but the guard keeps rendering correct
+        // if that invariant changes.
+        rowKey={(r) =>
+          `${r.project.id}:${r.role.id}:${r.source}:${r.sourceGroups.map(g => g.id).sort().join(',')}`
+        }
         dataSource={data?.projectRoles ?? []}
         columns={columns}
         loading={loading}
