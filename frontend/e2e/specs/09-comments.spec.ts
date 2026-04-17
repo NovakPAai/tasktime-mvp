@@ -83,7 +83,8 @@ test.describe('Comments', () => {
       return;
     }
     const submitBtn = page.locator('[data-testid="comment-submit"]');
-    await submitBtn.click();
+    // force:true handles disabled button (empty input disables submit)
+    await submitBtn.click({ force: true, timeout: 5_000 });
     await expect(page.locator('[data-testid="comment-input"]')).toBeVisible({ timeout: 3_000 });
   });
 
