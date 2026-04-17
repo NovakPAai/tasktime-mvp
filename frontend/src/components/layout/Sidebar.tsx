@@ -200,8 +200,9 @@ export default function Sidebar({
     { type: 'link', path: '/admin/monitoring',  label: 'Мониторинг' },
 
     { type: 'divider', label: 'Пользователи' },
-    { type: 'link', path: '/admin/users',       label: 'Пользователи' },
-    { type: 'link', path: '/admin/roles',       label: 'Назначение ролей' },
+    { type: 'link', path: '/admin/users',        label: 'Пользователи' },
+    { type: 'link', path: '/admin/user-groups',  label: 'Группы' },
+    { type: 'link', path: '/admin/roles',        label: 'Назначение ролей' },
     { type: 'link', path: '/admin/role-schemes', label: 'Схемы доступа' },
 
     { type: 'divider', label: 'Проекты' },

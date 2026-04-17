@@ -1,0 +1,153 @@
+import { useEffect, useState } from 'react';
+import { Table, Tag, Tooltip, Button, Alert, Space, message } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
+import {
+  userSecurityApi,
+  type UserSecurityPayload,
+  type SecurityProjectRole,
+} from '../../api/user-security';
+
+/**
+ * TTSEC-2 Phase 3: "Безопасность" block for SettingsPage (spec §5.8).
+ *
+ * Read-only — the user cannot grant themselves a role here. Shows:
+ *   - groups the user is a member of
+ *   - effective roles per project with `source` (DIRECT / GROUP) + `sourceGroups` list
+ *   - per-role permissions tooltip on hover
+ *   - CSV export for offline review
+ *
+ * Shape is driven by the backend `UserSecurityPayload` type.
+ */
+
+function downloadCsv(payload: UserSecurityPayload): void {
+  const header = 'Проект;Ключ;Роль;Источник;Через группы\n';
+  const body = payload.projectRoles
+    .map(r => {
+      const via = r.sourceGroups.map(g => g.name).join(', ');
+      return [
+        JSON.stringify(r.project.name),
+        JSON.stringify(r.project.key),
+        JSON.stringify(r.role.name),
+        r.source === 'DIRECT' ? 'Прямое' : 'Группа',
+        JSON.stringify(via),
+      ].join(';');
+    })
+    .join('\n');
+  const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `security-${payload.user.email}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function SecurityTab() {
+  const [data, setData] = useState<UserSecurityPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      setData(await userSecurityApi.getMine());
+    } catch {
+      message.error('Не удалось загрузить данные безопасности');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const columns: ColumnsType<SecurityProjectRole> = [
+    {
+      title: 'Проект',
+      render: (_, r) => (
+        <Space>
+          <code>{r.project.key}</code>
+          <span>{r.project.name}</span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Роль',
+      render: (_, r) => (
+        <Tooltip title={r.role.permissions.length > 0 ? r.role.permissions.join(', ') : 'Нет прав'}>
+          <Tag>{r.role.name}</Tag>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Источник',
+      render: (_, r) => {
+        const direct = r.source === 'DIRECT';
+        const groups = r.sourceGroups;
+        return (
+          <Space wrap size={4}>
+            <Tag color={direct ? 'blue' : 'purple'}>{direct ? 'Прямое назначение' : 'Через группу'}</Tag>
+            {groups.length > 0 && (
+              <Tooltip title={groups.map(g => g.name).join(', ')}>
+                <Tag>{direct ? 'также через' : ''} {groups.length} {groups.length === 1 ? 'группу' : 'групп(ы)'}</Tag>
+              </Tooltip>
+            )}
+          </Space>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h3 style={{ margin: 0 }}>Безопасность</h3>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Обновить</Button>
+          <Button
+            icon={<DownloadOutlined />}
+            disabled={!data || data.projectRoles.length === 0}
+            onClick={() => data && downloadCsv(data)}
+          >
+            Экспорт CSV
+          </Button>
+        </Space>
+      </div>
+
+      {data && data.groups.length > 0 ? (
+        <Alert
+          type="info"
+          showIcon
+          message="Ваши группы"
+          description={
+            <Space wrap>
+              {data.groups.map(g => (
+                <Tooltip key={g.id} title={`В группе: ${g.memberCount} участник(а/ов)`}>
+                  <Tag color="purple">{g.name}</Tag>
+                </Tooltip>
+              ))}
+            </Space>
+          }
+          style={{ marginBottom: 16 }}
+        />
+      ) : (
+        !loading && <Alert type="info" message="Вы не состоите ни в одной группе" style={{ marginBottom: 16 }} />
+      )}
+
+      <Table
+        rowKey={(r) => `${r.project.id}:${r.role.id}`}
+        dataSource={data?.projectRoles ?? []}
+        columns={columns}
+        loading={loading}
+        pagination={false}
+        size="small"
+        locale={{ emptyText: 'Нет проектных ролей' }}
+      />
+
+      {data && (
+        <div style={{ marginTop: 12, color: '#888', fontSize: 12 }}>
+          Обновлено: {new Date(data.updatedAt).toLocaleString('ru-RU')}
+        </div>
+      )}
+    </div>
+  );
+}

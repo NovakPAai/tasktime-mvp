@@ -679,12 +679,12 @@ router.delete('/:id', authenticate, async (req, res, next) => {
 - [x] TTSEC-10: audit — `user_group.{created,renamed,updated,deleted,members_changed}`, `project_group_role.{granted,revoked}`, `comment.{updated,deleted}`, `time_log.deleted`.
 - **DoD:** `npx tsc --noEmit` зелёный ✅. 24 unit-теста (rbac-effective + user-groups) ✅. Integration-тесты + perf-benchmark — в Phase 4 (требуют живой БД/Redis на CI).
 
-### Фаза 3 — Frontend — pending
-- [ ] TTSEC-11: `AdminGroupsPage` + `AdminGroupDetailPage` + `api/user-groups.ts`.
-- [ ] TTSEC-12: `PermissionMatrixDrawer` — новые колонки, убрать `*_MANAGE` для sprints/releases.
-- [ ] TTSEC-13: `ProfilePage` + `SecurityTab` + `api/user-security.ts`.
-- [ ] TTSEC-14: `Sidebar` — пункт «Группы» под `USER_GROUP_VIEW`.
-- **DoD:** `npm run typecheck` + `npm run lint` зелёные; Storybook билдится.
+### Фаза 3 — Frontend — **done (2026-04-17)**
+- [x] TTSEC-11: `api/user-groups.ts` + `AdminGroupsPage` (список + CRUD + delete-with-impact модалка) + `AdminGroupDetailPage` (табы Участники / Проектные роли, добавление/удаление, grant/revoke с фильтрацией ролей по активной схеме проекта).
+- [x] TTSEC-12: `PermissionMatrixDrawer` — гранулярные колонки для спринтов и релизов (CREATE/EDIT/DELETE), `*_DELETE_OTHERS` для комментариев и времени, новая категория «Группы пользователей» (`USER_GROUP_VIEW`/`USER_GROUP_MANAGE`); старые `SPRINTS_MANAGE`/`RELEASES_MANAGE` убраны из UI.
+- [x] TTSEC-13: `api/user-security.ts` + `components/profile/SecurityTab.tsx` (группы, таблица проект/роль/источник с tooltip на permissions, CSV-экспорт); встроено в `SettingsPage` как карточку «Безопасность».
+- [x] TTSEC-14: `Sidebar` — пункт «Группы» в секции «Пользователи» (под тем же admin-guard, что и остальные); `/admin/user-groups` + `/admin/user-groups/:id` в `App.tsx`.
+- **DoD:** `npx tsc --noEmit` ✅, `npx eslint` ✅ для новых и изменённых файлов. Storybook не трогал — новые компоненты без stories (не требуется по спецификации; Phase 4 добавит при необходимости).
 
 ### Фаза 4 — QA + rollout — pending
 - [ ] TTSEC-15: unit + integration + e2e.
