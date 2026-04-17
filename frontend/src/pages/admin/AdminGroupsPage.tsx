@@ -217,7 +217,10 @@ export default function AdminGroupsPage() {
                 {impact.projects.length > 0 && (
                   <ul>
                     {impact.projects.map(p => (
-                      <li key={p.project.id}>
+                      // Composite key: backend currently guarantees one binding per project
+                      // in a group (@@unique([groupId, projectId])), but defensive against
+                      // contract extension or duplicate rows sneaking in via data migration.
+                      <li key={`${p.project.id}-${p.roleDefinition.id}`}>
                         <code>{p.project.key}</code> · роль <b>{p.roleDefinition.name}</b>
                       </li>
                     ))}

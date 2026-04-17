@@ -51,7 +51,9 @@ function downloadCsv(payload: UserSecurityPayload): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `security-${payload.user.email}.csv`;
+  // AI review #66 round 5 🟡 — filename from email could contain @ / whitespace / stray
+  // characters. Use the stable user id instead; it's already a UUID, guaranteed filesystem-safe.
+  a.download = `security-${payload.user.id}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
