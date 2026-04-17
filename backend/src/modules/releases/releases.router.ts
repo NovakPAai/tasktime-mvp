@@ -1,6 +1,10 @@
 import { Router } from 'express';
+import type { ProjectPermission } from '@prisma/client';
 import { authenticate } from '../../shared/middleware/auth.js';
-import { requireRole } from '../../shared/middleware/rbac.js';
+import {
+  requireProjectPermission,
+  assertProjectPermission,
+} from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import {
   createReleaseDto,
@@ -16,10 +20,42 @@ import {
 import * as releasesService from './releases.service.js';
 import * as releaseWorkflowEngine from './release-workflow-engine.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
+import { hasAnySystemRole } from '../../shared/auth/roles.js';
 import type { AuthRequest } from '../../shared/types/index.js';
+import { AppError } from '../../shared/middleware/error-handler.js';
+import { prisma } from '../../prisma/client.js';
 
 const router = Router();
 router.use(authenticate);
+
+/**
+ * TTSEC-2 Phase 2: gate release mutations on granular `RELEASES_*` permissions.
+ *
+ * Releases may be project-scoped (ATOMIC) or multi-project (INTEGRATION). When projectId is
+ * known, we use `assertProjectPermission`; for INTEGRATION releases (projectId=null) we fall
+ * back to the legacy system-role gate (ADMIN / RELEASE_MANAGER).
+ */
+async function assertReleasePermission(
+  req: AuthRequest,
+  releaseId: string,
+  perms: ProjectPermission[],
+): Promise<void> {
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    select: { projectId: true },
+  });
+  if (!release) throw new AppError(404, 'Релиз не найден');
+
+  if (release.projectId) {
+    await assertProjectPermission(req.user!, release.projectId, perms);
+    return;
+  }
+  // INTEGRATION release — no single project; keep system-role gate until a multi-project perm
+  // model is designed. ADMIN and RELEASE_MANAGER correspond to the existing requireRole set.
+  if (!hasAnySystemRole(req.user!.systemRoles, ['ADMIN', 'RELEASE_MANAGER', 'SUPER_ADMIN'])) {
+    throw new AppError(403, 'Недостаточно прав для межпроектного релиза');
+  }
+}
 
 // ─── RM-03.1: GET /releases — global list with filtering ────────────────────
 
@@ -33,14 +69,24 @@ router.get('/releases', async (req: AuthRequest, res, next) => {
   }
 });
 
-// ─── RM-03.2: POST /releases — create with type ATOMIC/INTEGRATION ──────────
-
+// ─── RM-03.2: POST /releases — create (ATOMIC | INTEGRATION) ────────────────
+// TTSEC-2 Phase 2 (AI review #65 round 2): gate by context, not by one-size-fits-all role.
+//   - projectId in body  → ATOMIC release, project-scoped → `RELEASES_CREATE` granular check.
+//   - projectId omitted  → INTEGRATION release (multi-project), no single project to gate on →
+//     fall back to system-role `requireRole` equivalent until a multi-project perm model exists.
+// Combining both (requireRole AND granular) used to narrow access for users who had RELEASES_CREATE
+// in a project but no system ADMIN/RELEASE_MANAGER — they could not create project-scoped releases
+// through this endpoint, which contradicts the whole premise of granular permissions.
 router.post(
   '/releases',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(createReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
+      if (req.body.projectId) {
+        await assertProjectPermission(req.user!, req.body.projectId, ['RELEASES_CREATE']);
+      } else if (!hasAnySystemRole(req.user!.systemRoles, ['ADMIN', 'RELEASE_MANAGER', 'SUPER_ADMIN'])) {
+        throw new AppError(403, 'Недостаточно прав для межпроектного релиза');
+      }
       const release = await releasesService.createReleaseGlobal(req.body, req.user!.userId);
       await logAudit(req, 'release.created', 'release', release.id, {
         name: release.name,
@@ -54,8 +100,6 @@ router.post(
   },
 );
 
-// ─── GET /releases/:id — single release ──────────────────────────────────────
-
 router.get('/releases/:id', async (req: AuthRequest, res, next) => {
   try {
     const release = await releasesService.getRelease(req.params.id as string);
@@ -64,8 +108,6 @@ router.get('/releases/:id', async (req: AuthRequest, res, next) => {
     next(err);
   }
 });
-
-// ─── GET /releases/:id/history — audit log ───────────────────────────────────
 
 router.get('/releases/:id/history', async (req: AuthRequest, res, next) => {
   try {
@@ -76,40 +118,27 @@ router.get('/releases/:id/history', async (req: AuthRequest, res, next) => {
   }
 });
 
-// ─── RM-03.3: PATCH /releases/:id — update (immutable: type, projectId) ─────
+router.patch('/releases/:id', validate(updateReleaseDto), async (req: AuthRequest, res, next) => {
+  try {
+    await assertReleasePermission(req, req.params.id as string, ['RELEASES_EDIT']);
+    const release = await releasesService.updateRelease(req.params.id as string, req.body);
+    await logAudit(req, 'release.updated', 'release', release.id, req.body);
+    res.json(release);
+  } catch (err) {
+    next(err);
+  }
+});
 
-router.patch(
-  '/releases/:id',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
-  validate(updateReleaseDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const release = await releasesService.updateRelease(req.params.id as string, req.body);
-      await logAudit(req, 'release.updated', 'release', release.id, req.body);
-      res.json(release);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-// ─── RM-03.4: DELETE /releases/:id ───────────────────────────────────────────
-
-router.delete(
-  '/releases/:id',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
-  async (req: AuthRequest, res, next) => {
-    try {
-      await releasesService.deleteRelease(req.params.id as string);
-      await logAudit(req, 'release.deleted', 'release', req.params.id as string);
-      res.status(204).send();
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-// ─── RM-03.5: ReleaseItem CRUD ────────────────────────────────────────────────
+router.delete('/releases/:id', async (req: AuthRequest, res, next) => {
+  try {
+    await assertReleasePermission(req, req.params.id as string, ['RELEASES_DELETE']);
+    await releasesService.deleteRelease(req.params.id as string);
+    await logAudit(req, 'release.deleted', 'release', req.params.id as string);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/releases/:id/items', async (req: AuthRequest, res, next) => {
   try {
@@ -123,15 +152,11 @@ router.get('/releases/:id/items', async (req: AuthRequest, res, next) => {
 
 router.post(
   '/releases/:id/items',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(releaseItemsAddDto),
   async (req: AuthRequest, res, next) => {
     try {
-      await releasesService.addReleaseItems(
-        req.params.id as string,
-        req.body,
-        req.user!.userId,
-      );
+      await assertReleasePermission(req, req.params.id as string, ['RELEASES_EDIT']);
+      await releasesService.addReleaseItems(req.params.id as string, req.body, req.user!.userId);
       await logAudit(req, 'release.items_added', 'release', req.params.id as string, {
         issueIds: req.body.issueIds,
       });
@@ -144,14 +169,11 @@ router.post(
 
 router.post(
   '/releases/:id/items/remove',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(releaseItemsRemoveDto),
   async (req: AuthRequest, res, next) => {
     try {
-      await releasesService.removeReleaseItems(
-        req.params.id as string,
-        req.body.issueIds,
-      );
+      await assertReleasePermission(req, req.params.id as string, ['RELEASES_EDIT']);
+      await releasesService.removeReleaseItems(req.params.id as string, req.body.issueIds);
       await logAudit(req, 'release.items_removed', 'release', req.params.id as string, {
         issueIds: req.body.issueIds,
       });
@@ -162,30 +184,25 @@ router.post(
   },
 );
 
-// ─── RM-03.6: Transitions ────────────────────────────────────────────────────
-
-router.get(
-  '/releases/:id/transitions',
-  async (req: AuthRequest, res, next) => {
-    try {
-      const result = await releaseWorkflowEngine.getAvailableTransitions(
-        req.params.id as string,
-        req.user!.userId,
-        req.user!.systemRoles,
-      );
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.get('/releases/:id/transitions', async (req: AuthRequest, res, next) => {
+  try {
+    const result = await releaseWorkflowEngine.getAvailableTransitions(
+      req.params.id as string,
+      req.user!.userId,
+      req.user!.systemRoles,
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post(
   '/releases/:id/transitions/:transitionId',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(executeTransitionDto),
   async (req: AuthRequest, res, next) => {
     try {
+      await assertReleasePermission(req, req.params.id as string, ['RELEASES_EDIT']);
       await releaseWorkflowEngine.executeTransition(
         req.params.id as string,
         req.params.transitionId as string,
@@ -193,15 +210,12 @@ router.post(
         req.user!.systemRoles,
         (req.body as { comment?: string }).comment,
       );
-      // audit is written inside executeTransition via prisma.$transaction
       res.json({ ok: true });
     } catch (err) {
       next(err);
     }
   },
 );
-
-// ─── RM-03.7: GET /releases/:id/readiness — extended ─────────────────────────
 
 router.get('/releases/:id/readiness', async (req: AuthRequest, res, next) => {
   try {
@@ -216,14 +230,13 @@ router.get('/releases/:id/readiness', async (req: AuthRequest, res, next) => {
   }
 });
 
-// ─── RM-03.8: POST /releases/:id/clone ───────────────────────────────────────
-
 router.post(
   '/releases/:id/clone',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(cloneReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
+      // Cloning produces a NEW release; gate on CREATE at the source project boundary.
+      await assertReleasePermission(req, req.params.id as string, ['RELEASES_CREATE']);
       const cloned = await releasesService.cloneRelease(
         req.params.id as string,
         req.body,
@@ -235,8 +248,6 @@ router.post(
     }
   },
 );
-
-// ─── RM-03.9: Deprecated endpoints → 410 Gone ────────────────────────────────
 
 router.post('/releases/:id/ready', (_req, res) => {
   res.status(410).json({
@@ -265,7 +276,7 @@ router.get('/projects/:projectId/releases', async (req, res, next) => {
 
 router.post(
   '/projects/:projectId/releases',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
+  requireProjectPermission((req) => req.params.projectId as string, 'RELEASES_CREATE'),
   validate(createReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
@@ -304,10 +315,10 @@ router.get('/releases/:id/sprints', async (req, res, next) => {
 
 router.post(
   '/releases/:id/sprints',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(manageSprintsInReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
+      await assertReleasePermission(req, req.params.id as string, ['RELEASES_EDIT']);
       await releasesService.addSprintsToRelease(req.params.id as string, req.body.sprintIds);
       await logAudit(req, 'release.sprints_added', 'release', req.params.id as string, {
         sprintIds: req.body.sprintIds,
@@ -321,10 +332,10 @@ router.post(
 
 router.post(
   '/releases/:id/sprints/remove',
-  requireRole('ADMIN', 'RELEASE_MANAGER'),
   validate(manageSprintsInReleaseDto),
   async (req: AuthRequest, res, next) => {
     try {
+      await assertReleasePermission(req, req.params.id as string, ['RELEASES_EDIT']);
       await releasesService.removeSprintsFromRelease(req.params.id as string, req.body.sprintIds);
       await logAudit(req, 'release.sprints_removed', 'release', req.params.id as string, {
         sprintIds: req.body.sprintIds,

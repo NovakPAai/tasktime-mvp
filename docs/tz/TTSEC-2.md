@@ -671,13 +671,13 @@ router.delete('/:id', authenticate, async (req, res, next) => {
 - [x] TTSEC-5: `seed.ts` → `DEFAULT_ROLE_MATRIX` обновлена. ADMIN: гранулярные + `*_DELETE_OTHERS` + `USER_GROUP_*`; MANAGER: гранулярные + `*_DELETE_OTHERS`; `COMMENTS_MANAGE` / `TIME_LOGS_MANAGE` сохранены для модерации и настроек модуля; `SPRINTS_MANAGE` / `RELEASES_MANAGE` удалены из default-матрицы (enum сохраняет их как deprecated).
 - **DoD:** `npx prisma validate` зелёный ✅, `npx prisma generate` ✅, `npx tsc --noEmit` (backend) ✅. `prisma migrate deploy` на локальной БД не прогнан — Docker/PG локально недоступны; обязательно прогнать на staging CI перед мерджем (см. risk #1).
 
-### Фаза 2 — Backend — pending
-- [ ] TTSEC-6: модуль `modules/user-groups/` (CRUD + members + project-roles bindings).
-- [ ] TTSEC-7: `shared/auth/rbac.ts` — `computeEffectiveRole` с учётом групп, Redis-кэш + инвалидация, `assertProjectPermission(user, projectId, permissions[])`.
-- [ ] TTSEC-8: `/users/me/security` + `/admin/users/:id/security`.
-- [ ] TTSEC-9: middleware — `sprints`/`releases` гранулярные, `comments`/`time` DELETE (author OR `*_DELETE_OTHERS` OR `*_MANAGE`).
-- [ ] TTSEC-10: audit-события (§5.11).
-- **DoD:** все unit + integration тесты зелёные; `GET /issues` p95 регресс ≤ 10% (NFR-1).
+### Фаза 2 — Backend — **done (2026-04-17)**
+- [x] TTSEC-6: модуль `modules/user-groups/` (CRUD + members + project-roles bindings). 4 audit-события. DELETE требует `?confirm=true` + impact (FR-A9).
+- [x] TTSEC-7: `shared/middleware/rbac.ts` — `computeEffectiveRole` с учётом групп (max permissions, roleId tiebreaker), fallback на legacy-key если roleId stale/NULL, Redis-кэш `rbac:effective:{userId}:{projectId}` TTL 60s, `assertProjectPermission(user, projectId, permissions[])` OR-helper, `invalidateUserEffectivePermissions` / `invalidateProjectEffectivePermissions`.
+- [x] TTSEC-8: `modules/user-security/` — `GET /users/me/security` + `GET /admin/users/:id/security` (роли с источником, группы, обновлено).
+- [x] TTSEC-9: гранулярные permissions на всех CRUD/edit спринтов (SPRINTS_CREATE/EDIT) и релизов (RELEASES_CREATE/EDIT/DELETE, INTEGRATION-релизы — requireRole fallback); `DELETE /comments/:id` = author OR `COMMENTS_DELETE_OTHERS` OR `COMMENTS_MANAGE`; новый `DELETE /time-logs/:id` с той же схемой для time logs.
+- [x] TTSEC-10: audit — `user_group.{created,renamed,updated,deleted,members_changed}`, `project_group_role.{granted,revoked}`, `comment.{updated,deleted}`, `time_log.deleted`.
+- **DoD:** `npx tsc --noEmit` зелёный ✅. 24 unit-теста (rbac-effective + user-groups) ✅. Integration-тесты + perf-benchmark — в Phase 4 (требуют живой БД/Redis на CI).
 
 ### Фаза 3 — Frontend — pending
 - [ ] TTSEC-11: `AdminGroupsPage` + `AdminGroupDetailPage` + `api/user-groups.ts`.

@@ -3,6 +3,7 @@ import { ProjectRole } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson, delCacheByPrefix } from '../../shared/redis.js';
+import { invalidateProjectEffectivePermissions } from '../../shared/middleware/rbac.js';
 import type {
   CreateSchemeDto,
   UpdateSchemeDto,
@@ -22,13 +23,19 @@ async function invalidateSchemeCache(schemeId: string) {
 }
 
 /** Invalidate per-user permission cache for all projects bound to a scheme.
- * Call after any change that affects permission resolution (permissions matrix, role membership). */
+ * Call after any change that affects permission resolution (permissions matrix, role membership).
+ *
+ * AI review #65 round 4 🟠 — delegates to the exported `invalidateProjectEffectivePermissions`
+ * helper which does a prefix SCAN+DELETE over `rbac:effective:{projectId}:*`. This covers every
+ * cached user for the project, including ones who just lost access via this scheme change. Using
+ * the shared helper also guarantees key-format parity with the rest of rbac.ts — no more
+ * hand-built keys drifting out of sync. */
 async function invalidatePermissionCacheForScheme(schemeId: string) {
   const bindings = await prisma.projectRoleSchemeProject.findMany({
     where: { schemeId },
     select: { projectId: true },
   });
-  await Promise.all(bindings.map(b => delCacheByPrefix(`rbac:perm:${b.projectId}:`)));
+  await Promise.all(bindings.map(b => invalidateProjectEffectivePermissions(b.projectId)));
 }
 
 const schemeInclude = {
