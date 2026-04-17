@@ -240,6 +240,8 @@ export default function AdminGroupDetailPage() {
     }
   };
 
+  // Takes projectId (not binding.id) — backend keys by (groupId, projectId) per @@unique.
+  // See api/user-groups.ts revokeProjectRole for full contract note.
   const handleRevokeProjectRole = async (projectId: string) => {
     if (!group) return;
     try {
