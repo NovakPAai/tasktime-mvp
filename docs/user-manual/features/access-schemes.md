@@ -1,9 +1,9 @@
 ﻿# Схемы доступа — Руководство пользователя
 
-> Функция: Проектные схемы ролей и прав (RBAC)
-> Доступ: Настройка — **SUPER_ADMIN**; Назначение ролей в проекте — ADMIN
-> Путь: Меню → Администрирование → **Схемы доступа** (`/admin/role-schemes`)
-> Обновлено: 2026-04-17
+> Функция: Проектные схемы ролей и прав (RBAC) + группы пользователей
+> Доступ: Настройка схем — **SUPER_ADMIN**; Назначение ролей / управление группами — ADMIN
+> Путь: Меню → Администрирование → **Схемы доступа** (`/admin/role-schemes`), **Группы** (`/admin/user-groups`); Профиль → «Безопасность» (self-view)
+> Обновлено: 2026-04-18 (TTSEC-2)
 
 ---
 
@@ -72,15 +72,26 @@
 | Группа | Permissions |
 |--------|-------------|
 | Задачи | `ISSUES_VIEW`, `ISSUES_CREATE`, `ISSUES_EDIT`, `ISSUES_DELETE`, `ISSUES_ASSIGN`, `ISSUES_CHANGE_STATUS`, `ISSUES_CHANGE_TYPE` |
-| Спринты | `SPRINTS_VIEW`, `SPRINTS_MANAGE` |
-| Релизы | `RELEASES_VIEW`, `RELEASES_MANAGE` |
+| Спринты | `SPRINTS_VIEW`, `SPRINTS_CREATE`, `SPRINTS_EDIT`, `SPRINTS_DELETE` |
+| Релизы | `RELEASES_VIEW`, `RELEASES_CREATE`, `RELEASES_EDIT`, `RELEASES_DELETE` |
 | Участники | `MEMBERS_VIEW`, `MEMBERS_MANAGE` |
-| Время | `TIME_LOGS_VIEW`, `TIME_LOGS_CREATE`, `TIME_LOGS_MANAGE` |
-| Комментарии | `COMMENTS_VIEW`, `COMMENTS_CREATE`, `COMMENTS_MANAGE` |
+| Время | `TIME_LOGS_VIEW`, `TIME_LOGS_CREATE`, `TIME_LOGS_DELETE_OTHERS`, `TIME_LOGS_MANAGE` |
+| Комментарии | `COMMENTS_VIEW`, `COMMENTS_CREATE`, `COMMENTS_DELETE_OTHERS`, `COMMENTS_MANAGE` |
 | Настройки проекта | `PROJECT_SETTINGS_VIEW`, `PROJECT_SETTINGS_EDIT` |
 | Доски | `BOARDS_VIEW`, `BOARDS_MANAGE` |
+| Группы пользователей | `USER_GROUP_VIEW`, `USER_GROUP_MANAGE` |
 
 Checkbox на каждую permission. Сохранение — PATCH (partial update): в запросе можно передать только часть ключей, остальные не затрагиваются. Хранятся только `granted=true` — отсутствие записи означает «не разрешено».
+
+### TTSEC-2: гранулярные permissions
+
+В Phase 1/2/3 было введено разбиение крупно-гранулярных прав на CRUD:
+
+- **`SPRINTS_MANAGE` / `RELEASES_MANAGE`** убраны из UI матрицы (остаются в enum как deprecated — PostgreSQL не поддерживает `DROP VALUE`). Вместо них — `*_CREATE` / `*_EDIT` / `*_DELETE`. Роль можно настроить под «создавать, но не удалять» спринты.
+- **`COMMENTS_DELETE_OTHERS`** и **`TIME_LOGS_DELETE_OTHERS`** — модерация чужих записей. Автор всегда может удалять/редактировать **свои** записи без отдельного permission. Для удаления чужих нужен `*_DELETE_OTHERS` ИЛИ `*_MANAGE` (OR-список).
+- **`USER_GROUP_VIEW` / `USER_GROUP_MANAGE`** — system-level permissions для админки групп. По умолчанию выдаются только ADMIN-у. В Phase 4 появится helper `canViewUserGroups(user)`, который изолирует этот гейт от хардкод-проверки `ADMIN` роли.
+
+**Backfill при миграции на Phase 1**: каждая роль, у которой был granted `SPRINTS_MANAGE`, получила `SPRINTS_CREATE + EDIT + DELETE`. Аналогично для `RELEASES_MANAGE`. Роли с `COMMENTS_MANAGE` / `TIME_LOGS_MANAGE` дополнительно получили `*_DELETE_OTHERS`. Эффективный уровень доступа сохранён.
 
 ---
 
@@ -113,3 +124,74 @@ Checkbox на каждую permission. Сохранение — PATCH (partial u
 Старые назначения ролей с `role='ADMIN/MANAGER/USER/VIEWER'` и `roleId=NULL` автоматически заполняются в `seed.ts` при первом запуске после мёрджа: для каждого проекта определяется активная схема, подбирается роль по legacy-ключу, сохраняются `roleId` и `schemeId`.
 
 Если в базе существовало несколько ролей у одного пользователя в одном проекте, миграция `20260418000000_user_project_role_single` оставляет самую привилегированную (ADMIN > MANAGER > USER > VIEWER) и удаляет остальные **до** применения нового unique-индекса.
+
+---
+
+## Группы пользователей (TTSEC-2)
+
+**Группа** — уровень абстракции между пользователем и проектной ролью. Вместо того чтобы раздавать роли каждому пользователю поштучно, админ:
+1. Создаёт группу (например, «Frontend Team»).
+2. Добавляет 12 участников одной операцией.
+3. Выдаёт группе роль `Developer` в пяти проектах — все 12 получают права разом.
+4. При увольнении одного — убирает его из группы, доступы снимаются централизованно.
+
+### Страница «Группы» (`/admin/user-groups`)
+
+Таблица всех групп со счётчиками участников и проектных биндингов. Действия:
+- **Создать** — `name` (глобально уникальное) + optional `description`. Дубликаты имени — 409.
+- **Настроить** (клик по имени) — детализация с двумя табами:
+  - **Участники** — список user-ов с датой добавления и кем добавлен. Batch add (multi-select с server-side поиском для больших инсталляций). Удаление одной кнопкой.
+  - **Проектные роли** — один биндинг на проект (`@@unique([groupId, projectId])`). При добавлении выбирается проект → автоматически подгружается его активная схема → в селекте ролей только роли из этой схемы (кросс-схемный binding отклоняется 400 на бэкенде).
+- **Переименовать** — `name` / `description`.
+- **Удалить** — требует `?confirm=true`. Модалка предварительно показывает impact: список затронутых участников + проектных биндингов. Без подтверждения — 412 + impact в ответе.
+
+Все мутации логируются в `AuditLog`: `user_group.created/renamed/updated/deleted/members_changed`, `project_group_role.granted/revoked`.
+
+### Эффективная роль пользователя в проекте
+
+Когда пользователь открывает защищённую страницу проекта, бэкенд вычисляет **одну** эффективную роль:
+
+1. Собираются все кандидаты:
+   - Прямая роль из `UserProjectRole` (source=`DIRECT`).
+   - Роли через группы, в которых состоит пользователь и которые привязаны к этому проекту (source=`GROUP`).
+2. Выбирается кандидат с **максимальным числом granted permissions**. Tiebreaker — `roleId` в лексикографическом порядке (детерминированно).
+3. `source` — primary grant path (DIRECT выигрывает, если есть прямое назначение). `sourceGroups[]` — все группы, которые **также** дают эту роль (независимо от `source`). Используется для отображения «прямое назначение · также через Frontend Team».
+
+Результат (set granted permissions) кэшируется в Redis `rbac:effective:{projectId}:{userId}` на 60с.
+
+### Legacy-группы (миграция Phase 1)
+
+Миграция `20260421000001_ttsec2_groups_and_backfill` создаёт группы вида `Legacy: {project.key} — {role.name}` для каждой уникальной пары `(project, role)` из существующей таблицы `user_project_roles`. Члены этих групп — пользователи, у которых была соответствующая прямая роль. Эффективный уровень доступа не меняется: тот же набор permissions, но теперь он резолвится через группу.
+
+Префикс `Legacy:` позволяет фильтровать их в UI и удалить после завершения cutover-а (см. ниже).
+
+---
+
+## Вкладка «Безопасность» в профиле
+
+Путь: Настройки → карточка «Безопасность» (отдельный блок на `/settings`).
+
+Read-only view с тремя блоками:
+1. **Мои группы** — список групп, в которых состоит пользователь, со счётчиком членов каждой.
+2. **Мои роли в проектах** — таблица `Проект | Роль | Источник`. Роль — тег с tooltip на permissions. Источник — «Прямое назначение» или «Через группу» + список групп (если через группы).
+3. **Экспорт CSV** — скачивает таблицу (RFC 4180 escaping + UTF-8 BOM для корректной кириллицы в Excel).
+
+API:
+- `GET /api/users/me/security` — self-view (любой аутентифицированный юзер).
+- `GET /api/admin/users/:id/security` — admin-view для конкретного юзера.
+
+---
+
+## Cutover на группы (Phase 4)
+
+После того как вся команда мигрировала на групповое управление ролями, прямые назначения через `POST /api/admin/users/:id/project-roles` можно отключить на уровне среды.
+
+**Feature flag** (backend): `FEATURES_DIRECT_ROLES_DISABLED=true` в env. Когда включён:
+- `admin.assignProjectRole` отклоняется с 403 + сообщение, указывающее на `/admin/user-groups` как альтернативу.
+- Существующие `UserProjectRole` с `source='DIRECT'` **остаются функциональны** — их можно оставить как break-glass escape hatch либо мигрировать в группы отдельно.
+
+**Рекомендованный порядок включения:**
+1. Staging: `FEATURES_DIRECT_ROLES_DISABLED=true`, убедиться что все сценарии работают через группы.
+2. Prod: включить env-variable (флаг читается при каждом запросе, redeploy не нужен).
+
+**Откат:** просто снять env-variable.
