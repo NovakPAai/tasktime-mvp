@@ -114,8 +114,51 @@ function filterAndTruncateDiff(rawDiff, maxChars) {
 // ---------------------------------------------------------------------------
 // OpenAI review
 // ---------------------------------------------------------------------------
-async function reviewWithOpenAI(diff, prTitle = PR_TITLE, prBody = PR_BODY) {
-  const systemPrompt = `You are a senior software engineer doing a thorough code review.
+async function reviewWithOpenAI(diff, prTitle = PR_TITLE, prBody = PR_BODY, previousReview = null) {
+  const isFollowUp = !!previousReview;
+
+  const systemPrompt = isFollowUp
+    ? `You are a senior software engineer doing a FOLLOW-UP code review after the author addressed your previous feedback.
+
+The diff you receive is the FULL cumulative PR diff (base → HEAD), not just the latest commit.
+
+Return a JSON object with this exact structure:
+{
+  "summary": "2-3 sentence overview of what was fixed and remaining state",
+  "verdict": "approve" | "request_changes" | "comment",
+  "resolved": ["Short description of each issue from previous review that is now fixed"],
+  "issues": [
+    {
+      "severity": "critical" | "high" | "medium" | "low" | "info",
+      "file": "path/to/file.ts",
+      "line": 42,
+      "title": "Short issue title (max 80 chars)",
+      "description": "Clear explanation of the problem",
+      "suggestion": "Concrete fix or improvement",
+      "isNew": true
+    }
+  ],
+  "positives": ["Notable good practices or clean code found"]
+}
+
+Severity guide:
+  critical — security vulnerability, data loss, crash, broken auth
+  high     — logic bug, missing error handling, potential data corruption
+  medium   — performance issue, maintainability problem, incomplete handling
+  low      — style, naming, minor improvement
+  info     — optional suggestion, best practice
+
+CRITICAL rules to prevent review loops:
+- DO NOT re-raise issues from the previous review that are now fixed or reasonably addressed.
+- DO NOT raise new medium/low/info issues about code introduced specifically to fix a previous issue — if the fix is reasonable, accept it.
+- ONLY raise issues that are: (a) still unresolved from previous review, OR (b) genuinely new problems introduced by the latest commits.
+- Be conservative on follow-up reviews: prefer "approve" over "request_changes" unless something is truly critical or high severity.
+- If an issue from previous review is partially addressed (improved but not perfect), mark it resolved and leave a positive note instead of blocking again.
+- Write ALL text fields in ${REVIEW_LANGUAGE}.
+- Return ONLY valid JSON, no markdown code fences.
+- For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
+- Verdict: "approve" if no unresolved critical/high issues; "request_changes" only if critical/high issues remain or newly appeared; "comment" otherwise.`
+    : `You are a senior software engineer doing a thorough code review.
 Analyze the provided git diff and return a JSON object with this exact structure:
 {
   "summary": "2-3 sentence overview of what changed and overall quality",
@@ -147,8 +190,13 @@ Rules:
 - For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
 - Verdict: "approve" if no critical/high issues; "request_changes" if critical/high exist; "comment" otherwise.`;
 
-  const userPrompt = `PR: ${prTitle}${prBody ? `\nDescription: ${prBody}` : ''}
+  const previousReviewSection = isFollowUp
+    ? `\n\nPREVIOUS REVIEW (what you flagged before — check which issues are now resolved):\n${previousReview}\n\n---\n`
+    : '';
 
+  const userPrompt = `PR: ${prTitle}${prBody ? `\nDescription: ${prBody}` : ''}${previousReviewSection}
+
+Current full PR diff (base → HEAD):
 \`\`\`diff
 ${diff}
 \`\`\``;
@@ -240,7 +288,7 @@ const VERDICT_EMOJI = {
   comment: '💬',
 };
 
-function formatComment(review) {
+function formatComment(review, isFollowUp = false) {
   const counts = {};
   for (const issue of review.issues ?? []) {
     counts[issue.severity] = (counts[issue.severity] ?? 0) + 1;
@@ -251,10 +299,18 @@ function formatComment(review) {
     .map((s) => `${SEVERITY_EMOJI[s]} ${counts[s]} ${s}`)
     .join(' · ');
 
-  let md = `## ${VERDICT_EMOJI[review.verdict] ?? '💬'} AI Code Review\n\n`;
+  const iteration = isFollowUp ? ' (follow-up)' : '';
+  let md = `## ${VERDICT_EMOJI[review.verdict] ?? '💬'} AI Code Review${iteration}\n\n`;
   md += `${review.summary}\n\n`;
 
-  if (statLine) md += `**Issues:** ${statLine}\n\n`;
+  // Resolved issues from previous review
+  if (review.resolved?.length > 0) {
+    md += `### ✅ Resolved from previous review\n\n`;
+    for (const r of review.resolved) md += `- ${r}\n`;
+    md += '\n';
+  }
+
+  if (statLine) md += `**Remaining issues:** ${statLine}\n\n`;
 
   // Issues grouped by severity
   if (review.issues?.length > 0) {
@@ -265,8 +321,9 @@ function formatComment(review) {
         const location = issue.line
           ? `\`${issue.file}:${issue.line}\``
           : `\`${issue.file}\``;
+        const newBadge = issue.isNew ? ' 🆕' : '';
         md += `<details>\n`;
-        md += `<summary>${SEVERITY_EMOJI[sev]} <strong>${issue.title}</strong> — ${location}</summary>\n\n`;
+        md += `<summary>${SEVERITY_EMOJI[sev]} <strong>${issue.title}</strong>${newBadge} — ${location}</summary>\n\n`;
         md += `${issue.description}\n\n`;
         if (issue.suggestion) {
           md += `**Suggestion:** ${issue.suggestion}\n`;
@@ -297,8 +354,10 @@ async function postComment(body) {
     `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`
   );
 
+  let previousReviewBody = null;
   for (const c of existing) {
     if (c.body?.includes(BOT_MARKER)) {
+      previousReviewBody = c.body;
       await githubFetch(
         `/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${c.id}`,
         { method: 'DELETE' }
@@ -312,6 +371,15 @@ async function postComment(body) {
     { method: 'POST', body: JSON.stringify({ body }) }
   );
   console.log('Review comment posted.');
+  return previousReviewBody;
+}
+
+async function fetchPreviousReview() {
+  const existing = await githubFetch(
+    `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`
+  );
+  const botComment = existing?.find((c) => c.body?.includes(BOT_MARKER));
+  return botComment?.body ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,6 +408,13 @@ async function main() {
 
   console.log(`Reviewing PR #${PR_NUMBER} (${REPO_OWNER}/${REPO_NAME}) with ${AI_MODEL}`);
 
+  // Fetch previous review BEFORE posting (to pass as context to GPT)
+  const previousReview = await fetchPreviousReview();
+  const isFollowUp = !!previousReview;
+  if (isFollowUp) {
+    console.log('Previous review found — running follow-up review with context.');
+  }
+
   const rawDiff = await fetchPRDiff();
   const diff = filterAndTruncateDiff(rawDiff, parseInt(MAX_DIFF_CHARS, 10));
 
@@ -350,13 +425,13 @@ async function main() {
 
   console.log(`Diff: ${diff.length} chars`);
 
-  const review = await reviewWithOpenAI(diff, prTitle, prBody);
-  const comment = formatComment(review);
+  const review = await reviewWithOpenAI(diff, prTitle, prBody, previousReview);
+  const comment = formatComment(review, isFollowUp);
 
   await postComment(comment);
 
   const hasCritical = review.issues?.some((i) => i.severity === 'critical');
-  console.log(`Done. Verdict: ${review.verdict} | Issues: ${review.issues?.length ?? 0}`);
+  console.log(`Done. Verdict: ${review.verdict} | Issues: ${review.issues?.length ?? 0} | Follow-up: ${isFollowUp}`);
 
   if (FAIL_ON_CRITICAL === 'true' && hasCritical) {
     console.error('Critical issues found — failing the check (FAIL_ON_CRITICAL=true)');
