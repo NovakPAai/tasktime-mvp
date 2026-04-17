@@ -39,6 +39,8 @@ import workflowEngineRouter from './modules/workflow-engine/workflow-engine.rout
 import releaseStatusesRouter from './modules/releases/release-statuses.router.js';
 import releaseWorkflowsAdminRouter from './modules/releases/release-workflows-admin.router.js';
 import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
+import userGroupsRouter from './modules/user-groups/user-groups.router.js';
+import userSecurityRouter from './modules/user-security/user-security.router.js';
 import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
 import { getSchemeForProject as getRoleSchemeForProject } from './modules/project-role-schemes/project-role-schemes.service.js';
 import { authenticate } from './shared/middleware/auth.js';
@@ -137,6 +139,8 @@ export function createApp() {
   app.use('/api/admin/release-statuses', releaseStatusesRouter);
   app.use('/api/admin/release-workflows', releaseWorkflowsAdminRouter);
   app.use('/api/admin/role-schemes', roleSchemesRouter);
+  app.use('/api/admin/user-groups', userGroupsRouter);
+  app.use('/api', userSecurityRouter);
   app.use('/api', workflowEngineRouter);
 
   // Public: project workflow scheme

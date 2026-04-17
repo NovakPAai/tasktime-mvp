@@ -1,6 +1,8 @@
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import type { AuthUser } from '../../shared/types/index.js';
+import { assertProjectPermission } from '../../shared/middleware/rbac.js';
 import type { ManualTimeDto } from './time.dto.js';
 import { buildUserTimeSummary } from './time.domain.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
@@ -93,6 +95,32 @@ export async function getUserLogs(userId: string) {
     orderBy: { createdAt: 'desc' },
     take: 100,
   });
+}
+
+/**
+ * TTSEC-2 Phase 2: delete a time log. Owner always may delete their own. Otherwise require
+ * `TIME_LOGS_DELETE_OTHERS` OR `TIME_LOGS_MANAGE` in the log's project.
+ */
+export async function deleteTimeLog(id: string, user: AuthUser) {
+  const log = await prisma.timeLog.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      userId: true,
+      issue: { select: { projectId: true } },
+    },
+  });
+  if (!log) throw new AppError(404, 'Time log not found');
+
+  if (log.userId !== user.userId) {
+    await assertProjectPermission(user, log.issue.projectId, [
+      'TIME_LOGS_DELETE_OTHERS',
+      'TIME_LOGS_MANAGE',
+    ]);
+  }
+
+  await prisma.timeLog.delete({ where: { id } });
+  await delCachedJson(`time:summary:${log.userId}`);
 }
 
 export async function getUserTimeSummary(userId: string) {

@@ -22,13 +22,44 @@ async function invalidateSchemeCache(schemeId: string) {
 }
 
 /** Invalidate per-user permission cache for all projects bound to a scheme.
- * Call after any change that affects permission resolution (permissions matrix, role membership). */
+ * Call after any change that affects permission resolution (permissions matrix, role membership).
+ *
+ * TTSEC-2 Phase 2: kills both legacy (`rbac:perm:{projectId}:*`) and new group-aware
+ * (`rbac:effective:{userId}:{projectId}`) caches for every user who could be affected by the
+ * scheme — direct role holders PLUS members of any group bound to a project in this scheme.
+ * Per-user scan is necessary because the new key is userId-prefixed, not projectId-prefixed. */
 async function invalidatePermissionCacheForScheme(schemeId: string) {
   const bindings = await prisma.projectRoleSchemeProject.findMany({
     where: { schemeId },
     select: { projectId: true },
   });
-  await Promise.all(bindings.map(b => delCacheByPrefix(`rbac:perm:${b.projectId}:`)));
+  const projectIds = bindings.map(b => b.projectId);
+  if (projectIds.length === 0) return;
+
+  const [directUsers, groupUsers] = await Promise.all([
+    prisma.userProjectRole.findMany({
+      where: { projectId: { in: projectIds } },
+      select: { userId: true, projectId: true },
+    }),
+    prisma.userGroupMember.findMany({
+      where: { group: { projectRoles: { some: { projectId: { in: projectIds } } } } },
+      select: { userId: true, group: { select: { projectRoles: { where: { projectId: { in: projectIds } }, select: { projectId: true } } } } },
+    }),
+  ]);
+
+  const pairs = new Set<string>();
+  for (const row of directUsers) pairs.add(`${row.userId}::${row.projectId}`);
+  for (const row of groupUsers) {
+    for (const pr of row.group.projectRoles) pairs.add(`${row.userId}::${pr.projectId}`);
+  }
+
+  await Promise.all([
+    ...projectIds.map(pid => delCacheByPrefix(`rbac:perm:${pid}:`)),
+    ...Array.from(pairs).map(p => {
+      const [uid, pid] = p.split('::');
+      return delCachedJson(`rbac:effective:${uid}:${pid}`);
+    }),
+  ]);
 }
 
 const schemeInclude = {
