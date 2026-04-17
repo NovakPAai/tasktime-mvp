@@ -38,9 +38,11 @@ import transitionScreensRouter from './modules/transition-screens/transition-scr
 import workflowEngineRouter from './modules/workflow-engine/workflow-engine.router.js';
 import releaseStatusesRouter from './modules/releases/release-statuses.router.js';
 import releaseWorkflowsAdminRouter from './modules/releases/release-workflows-admin.router.js';
+import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
 import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes.service.js';
+import { getSchemeForProject as getRoleSchemeForProject } from './modules/project-role-schemes/project-role-schemes.service.js';
 import { authenticate } from './shared/middleware/auth.js';
-import { requireRole } from './shared/middleware/rbac.js';
+import { requireRole, requireProjectPermission } from './shared/middleware/rbac.js';
 
 export function createApp() {
   const app = express();
@@ -134,6 +136,7 @@ export function createApp() {
   app.use('/api/admin/transition-screens', transitionScreensRouter);
   app.use('/api/admin/release-statuses', releaseStatusesRouter);
   app.use('/api/admin/release-workflows', releaseWorkflowsAdminRouter);
+  app.use('/api/admin/role-schemes', roleSchemesRouter);
   app.use('/api', workflowEngineRouter);
 
   // Public: project workflow scheme
@@ -144,6 +147,22 @@ export function createApp() {
       next(err);
     }
   });
+
+  // Project role scheme — strictly scoped to project members. Global project-read system roles
+  // (ADMIN/RELEASE_MANAGER/AUDITOR) do NOT bypass this check — role/permission matrices are
+  // considered per-project configuration. SUPER_ADMIN still passes through unconditionally.
+  app.get(
+    '/api/projects/:projectId/role-scheme',
+    authenticate,
+    requireProjectPermission((req) => req.params.projectId as string, 'MEMBERS_VIEW', { allowGlobalRead: false }),
+    async (req, res, next) => {
+      try {
+        res.json(await getRoleSchemeForProject(req.params.projectId as string));
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   // Error handler (must be last)
   app.use(errorHandler);

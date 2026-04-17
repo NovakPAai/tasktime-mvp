@@ -200,11 +200,11 @@ export default function AdminPage() {
   const handleCreateLinkType = async (values: { name: string; outboundName: string; inboundName: string }) => {
     setCreating(true);
     try {
-      const newType = await linksApi.createLinkType(values);
-      setLinkTypes((prev) => [...prev, newType]);
+      await linksApi.createLinkType(values);
       setCreateModalOpen(false);
       createForm.resetFields();
       void message.success('Тип связи создан');
+      void loadLinkTypes();
     } catch (err) {
       void message.error(err instanceof Error ? err.message : 'Ошибка создания');
     } finally {
@@ -615,7 +615,7 @@ export default function AdminPage() {
       <Modal
         title="Создать вид связи"
         open={createModalOpen}
-        onCancel={() => { setCreateModalOpen(false); createForm.resetFields(); }}
+        onCancel={() => { setCreateModalOpen(false); createForm.resetFields(); void loadLinkTypes(); }}
         onOk={() => createForm.submit()}
         confirmLoading={creating}
         okText="Создать"

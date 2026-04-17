@@ -633,7 +633,7 @@ export default function AdminReleaseWorkflowEditorPage() {
       <Drawer
         title="Добавить статус"
         open={stepDrawerOpen}
-        onClose={() => setStepDrawerOpen(false)}
+        onClose={() => { setStepDrawerOpen(false); void load(); }}
         width={360}
       >
         <Form form={stepForm} layout="vertical" onFinish={handleAddStep}>
@@ -669,7 +669,7 @@ export default function AdminReleaseWorkflowEditorPage() {
       <Drawer
         title={editingTransition ? 'Редактировать переход' : 'Добавить переход'}
         open={transitionDrawerOpen}
-        onClose={() => setTransitionDrawerOpen(false)}
+        onClose={() => { setTransitionDrawerOpen(false); void load(); }}
         width={420}
         extra={
           editingTransition && (
@@ -742,7 +742,7 @@ export default function AdminReleaseWorkflowEditorPage() {
       <Drawer
         title="Настройки workflow"
         open={headerDrawerOpen}
-        onClose={() => setHeaderDrawerOpen(false)}
+        onClose={() => { setHeaderDrawerOpen(false); void load(); }}
         width={380}
       >
         <Form

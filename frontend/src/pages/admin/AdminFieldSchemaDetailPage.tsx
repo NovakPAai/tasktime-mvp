@@ -540,7 +540,7 @@ export default function AdminFieldSchemaDetailPage() {
         title="Редактировать схему"
         open={editMetaOpen}
         onOk={handleSaveMeta}
-        onCancel={() => setEditMetaOpen(false)}
+        onCancel={() => { setEditMetaOpen(false); void load(); }}
         confirmLoading={saving}
         okText="Сохранить"
         cancelText="Отмена"
@@ -561,7 +561,7 @@ export default function AdminFieldSchemaDetailPage() {
         title="Добавить поле в схему"
         open={addItemOpen}
         onOk={handleAddItem}
-        onCancel={() => setAddItemOpen(false)}
+        onCancel={() => { setAddItemOpen(false); void load(); }}
         confirmLoading={addItemSaving}
         okText="Добавить"
         cancelText="Отмена"
@@ -590,7 +590,7 @@ export default function AdminFieldSchemaDetailPage() {
         title="Добавить привязку"
         open={addBindingOpen}
         onOk={handleAddBindings}
-        onCancel={() => setAddBindingOpen(false)}
+        onCancel={() => { setAddBindingOpen(false); void load(); }}
         confirmLoading={bindingSaving}
         okText="Добавить"
         cancelText="Отмена"
@@ -645,7 +645,7 @@ export default function AdminFieldSchemaDetailPage() {
           schemaId={schema.id}
           schemaName={schema.name}
           result={conflictsResult}
-          onCancel={() => setConflictsOpen(false)}
+          onCancel={() => { setConflictsOpen(false); void load(); }}
           onPublishWithWarnings={handlePublishWithWarnings}
           publishing={publishing}
         />

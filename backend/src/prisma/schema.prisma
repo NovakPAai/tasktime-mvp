@@ -86,12 +86,21 @@ model UserProjectRole {
   userId    String      @map("user_id")
   projectId String      @map("project_id")
   role      ProjectRole
+  roleId    String?     @map("role_id")         // nullable на фазе 1
+  schemeId  String?     @map("scheme_id")       // must match the scheme of roleId (see migration 20260417000000_user_project_role_scheme_fk)
   createdAt DateTime    @default(now()) @map("created_at")
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Composite FK guarantees roleId belongs to schemeId at the DB level.
+  // onDelete: Restrict — never orphan UserProjectRole rows by a cascading delete. Service
+  // deleteRole already enforces this at application level (usageCount check); Restrict makes
+  // the invariant a DB guarantee, so raw SQL / scripts cannot break it either.
+  // A CHECK constraint (`(role_id IS NULL) = (scheme_id IS NULL)`) is added in the migration
+  // 20260417000000_user_project_role_scheme_fk and cannot be expressed declaratively in Prisma.
+  roleDefinition ProjectRoleDefinition? @relation(fields: [roleId, schemeId], references: [id, schemeId], onDelete: Restrict)
 
-  @@unique([userId, projectId, role])
+  @@unique([userId, projectId]) // one role per user per project — switch from (userId, projectId, role) in migration 20260418000000_user_project_role_single
   @@index([userId])
   @@index([projectId])
   @@map("user_project_roles")
@@ -130,6 +139,7 @@ model Project {
   userRoles           UserProjectRole[]
   fieldSchemaBindings FieldSchemaBinding[]
   workflowScheme      WorkflowSchemeProject?
+  roleScheme          ProjectRoleSchemeProject?
 
   @@map("projects")
 }
@@ -934,4 +944,93 @@ model WorkflowSchemeProject {
 
   @@index([schemeId])
   @@map("workflow_scheme_projects")
+}
+
+// ===== PROJECT ROLE SCHEMES =====
+
+enum ProjectPermission {
+  ISSUES_VIEW
+  ISSUES_CREATE
+  ISSUES_EDIT
+  ISSUES_DELETE
+  ISSUES_ASSIGN
+  ISSUES_CHANGE_STATUS
+  ISSUES_CHANGE_TYPE
+  SPRINTS_VIEW
+  SPRINTS_MANAGE
+  RELEASES_VIEW
+  RELEASES_MANAGE
+  MEMBERS_VIEW
+  MEMBERS_MANAGE
+  TIME_LOGS_VIEW
+  TIME_LOGS_CREATE
+  TIME_LOGS_MANAGE
+  COMMENTS_VIEW
+  COMMENTS_CREATE
+  COMMENTS_MANAGE
+  PROJECT_SETTINGS_VIEW
+  PROJECT_SETTINGS_EDIT
+  BOARDS_VIEW
+  BOARDS_MANAGE
+}
+
+model ProjectRoleScheme {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  roles    ProjectRoleDefinition[]
+  projects ProjectRoleSchemeProject[]
+
+  @@map("project_role_schemes")
+}
+
+model ProjectRoleDefinition {
+  id          String   @id @default(uuid())
+  schemeId    String   @map("scheme_id")
+  name        String
+  key         String
+  description String?
+  color       String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  scheme           ProjectRoleScheme       @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  permissions      ProjectRolePermission[]
+  userProjectRoles UserProjectRole[]
+
+  @@unique([schemeId, key])
+  @@unique([id, schemeId]) // composite unique — target for UserProjectRole composite FK
+  @@index([schemeId])
+  @@map("project_role_definitions")
+}
+
+model ProjectRolePermission {
+  id         String            @id @default(uuid())
+  roleId     String            @map("role_id")
+  permission ProjectPermission
+  granted    Boolean           @default(false)
+
+  role ProjectRoleDefinition @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@index([roleId])
+  @@map("project_role_permissions")
+}
+
+model ProjectRoleSchemeProject {
+  id        String   @id @default(uuid())
+  schemeId  String   @map("scheme_id")
+  projectId String   @unique @map("project_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scheme  ProjectRoleScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([schemeId])
+  @@map("project_role_scheme_projects")
 }

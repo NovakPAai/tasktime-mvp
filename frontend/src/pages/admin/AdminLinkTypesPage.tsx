@@ -33,11 +33,11 @@ export default function AdminLinkTypesPage() {
   const handleCreateLinkType = async (values: { name: string; outboundName: string; inboundName: string }) => {
     setCreating(true);
     try {
-      const newType = await linksApi.createLinkType(values);
-      setLinkTypes((prev) => [...prev, newType]);
+      await linksApi.createLinkType(values);
       setCreateModalOpen(false);
       createForm.resetFields();
       void message.success('Тип связи создан');
+      void loadLinkTypes();
     } catch (err) {
       void message.error(err instanceof Error ? err.message : 'Ошибка создания');
     } finally {
@@ -49,10 +49,10 @@ export default function AdminLinkTypesPage() {
     if (!editingType) return;
     setSaving(true);
     try {
-      const updated = await linksApi.updateLinkType(editingType.id, values);
-      setLinkTypes((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      await linksApi.updateLinkType(editingType.id, values);
       setEditingType(null);
       void message.success('Вид связи обновлён');
+      void loadLinkTypes();
     } catch (err) {
       void message.error(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -167,7 +167,7 @@ export default function AdminLinkTypesPage() {
       <Modal
         title="Редактировать вид связи"
         open={!!editingType}
-        onCancel={() => setEditingType(null)}
+        onCancel={() => { setEditingType(null); void loadLinkTypes(); }}
         onOk={() => editForm.submit()}
         confirmLoading={saving}
         okText="Сохранить"
@@ -195,7 +195,7 @@ export default function AdminLinkTypesPage() {
       <Modal
         title="Создать вид связи"
         open={createModalOpen}
-        onCancel={() => { setCreateModalOpen(false); createForm.resetFields(); }}
+        onCancel={() => { setCreateModalOpen(false); createForm.resetFields(); void loadLinkTypes(); }}
         onOk={() => createForm.submit()}
         confirmLoading={creating}
         okText="Создать"

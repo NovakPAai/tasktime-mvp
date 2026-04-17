@@ -229,7 +229,7 @@ export default function AdminReleaseStatusesPage() {
         title="Создать статус релиза"
         open={createOpen}
         onOk={() => void handleCreate()}
-        onCancel={() => { setCreateOpen(false); createForm.resetFields(); }}
+        onCancel={() => { setCreateOpen(false); createForm.resetFields(); void load(); }}
         confirmLoading={creating}
         okText="Создать"
         cancelText="Отмена"
@@ -242,7 +242,7 @@ export default function AdminReleaseStatusesPage() {
         title={`Редактировать: ${editTarget?.name}`}
         open={!!editTarget}
         onOk={() => void handleSave()}
-        onCancel={() => setEditTarget(null)}
+        onCancel={() => { setEditTarget(null); void load(); }}
         confirmLoading={saving}
         okText="Сохранить"
         cancelText="Отмена"

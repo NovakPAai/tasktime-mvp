@@ -36,6 +36,8 @@ import AdminWorkflowsPage from './pages/admin/AdminWorkflowsPage';
 import AdminWorkflowEditorPage from './pages/admin/AdminWorkflowEditorPage';
 import AdminWorkflowSchemesPage from './pages/admin/AdminWorkflowSchemesPage';
 import AdminWorkflowSchemeEditorPage from './pages/admin/AdminWorkflowSchemeEditorPage';
+import AdminRoleSchemesPage from './pages/admin/AdminRoleSchemesPage';
+import AdminRoleSchemeDetailPage from './pages/admin/AdminRoleSchemeDetailPage';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
 import AdminReleaseWorkflowsPage from './pages/admin/AdminReleaseWorkflowsPage';
@@ -195,6 +197,8 @@ export default function App() {
             <Route path="admin/workflows/:id" element={<AdminWorkflowEditorPage />} />
             <Route path="admin/workflow-schemes" element={<AdminWorkflowSchemesPage />} />
             <Route path="admin/workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
+            <Route path="admin/role-schemes" element={<AdminRoleSchemesPage />} />
+            <Route path="admin/role-schemes/:id" element={<AdminRoleSchemeDetailPage />} />
             <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
             <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
             <Route path="admin/release-workflows" element={<AdminReleaseWorkflowsPage />} />

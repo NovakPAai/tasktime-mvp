@@ -380,7 +380,7 @@ export default function AdminCustomFieldsPage() {
         title={editField ? 'Редактировать поле' : 'Добавить поле'}
         open={modalOpen}
         onOk={handleModalOk}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); void load(); }}
         confirmLoading={saving}
         okText={editField ? 'Сохранить' : 'Создать'}
         cancelText="Отмена"

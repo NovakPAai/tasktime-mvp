@@ -1,10 +1,13 @@
 import type { Prisma, SystemRoleType } from '@prisma/client';
+import { ProjectRole } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { config } from '../../config.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
 import { UAT_TESTS, type UatRole, type UatTest } from './uat-tests.data.js';
 import { hashPassword } from '../../shared/utils/password.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
+import { getSchemeForProject } from '../project-role-schemes/project-role-schemes.service.js';
 import type { CreateUserDto, UpdateUserAdminDto, AssignProjectRoleDto } from './admin.dto.js';
 
 function flattenRoles<T extends { systemRoles: { role: SystemRoleType }[] }>(
@@ -355,6 +358,12 @@ export async function getUserProjectRoles(userId: string) {
   });
 }
 
+// Shared include spec for UserProjectRole reads — keeps idempotent (existing) and create
+// responses symmetric so the API contract stays stable as fields are added.
+const USER_PROJECT_ROLE_INCLUDE = {
+  project: { select: { id: true, name: true, key: true } },
+} as const;
+
 export async function assignProjectRole(actorId: string, userId: string, dto: AssignProjectRoleDto) {
   const [user, project] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
@@ -363,15 +372,67 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   if (!user) throw new AppError(404, 'User not found');
   if (!project) throw new AppError(404, 'Project not found');
 
+  // Resolve legacy role enum value AND resolvedSchemeId. New clients send `roleId`; legacy clients
+  // send `role`; we always resolve the active project scheme so that `roleId` and `schemeId` are
+  // stored together on the UserProjectRole row — otherwise a legacy-only assignment would leave
+  // the row unlinked from the active scheme and later remapping/permission checks would have to
+  // rely on fragile legacy fallback.
+  const legacyRoles = Object.values(ProjectRole) as string[]; // Prisma-generated enum — kept in sync automatically.
+  let legacyRole = dto.role as ProjectRole | undefined;
+  let resolvedSchemeId: string | undefined;
+  let resolvedRoleId: string | undefined;
+  const projectScheme = await getSchemeForProject(dto.projectId);
+  if (dto.roleId) {
+    const roleDef = projectScheme.roles.find(r => r.id === dto.roleId);
+    if (!roleDef) {
+      throw new AppError(400, 'roleId не принадлежит схеме, привязанной к проекту');
+    }
+    resolvedSchemeId = projectScheme.id;
+    resolvedRoleId = dto.roleId;
+    const derivedKey = legacyRoles.includes(roleDef.key) ? (roleDef.key as ProjectRole) : undefined;
+    if (dto.role && derivedKey && dto.role !== derivedKey) {
+      throw new AppError(400, `Ключ роли "${roleDef.key}" не совпадает с legacy role "${dto.role}"`);
+    }
+    legacyRole = derivedKey ?? dto.role;
+  } else if (dto.role) {
+    // Legacy path: resolve the role in the active project scheme by key, so roleId/schemeId are
+    // still populated. If the active scheme doesn't define a role with this key, reject instead
+    // of silently creating a half-linked row.
+    const roleDef = projectScheme.roles.find(r => r.key === dto.role);
+    if (!roleDef) {
+      throw new AppError(400, `В схеме проекта нет роли с ключом "${dto.role}" — используйте roleId`);
+    }
+    legacyRole = dto.role;
+    resolvedSchemeId = projectScheme.id;
+    resolvedRoleId = roleDef.id;
+  }
+  if (!legacyRole) throw new AppError(400, 'Нужно передать role или roleId');
+
   const existing = await prisma.userProjectRole.findFirst({
-    where: { userId, projectId: dto.projectId, role: dto.role },
+    where: { userId, projectId: dto.projectId },
+    include: USER_PROJECT_ROLE_INCLUDE,
   });
-  if (existing) throw new AppError(409, 'Role already assigned');
+  if (existing) {
+    // Idempotent: the same assignment (matching legacy role AND roleId) is a no-op.
+    const sameLegacy = existing.role === legacyRole;
+    const sameRoleId = (existing.roleId ?? null) === (resolvedRoleId ?? null);
+    if (sameLegacy && sameRoleId) {
+      return existing;
+    }
+    throw new AppError(409, 'У пользователя уже есть другая роль в этом проекте — удалите её перед назначением новой');
+  }
 
   const roleEntry = await prisma.userProjectRole.create({
-    data: { userId, projectId: dto.projectId, role: dto.role },
-    include: { project: { select: { id: true, name: true, key: true } } },
+    data: {
+      userId,
+      projectId: dto.projectId,
+      role: legacyRole,
+      // roleId and schemeId must be set together (enforced by CHECK constraint on the DB side).
+      ...(resolvedRoleId && resolvedSchemeId ? { roleId: resolvedRoleId, schemeId: resolvedSchemeId } : {}),
+    },
+    include: USER_PROJECT_ROLE_INCLUDE,
   });
+  await invalidateProjectPermissionCache(dto.projectId, userId);
 
   await prisma.auditLog.create({
     data: {
@@ -379,7 +440,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
       entityType: 'user',
       entityId: userId,
       userId: actorId,
-      details: { projectId: dto.projectId, role: dto.role },
+      details: { projectId: dto.projectId, role: legacyRole, roleId: resolvedRoleId, schemeId: resolvedSchemeId },
     },
   });
 
@@ -393,6 +454,7 @@ export async function removeProjectRole(actorId: string, userId: string, roleId:
   if (!roleEntry) throw new AppError(404, 'Role assignment not found');
 
   await prisma.userProjectRole.delete({ where: { id: roleId } });
+  await invalidateProjectPermissionCache(roleEntry.projectId, userId);
 
   await prisma.auditLog.create({
     data: {

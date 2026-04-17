@@ -571,7 +571,7 @@ export default function TeamsPage() {
       <Modal
         open={isModalOpen}
         title={editingTeam ? 'Редактировать команду' : 'Новая команда'}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => { setIsModalOpen(false); void load(); }}
         onOk={() => void handleSave()}
         okText="Сохранить"
       >
@@ -593,7 +593,7 @@ export default function TeamsPage() {
       <Modal
         open={isMembersModalOpen}
         title={`Участники: ${editingTeam?.name ?? ''}`}
-        onCancel={() => setIsMembersModalOpen(false)}
+        onCancel={() => { setIsMembersModalOpen(false); void load(); }}
         onOk={() => void handleSaveMembers()}
         okText="Сохранить"
         width={520}

@@ -436,7 +436,7 @@ export default function AdminUsersPage() {
         title="Создать пользователя"
         open={createOpen}
         onOk={() => void handleCreate()}
-        onCancel={() => { setCreateOpen(false); createForm.resetFields(); }}
+        onCancel={() => { setCreateOpen(false); createForm.resetFields(); void loadUsers(); }}
         confirmLoading={creating}
         okText="Создать"
       >
@@ -458,7 +458,7 @@ export default function AdminUsersPage() {
         title={`Редактировать: ${editUser?.name}`}
         open={editOpen}
         onOk={() => void handleSave()}
-        onCancel={() => setEditOpen(false)}
+        onCancel={() => { setEditOpen(false); void loadUsers(); }}
         confirmLoading={saving}
         okText="Сохранить"
         width={640}
@@ -549,7 +549,7 @@ export default function AdminUsersPage() {
       <Modal
         title="Удалить пользователя"
         open={deleteOpen}
-        onCancel={() => { setDeleteOpen(false); setDeleteTarget(null); }}
+        onCancel={() => { setDeleteOpen(false); setDeleteTarget(null); void loadUsers(); }}
         footer={[
           <Button key="cancel" onClick={() => { setDeleteOpen(false); setDeleteTarget(null); }}>Отмена</Button>,
           <Button
@@ -575,7 +575,7 @@ export default function AdminUsersPage() {
       <Modal
         title="Нельзя удалить пользователя"
         open={deactivateOpen}
-        onCancel={() => { setDeactivateOpen(false); setDeactivateTarget(null); }}
+        onCancel={() => { setDeactivateOpen(false); setDeactivateTarget(null); void loadUsers(); }}
         footer={[
           <Button key="cancel" onClick={() => { setDeactivateOpen(false); setDeactivateTarget(null); }}>Отмена</Button>,
           <Button key="deactivate" type="primary" loading={deactivating} onClick={() => void handleDeactivate()}>

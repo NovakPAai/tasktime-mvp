@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-import { PrismaClient, Prisma, type User } from '@prisma/client';
+import { PrismaClient, Prisma, ProjectPermission, ProjectRole, type User } from '@prisma/client';
 
 import { bootstrapDefaultUsers, getBootstrapUsers } from './bootstrap.js';
 import { hashPassword } from '../shared/utils/password.js';
@@ -94,6 +94,169 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     seededUsers,
     process.env.BOOTSTRAP_OWNER_ADMIN_EMAIL,
   );
+
+  // ===== DEFAULT PROJECT ROLE SCHEME =====
+  // Everything below — default scheme upsert, role+permission matrix, and the legacy roleId
+  // backfill — runs inside a SINGLE interactive transaction. A partial failure here would
+  // leave the RBAC data in a mixed state (e.g. new scheme without roles, or some rows
+  // backfilled while others still carry roleId=NULL), which is hard to diagnose and can
+  // distort permission resolution until someone notices.
+  const DEFAULT_SCHEME_ID = '00000000-0000-0000-0000-000000000001';
+
+  // Typed via Prisma enums — any typo in a permission/role key is a compile-time error.
+  const DEFAULT_ROLE_MATRIX: Record<ProjectRole, { key: ProjectRole; name: string; color: string; permissions: ProjectPermission[] }> = {
+    [ProjectRole.ADMIN]: {
+      key: ProjectRole.ADMIN, name: 'Администратор', color: '#fa8c16',
+      permissions: [
+        ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT, ProjectPermission.ISSUES_DELETE,
+        ProjectPermission.ISSUES_ASSIGN, ProjectPermission.ISSUES_CHANGE_STATUS, ProjectPermission.ISSUES_CHANGE_TYPE,
+        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_MANAGE,
+        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_MANAGE,
+        ProjectPermission.MEMBERS_VIEW, ProjectPermission.MEMBERS_MANAGE,
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_MANAGE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_MANAGE,
+        ProjectPermission.PROJECT_SETTINGS_VIEW, ProjectPermission.PROJECT_SETTINGS_EDIT,
+        ProjectPermission.BOARDS_VIEW, ProjectPermission.BOARDS_MANAGE,
+      ],
+    },
+    [ProjectRole.MANAGER]: {
+      key: ProjectRole.MANAGER, name: 'Менеджер', color: '#1677ff',
+      permissions: [
+        ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT, ProjectPermission.ISSUES_DELETE,
+        ProjectPermission.ISSUES_ASSIGN, ProjectPermission.ISSUES_CHANGE_STATUS, ProjectPermission.ISSUES_CHANGE_TYPE,
+        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_MANAGE,
+        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_MANAGE,
+        ProjectPermission.MEMBERS_VIEW, ProjectPermission.MEMBERS_MANAGE,
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_MANAGE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_MANAGE,
+        ProjectPermission.PROJECT_SETTINGS_VIEW,
+        ProjectPermission.BOARDS_VIEW, ProjectPermission.BOARDS_MANAGE,
+      ],
+    },
+    [ProjectRole.USER]: {
+      key: ProjectRole.USER, name: 'Участник', color: '#52c41a',
+      permissions: [
+        ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT,
+        ProjectPermission.ISSUES_CHANGE_STATUS,
+        ProjectPermission.SPRINTS_VIEW,
+        ProjectPermission.RELEASES_VIEW,
+        ProjectPermission.MEMBERS_VIEW,
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE,
+        ProjectPermission.PROJECT_SETTINGS_VIEW,
+        ProjectPermission.BOARDS_VIEW,
+      ],
+    },
+    [ProjectRole.VIEWER]: {
+      key: ProjectRole.VIEWER, name: 'Наблюдатель', color: '#d9d9d9',
+      permissions: [
+        ProjectPermission.ISSUES_VIEW,
+        ProjectPermission.SPRINTS_VIEW,
+        ProjectPermission.RELEASES_VIEW,
+        ProjectPermission.MEMBERS_VIEW,
+        ProjectPermission.TIME_LOGS_VIEW,
+        ProjectPermission.COMMENTS_VIEW,
+        ProjectPermission.PROJECT_SETTINGS_VIEW,
+        ProjectPermission.BOARDS_VIEW,
+      ],
+    },
+  };
+
+  const ALL_PERMISSIONS: ProjectPermission[] = Object.values(ProjectPermission);
+
+  const { backfilled, unmappedKeys } = await client.$transaction(async (tx) => {
+    // 1. Ensure a single canonical default scheme.
+    await tx.projectRoleScheme.updateMany({
+      where: { isDefault: true, id: { not: DEFAULT_SCHEME_ID } },
+      data: { isDefault: false },
+    });
+    const defaultRoleScheme = await tx.projectRoleScheme.upsert({
+      where: { id: DEFAULT_SCHEME_ID },
+      update: { isDefault: true },
+      create: {
+        id: DEFAULT_SCHEME_ID,
+        name: 'Default',
+        description: 'Схема доступа по умолчанию',
+        isDefault: true,
+      },
+    });
+
+    // 2. Upsert system roles and their permission matrix (granted=true rows only).
+    for (const [, roleDef] of Object.entries(DEFAULT_ROLE_MATRIX)) {
+      const role = await tx.projectRoleDefinition.upsert({
+        where: { schemeId_key: { schemeId: defaultRoleScheme.id, key: roleDef.key } },
+        update: { name: roleDef.name, color: roleDef.color },
+        create: {
+          schemeId: defaultRoleScheme.id,
+          name: roleDef.name,
+          key: roleDef.key,
+          color: roleDef.color,
+          isSystem: true,
+        },
+      });
+      const grantedPerms = ALL_PERMISSIONS.filter(p => roleDef.permissions.includes(p));
+      const revokedPerms = ALL_PERMISSIONS.filter(p => !roleDef.permissions.includes(p));
+      if (revokedPerms.length > 0) {
+        await tx.projectRolePermission.deleteMany({
+          where: { roleId: role.id, permission: { in: revokedPerms } },
+        });
+      }
+      for (const perm of grantedPerms) {
+        await tx.projectRolePermission.upsert({
+          where: { roleId_permission: { roleId: role.id, permission: perm } },
+          update: { granted: true },
+          create: { roleId: role.id, permission: perm, granted: true },
+        });
+      }
+    }
+
+    // 3. Backfill UserProjectRole.roleId/schemeId PER-PROJECT: resolve the project's active
+    // scheme (explicit binding → else default) and find the role by key in THAT scheme.
+    const bindings = await tx.projectRoleSchemeProject.findMany({
+      select: { projectId: true, schemeId: true },
+    });
+    const projectToSchemeId = new Map(bindings.map(b => [b.projectId, b.schemeId]));
+    const allSchemeRoles = await tx.projectRoleDefinition.findMany({
+      select: { id: true, key: true, schemeId: true },
+    });
+    const schemeKeyToRoleId = new Map<string, string>(
+      allSchemeRoles.map(r => [`${r.schemeId}:${r.key}`, r.id]),
+    );
+    const rowsToBackfill = await tx.userProjectRole.findMany({
+      where: { roleId: null },
+      select: { id: true, projectId: true, role: true },
+    });
+    const groups = new Map<string, { schemeId: string; role: string; ids: string[] }>();
+    for (const r of rowsToBackfill) {
+      const effectiveSchemeId = projectToSchemeId.get(r.projectId) ?? defaultRoleScheme.id;
+      const key = `${effectiveSchemeId}:${r.role}`;
+      const bucket = groups.get(key) ?? { schemeId: effectiveSchemeId, role: r.role, ids: [] };
+      bucket.ids.push(r.id);
+      groups.set(key, bucket);
+    }
+    let backfilled = 0;
+    const unmappedKeys: string[] = [];
+    for (const [key, { schemeId, role, ids }] of groups) {
+      const targetRoleId = schemeKeyToRoleId.get(key);
+      if (!targetRoleId) {
+        unmappedKeys.push(`${role}@scheme:${schemeId}(${ids.length})`);
+        continue;
+      }
+      const { count } = await tx.userProjectRole.updateMany({
+        where: { id: { in: ids } },
+        data: { roleId: targetRoleId, schemeId },
+      });
+      backfilled += count;
+    }
+    return { defaultRoleScheme, backfilled, unmappedKeys };
+  }, { timeout: 30000 });
+
+  console.log('Default project role scheme seeded.');
+  console.log(`Backfilled ${backfilled} UserProjectRole records.`);
+  if (unmappedKeys.length > 0) {
+    console.warn(`Unmapped legacy role values (no matching key in the project's active scheme): ${unmappedKeys.join(', ')}`);
+  }
+  // ===== END DEFAULT PROJECT ROLE SCHEME =====
 
   // Create projects (DEMO/BACK/LIVE only when not TTMP_ONLY)
   let project: { id: string; key: string } | null = null;

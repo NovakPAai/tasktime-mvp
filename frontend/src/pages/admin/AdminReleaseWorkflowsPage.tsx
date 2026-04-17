@@ -190,7 +190,7 @@ export default function AdminReleaseWorkflowsPage() {
       <Modal
         title={editing ? 'Редактировать workflow' : 'Создать workflow'}
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); void load(); }}
         footer={null}
         destroyOnClose
       >
@@ -223,7 +223,7 @@ export default function AdminReleaseWorkflowsPage() {
           </Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={saving}>Сохранить</Button>
-            <Button onClick={() => setModalOpen(false)}>Отмена</Button>
+            <Button onClick={() => { setModalOpen(false); void load(); }}>Отмена</Button>
           </Space>
         </Form>
       </Modal>

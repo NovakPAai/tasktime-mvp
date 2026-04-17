@@ -202,6 +202,7 @@ export default function Sidebar({
     { type: 'divider', label: 'Пользователи' },
     { type: 'link', path: '/admin/users',       label: 'Пользователи' },
     { type: 'link', path: '/admin/roles',       label: 'Назначение ролей' },
+    { type: 'link', path: '/admin/role-schemes', label: 'Схемы доступа' },
 
     { type: 'divider', label: 'Проекты' },
     { type: 'link', path: '/admin/projects',    label: 'Проекты' },

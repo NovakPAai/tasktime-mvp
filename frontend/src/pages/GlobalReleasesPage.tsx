@@ -795,7 +795,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
       <Modal
         open={addIssuesOpen}
         title="Добавить задачи в релиз"
-        onCancel={() => { setAddIssuesOpen(false); setSelectedIssueIds([]); setIssueSearch(''); setIssueProjectFilter(undefined); setAllIssues([]); }}
+        onCancel={() => { setAddIssuesOpen(false); setSelectedIssueIds([]); setIssueSearch(''); setIssueProjectFilter(undefined); setAllIssues([]); onReleasesRefresh(); }}
         onOk={handleAddIssues}
         okText="Добавить"
         cancelText="Отмена"
@@ -861,7 +861,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
       <Modal
         open={addSprintsOpen}
         title="Добавить спринты в релиз"
-        onCancel={() => { setAddSprintsOpen(false); setSelectedSprintIds([]); }}
+        onCancel={() => { setAddSprintsOpen(false); setSelectedSprintIds([]); onReleasesRefresh(); }}
         onOk={handleAddSprints}
         okText="Добавить"
         cancelText="Отмена"
@@ -1377,7 +1377,7 @@ export default function GlobalReleasesPage() {
             C={C}
             isDark={isDark}
             canManage={canManage}
-            onClose={() => setSelectedRelease(null)}
+            onClose={() => { setSelectedRelease(null); void loadReleases(page); }}
             onTransition={handleTransition}
             onReleasesRefresh={() => loadReleases(page)}
           />
@@ -1388,7 +1388,7 @@ export default function GlobalReleasesPage() {
       <Modal
         open={createOpen}
         title="Создать релиз"
-        onCancel={() => { setCreateOpen(false); createForm.resetFields(); setCreateType('ATOMIC'); }}
+        onCancel={() => { setCreateOpen(false); createForm.resetFields(); setCreateType('ATOMIC'); void loadReleases(page); }}
         onOk={() => createForm.submit()}
         okText="Создать"
         cancelText="Отмена"
