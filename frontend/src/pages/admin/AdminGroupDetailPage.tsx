@@ -48,6 +48,7 @@ export default function AdminGroupDetailPage() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [grantProjectId, setGrantProjectId] = useState<string | undefined>();
   const [grantProjectScheme, setGrantProjectScheme] = useState<ProjectRoleScheme | null>(null);
+  const [grantSchemeLoading, setGrantSchemeLoading] = useState(false);
   const [grantRoleId, setGrantRoleId] = useState<string | undefined>();
   const [granting, setGranting] = useState(false);
 
@@ -107,15 +108,18 @@ export default function AdminGroupDetailPage() {
   useEffect(() => {
     setGrantProjectScheme(null);
     setGrantRoleId(undefined);
-    if (!grantProjectId) return;
+    if (!grantProjectId) { setGrantSchemeLoading(false); return; }
+    // AI review #66 round 9 🟡 — surface the scheme fetch as a loading state on the role select
+    // so the user doesn't see an unexplained empty dropdown during the request.
+    setGrantSchemeLoading(true);
     let cancelled = false;
     roleSchemesApi.getForProject(grantProjectId)
       .then(s => { if (!cancelled) setGrantProjectScheme(s); })
       .catch(() => {
         if (cancelled) return;
         message.error('Не удалось загрузить схему проекта');
-        // State already cleared above — nothing to roll back.
-      });
+      })
+      .finally(() => { if (!cancelled) setGrantSchemeLoading(false); });
     return () => { cancelled = true; };
   }, [grantProjectId]);
 
@@ -409,11 +413,18 @@ export default function AdminGroupDetailPage() {
             options={availableProjectsForGrant.map(p => ({ value: p.id, label: `${p.key}: ${p.name}` }))}
           />
           <Select
-            placeholder={grantProjectScheme ? 'Роль' : 'Сначала выберите проект'}
+            placeholder={
+              grantSchemeLoading
+                ? 'Загрузка ролей…'
+                : grantProjectScheme
+                  ? 'Роль'
+                  : 'Сначала выберите проект'
+            }
             style={{ width: '100%' }}
             value={grantRoleId}
             onChange={setGrantRoleId}
-            disabled={!grantProjectScheme}
+            disabled={!grantProjectScheme || grantSchemeLoading}
+            loading={grantSchemeLoading}
             options={(grantProjectScheme?.roles ?? []).map(r => ({
               value: r.id,
               label: r.name,
