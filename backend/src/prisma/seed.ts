@@ -139,6 +139,9 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
         ProjectPermission.BOARDS_VIEW, ProjectPermission.BOARDS_MANAGE,
       ],
     },
+    // TTSEC-2: USER и VIEWER НЕ получают новых permissions по умолчанию — спека §5.4.
+    // Гранулярный CRUD SPRINTS/RELEASES, *_DELETE_OTHERS и USER_GROUP_* — привилегии ADMIN/MANAGER.
+    // У USER остаётся только VIEW на sprints/releases; у VIEWER — read-only. Пропуск намеренный.
     [ProjectRole.USER]: {
       key: ProjectRole.USER, name: 'Участник', color: '#52c41a',
       permissions: [

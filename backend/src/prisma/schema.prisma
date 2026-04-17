@@ -958,6 +958,10 @@ model WorkflowSchemeProject {
 
 // ===== PROJECT ROLE SCHEMES =====
 
+// TTSEC-2 note: USER_GROUP_* живут в этом enum как временный компромисс —
+// инфраструктура permissions пока одна. В Phase 2 планируется изолировать
+// system-level проверки в отдельном helper (`assertSystemPermission`), чтобы
+// проектный middleware их не принимал как project-scoped permission.
 enum ProjectPermission {
   ISSUES_VIEW
   ISSUES_CREATE
@@ -1059,7 +1063,12 @@ model ProjectRoleSchemeProject {
 // ===== USER GROUPS (TTSEC-2) =====
 
 model UserGroup {
-  id          String   @id @default(uuid())
+  id   String @id @default(uuid())
+  // TTSEC-2: `name` — глобально уникален. Система single-tenant, `Project.key`
+  // уже глобально уникален, поэтому Legacy-имя `Legacy: {project.key} — {role.name}`
+  // детерминировано, а `ON CONFLICT (name) DO NOTHING` делает Legacy-backfill идемпотентным.
+  // Если в будущем появится мульти-тенант или переименование проекта — ввести slug/legacyKey
+  // и ослабить уникальность до контекста (см. AI-review PR #64).
   name        String   @unique
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
@@ -1099,6 +1108,10 @@ model ProjectGroupRole {
   project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   roleDefinition ProjectRoleDefinition @relation(fields: [roleId, schemeId], references: [id, schemeId], onDelete: Restrict)
 
+  // TTSEC-2 intentional: одна группа → одна роль в проекте. Продиктовано спекой §2+§5.1.2:
+  // merge-priority (max permissions) разводит конфликты МЕЖДУ несколькими группами одного юзера,
+  // а не внутри одной группы. Комбинирование нескольких ролей одной группы в одном проекте —
+  // out of scope MVP; при появлении такого требования ослабить до @@unique([groupId, projectId, roleId]).
   @@unique([groupId, projectId])
   @@index([projectId])
   @@index([groupId])
