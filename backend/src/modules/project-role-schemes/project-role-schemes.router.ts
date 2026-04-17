@@ -53,9 +53,9 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
 
 router.post('/:id/projects', validate(attachProjectDto), async (req: AuthRequest, res, next) => {
   try {
-    const binding = await service.attachProject(req.params.id as string, req.body.projectId);
+    const { binding, created } = await service.attachProject(req.params.id as string, req.body.projectId);
     await logAudit(req, 'role_scheme.project_attached', 'role_scheme', req.params.id as string, req.body);
-    res.status(201).json(binding);
+    res.status(created ? 201 : 200).json(binding);
   } catch (err) { next(err); }
 });
 

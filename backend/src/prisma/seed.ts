@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-import { PrismaClient, Prisma, type User } from '@prisma/client';
+import { PrismaClient, Prisma, ProjectRole, type User } from '@prisma/client';
 
 import { bootstrapDefaultUsers, getBootstrapUsers } from './bootstrap.js';
 import { hashPassword } from '../shared/utils/password.js';
@@ -203,33 +203,32 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   }
   console.log('Default project role scheme seeded.');
 
-  // Backfill UserProjectRole.roleId
+  // Backfill UserProjectRole.roleId / schemeId — one updateMany per legacy ProjectRole value
+  // (4 queries total, independent of row count). Unmapped legacy values are reported but not
+  // updated so we don't silently paper over unknown keys.
   const schemeRoles = await client.projectRoleDefinition.findMany({
     where: { schemeId: defaultRoleScheme.id },
     select: { id: true, key: true },
   });
-  const roleKeyToId = Object.fromEntries(schemeRoles.map(r => [r.key, r.id]));
-  const userProjectRoles = await client.userProjectRole.findMany({
-    where: { roleId: null },
-  });
+  const roleKeyToId = new Map(schemeRoles.map(r => [r.key, r.id]));
   let backfilled = 0;
-  const unmapped: string[] = [];
-  for (const upr of userProjectRoles) {
-    const roleId = roleKeyToId[upr.role as string];
-    if (roleId) {
-      await client.userProjectRole.update({
-        where: { id: upr.id },
-        data: { roleId, schemeId: defaultRoleScheme.id },
-      });
-      backfilled += 1;
-    } else {
-      unmapped.push(upr.role as string);
+  const unmappedKeys: string[] = [];
+  for (const key of Object.values(ProjectRole)) {
+    const roleId = roleKeyToId.get(key);
+    if (!roleId) {
+      const leftover = await client.userProjectRole.count({ where: { role: key, roleId: null } });
+      if (leftover > 0) unmappedKeys.push(`${key}(${leftover})`);
+      continue;
     }
+    const { count } = await client.userProjectRole.updateMany({
+      where: { role: key, roleId: null },
+      data: { roleId, schemeId: defaultRoleScheme.id },
+    });
+    backfilled += count;
   }
-  console.log(`Backfilled ${backfilled}/${userProjectRoles.length} UserProjectRole records.`);
-  if (unmapped.length > 0) {
-    const unique = Array.from(new Set(unmapped));
-    console.warn(`Unmapped legacy role values (no matching key in default scheme): ${unique.join(', ')}`);
+  console.log(`Backfilled ${backfilled} UserProjectRole records.`);
+  if (unmappedKeys.length > 0) {
+    console.warn(`Unmapped legacy role values (no matching key in default scheme): ${unmappedKeys.join(', ')}`);
   }
   // ===== END DEFAULT PROJECT ROLE SCHEME =====
 

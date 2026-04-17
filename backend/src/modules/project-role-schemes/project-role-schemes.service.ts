@@ -136,18 +136,20 @@ export async function attachProject(schemeId: string, projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new AppError(404, 'Project not found');
 
-  const binding = await prisma.$transaction(async (tx) => {
+  const { binding, created } = await prisma.$transaction(async (tx) => {
+    const existing = await tx.projectRoleSchemeProject.findUnique({ where: { projectId } });
     await remapProjectUserRolesToScheme(tx, projectId, schemeId);
-    return tx.projectRoleSchemeProject.upsert({
+    const binding = await tx.projectRoleSchemeProject.upsert({
       where: { projectId },
       update: { schemeId },
       create: { schemeId, projectId },
     });
+    return { binding, created: !existing };
   });
 
   await delCachedJson(PROJECT_SCHEME_KEY(projectId));
   await delCacheByPrefix(`rbac:perm:${projectId}:`);
-  return binding;
+  return { binding, created };
 }
 
 export async function detachProject(schemeId: string, projectId: string) {
@@ -170,6 +172,12 @@ export async function detachProject(schemeId: string, projectId: string) {
 export async function getSchemeForProject(projectId: string) {
   const cached = await getCachedJson<Awaited<ReturnType<typeof getScheme>>>(PROJECT_SCHEME_KEY(projectId));
   if (cached) return cached;
+
+  // Validate project exists before returning any scheme (the default) — otherwise the public
+  // /api/projects/:projectId/role-scheme endpoint would silently answer for arbitrary UUIDs
+  // and the permission cache would accumulate entries for non-existent projects.
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
+  if (!project) throw new AppError(404, 'Project not found');
 
   const binding = await prisma.projectRoleSchemeProject.findUnique({
     where: { projectId },

@@ -148,11 +148,13 @@ export function createApp() {
     }
   });
 
-  // Project role scheme — requires membership in the project (MEMBERS_VIEW) or global project-read role.
+  // Project role scheme — strictly scoped to project members. Global project-read system roles
+  // (ADMIN/RELEASE_MANAGER/AUDITOR) do NOT bypass this check — role/permission matrices are
+  // considered per-project configuration. SUPER_ADMIN still passes through unconditionally.
   app.get(
     '/api/projects/:projectId/role-scheme',
     authenticate,
-    requireProjectPermission((req) => req.params.projectId as string, 'MEMBERS_VIEW'),
+    requireProjectPermission((req) => req.params.projectId as string, 'MEMBERS_VIEW', { allowGlobalRead: false }),
     async (req, res, next) => {
       try {
         res.json(await getRoleSchemeForProject(req.params.projectId as string));
