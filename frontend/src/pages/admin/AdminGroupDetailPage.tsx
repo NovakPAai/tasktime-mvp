@@ -42,6 +42,12 @@ export default function AdminGroupDetailPage() {
   const [allUsers, setAllUsers] = useState<AdminUser[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [addingMembers, setAddingMembers] = useState(false);
+  // AI review #66 round 12 🟡 — initial bulk load is capped at 500 for UX (virtualisation
+  // becomes ugly beyond that). On installations with more users, admins type a search in the
+  // multi-select; we run a debounced server-side search and swap the candidate list.
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const [memberCandidates, setMemberCandidates] = useState<AdminUser[] | null>(null);
 
   // Grant project role
   const [grantOpen, setGrantOpen] = useState(false);
@@ -98,6 +104,28 @@ export default function AdminGroupDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Debounced server-side user search for the add-members select. Null `memberCandidates` means
+  // "no active search" and the UI falls back to the initial 500-user bulk load; populated array
+  // means "show these server results". Empty search clears the override.
+  useEffect(() => {
+    if (!addMembersOpen) return;
+    const q = memberSearch.trim();
+    if (q.length === 0) { setMemberCandidates(null); setMemberSearchLoading(false); return; }
+    setMemberSearchLoading(true);
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const resp = await adminApi.listUsers({ search: q, isActive: true, pageSize: 100 });
+        if (!cancelled) setMemberCandidates(resp.users);
+      } catch {
+        if (!cancelled) setMemberCandidates([]);
+      } finally {
+        if (!cancelled) setMemberSearchLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [memberSearch, addMembersOpen]);
 
   // When the admin picks a project, fetch its active scheme so the role-select only lists roles
   // that backend will actually accept (grantProjectRole rejects cross-scheme roles with 400).
@@ -170,8 +198,11 @@ export default function AdminGroupDetailPage() {
   const availableUsersForAdd = useMemo(() => {
     if (!group) return [];
     const existing = new Set(group.members.map(m => m.userId));
-    return allUsers.filter(u => !existing.has(u.id));
-  }, [allUsers, group]);
+    // Source precedence: active server search results > initial bulk list. Both get the
+    // existing-members filter so we never offer someone who's already in.
+    const source = memberCandidates ?? allUsers;
+    return source.filter(u => !existing.has(u.id));
+  }, [allUsers, memberCandidates, group]);
 
   const availableProjectsForGrant = useMemo(() => {
     if (!group) return allProjects;
@@ -203,6 +234,8 @@ export default function AdminGroupDetailPage() {
       message.success(`Добавлено: ${selectedUserIds.length}`);
       setAddMembersOpen(false);
       setSelectedUserIds([]);
+      setMemberSearch('');
+      setMemberCandidates(null);
       load();
     } catch {
       message.error('Не удалось добавить участников');
@@ -360,7 +393,7 @@ export default function AdminGroupDetailPage() {
       <Modal
         title="Добавить участников"
         open={addMembersOpen}
-        onCancel={() => { setAddMembersOpen(false); setSelectedUserIds([]); void load(); }}
+        onCancel={() => { setAddMembersOpen(false); setSelectedUserIds([]); setMemberSearch(''); setMemberCandidates(null); void load(); }}
         onOk={handleAddMembers}
         okText="Добавить"
         cancelText="Отмена"
@@ -371,14 +404,18 @@ export default function AdminGroupDetailPage() {
       >
         <Select
           mode="multiple"
-          placeholder="Выберите пользователей"
+          placeholder="Начните вводить имя или email"
           value={selectedUserIds}
           onChange={setSelectedUserIds}
           style={{ width: '100%' }}
           showSearch
-          filterOption={(input, opt) =>
-            (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())
-          }
+          // Switch to server-driven search: client-side filtering returns false so the Select
+          // trusts the options we pass (already filtered by server search + existing members).
+          filterOption={false}
+          onSearch={setMemberSearch}
+          onBlur={() => setMemberSearch('')}
+          loading={memberSearchLoading}
+          notFoundContent={memberSearchLoading ? 'Поиск…' : memberSearch ? 'Ничего не найдено' : 'Введите запрос для поиска большего числа пользователей'}
           options={availableUsersForAdd.map(u => ({
             value: u.id,
             label: `${u.name} · ${u.email}`,
