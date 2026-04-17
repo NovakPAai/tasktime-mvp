@@ -1,14 +1,23 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import {
-  invalidateUserEffectivePermissions,
-  invalidateProjectPermissionCache,
-} from '../../shared/middleware/rbac.js';
+import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
 import type {
   CreateUserGroupDto,
   UpdateUserGroupDto,
   GrantProjectRoleDto,
 } from './user-groups.dto.js';
+
+/**
+ * Invalidate both the new group-aware effective cache AND the legacy per-permission cache for
+ * every (user, project) pair that a group change touches. Pair-based is exact and kills legacy
+ * `rbac:perm:*` keys too (AI review #65 round 3 🟡). Used by add/remove member, grant/revoke
+ * binding, delete group.
+ */
+async function invalidatePairs(pairs: Iterable<{ userId: string; projectId: string }>): Promise<void> {
+  await Promise.all(
+    Array.from(pairs).map(p => invalidateProjectPermissionCache(p.projectId, p.userId)),
+  );
+}
 
 /**
  * TTSEC-2 Phase 2 user groups.
@@ -114,12 +123,7 @@ export async function deleteGroup(id: string) {
   }
 
   await prisma.userGroup.delete({ where: { id } });
-
-  await Promise.all(
-    Array.from(new Set(group.members.map(m => m.userId))).map(uid =>
-      invalidateUserEffectivePermissions(uid),
-    ),
-  );
+  await invalidatePairs(affectedPairs);
 
   return {
     name: group.name,
@@ -153,7 +157,10 @@ export async function getGroupImpact(id: string) {
 }
 
 export async function addMembers(groupId: string, userIds: string[], addedById: string) {
-  const group = await prisma.userGroup.findUnique({ where: { id: groupId }, select: { id: true } });
+  const group = await prisma.userGroup.findUnique({
+    where: { id: groupId },
+    include: { projectRoles: { select: { projectId: true } } },
+  });
   if (!group) throw new AppError(404, 'Группа не найдена');
 
   const users = await prisma.user.findMany({
@@ -172,7 +179,9 @@ export async function addMembers(groupId: string, userIds: string[], addedById: 
     skipDuplicates: true,
   });
 
-  await Promise.all(userIds.map(uid => invalidateUserEffectivePermissions(uid)));
+  // Only the projects this group is bound to are affected by the new members — exact invalidation.
+  const pairs = userIds.flatMap(uid => group.projectRoles.map(pr => ({ userId: uid, projectId: pr.projectId })));
+  await invalidatePairs(pairs);
   return { added: result.count };
 }
 
@@ -182,10 +191,19 @@ export async function removeMember(groupId: string, userId: string) {
     select: { groupId: true },
   });
   if (!existing) throw new AppError(404, 'Пользователь не является участником группы');
+
+  // Capture the projects bound to this group BEFORE deleting membership — those are the projects
+  // where the removed user is losing access.
+  const bindings = await prisma.projectGroupRole.findMany({
+    where: { groupId },
+    select: { projectId: true },
+  });
+
   await prisma.userGroupMember.delete({
     where: { groupId_userId: { groupId, userId } },
   });
-  await invalidateUserEffectivePermissions(userId);
+
+  await invalidatePairs(bindings.map(b => ({ userId, projectId: b.projectId })));
   return { ok: true };
 }
 

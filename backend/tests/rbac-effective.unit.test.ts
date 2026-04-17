@@ -141,14 +141,14 @@ describe('computeEffectiveRole', () => {
     expect(eff?.roleId).toBe('aaaa'); // min id wins tiebreaker
   });
 
-  it('same role via both DIRECT and GROUP is listed once with sourceGroups populated', async () => {
+  it('when chosen role is DIRECT, sourceGroups is empty even if groups also grant it (round 3)', async () => {
     mockPrisma.userProjectRole.findMany.mockResolvedValue([{ roleId: ADMIN.id, role: 'ADMIN' }]);
     mockPrisma.projectGroupRole.findMany.mockResolvedValue([
       { roleId: ADMIN.id, group: { id: 'g-1', name: 'Admins' }, roleDefinition: { key: 'ADMIN' } },
     ]);
     const eff = await computeEffectiveRole(USER_ID, PROJECT_ID);
-    expect(eff?.source).toBe('DIRECT'); // direct was inserted first
-    expect(eff?.sourceGroups).toEqual([{ id: 'g-1', name: 'Admins' }]);
+    expect(eff?.source).toBe('DIRECT');
+    expect(eff?.sourceGroups).toEqual([]);
   });
 
   it('sourceGroups is deduplicated when the same group appears twice (AI review #65 round 2)', async () => {
