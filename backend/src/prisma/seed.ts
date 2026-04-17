@@ -191,15 +191,20 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
         isSystem: true,
       },
     });
-    for (const perm of ALL_PERMISSIONS) {
+    // Store only granted=true rows (absence of a row means "not granted"). Matches the service
+    // model in updatePermissions — keeps the permissions table compact and consistent.
+    const grantedPerms = ALL_PERMISSIONS.filter(p => roleDef.permissions.includes(p));
+    const revokedPerms = ALL_PERMISSIONS.filter(p => !roleDef.permissions.includes(p));
+    if (revokedPerms.length > 0) {
+      await client.projectRolePermission.deleteMany({
+        where: { roleId: role.id, permission: { in: revokedPerms as any } },
+      });
+    }
+    for (const perm of grantedPerms) {
       await client.projectRolePermission.upsert({
         where: { roleId_permission: { roleId: role.id, permission: perm as any } },
-        update: { granted: roleDef.permissions.includes(perm) },
-        create: {
-          roleId: role.id,
-          permission: perm as any,
-          granted: roleDef.permissions.includes(perm),
-        },
+        update: { granted: true },
+        create: { roleId: role.id, permission: perm as any, granted: true },
       });
     }
   }

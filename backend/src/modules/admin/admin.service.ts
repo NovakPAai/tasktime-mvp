@@ -404,8 +404,17 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
 
   const existing = await prisma.userProjectRole.findFirst({
     where: { userId, projectId: dto.projectId },
+    include: { project: { select: { id: true, name: true, key: true } } },
   });
-  if (existing) throw new AppError(409, 'У пользователя уже есть роль в этом проекте — удалите её перед назначением новой');
+  if (existing) {
+    // Idempotent: the same assignment (matching legacy role AND roleId) is a no-op.
+    const sameLegacy = existing.role === legacyRole;
+    const sameRoleId = (existing.roleId ?? null) === (resolvedRoleId ?? null);
+    if (sameLegacy && sameRoleId) {
+      return existing;
+    }
+    throw new AppError(409, 'У пользователя уже есть другая роль в этом проекте — удалите её перед назначением новой');
+  }
 
   const roleEntry = await prisma.userProjectRole.create({
     data: {

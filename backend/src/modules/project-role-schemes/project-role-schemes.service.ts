@@ -152,6 +152,7 @@ export async function deleteScheme(id: string) {
   // Invalidate BEFORE delete — otherwise any bindings are already gone (cascade) and we cannot
   // resolve the list of projectIds whose cache still holds a reference to this scheme.
   await invalidateSchemeCache(id);
+  await invalidatePermissionCacheForScheme(id);
   await prisma.projectRoleScheme.delete({ where: { id } });
   return { ok: true };
 }
