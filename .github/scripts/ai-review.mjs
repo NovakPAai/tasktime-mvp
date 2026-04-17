@@ -44,6 +44,8 @@ const IGNORE_PATTERNS = [
   /__generated__/,
   /\.snap$/,
   /public\/assets\//,
+  /version_history\.md$/,
+  /CHANGELOG\.md$/,
 ];
 
 function shouldIgnore(filePath) {
@@ -154,6 +156,7 @@ CRITICAL rules to prevent review loops:
 - ONLY raise issues that are: (a) still unresolved from previous review, OR (b) genuinely new problems introduced by the latest commits.
 - Be conservative on follow-up reviews: prefer "approve" over "request_changes" unless something is truly critical or high severity.
 - If an issue from previous review is partially addressed (improved but not perfect), mark it resolved and leave a positive note instead of blocking again.
+- Do NOT repeat reminders about manually maintained files (version_history.md, CHANGELOG, release notes) — if you mentioned them in the previous review, do not mention them again.
 - Write ALL text fields in ${REVIEW_LANGUAGE}.
 - Return ONLY valid JSON, no markdown code fences.
 - For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
@@ -188,7 +191,8 @@ Rules:
 - Return ONLY valid JSON, no markdown code fences.
 - Skip trivial style issues unless they're systematic.
 - For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
-- Verdict: "approve" if no critical/high issues; "request_changes" if critical/high exist; "comment" otherwise.`;
+- Verdict: "approve" if no critical/high issues; "request_changes" if critical/high exist; "comment" otherwise.
+- Do NOT remind about manually maintained files (version_history.md, CHANGELOG, release notes) — these are updated by the team manually after merge, not in every commit.`;
 
   const previousReviewSection = isFollowUp
     ? `\n\nPREVIOUS REVIEW (what you flagged before — check which issues are now resolved):\n${previousReview}\n\n---\n`
