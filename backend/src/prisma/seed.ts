@@ -96,17 +96,26 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   );
 
   // ===== DEFAULT PROJECT ROLE SCHEME =====
-  // Re-assert isDefault=true on update: getSchemeForProject/detachProject 500 without a default,
-  // so seed must actively restore the flag if it was ever flipped off in this DB.
-  const defaultRoleScheme = await client.projectRoleScheme.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000001' },
-    update: { isDefault: true },
-    create: {
-      id: '00000000-0000-0000-0000-000000000001',
-      name: 'Default',
-      description: 'Схема доступа по умолчанию',
-      isDefault: true,
-    },
+  // Atomically ensure a single default: first clear isDefault on any OTHER scheme that has it,
+  // then upsert the canonical default and (re-)assert isDefault=true. Without the updateMany a
+  // pre-existing default with a different id would survive, leaving the system with multiple
+  // defaults and making findFirst({ isDefault: true }) non-deterministic.
+  const DEFAULT_SCHEME_ID = '00000000-0000-0000-0000-000000000001';
+  const defaultRoleScheme = await client.$transaction(async (tx) => {
+    await tx.projectRoleScheme.updateMany({
+      where: { isDefault: true, id: { not: DEFAULT_SCHEME_ID } },
+      data: { isDefault: false },
+    });
+    return tx.projectRoleScheme.upsert({
+      where: { id: DEFAULT_SCHEME_ID },
+      update: { isDefault: true },
+      create: {
+        id: DEFAULT_SCHEME_ID,
+        name: 'Default',
+        description: 'Схема доступа по умолчанию',
+        isDefault: true,
+      },
+    });
   });
 
   const DEFAULT_ROLE_MATRIX: Record<string, { key: string; name: string; color: string; permissions: string[] }> = {

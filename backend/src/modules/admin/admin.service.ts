@@ -358,6 +358,12 @@ export async function getUserProjectRoles(userId: string) {
   });
 }
 
+// Shared include spec for UserProjectRole reads — keeps idempotent (existing) and create
+// responses symmetric so the API contract stays stable as fields are added.
+const USER_PROJECT_ROLE_INCLUDE = {
+  project: { select: { id: true, name: true, key: true } },
+} as const;
+
 export async function assignProjectRole(actorId: string, userId: string, dto: AssignProjectRoleDto) {
   const [user, project] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
@@ -404,7 +410,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
 
   const existing = await prisma.userProjectRole.findFirst({
     where: { userId, projectId: dto.projectId },
-    include: { project: { select: { id: true, name: true, key: true } } },
+    include: USER_PROJECT_ROLE_INCLUDE,
   });
   if (existing) {
     // Idempotent: the same assignment (matching legacy role AND roleId) is a no-op.
@@ -424,7 +430,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
       // roleId and schemeId must be set together (enforced by CHECK constraint on the DB side).
       ...(resolvedRoleId && resolvedSchemeId ? { roleId: resolvedRoleId, schemeId: resolvedSchemeId } : {}),
     },
-    include: { project: { select: { id: true, name: true, key: true } } },
+    include: USER_PROJECT_ROLE_INCLUDE,
   });
   await invalidateProjectPermissionCache(dto.projectId, userId);
 

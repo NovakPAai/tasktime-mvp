@@ -64,32 +64,33 @@ export async function createScheme(dto: CreateSchemeDto) {
       where: { isDefault: true },
       include: { roles: { include: { permissions: true } } },
     });
+    // Require a default scheme to exist — createScheme clones system roles from it. Without a
+    // source the new scheme would be unusable (no ADMIN/MANAGER/USER/VIEWER, attachProject 400s).
+    // Run `prisma db seed` to initialize the default scheme.
+    if (!sourceScheme) {
+      throw new AppError(500, 'No default role scheme configured — run seed to initialize the system default scheme before creating new schemes');
+    }
     if (dto.isDefault) {
       await tx.projectRoleScheme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
     }
     const scheme = await tx.projectRoleScheme.create({ data: dto });
     // Bootstrap the 4 system roles with permissions cloned from the previous default scheme.
-    // Without this a freshly created scheme has no ADMIN/MANAGER/USER/VIEWER definitions, so
-    // attachProject (which remaps UserProjectRole rows by role key) would reject any project
-    // that already has members.
-    if (sourceScheme) {
-      for (const srcRole of sourceScheme.roles.filter(r => r.isSystem)) {
-        const dstRole = await tx.projectRoleDefinition.create({
-          data: {
-            schemeId: scheme.id,
-            name: srcRole.name,
-            key: srcRole.key,
-            description: srcRole.description,
-            color: srcRole.color,
-            isSystem: true,
-          },
+    for (const srcRole of sourceScheme.roles.filter(r => r.isSystem)) {
+      const dstRole = await tx.projectRoleDefinition.create({
+        data: {
+          schemeId: scheme.id,
+          name: srcRole.name,
+          key: srcRole.key,
+          description: srcRole.description,
+          color: srcRole.color,
+          isSystem: true,
+        },
+      });
+      const grantedPerms = srcRole.permissions.filter(p => p.granted);
+      if (grantedPerms.length > 0) {
+        await tx.projectRolePermission.createMany({
+          data: grantedPerms.map(p => ({ roleId: dstRole.id, permission: p.permission, granted: true })),
         });
-        const grantedPerms = srcRole.permissions.filter(p => p.granted);
-        if (grantedPerms.length > 0) {
-          await tx.projectRolePermission.createMany({
-            data: grantedPerms.map(p => ({ roleId: dstRole.id, permission: p.permission, granted: true })),
-          });
-        }
       }
     }
     return tx.projectRoleScheme.findUniqueOrThrow({ where: { id: scheme.id }, include: schemeInclude });
