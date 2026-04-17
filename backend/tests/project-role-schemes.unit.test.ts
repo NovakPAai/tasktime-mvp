@@ -295,9 +295,10 @@ describe('updatePermissions', () => {
     });
   });
 
-  it('инвалидирует кэш схемы', async () => {
+  it('инвалидирует project-scheme кэш привязанных проектов', async () => {
+    mp.projectRoleSchemeProject.findMany.mockResolvedValue([{ projectId: 'proj-9' }]);
     await updatePermissions('scheme-1', 'role-1', { permissions: { ISSUES_VIEW: true } });
 
-    expect(mredis.delCachedJson).toHaveBeenCalledWith(`rbac:scheme:scheme-1:roles`);
+    expect(mredis.delCachedJson).toHaveBeenCalledWith(`rbac:project:proj-9:scheme`);
   });
 });

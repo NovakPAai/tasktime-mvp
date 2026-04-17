@@ -11,11 +11,9 @@ import type {
   UpdatePermissionsDto,
 } from './project-role-schemes.dto.js';
 
-const SCHEME_CACHE_KEY = (schemeId: string) => `rbac:scheme:${schemeId}:roles`;
 const PROJECT_SCHEME_KEY = (projectId: string) => `rbac:project:${projectId}:scheme`;
 
 async function invalidateSchemeCache(schemeId: string) {
-  await delCachedJson(SCHEME_CACHE_KEY(schemeId));
   const bindings = await prisma.projectRoleSchemeProject.findMany({
     where: { schemeId },
     select: { projectId: true },
@@ -62,7 +60,36 @@ export async function createScheme(dto: CreateSchemeDto) {
     if (dto.isDefault) {
       await tx.projectRoleScheme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
     }
-    return tx.projectRoleScheme.create({ data: dto, include: schemeInclude });
+    const scheme = await tx.projectRoleScheme.create({ data: dto });
+    // Bootstrap the 4 system roles with permissions cloned from the default scheme. Without this
+    // a freshly created scheme has no ADMIN/MANAGER/USER/VIEWER definitions, so attachProject
+    // (which remaps UserProjectRole rows by role key) would reject any project that already has
+    // members. Cloning keeps parity with the default scheme and works out-of-the-box.
+    const defaultScheme = await tx.projectRoleScheme.findFirst({
+      where: { isDefault: true, id: { not: scheme.id } },
+      include: { roles: { include: { permissions: true } } },
+    });
+    if (defaultScheme) {
+      for (const srcRole of defaultScheme.roles.filter(r => r.isSystem)) {
+        const dstRole = await tx.projectRoleDefinition.create({
+          data: {
+            schemeId: scheme.id,
+            name: srcRole.name,
+            key: srcRole.key,
+            description: srcRole.description,
+            color: srcRole.color,
+            isSystem: true,
+          },
+        });
+        const grantedPerms = srcRole.permissions.filter(p => p.granted);
+        if (grantedPerms.length > 0) {
+          await tx.projectRolePermission.createMany({
+            data: grantedPerms.map(p => ({ roleId: dstRole.id, permission: p.permission, granted: true })),
+          });
+        }
+      }
+    }
+    return tx.projectRoleScheme.findUniqueOrThrow({ where: { id: scheme.id }, include: schemeInclude });
   });
   if (dto.isDefault) {
     // Unbound projects fall back to the default scheme via getSchemeForProject. When the default

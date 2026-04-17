@@ -23,9 +23,10 @@ export const assignProjectRoleDto = z
     // Reject at validation level instead of surfacing the service-level "role or roleId is required"
     // as a 400 from deeper in the stack.
     if (!data.role && !data.roleId) {
+      // Form-level issue: the rule "role OR roleId" isn't specific to either field.
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['role'],
+        path: [],
         message: 'Нужно передать role (legacy) или roleId',
       });
     }
