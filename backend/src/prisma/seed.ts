@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-import { PrismaClient, Prisma, ProjectRole, type User } from '@prisma/client';
+import { PrismaClient, Prisma, type User } from '@prisma/client';
 
 import { bootstrapDefaultUsers, getBootstrapUsers } from './bootstrap.js';
 import { hashPassword } from '../shared/utils/password.js';
@@ -210,32 +210,54 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   }
   console.log('Default project role scheme seeded.');
 
-  // Backfill UserProjectRole.roleId / schemeId — one updateMany per legacy ProjectRole value
-  // (4 queries total, independent of row count). Unmapped legacy values are reported but not
-  // updated so we don't silently paper over unknown keys.
-  const schemeRoles = await client.projectRoleDefinition.findMany({
-    where: { schemeId: defaultRoleScheme.id },
-    select: { id: true, key: true },
+  // Backfill UserProjectRole.roleId / schemeId PER-PROJECT: for each row resolve the project's
+  // ACTIVE scheme (explicit binding → else default) and find the role by key in THAT scheme.
+  // Without this step rows on projects bound to a non-default scheme would be linked to roles
+  // of the wrong scheme, breaking the (schemeId matches active project scheme) invariant.
+  const bindings = await client.projectRoleSchemeProject.findMany({
+    select: { projectId: true, schemeId: true },
   });
-  const roleKeyToId = new Map(schemeRoles.map(r => [r.key, r.id]));
+  const projectToSchemeId = new Map(bindings.map(b => [b.projectId, b.schemeId]));
+
+  const allSchemeRoles = await client.projectRoleDefinition.findMany({
+    select: { id: true, key: true, schemeId: true },
+  });
+  const schemeKeyToRoleId = new Map<string, string>(
+    allSchemeRoles.map(r => [`${r.schemeId}:${r.key}`, r.id]),
+  );
+
+  const rowsToBackfill = await client.userProjectRole.findMany({
+    where: { roleId: null },
+    select: { id: true, projectId: true, role: true },
+  });
+
+  // Group rows by (effectiveSchemeId, legacyRole) so updates batch into one query per pair.
+  const groups = new Map<string, { schemeId: string; role: string; ids: string[] }>();
+  for (const r of rowsToBackfill) {
+    const effectiveSchemeId = projectToSchemeId.get(r.projectId) ?? defaultRoleScheme.id;
+    const key = `${effectiveSchemeId}:${r.role}`;
+    const bucket = groups.get(key) ?? { schemeId: effectiveSchemeId, role: r.role, ids: [] };
+    bucket.ids.push(r.id);
+    groups.set(key, bucket);
+  }
+
   let backfilled = 0;
   const unmappedKeys: string[] = [];
-  for (const key of Object.values(ProjectRole)) {
-    const roleId = roleKeyToId.get(key);
-    if (!roleId) {
-      const leftover = await client.userProjectRole.count({ where: { role: key, roleId: null } });
-      if (leftover > 0) unmappedKeys.push(`${key}(${leftover})`);
+  for (const [key, { schemeId, role, ids }] of groups) {
+    const targetRoleId = schemeKeyToRoleId.get(key);
+    if (!targetRoleId) {
+      unmappedKeys.push(`${role}@scheme:${schemeId}(${ids.length})`);
       continue;
     }
     const { count } = await client.userProjectRole.updateMany({
-      where: { role: key, roleId: null },
-      data: { roleId, schemeId: defaultRoleScheme.id },
+      where: { id: { in: ids } },
+      data: { roleId: targetRoleId, schemeId },
     });
     backfilled += count;
   }
   console.log(`Backfilled ${backfilled} UserProjectRole records.`);
   if (unmappedKeys.length > 0) {
-    console.warn(`Unmapped legacy role values (no matching key in default scheme): ${unmappedKeys.join(', ')}`);
+    console.warn(`Unmapped legacy role values (no matching key in the project's active scheme): ${unmappedKeys.join(', ')}`);
   }
   // ===== END DEFAULT PROJECT ROLE SCHEME =====
 
