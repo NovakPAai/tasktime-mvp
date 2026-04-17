@@ -48,6 +48,12 @@ export default function AdminGroupDetailPage() {
   const [memberSearch, setMemberSearch] = useState('');
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
   const [memberCandidates, setMemberCandidates] = useState<AdminUser[] | null>(null);
+  // AI review #66 round 14 🟠 — keep a stable cache of user metadata (id → {name, email})
+  // for everyone we've ever seen in this session: initial bulk list, server-search results,
+  // and already-selected ids. Without this, toggling the server search off (via onBlur or
+  // similar) would lose option labels for selections that came from server results, causing
+  // Ant Select to render raw UUIDs.
+  const [selectedUserCache, setSelectedUserCache] = useState<Map<string, AdminUser>>(new Map());
 
   // Grant project role
   const [grantOpen, setGrantOpen] = useState(false);
@@ -201,8 +207,19 @@ export default function AdminGroupDetailPage() {
     // Source precedence: active server search results > initial bulk list. Both get the
     // existing-members filter so we never offer someone who's already in.
     const source = memberCandidates ?? allUsers;
-    return source.filter(u => !existing.has(u.id));
-  }, [allUsers, memberCandidates, group]);
+    const sourceFiltered = source.filter(u => !existing.has(u.id));
+    // AI review #66 round 14 🟠 — always keep already-selected users visible so Ant Select
+    // can show their proper labels even when source list switches. We union the source with
+    // the cached metadata for currently-selected ids, de-duped by id.
+    const byId = new Map<string, AdminUser>(sourceFiltered.map(u => [u.id, u]));
+    for (const id of selectedUserIds) {
+      if (byId.has(id)) continue;
+      if (existing.has(id)) continue;
+      const cached = selectedUserCache.get(id);
+      if (cached) byId.set(id, cached);
+    }
+    return Array.from(byId.values());
+  }, [allUsers, memberCandidates, group, selectedUserIds, selectedUserCache]);
 
   const availableProjectsForGrant = useMemo(() => {
     if (!group) return allProjects;
@@ -236,6 +253,7 @@ export default function AdminGroupDetailPage() {
       setSelectedUserIds([]);
       setMemberSearch('');
       setMemberCandidates(null);
+      setSelectedUserCache(new Map());
       load();
     } catch {
       message.error('Не удалось добавить участников');
@@ -393,7 +411,14 @@ export default function AdminGroupDetailPage() {
       <Modal
         title="Добавить участников"
         open={addMembersOpen}
-        onCancel={() => { setAddMembersOpen(false); setSelectedUserIds([]); setMemberSearch(''); setMemberCandidates(null); void load(); }}
+        onCancel={() => {
+          setAddMembersOpen(false);
+          setSelectedUserIds([]);
+          setMemberSearch('');
+          setMemberCandidates(null);
+          setSelectedUserCache(new Map());
+          void load();
+        }}
         onOk={handleAddMembers}
         okText="Добавить"
         cancelText="Отмена"
@@ -406,7 +431,23 @@ export default function AdminGroupDetailPage() {
           mode="multiple"
           placeholder="Начните вводить имя или email"
           value={selectedUserIds}
-          onChange={setSelectedUserIds}
+          onChange={(ids: string[]) => {
+            // Snapshot the metadata for every newly-added id so the option can always render
+            // a proper label — even if we later switch source lists (AI review #66 round 14).
+            const pool = memberCandidates ?? allUsers;
+            const byId = new Map<string, AdminUser>(pool.map(u => [u.id, u]));
+            setSelectedUserCache(prev => {
+              const next = new Map(prev);
+              for (const id of ids) {
+                if (!next.has(id)) {
+                  const hit = byId.get(id);
+                  if (hit) next.set(id, hit);
+                }
+              }
+              return next;
+            });
+            setSelectedUserIds(ids);
+          }}
           style={{ width: '100%' }}
           showSearch
           // AI review #66 round 13 🟠 — dual-mode filter:
@@ -420,7 +461,6 @@ export default function AdminGroupDetailPage() {
               : false
           }
           onSearch={setMemberSearch}
-          onBlur={() => setMemberSearch('')}
           loading={memberSearchLoading}
           notFoundContent={
             memberSearchLoading
