@@ -58,17 +58,29 @@ export async function getScheme(id: string) {
 }
 
 export async function createScheme(dto: CreateSchemeDto) {
-  return prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx) => {
     if (dto.isDefault) {
       await tx.projectRoleScheme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
     }
     return tx.projectRoleScheme.create({ data: dto, include: schemeInclude });
   });
+  if (dto.isDefault) {
+    // Unbound projects fall back to the default scheme via getSchemeForProject. When the default
+    // itself changes, every cached PROJECT_SCHEME_KEY is potentially stale.
+    await delCacheByPrefix('rbac:project:');
+  }
+  return created;
 }
 
 export async function updateScheme(id: string, dto: UpdateSchemeDto) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id } });
   if (!scheme) throw new AppError(404, 'Role scheme not found');
+  // Protect the "at least one default scheme" invariant — getSchemeForProject and detachProject
+  // both assume one exists and fail with 500 otherwise.
+  if (scheme.isDefault && dto.isDefault === false) {
+    throw new AppError(400, 'Нельзя снять флаг isDefault у единственной дефолтной схемы — назначьте дефолтной другую схему');
+  }
+  const defaultChanged = dto.isDefault === true && !scheme.isDefault;
   const updated = await prisma.$transaction(async (tx) => {
     if (dto.isDefault === true) {
       await tx.projectRoleScheme.updateMany({
@@ -87,6 +99,9 @@ export async function updateScheme(id: string, dto: UpdateSchemeDto) {
     });
   });
   await invalidateSchemeCache(id);
+  if (defaultChanged) {
+    await delCacheByPrefix('rbac:project:');
+  }
   return updated;
 }
 

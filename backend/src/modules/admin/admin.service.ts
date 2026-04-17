@@ -366,26 +366,41 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   if (!user) throw new AppError(404, 'User not found');
   if (!project) throw new AppError(404, 'Project not found');
 
-  // Resolve legacy role enum value. When `roleId` is provided it is authoritative:
-  //   - if roleDef.key is a legacy enum value, derive legacyRole from it (and reject a conflicting dto.role);
-  //   - if roleDef.key is custom, fall back to dto.role for the legacy column — must be supplied explicitly.
+  // Resolve legacy role enum value AND resolvedSchemeId. New clients send `roleId`; legacy clients
+  // send `role`; we always resolve the active project scheme so that `roleId` and `schemeId` are
+  // stored together on the UserProjectRole row — otherwise a legacy-only assignment would leave
+  // the row unlinked from the active scheme and later remapping/permission checks would have to
+  // rely on fragile legacy fallback.
   const legacyRoles = Object.values(ProjectRole) as string[]; // Prisma-generated enum — kept in sync automatically.
   let legacyRole = dto.role as ProjectRole | undefined;
   let resolvedSchemeId: string | undefined;
+  let resolvedRoleId: string | undefined;
+  const projectScheme = await getSchemeForProject(dto.projectId);
   if (dto.roleId) {
-    const projectScheme = await getSchemeForProject(dto.projectId);
     const roleDef = projectScheme.roles.find(r => r.id === dto.roleId);
     if (!roleDef) {
       throw new AppError(400, 'roleId не принадлежит схеме, привязанной к проекту');
     }
     resolvedSchemeId = projectScheme.id;
+    resolvedRoleId = dto.roleId;
     const derivedKey = legacyRoles.includes(roleDef.key) ? (roleDef.key as ProjectRole) : undefined;
     if (dto.role && derivedKey && dto.role !== derivedKey) {
       throw new AppError(400, `Ключ роли "${roleDef.key}" не совпадает с legacy role "${dto.role}"`);
     }
     legacyRole = derivedKey ?? dto.role;
+  } else if (dto.role) {
+    // Legacy path: resolve the role in the active project scheme by key, so roleId/schemeId are
+    // still populated. If the active scheme doesn't define a role with this key, reject instead
+    // of silently creating a half-linked row.
+    const roleDef = projectScheme.roles.find(r => r.key === dto.role);
+    if (!roleDef) {
+      throw new AppError(400, `В схеме проекта нет роли с ключом "${dto.role}" — используйте roleId`);
+    }
+    legacyRole = dto.role;
+    resolvedSchemeId = projectScheme.id;
+    resolvedRoleId = roleDef.id;
   }
-  if (!legacyRole) throw new AppError(400, 'Нужно передать role или roleId (для кастомных ролей укажите legacy role через поле "role")');
+  if (!legacyRole) throw new AppError(400, 'Нужно передать role или roleId');
 
   const existing = await prisma.userProjectRole.findFirst({
     where: { userId, projectId: dto.projectId },
@@ -398,7 +413,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
       projectId: dto.projectId,
       role: legacyRole,
       // roleId and schemeId must be set together (enforced by CHECK constraint on the DB side).
-      ...(dto.roleId && resolvedSchemeId ? { roleId: dto.roleId, schemeId: resolvedSchemeId } : {}),
+      ...(resolvedRoleId && resolvedSchemeId ? { roleId: resolvedRoleId, schemeId: resolvedSchemeId } : {}),
     },
     include: { project: { select: { id: true, name: true, key: true } } },
   });
