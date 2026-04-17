@@ -1,6 +1,7 @@
-import type { SystemRoleType } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import type { AuthUser } from '../../shared/types/index.js';
+import { assertProjectPermission } from '../../shared/middleware/rbac.js';
 import type { CreateCommentDto, UpdateCommentDto } from './comments.dto.js';
 
 export async function listComments(issueId: string) {
@@ -21,11 +22,27 @@ export async function createComment(issueId: string, authorId: string, dto: Crea
   });
 }
 
-export async function updateComment(id: string, userId: string, userRoles: SystemRoleType[], dto: UpdateCommentDto) {
-  const comment = await prisma.comment.findUnique({ where: { id } });
+/**
+ * TTSEC-2 Phase 2 authorisation:
+ *   - Author always may edit/delete their own comment (spec §2 — owner control).
+ *   - Otherwise require `COMMENTS_MANAGE` (edit + full admin) for edit.
+ *   - For delete of someone else's: `COMMENTS_DELETE_OTHERS` OR `COMMENTS_MANAGE`.
+ *
+ * SUPER_ADMIN bypass and global project-read bypass are handled inside assertProjectPermission.
+ */
+export async function updateComment(id: string, user: AuthUser, dto: UpdateCommentDto) {
+  const comment = await prisma.comment.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      authorId: true,
+      issue: { select: { projectId: true } },
+    },
+  });
   if (!comment) throw new AppError(404, 'Comment not found');
-  if (comment.authorId !== userId && !userRoles.includes('ADMIN') && !userRoles.includes('SUPER_ADMIN')) {
-    throw new AppError(403, 'Not allowed');
+
+  if (comment.authorId !== user.userId) {
+    await assertProjectPermission(user, comment.issue.projectId, ['COMMENTS_MANAGE']);
   }
 
   return prisma.comment.update({
@@ -35,11 +52,22 @@ export async function updateComment(id: string, userId: string, userRoles: Syste
   });
 }
 
-export async function deleteComment(id: string, userId: string, userRoles: SystemRoleType[]) {
-  const comment = await prisma.comment.findUnique({ where: { id } });
+export async function deleteComment(id: string, user: AuthUser) {
+  const comment = await prisma.comment.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      authorId: true,
+      issue: { select: { projectId: true } },
+    },
+  });
   if (!comment) throw new AppError(404, 'Comment not found');
-  if (comment.authorId !== userId && !userRoles.includes('ADMIN') && !userRoles.includes('SUPER_ADMIN')) {
-    throw new AppError(403, 'Not allowed');
+
+  if (comment.authorId !== user.userId) {
+    await assertProjectPermission(user, comment.issue.projectId, [
+      'COMMENTS_DELETE_OTHERS',
+      'COMMENTS_MANAGE',
+    ]);
   }
 
   await prisma.comment.delete({ where: { id } });

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { validate } from '../../shared/middleware/validate.js';
+import { logAudit } from '../../shared/middleware/audit.js';
 import { manualTimeDto } from './time.dto.js';
 import * as timeService from './time.service.js';
 import type { AuthRequest } from '../../shared/types/index.js';
@@ -71,6 +72,15 @@ router.get('/time/active', async (req: AuthRequest, res, next) => {
   try {
     const timer = await timeService.getActiveTimer(req.user!.userId);
     res.json(timer);
+  } catch (err) { next(err); }
+});
+
+// TTSEC-2: DELETE time log (owner OR TIME_LOGS_DELETE_OTHERS OR TIME_LOGS_MANAGE)
+router.delete('/time-logs/:id', async (req: AuthRequest, res, next) => {
+  try {
+    await timeService.deleteTimeLog(req.params.id as string, req.user!);
+    await logAudit(req, 'time_log.deleted', 'time_log', req.params.id as string);
+    res.status(204).send();
   } catch (err) { next(err); }
 });
 

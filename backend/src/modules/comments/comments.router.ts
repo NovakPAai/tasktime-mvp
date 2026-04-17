@@ -26,14 +26,16 @@ router.post('/issues/:issueId/comments', validate(createCommentDto), async (req:
 
 router.patch('/comments/:id', validate(updateCommentDto), async (req: AuthRequest, res, next) => {
   try {
-    const comment = await commentsService.updateComment(req.params.id as string, req.user!.userId, req.user!.systemRoles, req.body);
+    const comment = await commentsService.updateComment(req.params.id as string, req.user!, req.body);
+    await logAudit(req, 'comment.updated', 'comment', comment.id);
     res.json(comment);
   } catch (err) { next(err); }
 });
 
 router.delete('/comments/:id', async (req: AuthRequest, res, next) => {
   try {
-    await commentsService.deleteComment(req.params.id as string, req.user!.userId, req.user!.systemRoles);
+    await commentsService.deleteComment(req.params.id as string, req.user!);
+    await logAudit(req, 'comment.deleted', 'comment', req.params.id as string);
     res.status(204).send();
   } catch (err) { next(err); }
 });
