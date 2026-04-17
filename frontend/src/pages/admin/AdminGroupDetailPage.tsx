@@ -409,13 +409,26 @@ export default function AdminGroupDetailPage() {
           onChange={setSelectedUserIds}
           style={{ width: '100%' }}
           showSearch
-          // Switch to server-driven search: client-side filtering returns false so the Select
-          // trusts the options we pass (already filtered by server search + existing members).
-          filterOption={false}
+          // AI review #66 round 13 🟠 — dual-mode filter:
+          //   - No server search active → client-side filter by label over the initial bulk list
+          //     so the dropdown is snappy and works without typing triggering a roundtrip.
+          //   - Server search active (memberCandidates populated) → options are already filtered
+          //     by the backend; disable client-side filter to trust them as-is.
+          filterOption={
+            memberCandidates === null
+              ? (input, opt) => (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())
+              : false
+          }
           onSearch={setMemberSearch}
           onBlur={() => setMemberSearch('')}
           loading={memberSearchLoading}
-          notFoundContent={memberSearchLoading ? 'Поиск…' : memberSearch ? 'Ничего не найдено' : 'Введите запрос для поиска большего числа пользователей'}
+          notFoundContent={
+            memberSearchLoading
+              ? 'Поиск…'
+              : memberSearch
+                ? 'Ничего не найдено'
+                : 'Нет доступных пользователей'
+          }
           options={availableUsersForAdd.map(u => ({
             value: u.id,
             label: `${u.name} · ${u.email}`,
