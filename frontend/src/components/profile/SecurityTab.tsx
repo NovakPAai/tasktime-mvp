@@ -147,13 +147,13 @@ export default function SecurityTab() {
       )}
 
       <Table
-        // Defensive key: include source + sorted sourceGroup ids so two rows for the same
-        // (project, role) via different paths wouldn't collapse (AI review #66 🟠). Today
-        // the backend returns one row per project, but the guard keeps rendering correct
-        // if that invariant changes.
-        rowKey={(r) =>
-          `${r.project.id}:${r.role.id}:${r.source}:${r.sourceGroups.map(g => g.id).sort().join(',')}`
-        }
+        // AI review #66 round 4 🟠 — use the actual unique identifier from the API contract.
+        // `computeEffectiveRole` returns exactly one effective row per (userId, projectId), so
+        // `project.id` is the stable unique key. If the contract ever changes to support
+        // multiple rows per project, the `SecurityProjectRole` type in `api/user-security.ts`
+        // should gain an explicit `id` field and this key updated to match — a compile-time
+        // signal rather than a silent rendering bug.
+        rowKey={(r) => r.project.id}
         dataSource={data?.projectRoles ?? []}
         columns={columns}
         loading={loading}
