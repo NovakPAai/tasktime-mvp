@@ -193,7 +193,7 @@ Rules:
 - If version_history.md was not updated in this PR, mention it ONCE as a single brief info-level issue (one sentence). Do not elaborate.`;
 
   const previousReviewSection = isFollowUp
-    ? `\n\nPREVIOUS REVIEW (what you flagged before — check which issues are now resolved):\n${previousReview}\n\n---\n`
+    ? `\n\nPREVIOUS REVIEW JSON (structured — use this to track what was flagged and what is now resolved):\n${JSON.stringify(previousReview, null, 2)}\n\n---\n`
     : '';
 
   const userPrompt = `PR: ${prTitle}${prBody ? `\nDescription: ${prBody}` : ''}${previousReviewSection}
@@ -346,6 +346,27 @@ function formatComment(review, isFollowUp = false) {
   return md;
 }
 
+const JSON_MARKER = '<!-- ai-review-json:';
+const JSON_MARKER_END = '-->';
+
+function embedReviewJson(comment, review) {
+  return `${comment}\n${JSON_MARKER}${JSON.stringify(review)}${JSON_MARKER_END}`;
+}
+
+function extractReviewJson(commentBody) {
+  if (!commentBody) return null;
+  const start = commentBody.indexOf(JSON_MARKER);
+  if (start === -1) return null;
+  const jsonStart = start + JSON_MARKER.length;
+  const end = commentBody.indexOf(JSON_MARKER_END, jsonStart);
+  if (end === -1) return null;
+  try {
+    return JSON.parse(commentBody.slice(jsonStart, end));
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Post comment (replace previous bot comment to avoid spam)
 // ---------------------------------------------------------------------------
@@ -381,7 +402,8 @@ async function fetchPreviousReview() {
     `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`
   );
   const botComment = existing?.find((c) => c.body?.includes(BOT_MARKER));
-  return botComment?.body ?? null;
+  if (!botComment) return null;
+  return extractReviewJson(botComment.body);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +450,7 @@ async function main() {
   console.log(`Diff: ${diff.length} chars`);
 
   const review = await reviewWithOpenAI(diff, prTitle, prBody, previousReview);
-  const comment = formatComment(review, isFollowUp);
+  const comment = embedReviewJson(formatComment(review, isFollowUp), review);
 
   await postComment(comment);
 
