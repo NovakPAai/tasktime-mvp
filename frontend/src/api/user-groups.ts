@@ -63,6 +63,15 @@ export const userGroupsApi = {
     api.delete(`/admin/user-groups/${id}/members/${userId}`).then(r => r.data),
   grantProjectRole: (id: string, data: { projectId: string; roleId: string }) =>
     api.post<UserGroupProjectRole>(`/admin/user-groups/${id}/project-roles`, data).then(r => r.data),
+  /**
+   * Revoke the group's project-role binding. Keyed by `projectId` because the backend contract
+   * (Phase 2, spec §5.6) enforces `@@unique([groupId, projectId])` on `ProjectGroupRole` — a
+   * group can have at most one role per project, so (groupId, projectId) IS the natural key.
+   *
+   * `UserGroupProjectRole.id` exists as a surrogate for `@id @default(uuid())` but is NOT part
+   * of the URL contract. If a future requirement allows multiple bindings per project
+   * (@@unique relaxed), both the backend route AND this method should migrate to binding id.
+   */
   revokeProjectRole: (id: string, projectId: string) =>
     api.delete(`/admin/user-groups/${id}/project-roles/${projectId}`).then(r => r.data),
 };
