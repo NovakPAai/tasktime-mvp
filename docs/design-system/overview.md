@@ -114,6 +114,7 @@ Key reusable components:
 | `ProgressBar` | `ui/ProgressBar.tsx` | Sprint/release completion % |
 | `AvatarGroup` | `ui/AvatarGroup.tsx` | Multiple user avatars overlap |
 | `LoadingSpinner` | `common/LoadingSpinner.tsx` | Centered loading state |
+| `PermissionMatrixDrawer` | `admin/PermissionMatrixDrawer.tsx` | Permission matrix editor for a role in a scheme (grouped checkboxes, PATCH partial-update) |
 
 ---
 
