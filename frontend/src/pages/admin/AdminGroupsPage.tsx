@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Tooltip } from 'antd';
+import { Table, Button, Modal, Form, Input, Space, message, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,7 @@ export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<UserGroupListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<UserGroupListItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -25,16 +26,23 @@ export default function AdminGroupsPage() {
   const [impactFor, setImpactFor] = useState<UserGroupListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Debounce the user-typed search so we don't fire a request per keystroke
+  // (AI review #66 🟡). 300ms is the usual sweet spot — feels instant, batches fast typists.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setGroups(await userGroupsApi.list(search.trim() || undefined));
+      setGroups(await userGroupsApi.list(debouncedSearch.trim() || undefined));
     } catch {
       message.error('Не удалось загрузить группы');
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -192,14 +200,9 @@ export default function AdminGroupsPage() {
                 )}
               </li>
             </ul>
-            <Popconfirm
-              title="Операция необратима"
-              description="Убедитесь, что участникам предоставлен альтернативный доступ"
-              okText="Понятно"
-              showCancel={false}
-            >
-              <span />
-            </Popconfirm>
+            <p style={{ color: '#d46b08', marginBottom: 0 }}>
+              Операция необратима. Убедитесь, что участникам предоставлен альтернативный доступ.
+            </p>
           </>
         ) : (
           <p>Загрузка…</p>
