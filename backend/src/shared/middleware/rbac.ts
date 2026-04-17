@@ -347,7 +347,8 @@ export async function assertProjectPermission(
   permissions: ProjectPermission[],
 ): Promise<void> {
   if (permissions.length === 0) throw new AppError(500, 'assertProjectPermission: empty list');
-  if (isSuperAdmin(user.systemRoles)) return;
+  // SUPER_ADMIN and system ADMIN bypass — symmetric with requireProjectPermission.
+  if (hasAnySystemRole(user.systemRoles, ['SUPER_ADMIN', 'ADMIN'])) return;
   if (permissions.every(p => p.endsWith('_VIEW')) && hasGlobalProjectReadAccess(user.systemRoles)) return;
 
   const granted = await getEffectiveProjectPermissions(user.userId, projectId);
@@ -399,7 +400,10 @@ export function requireProjectPermission(
   const { allowGlobalRead = true } = options;
   return async (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) return next(new AppError(401, 'Authentication required'));
-    if (isSuperAdmin(req.user.systemRoles)) return next();
+    // SUPER_ADMIN and system ADMIN bypass project-scoped checks — matches the pre-Phase-2
+    // semantics of `requireRole('ADMIN')` and keeps existing integration tests / admin tooling
+    // working without having to seed a project role for every tenant admin.
+    if (hasAnySystemRole(req.user.systemRoles, ['SUPER_ADMIN', 'ADMIN'])) return next();
     if (allowGlobalRead && permission.endsWith('_VIEW') && hasGlobalProjectReadAccess(req.user.systemRoles)) return next();
 
     const projectId = getProjectId(req);

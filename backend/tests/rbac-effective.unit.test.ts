@@ -239,6 +239,14 @@ describe('assertProjectPermission', () => {
     expect(mockPrisma.userProjectRole.findMany).not.toHaveBeenCalled();
   });
 
+  it('system ADMIN bypasses non-VIEW permissions (matches pre-Phase-2 requireRole ADMIN)', async () => {
+    const admin = { userId: USER_ID, email: 'a@ex.com', systemRoles: ['ADMIN' as const] };
+    await expect(
+      assertProjectPermission(admin, PROJECT_ID, ['SPRINTS_CREATE']),
+    ).resolves.toBeUndefined();
+    expect(mockPrisma.userProjectRole.findMany).not.toHaveBeenCalled();
+  });
+
   it('rejects empty permission list (programmer error)', async () => {
     await expect(
       assertProjectPermission(authUser, PROJECT_ID, []),
