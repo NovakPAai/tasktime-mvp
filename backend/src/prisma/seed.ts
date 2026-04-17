@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-import { PrismaClient, Prisma, type User } from '@prisma/client';
+import { PrismaClient, Prisma, ProjectPermission, ProjectRole, type User } from '@prisma/client';
 
 import { bootstrapDefaultUsers, getBootstrapUsers } from './bootstrap.js';
 import { hashPassword } from '../shared/utils/password.js';
@@ -103,77 +103,68 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   // distort permission resolution until someone notices.
   const DEFAULT_SCHEME_ID = '00000000-0000-0000-0000-000000000001';
 
-  const DEFAULT_ROLE_MATRIX: Record<string, { key: string; name: string; color: string; permissions: string[] }> = {
-    ADMIN: {
-      key: 'ADMIN', name: 'Администратор', color: '#fa8c16',
+  // Typed via Prisma enums — any typo in a permission/role key is a compile-time error.
+  const DEFAULT_ROLE_MATRIX: Record<ProjectRole, { key: ProjectRole; name: string; color: string; permissions: ProjectPermission[] }> = {
+    [ProjectRole.ADMIN]: {
+      key: ProjectRole.ADMIN, name: 'Администратор', color: '#fa8c16',
       permissions: [
-        'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT', 'ISSUES_DELETE',
-        'ISSUES_ASSIGN', 'ISSUES_CHANGE_STATUS', 'ISSUES_CHANGE_TYPE',
-        'SPRINTS_VIEW', 'SPRINTS_MANAGE',
-        'RELEASES_VIEW', 'RELEASES_MANAGE',
-        'MEMBERS_VIEW', 'MEMBERS_MANAGE',
-        'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE', 'TIME_LOGS_MANAGE',
-        'COMMENTS_VIEW', 'COMMENTS_CREATE', 'COMMENTS_MANAGE',
-        'PROJECT_SETTINGS_VIEW', 'PROJECT_SETTINGS_EDIT',
-        'BOARDS_VIEW', 'BOARDS_MANAGE',
+        ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT, ProjectPermission.ISSUES_DELETE,
+        ProjectPermission.ISSUES_ASSIGN, ProjectPermission.ISSUES_CHANGE_STATUS, ProjectPermission.ISSUES_CHANGE_TYPE,
+        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_MANAGE,
+        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_MANAGE,
+        ProjectPermission.MEMBERS_VIEW, ProjectPermission.MEMBERS_MANAGE,
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_MANAGE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_MANAGE,
+        ProjectPermission.PROJECT_SETTINGS_VIEW, ProjectPermission.PROJECT_SETTINGS_EDIT,
+        ProjectPermission.BOARDS_VIEW, ProjectPermission.BOARDS_MANAGE,
       ],
     },
-    MANAGER: {
-      key: 'MANAGER', name: 'Менеджер', color: '#1677ff',
+    [ProjectRole.MANAGER]: {
+      key: ProjectRole.MANAGER, name: 'Менеджер', color: '#1677ff',
       permissions: [
-        'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT', 'ISSUES_DELETE',
-        'ISSUES_ASSIGN', 'ISSUES_CHANGE_STATUS', 'ISSUES_CHANGE_TYPE',
-        'SPRINTS_VIEW', 'SPRINTS_MANAGE',
-        'RELEASES_VIEW', 'RELEASES_MANAGE',
-        'MEMBERS_VIEW', 'MEMBERS_MANAGE',
-        'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE', 'TIME_LOGS_MANAGE',
-        'COMMENTS_VIEW', 'COMMENTS_CREATE', 'COMMENTS_MANAGE',
-        'PROJECT_SETTINGS_VIEW',
-        'BOARDS_VIEW', 'BOARDS_MANAGE',
+        ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT, ProjectPermission.ISSUES_DELETE,
+        ProjectPermission.ISSUES_ASSIGN, ProjectPermission.ISSUES_CHANGE_STATUS, ProjectPermission.ISSUES_CHANGE_TYPE,
+        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_MANAGE,
+        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_MANAGE,
+        ProjectPermission.MEMBERS_VIEW, ProjectPermission.MEMBERS_MANAGE,
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_MANAGE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_MANAGE,
+        ProjectPermission.PROJECT_SETTINGS_VIEW,
+        ProjectPermission.BOARDS_VIEW, ProjectPermission.BOARDS_MANAGE,
       ],
     },
-    USER: {
-      key: 'USER', name: 'Участник', color: '#52c41a',
+    [ProjectRole.USER]: {
+      key: ProjectRole.USER, name: 'Участник', color: '#52c41a',
       permissions: [
-        'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT',
-        'ISSUES_CHANGE_STATUS',
-        'SPRINTS_VIEW',
-        'RELEASES_VIEW',
-        'MEMBERS_VIEW',
-        'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE',
-        'COMMENTS_VIEW', 'COMMENTS_CREATE',
-        'PROJECT_SETTINGS_VIEW',
-        'BOARDS_VIEW',
+        ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT,
+        ProjectPermission.ISSUES_CHANGE_STATUS,
+        ProjectPermission.SPRINTS_VIEW,
+        ProjectPermission.RELEASES_VIEW,
+        ProjectPermission.MEMBERS_VIEW,
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE,
+        ProjectPermission.PROJECT_SETTINGS_VIEW,
+        ProjectPermission.BOARDS_VIEW,
       ],
     },
-    VIEWER: {
-      key: 'VIEWER', name: 'Наблюдатель', color: '#d9d9d9',
+    [ProjectRole.VIEWER]: {
+      key: ProjectRole.VIEWER, name: 'Наблюдатель', color: '#d9d9d9',
       permissions: [
-        'ISSUES_VIEW',
-        'SPRINTS_VIEW',
-        'RELEASES_VIEW',
-        'MEMBERS_VIEW',
-        'TIME_LOGS_VIEW',
-        'COMMENTS_VIEW',
-        'PROJECT_SETTINGS_VIEW',
-        'BOARDS_VIEW',
+        ProjectPermission.ISSUES_VIEW,
+        ProjectPermission.SPRINTS_VIEW,
+        ProjectPermission.RELEASES_VIEW,
+        ProjectPermission.MEMBERS_VIEW,
+        ProjectPermission.TIME_LOGS_VIEW,
+        ProjectPermission.COMMENTS_VIEW,
+        ProjectPermission.PROJECT_SETTINGS_VIEW,
+        ProjectPermission.BOARDS_VIEW,
       ],
     },
   };
 
-  const ALL_PERMISSIONS = [
-    'ISSUES_VIEW', 'ISSUES_CREATE', 'ISSUES_EDIT', 'ISSUES_DELETE',
-    'ISSUES_ASSIGN', 'ISSUES_CHANGE_STATUS', 'ISSUES_CHANGE_TYPE',
-    'SPRINTS_VIEW', 'SPRINTS_MANAGE',
-    'RELEASES_VIEW', 'RELEASES_MANAGE',
-    'MEMBERS_VIEW', 'MEMBERS_MANAGE',
-    'TIME_LOGS_VIEW', 'TIME_LOGS_CREATE', 'TIME_LOGS_MANAGE',
-    'COMMENTS_VIEW', 'COMMENTS_CREATE', 'COMMENTS_MANAGE',
-    'PROJECT_SETTINGS_VIEW', 'PROJECT_SETTINGS_EDIT',
-    'BOARDS_VIEW', 'BOARDS_MANAGE',
-  ] as const;
+  const ALL_PERMISSIONS: ProjectPermission[] = Object.values(ProjectPermission);
 
-  const { defaultRoleScheme, backfilled, unmappedKeys } = await client.$transaction(async (tx) => {
+  const { backfilled, unmappedKeys } = await client.$transaction(async (tx) => {
     // 1. Ensure a single canonical default scheme.
     await tx.projectRoleScheme.updateMany({
       where: { isDefault: true, id: { not: DEFAULT_SCHEME_ID } },
@@ -207,14 +198,14 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
       const revokedPerms = ALL_PERMISSIONS.filter(p => !roleDef.permissions.includes(p));
       if (revokedPerms.length > 0) {
         await tx.projectRolePermission.deleteMany({
-          where: { roleId: role.id, permission: { in: revokedPerms as any } },
+          where: { roleId: role.id, permission: { in: revokedPerms } },
         });
       }
       for (const perm of grantedPerms) {
         await tx.projectRolePermission.upsert({
-          where: { roleId_permission: { roleId: role.id, permission: perm as any } },
+          where: { roleId_permission: { roleId: role.id, permission: perm } },
           update: { granted: true },
-          create: { roleId: role.id, permission: perm as any, granted: true },
+          create: { roleId: role.id, permission: perm, granted: true },
         });
       }
     }

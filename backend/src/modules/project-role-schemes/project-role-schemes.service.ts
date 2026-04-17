@@ -68,7 +68,7 @@ export async function createScheme(dto: CreateSchemeDto) {
     // source the new scheme would be unusable (no ADMIN/MANAGER/USER/VIEWER, attachProject 400s).
     // Run `prisma db seed` to initialize the default scheme.
     if (!sourceScheme) {
-      throw new AppError(500, 'No default role scheme configured — run seed to initialize the system default scheme before creating new schemes');
+      throw new AppError(500, 'Не настроена дефолтная схема ролей — запустите seed для инициализации перед созданием новых схем');
     }
     if (dto.isDefault) {
       await tx.projectRoleScheme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
@@ -313,7 +313,7 @@ export async function createRole(schemeId: string, dto: CreateRoleDefinitionDto)
   const existing = await prisma.projectRoleDefinition.findUnique({
     where: { schemeId_key: { schemeId, key: dto.key } },
   });
-  if (existing) throw new AppError(409, `Role with key "${dto.key}" already exists in this scheme`);
+  if (existing) throw new AppError(409, `Роль с ключом "${dto.key}" уже существует в этой схеме`);
   const role = await prisma.projectRoleDefinition.create({
     data: { ...dto, schemeId, isSystem: false },
     include: { permissions: true },
@@ -345,7 +345,7 @@ export async function deleteRole(schemeId: string, roleId: string) {
   if (!role) throw new AppError(404, 'Роль не найдена');
   if (role.isSystem) throw new AppError(400, 'Нельзя удалить системную роль');
   const usageCount = await prisma.userProjectRole.count({ where: { roleId } });
-  if (usageCount > 0) throw new AppError(400, `ROLE_IN_USE: ${usageCount} users have this role`);
+  if (usageCount > 0) throw new AppError(400, `ROLE_IN_USE: роль назначена ${usageCount} пользователям`);
   await prisma.projectRoleDefinition.delete({ where: { id: roleId } });
   await invalidateSchemeCache(schemeId);
   await invalidatePermissionCacheForScheme(schemeId);
