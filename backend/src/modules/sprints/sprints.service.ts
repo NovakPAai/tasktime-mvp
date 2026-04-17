@@ -243,11 +243,33 @@ export async function closeSprint(id: string) {
   return updated;
 }
 
-export async function moveIssuesToSprint(sprintId: string | null, issueIds: string[]) {
-  // Fetch all unique projectIds for correct cache invalidation across projects
+/**
+ * Move a batch of issues to a sprint (or to backlog when sprintId is null).
+ *
+ * TTSEC-2 hardening (AI review #65): `expectedProjectId` forces all issue ids to belong to the
+ * caller-approved project. Without it a user authorised to edit sprints in project A could pass
+ * issueIds from project B and touch them. Routes that have a clear "target project" — the sprint
+ * owner, or the backlog's projectId — MUST supply it.
+ */
+export async function moveIssuesToSprint(
+  sprintId: string | null,
+  issueIds: string[],
+  expectedProjectId?: string,
+) {
   const affectedIssues = issueIds.length > 0
-    ? await prisma.issue.findMany({ where: { id: { in: issueIds } }, select: { projectId: true } })
+    ? await prisma.issue.findMany({ where: { id: { in: issueIds } }, select: { id: true, projectId: true } })
     : [];
+
+  if (expectedProjectId) {
+    if (affectedIssues.length !== issueIds.length) {
+      throw new AppError(400, 'Некоторые задачи не найдены');
+    }
+    const foreign = affectedIssues.filter(i => i.projectId !== expectedProjectId);
+    if (foreign.length > 0) {
+      throw new AppError(403, 'Задачи принадлежат другому проекту');
+    }
+  }
+
   const projectIds = [...new Set(affectedIssues.map((i) => i.projectId))];
 
   await prisma.issue.updateMany({

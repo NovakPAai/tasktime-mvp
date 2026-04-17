@@ -117,25 +117,28 @@ router.post('/sprints/:id/close', async (req: AuthRequest, res, next) => {
 });
 
 // Move issues to a sprint — edit-level change on the target sprint.
+// Pass expectedProjectId = sprint.projectId so the service rejects foreign-project ids.
 router.post('/sprints/:id/issues', validate(moveIssuesToSprintDto), async (req: AuthRequest, res, next) => {
   try {
     const projectId = await projectIdFromSprint(req.params.id as string);
     await assertProjectPermission(req.user!, projectId, ['SPRINTS_EDIT']);
-    await sprintsService.moveIssuesToSprint(req.params.id as string, req.body.issueIds);
+    await sprintsService.moveIssuesToSprint(req.params.id as string, req.body.issueIds, projectId);
     await logAudit(req, 'sprint.issues_moved', 'sprint', req.params.id as string, { issueIds: req.body.issueIds });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
 // Move issues to backlog — affects sprint membership in a project.
+// Pass expectedProjectId = req.params.projectId so issueIds from other projects are rejected.
 router.post(
   '/projects/:projectId/backlog/issues',
   requireProjectPermission((req) => req.params.projectId as string, 'SPRINTS_EDIT'),
   validate(moveIssuesToSprintDto),
   async (req: AuthRequest, res, next) => {
     try {
-      await sprintsService.moveIssuesToSprint(null, req.body.issueIds);
-      await logAudit(req, 'sprint.issues_moved_to_backlog', 'project', req.params.projectId as string, { issueIds: req.body.issueIds });
+      const projectId = req.params.projectId as string;
+      await sprintsService.moveIssuesToSprint(null, req.body.issueIds, projectId);
+      await logAudit(req, 'sprint.issues_moved_to_backlog', 'project', projectId, { issueIds: req.body.issueIds });
       res.json({ ok: true });
     } catch (err) { next(err); }
   },
