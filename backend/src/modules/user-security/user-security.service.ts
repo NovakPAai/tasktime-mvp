@@ -106,6 +106,9 @@ export async function getUserSecurity(userId: string): Promise<UserSecurityPaylo
     });
   }
 
+  // AI review #65 round 5 🟡 — deterministic ordering so UI / tests / snapshots get stable output.
+  projectRoles.sort((a, b) => a.project.key.localeCompare(b.project.key));
+
   return {
     user: { id: user.id, name: user.name, email: user.email },
     groups: groups.map(m => ({

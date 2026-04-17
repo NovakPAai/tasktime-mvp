@@ -6,23 +6,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ProjectPermission } from '@prisma/client';
 
-const { mockPrisma } = vi.hoisted(() => {
+const { mockPrisma, mockRedis } = vi.hoisted(() => {
   const mockPrisma = {
     userProjectRole: { findMany: vi.fn() },
     projectGroupRole: { findMany: vi.fn() },
     userGroupMember: { findMany: vi.fn() },
   };
-  return { mockPrisma };
+  const mockRedis = {
+    getCachedJson: vi.fn().mockResolvedValue(null),
+    setCachedJson: vi.fn(),
+    delCachedJson: vi.fn(),
+    delCacheByPrefix: vi.fn(),
+  };
+  return { mockPrisma, mockRedis };
 });
 
 vi.mock('../src/prisma/client.js', () => ({ prisma: mockPrisma }));
-
-vi.mock('../src/shared/redis.js', () => ({
-  getCachedJson: vi.fn().mockResolvedValue(null), // always miss → exercise compute path
-  setCachedJson: vi.fn(),
-  delCachedJson: vi.fn(),
-  delCacheByPrefix: vi.fn(),
-}));
+vi.mock('../src/shared/redis.js', () => mockRedis);
 
 const mockGetScheme = vi.fn();
 vi.mock('../src/modules/project-role-schemes/project-role-schemes.service.js', () => ({
@@ -35,6 +35,8 @@ const {
   assertProjectPermission,
   getEffectiveProjectPermissions,
   computeEffectiveRolesForProjects,
+  invalidateProjectEffectivePermissions,
+  invalidateProjectPermissionCache,
 } = await import('../src/shared/middleware/rbac.js');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -257,5 +259,23 @@ describe('getEffectiveProjectPermissions', () => {
     const perms = await getEffectiveProjectPermissions(USER_ID, PROJECT_ID);
     expect(perms).toContain('SPRINTS_CREATE');
     expect(perms).toContain('SPRINTS_DELETE');
+  });
+});
+
+// ─── Cache invalidation (AI review #65 round 5 🟠) ───────────────────────────
+
+describe('cache invalidation key format', () => {
+  it('invalidateProjectEffectivePermissions uses project-prefix (covers stale users)', async () => {
+    await invalidateProjectEffectivePermissions('proj-X');
+    // Must kill both the new effective cache prefix AND the legacy per-permission prefix.
+    expect(mockRedis.delCacheByPrefix).toHaveBeenCalledWith('rbac:effective:proj-X:');
+    expect(mockRedis.delCacheByPrefix).toHaveBeenCalledWith('rbac:perm:proj-X:');
+  });
+
+  it('invalidateProjectPermissionCache uses projectId-first composite key', async () => {
+    await invalidateProjectPermissionCache('proj-X', 'user-Y');
+    // Single composite key, projectId first — the SCAN above hits this same namespace.
+    expect(mockRedis.delCachedJson).toHaveBeenCalledWith('rbac:effective:proj-X:user-Y');
+    expect(mockRedis.delCacheByPrefix).toHaveBeenCalledWith('rbac:perm:proj-X:user-Y:');
   });
 });
