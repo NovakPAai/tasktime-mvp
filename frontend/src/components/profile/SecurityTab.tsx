@@ -30,6 +30,19 @@ function csvField(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+/**
+ * Russian noun pluralization: `pluralize(1, 'группа', 'группы', 'групп')` → "группа".
+ * Rule: 1 → one, 2-4 → few (except 12-14 → many), 0/5+ → many.
+ */
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod100 = Math.abs(n) % 100;
+  const mod10 = mod100 % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
 function downloadCsv(payload: UserSecurityPayload): void {
   const rows: string[] = [
     ['Проект', 'Ключ', 'Роль', 'Источник', 'Через группы']
@@ -107,7 +120,10 @@ export default function SecurityTab() {
             <Tag color={direct ? 'blue' : 'purple'}>{direct ? 'Прямое назначение' : 'Через группу'}</Tag>
             {groups.length > 0 && (
               <Tooltip title={groups.map(g => g.name).join(', ')}>
-                <Tag>{direct ? 'также через' : ''} {groups.length} {groups.length === 1 ? 'группу' : 'групп(ы)'}</Tag>
+                <Tag>
+                  {direct ? 'также через ' : ''}
+                  {groups.length} {pluralize(groups.length, 'группу', 'группы', 'групп')}
+                </Tag>
               </Tooltip>
             )}
           </Space>
@@ -140,7 +156,7 @@ export default function SecurityTab() {
           description={
             <Space wrap>
               {data.groups.map(g => (
-                <Tooltip key={g.id} title={`В группе: ${g.memberCount} участник(а/ов)`}>
+                <Tooltip key={g.id} title={`В группе: ${g.memberCount} ${pluralize(g.memberCount, 'участник', 'участника', 'участников')}`}>
                   <Tag color="purple">{g.name}</Tag>
                 </Tooltip>
               ))}
