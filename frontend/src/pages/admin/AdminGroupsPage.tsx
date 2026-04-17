@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Tooltip } from 'antd';
+import { Table, Button, Modal, Form, Input, Space, message, Tooltip, Alert } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,7 @@ export default function AdminGroupsPage() {
 
   const [impact, setImpact] = useState<UserGroupImpact | null>(null);
   const [impactFor, setImpactFor] = useState<UserGroupListItem | null>(null);
+  const [impactError, setImpactError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Debounce the user-typed search so we don't fire a request per keystroke
@@ -74,12 +75,12 @@ export default function AdminGroupsPage() {
     }
   };
 
-  const openDelete = async (g: UserGroupListItem) => {
+  const loadImpact = async (g: UserGroupListItem) => {
     // Race guard (AI review #66 round 3 🟠) — if the admin quickly switches between groups,
     // a slower in-flight response must NOT overwrite the impact for the currently-open group.
     // We re-read `impactFor` inside the settled handlers and apply only when it's still `g`.
-    setImpactFor(g);
-    setImpact(null); // clear whatever was there for the previous group while the new one loads
+    setImpact(null);
+    setImpactError(null);
     try {
       const result = await userGroupsApi.getImpact(g.id);
       setImpactFor(current => {
@@ -87,14 +88,19 @@ export default function AdminGroupsPage() {
         return current;
       });
     } catch {
+      // AI review #66 round 8 🟠 — keep the modal open on error so the user sees what went
+      // wrong and can retry; previously we closed it silently, which hid the delete-with-impact
+      // UX contract.
       setImpactFor(current => {
-        if (current?.id === g.id) {
-          message.error('Не удалось получить impact группы');
-          return null;
-        }
+        if (current?.id === g.id) setImpactError('Не удалось получить impact группы');
         return current;
       });
     }
+  };
+
+  const openDelete = async (g: UserGroupListItem) => {
+    setImpactFor(g);
+    await loadImpact(g);
   };
 
   const confirmDelete = async () => {
@@ -189,14 +195,19 @@ export default function AdminGroupsPage() {
       <Modal
         title={`Удалить группу «${impactFor?.name ?? ''}»?`}
         open={!!impactFor}
-        onCancel={() => { setImpactFor(null); setImpact(null); }}
+        onCancel={() => { setImpactFor(null); setImpact(null); setImpactError(null); }}
         onOk={confirmDelete}
         okText="Удалить"
         okButtonProps={{ danger: true, disabled: !impact }}
         cancelText="Отмена"
         confirmLoading={deleting}
       >
-        {impact ? (
+        {impactError ? (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Alert type="error" message={impactError} showIcon />
+            <Button onClick={() => impactFor && loadImpact(impactFor)}>Повторить</Button>
+          </Space>
+        ) : impact ? (
           <>
             <p>Будут отозваны следующие доступы:</p>
             <ul>

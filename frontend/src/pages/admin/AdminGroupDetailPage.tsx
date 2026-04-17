@@ -59,6 +59,10 @@ export default function AdminGroupDetailPage() {
     // allSettled to keep partial degradation: group fails → fall back to error state; ref
     // lists fail → the page still renders, only the relevant modal shows an error on open.
     setLoadError(null);
+    // AI review #66 round 8 🟡 — clear reference lists upfront so a subsequent partial-failure
+    // cannot leave stale data from a previous group visible in modal dropdowns.
+    setAllProjects([]);
+    setAllUsers([]);
     try {
       const g = await userGroupsApi.get(id);
       setGroup(g);
