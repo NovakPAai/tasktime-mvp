@@ -1,4 +1,5 @@
 import type { Prisma, SystemRoleType } from '@prisma/client';
+import { ProjectRole } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { config } from '../../config.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
@@ -368,9 +369,8 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   // Resolve legacy role enum value. When `roleId` is provided it is authoritative:
   //   - if roleDef.key is a legacy enum value, derive legacyRole from it (and reject a conflicting dto.role);
   //   - if roleDef.key is custom, fall back to dto.role for the legacy column — must be supplied explicitly.
-  const LEGACY_KEYS = ['ADMIN', 'MANAGER', 'USER', 'VIEWER'] as const;
-  type LegacyRole = typeof LEGACY_KEYS[number];
-  let legacyRole = dto.role as LegacyRole | undefined;
+  const legacyRoles = Object.values(ProjectRole) as string[]; // Prisma-generated enum — kept in sync automatically.
+  let legacyRole = dto.role as ProjectRole | undefined;
   let resolvedSchemeId: string | undefined;
   if (dto.roleId) {
     const projectScheme = await getSchemeForProject(dto.projectId);
@@ -379,9 +379,7 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
       throw new AppError(400, 'roleId does not belong to the scheme attached to this project');
     }
     resolvedSchemeId = projectScheme.id;
-    const derivedKey = (LEGACY_KEYS as readonly string[]).includes(roleDef.key)
-      ? (roleDef.key as LegacyRole)
-      : undefined;
+    const derivedKey = legacyRoles.includes(roleDef.key) ? (roleDef.key as ProjectRole) : undefined;
     if (dto.role && derivedKey && dto.role !== derivedKey) {
       throw new AppError(400, `roleId key "${roleDef.key}" does not match legacy role "${dto.role}"`);
     }

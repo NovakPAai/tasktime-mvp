@@ -34,6 +34,8 @@ const { mockPrisma } = vi.hoisted(() => {
     },
     projectRolePermission: {
       upsert: vi.fn(),
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
     },
     userProjectRole: {
       findFirst: vi.fn(),
@@ -251,23 +253,28 @@ describe('updatePermissions', () => {
   beforeEach(() => {
     mp.projectRoleDefinition.findFirst.mockResolvedValue(ROLE);
     mp.projectRoleDefinition.findUnique.mockResolvedValue({ ...ROLE, permissions: [{ permission: 'ISSUES_VIEW', granted: true }] });
-    mp.projectRolePermission.upsert.mockResolvedValue({});
+    mp.projectRolePermission.deleteMany.mockResolvedValue({ count: 0 });
+    mp.projectRolePermission.createMany.mockResolvedValue({ count: 2 });
     mp.projectRoleSchemeProject.findMany.mockResolvedValue([]);
-    mp.$transaction.mockImplementation((ops: unknown[]) => Promise.all(ops as Promise<unknown>[]));
+    mp.$transaction.mockImplementation((arg: unknown) =>
+      typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(mp) : Promise.all(arg as Promise<unknown>[]),
+    );
   });
 
-  it('upsert всех переданных разрешений', async () => {
+  it('batch-replace переданных разрешений через deleteMany + createMany', async () => {
     await updatePermissions('scheme-1', 'role-1', {
       permissions: { ISSUES_VIEW: true, ISSUES_CREATE: false },
     });
 
-    expect(mp.projectRolePermission.upsert).toHaveBeenCalledTimes(2);
-    expect(mp.projectRolePermission.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ create: expect.objectContaining({ permission: 'ISSUES_VIEW', granted: true }) }),
-    );
-    expect(mp.projectRolePermission.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ create: expect.objectContaining({ permission: 'ISSUES_CREATE', granted: false }) }),
-    );
+    expect(mp.projectRolePermission.deleteMany).toHaveBeenCalledWith({
+      where: { roleId: 'role-1', permission: { in: ['ISSUES_VIEW', 'ISSUES_CREATE'] } },
+    });
+    expect(mp.projectRolePermission.createMany).toHaveBeenCalledWith({
+      data: [
+        { roleId: 'role-1', permission: 'ISSUES_VIEW', granted: true },
+        { roleId: 'role-1', permission: 'ISSUES_CREATE', granted: false },
+      ],
+    });
   });
 
   it('инвалидирует кэш схемы', async () => {

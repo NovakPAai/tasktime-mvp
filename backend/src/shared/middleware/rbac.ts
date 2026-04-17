@@ -37,14 +37,26 @@ export function requireSuperAdmin() {
   };
 }
 
+/**
+ * Options for requireProjectPermission.
+ * - allowGlobalRead: when true (default) and the permission is a read (_VIEW), users with
+ *   global project-read system roles bypass the project membership check. Set to `false` for
+ *   endpoints that must be strictly scoped to project members (e.g. sensitive per-project data).
+ */
+export type RequireProjectPermissionOptions = {
+  allowGlobalRead?: boolean;
+};
+
 export function requireProjectPermission(
   getProjectId: (req: AuthRequest) => string,
   permission: ProjectPermission,
+  options: RequireProjectPermissionOptions = {},
 ) {
+  const { allowGlobalRead = true } = options;
   return async (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) return next(new AppError(401, 'Authentication required'));
     if (isSuperAdmin(req.user.systemRoles)) return next();
-    if (permission.endsWith('_VIEW') && hasGlobalProjectReadAccess(req.user.systemRoles)) return next();
+    if (allowGlobalRead && permission.endsWith('_VIEW') && hasGlobalProjectReadAccess(req.user.systemRoles)) return next();
 
     const projectId = getProjectId(req);
     if (!projectId) return next(new AppError(400, 'Project ID required'));

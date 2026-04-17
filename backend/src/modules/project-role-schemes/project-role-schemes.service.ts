@@ -1,4 +1,5 @@
 import type { Prisma, ProjectPermission } from '@prisma/client';
+import { ProjectRole } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson, delCacheByPrefix } from '../../shared/redis.js';
@@ -120,8 +121,7 @@ async function remapProjectUserRolesToScheme(
     select: { id: true, key: true },
   });
   const keyToId = new Map(targetRoles.map(r => [r.key, r.id]));
-  const legacyKeys = ['ADMIN', 'MANAGER', 'USER', 'VIEWER'] as const;
-  for (const key of legacyKeys) {
+  for (const key of Object.values(ProjectRole)) {
     const roleId = keyToId.get(key);
     await tx.userProjectRole.updateMany({
       where: { projectId, role: key },
@@ -154,13 +154,13 @@ export async function detachProject(schemeId: string, projectId: string) {
   await prisma.$transaction(async (tx) => {
     const binding = await tx.projectRoleSchemeProject.findFirst({ where: { schemeId, projectId } });
     if (!binding) throw new AppError(404, 'Project not attached to this scheme');
-    await tx.projectRoleSchemeProject.delete({ where: { projectId } });
-    // After detach the project falls back to the default scheme — remap UserProjectRole rows
-    // so their roleId/schemeId stop referencing the now-unrelated previous scheme.
+    // After detach the project falls back to the default scheme. A default scheme is a system
+    // invariant; without one we would leave UserProjectRole rows pointing at the now-unrelated
+    // previous scheme and getSchemeForProject would already be broken. Fail fast instead.
     const defaultScheme = await tx.projectRoleScheme.findFirst({ where: { isDefault: true }, select: { id: true } });
-    if (defaultScheme) {
-      await remapProjectUserRolesToScheme(tx, projectId, defaultScheme.id);
-    }
+    if (!defaultScheme) throw new AppError(500, 'No default role scheme configured');
+    await tx.projectRoleSchemeProject.delete({ where: { projectId } });
+    await remapProjectUserRolesToScheme(tx, projectId, defaultScheme.id);
   });
   await delCachedJson(PROJECT_SCHEME_KEY(projectId));
   await delCacheByPrefix(`rbac:perm:${projectId}:`);
@@ -256,12 +256,16 @@ export async function getPermissions(schemeId: string, roleId: string) {
 export async function updatePermissions(schemeId: string, roleId: string, dto: UpdatePermissionsDto) {
   const role = await prisma.projectRoleDefinition.findFirst({ where: { id: roleId, schemeId } });
   if (!role) throw new AppError(404, 'Role not found');
+  // Replace only the keys present in dto.permissions (partial update semantics).
+  // Use deleteMany + createMany inside a transaction instead of N per-permission upsert: 2 queries
+  // total regardless of matrix size.
+  const entries = Object.entries(dto.permissions) as [ProjectPermission, boolean][];
+  const keys = entries.map(([p]) => p);
   const result = await prisma.$transaction(async (tx) => {
-    for (const [permission, granted] of Object.entries(dto.permissions) as [ProjectPermission, boolean][]) {
-      await tx.projectRolePermission.upsert({
-        where: { roleId_permission: { roleId, permission } },
-        update: { granted },
-        create: { roleId, permission, granted },
+    if (keys.length > 0) {
+      await tx.projectRolePermission.deleteMany({ where: { roleId, permission: { in: keys } } });
+      await tx.projectRolePermission.createMany({
+        data: entries.map(([permission, granted]) => ({ roleId, permission, granted })),
       });
     }
     return tx.projectRoleDefinition.findUnique({
