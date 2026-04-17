@@ -48,7 +48,9 @@ test.describe('Issues', () => {
 
     const title = `E2E Task ${Date.now()}`;
     await page.getByLabel('Title').fill(title);
-    await page.getByRole('button', { name: 'Create' }).click();
+    const createModalBtn = page.getByRole('button', { name: 'Create' });
+    await expect(createModalBtn).toBeEnabled({ timeout: 5_000 });
+    await createModalBtn.click();
 
     await expect(page.getByText('Issue created')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(title)).toBeVisible({ timeout: 10_000 });
@@ -97,7 +99,9 @@ test.describe('Issues', () => {
 
     const commentText = `E2E comment ${Date.now()}`;
     await commentInput.fill(commentText);
-    await page.locator('[data-testid="comment-submit"]').click();
+    const submitBtn = page.locator('[data-testid="comment-submit"]');
+    await expect(submitBtn).toBeEnabled({ timeout: 5_000 });
+    await submitBtn.click();
 
     await expect(page.getByText(commentText)).toBeVisible({ timeout: 10_000 });
   });
