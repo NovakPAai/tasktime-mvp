@@ -110,13 +110,18 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
       permissions: [
         ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT, ProjectPermission.ISSUES_DELETE,
         ProjectPermission.ISSUES_ASSIGN, ProjectPermission.ISSUES_CHANGE_STATUS, ProjectPermission.ISSUES_CHANGE_TYPE,
-        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_MANAGE,
-        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_MANAGE,
+        // TTSEC-2: гранулярные SPRINTS/RELEASES; *_MANAGE исключены из default-матрицы
+        // (enum их сохраняет как deprecated для backward-compat).
+        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_CREATE, ProjectPermission.SPRINTS_EDIT, ProjectPermission.SPRINTS_DELETE,
+        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_CREATE, ProjectPermission.RELEASES_EDIT, ProjectPermission.RELEASES_DELETE,
         ProjectPermission.MEMBERS_VIEW, ProjectPermission.MEMBERS_MANAGE,
-        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_MANAGE,
-        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_MANAGE,
+        // TTSEC-2: TIME_LOGS_MANAGE сохранён (включает настройки модуля); DELETE_OTHERS — отдельно.
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_DELETE_OTHERS, ProjectPermission.TIME_LOGS_MANAGE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_DELETE_OTHERS, ProjectPermission.COMMENTS_MANAGE,
         ProjectPermission.PROJECT_SETTINGS_VIEW, ProjectPermission.PROJECT_SETTINGS_EDIT,
         ProjectPermission.BOARDS_VIEW, ProjectPermission.BOARDS_MANAGE,
+        // TTSEC-2: system-level — только ADMIN по умолчанию.
+        ProjectPermission.USER_GROUP_VIEW, ProjectPermission.USER_GROUP_MANAGE,
       ],
     },
     [ProjectRole.MANAGER]: {
@@ -124,11 +129,12 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
       permissions: [
         ProjectPermission.ISSUES_VIEW, ProjectPermission.ISSUES_CREATE, ProjectPermission.ISSUES_EDIT, ProjectPermission.ISSUES_DELETE,
         ProjectPermission.ISSUES_ASSIGN, ProjectPermission.ISSUES_CHANGE_STATUS, ProjectPermission.ISSUES_CHANGE_TYPE,
-        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_MANAGE,
-        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_MANAGE,
+        // TTSEC-2: гранулярные SPRINTS/RELEASES вместо *_MANAGE.
+        ProjectPermission.SPRINTS_VIEW, ProjectPermission.SPRINTS_CREATE, ProjectPermission.SPRINTS_EDIT, ProjectPermission.SPRINTS_DELETE,
+        ProjectPermission.RELEASES_VIEW, ProjectPermission.RELEASES_CREATE, ProjectPermission.RELEASES_EDIT, ProjectPermission.RELEASES_DELETE,
         ProjectPermission.MEMBERS_VIEW, ProjectPermission.MEMBERS_MANAGE,
-        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_MANAGE,
-        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_MANAGE,
+        ProjectPermission.TIME_LOGS_VIEW, ProjectPermission.TIME_LOGS_CREATE, ProjectPermission.TIME_LOGS_DELETE_OTHERS, ProjectPermission.TIME_LOGS_MANAGE,
+        ProjectPermission.COMMENTS_VIEW, ProjectPermission.COMMENTS_CREATE, ProjectPermission.COMMENTS_DELETE_OTHERS, ProjectPermission.COMMENTS_MANAGE,
         ProjectPermission.PROJECT_SETTINGS_VIEW,
         ProjectPermission.BOARDS_VIEW, ProjectPermission.BOARDS_MANAGE,
       ],
