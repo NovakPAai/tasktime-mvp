@@ -276,7 +276,7 @@ export async function updatePermissions(schemeId: string, roleId: string, dto: U
         data: entries.map(([permission, granted]) => ({ roleId, permission, granted })),
       });
     }
-    return tx.projectRoleDefinition.findUnique({
+    return tx.projectRoleDefinition.findUniqueOrThrow({
       where: { id: roleId },
       include: { permissions: true },
     });

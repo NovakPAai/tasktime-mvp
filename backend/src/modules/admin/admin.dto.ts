@@ -12,11 +12,24 @@ export const updateUserAdminDto = z.object({
   isActive: z.boolean().optional(),
 });
 
-export const assignProjectRoleDto = z.object({
-  projectId: z.string().uuid(),
-  roleId: z.string().uuid().optional(),                                   // FK на ProjectRoleDefinition
-  role: z.enum(['ADMIN', 'MANAGER', 'USER', 'VIEWER']).optional(),       // обратная совместимость
-});
+export const assignProjectRoleDto = z
+  .object({
+    projectId: z.string().uuid(),
+    roleId: z.string().uuid().optional(),                                   // FK на ProjectRoleDefinition
+    role: z.enum(['ADMIN', 'MANAGER', 'USER', 'VIEWER']).optional(),       // обратная совместимость
+  })
+  .superRefine((data, ctx) => {
+    // Legacy clients must keep sending `role`; new clients may send `roleId` instead or both.
+    // Reject at validation level instead of surfacing the service-level "role or roleId is required"
+    // as a 400 from deeper in the stack.
+    if (!data.role && !data.roleId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['role'],
+        message: 'Either role (legacy) or roleId is required',
+      });
+    }
+  });
 
 export const updateSystemSettingsDto = z.object({
   sessionLifetimeMinutes: z.number().int().min(5).max(10080),

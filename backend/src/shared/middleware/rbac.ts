@@ -77,10 +77,12 @@ export function requireProjectPermission(
     const cacheKey = `rbac:perm:${projectId}:${req.user.userId}:${permission}`;
 
     try {
+      // Cache holds only positive (granted) results — a cached `true` means "still allowed".
+      // We do not cache deny decisions: a missing cache entry means "recompute", so granting a
+      // new role via a write path that forgot to invalidate still takes effect on the next
+      // request instead of being masked by a stale `false` for the full TTL.
       const cachedResult = await getCachedJson<boolean>(cacheKey);
-      if (cachedResult !== null) {
-        return cachedResult ? next() : next(new AppError(403, 'Insufficient project permissions'));
-      }
+      if (cachedResult === true) return next();
 
       const scheme = await getSchemeForProject(projectId);
       const userRole = await prisma.userProjectRole.findFirst({
@@ -100,7 +102,7 @@ export function requireProjectPermission(
         granted = roleDef?.permissions.find(p => p.permission === permission)?.granted ?? false;
       }
 
-      await setCachedJson(cacheKey, granted, 60);
+      if (granted) await setCachedJson(cacheKey, true, 60);
       return granted ? next() : next(new AppError(403, 'Insufficient project permissions'));
     } catch (err) {
       next(err);
