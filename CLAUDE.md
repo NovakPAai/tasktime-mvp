@@ -138,45 +138,14 @@ PR → CI → merge в main → auto-publish images → auto-deploy staging
 Flow Universe — импортозамещение Jira для российского финансового сектора.
 Конкуренты: Т1 Сфера, EVA, Diasoft.
 
-## Текущее состояние (2026-03-11)
+## Текущее состояние (2026-04-18)
 
-**Фаза:** Пересборка с нуля (v2). Старый прототип удалён.
-**План:** утверждён в `docs/RU/REBUILD_PLAN_V2.md`
-**Статус:** Sprints 1–4 ЗАВЕРШЕНЫ. Sprint 5 в работе (claude/agitated-hugle).
-
-### Sprint 1 — DONE (2026-03-10)
-
-Реализовано всё из плана (задачи 1.1–1.20):
-- Backend skeleton: Express + TypeScript + Prisma 6
-- Prisma schema: User, Project, Issue, Comment, AuditLog
-- Auth module: register, login, refresh, logout, me (JWT + refresh tokens)
-- Users module: CRUD, role management (RBAC)
-- Projects module: CRUD с ключами (DEMO, BACK)
-- Issues module: CRUD + иерархия (EPIC→STORY→TASK→SUBTASK, BUG) + статусы
-- RBAC middleware (ADMIN, MANAGER, USER, VIEWER)
-- Audit logging middleware
-- Validation (Zod DTOs)
-- Error handling middleware
-- Frontend: Vite + React 18 + Ant Design 5 + React Router
-- Login page, Dashboard, Projects list, Project detail + issues list
-- Issue create/edit form
-- Seed script (demo data: 4 пользователя, 2 проекта, 5 задач)
-- Docker Compose (PostgreSQL 16 + Redis 7)
-- Makefile: setup, dev, backend, frontend
+**Фаза:** UI Kit 2.0 — пересборка всех страниц по артбордам Paper (см. таблицу страниц выше).
+**Статус:** Sprints 1–4 ЗАВЕРШЕНЫ. Детали — в `obsidian/Sprint * — Done.md`.
 
 **Запуск:** `make setup && make dev` → http://localhost:5173
 **Прод:** https://flowuniverse.ru/
 **Аккаунты:** admin/manager/dev/viewer @tasktime.ru, пароль: password123
-
-### Sprint 2 — DONE (2026-03-10)
-
-Реализовано всё из плана Sprint 2 (2.1–2.10):
-- Kanban Board API/UI: колонки по статусам, drag-n-drop, сохранение порядка и статуса задач.
-- Sprints module API + UI: создание спринтов, старт/закрытие, перенос задач между бэклогом и спринтом, один ACTIVE спринт на проект.
-- Time tracking API + UI: старт/стоп таймера, ручной ввод времени, страница `My Time`, логирование по задачам и пользователю.
-- Comments API + UI: CRUD комментариев к задаче с проверкой прав, блок комментариев на странице задачи.
-- Issue detail page: полная карточка задачи (поля, иерархия, связи, время, комментарии).
-- Issue history: история изменений задачи из `audit_log` с привязкой к пользователю и действию.
 
 ## Решения из интервью (8 блоков)
 
@@ -356,21 +325,6 @@ PO выбрал:
 6. PO подтвердил: в репо не должно остаться ничего от старого прототипа — обновлён раздел миграции
 7. PO попросил проверить иерархию задач — проверена, соответствует ответам
 
-### Sprint 3 — DONE (2026-03-11)
-
-Реализовано всё из плана Sprint 3 (3.1–3.10):
-- Teams module: управление командами, привязка пользователей к командам.
-- Admin module: административные функции и настройки, связанные с управлением системой.
-- Reports: базовые отчёты по задачам и времени (минимальный набор для MVP).
-- Redis: доработка использования Redis в соответствии с планом (кэш, вспомогательные сценарии).
-
-### Текущий статус (2026-03-11)
-
-- Sprints 1–3 ЗАВЕРШЕНЫ и работают.
-- Ветка: `claude/mvp-project-management-hdAvd`
-- Старый прототип полностью удалён
-- **Следующий шаг:** Sprint 5 (AI Dev Loop) — в работе
-
 ## MCP — Flow Universe AI Tools
 
 MCP-сервер реализован на StreamableHTTP транспорте. Работает на порту 3002 на staging и production.
@@ -486,19 +440,13 @@ CI (push/PR) → Build & Publish (workflow_run, main only) → Deploy Staging (a
 
 ### Аудит и фиксы (ветка claude/mvp-project-management-hdAvd)
 
-**Коммиты:** `2ad8ed3`, `32eb187` — CI зелёный, в main ещё НЕ смержены.
-
-**Что исправлено:**
+**Что было исправлено (смержено в main):**
 - Redis 7 service container добавлен в CI (был в env, но контейнер отсутствовал)
 - actions/checkout v4→v6, setup-node v4→v6, setup-buildx v3→v4 (Node.js 20 deprecation June 2026)
 - Docker layer caching (GHA, scope per image) в Build & Publish
 - `deploy.sh`: retry loop (12×5s) вместо `sleep 10`, диагностика при падении, автобэкап Postgres перед миграциями
 - `rollback.sh`: добавлен health-check с retry loop
 - `nginx.conf`: rate-limiting (auth 5r/s, api 30r/s), security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), client_max_body_size 10m, proxy buffering
-
-### Открытые проблемы
-
-- **P1 (блокер для staging):** секреты staging environment не настроены в GitHub → Deploy Staging всегда failure. Нужно: Settings → Environments → staging → добавить `STAGING_DEPLOY_SSH_KEY`, `STAGING_DEPLOY_HOST`, `STAGING_DEPLOY_USER`, `STAGING_DEPLOY_PATH`. Или отключить auto-deploy staging (`if: false`).
 
 ### История проблем при деплоях
 
