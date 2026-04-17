@@ -199,11 +199,13 @@ export async function computeEffectiveRole(
     roleName: chosen.role.name,
     roleKey: chosen.role.key,
     permissions: chosen.role.permissions.filter(p => p.granted).map(p => p.permission),
+    // `source` indicates the PRIMARY grant path; DIRECT wins if the user has the role directly.
     source: chosen.source,
-    // AI review #65 round 3 🟡 — when the chosen role is DIRECT, don't leak irrelevant group
-    // context. If the user also holds the same role via groups, that's informational only and
-    // unrelated to the effective grant path; keeping it would contradict `source: 'DIRECT'`.
-    sourceGroups: chosen.source === 'DIRECT' ? [] : chosen.groups,
+    // `sourceGroups` lists ALL groups that also grant this role — independent of `source`.
+    // AI review #65 round 4 🟡: restored; round 3 cleared this when source=DIRECT, but that
+    // lost information SecurityTab needs ("also via Team A, Team B"). Documented in
+    // user-security.service SecurityProjectRole interface.
+    sourceGroups: chosen.groups,
   };
 }
 
@@ -302,8 +304,8 @@ export async function computeEffectiveRolesForProjects(
       roleKey: chosen.role.key,
       permissions: chosen.role.permissions.filter(p => p.granted).map(p => p.permission),
       source: chosen.source,
-      // AI review #65 round 3 🟡 — see single-project variant above.
-      sourceGroups: chosen.source === 'DIRECT' ? [] : chosen.groups,
+      // See single-project variant — sourceGroups lists all groups that also grant this role.
+      sourceGroups: chosen.groups,
     });
   }
 

@@ -10,7 +10,13 @@ import { computeEffectiveRolesForProjects } from '../../shared/middleware/rbac.j
 export interface SecurityProjectRole {
   project: { id: string; key: string; name: string };
   role: { id: string; name: string; key: string; permissions: ProjectPermission[] };
+  /**
+   * The PRIMARY grant path. DIRECT wins when the user has the role directly assigned.
+   * When both DIRECT and at least one group grant the same role, source='DIRECT' and
+   * sourceGroups lists every group that additionally grants it ("also via Team A").
+   */
   source: 'DIRECT' | 'GROUP';
+  /** Every group that grants this role, independent of `source`. Empty iff the role is not granted via any group. */
   sourceGroups: { id: string; name: string }[];
 }
 
