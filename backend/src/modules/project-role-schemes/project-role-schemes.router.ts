@@ -101,7 +101,8 @@ router.get('/:id/roles/:roleId/permissions', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/:id/roles/:roleId/permissions', validate(updatePermissionsDto), async (req: AuthRequest, res, next) => {
+// PATCH is correct: we accept a partial permissions map and merge it; PUT would imply full replacement.
+router.patch('/:id/roles/:roleId/permissions', validate(updatePermissionsDto), async (req: AuthRequest, res, next) => {
   try {
     const role = await service.updatePermissions(req.params.id as string, req.params.roleId as string, req.body);
     await logAudit(req, 'role_scheme.permissions_updated', 'role_scheme', req.params.id as string, { roleId: req.params.roleId, permissions: req.body.permissions });

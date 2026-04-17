@@ -376,21 +376,21 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
     const projectScheme = await getSchemeForProject(dto.projectId);
     const roleDef = projectScheme.roles.find(r => r.id === dto.roleId);
     if (!roleDef) {
-      throw new AppError(400, 'roleId does not belong to the scheme attached to this project');
+      throw new AppError(400, 'roleId не принадлежит схеме, привязанной к проекту');
     }
     resolvedSchemeId = projectScheme.id;
     const derivedKey = legacyRoles.includes(roleDef.key) ? (roleDef.key as ProjectRole) : undefined;
     if (dto.role && derivedKey && dto.role !== derivedKey) {
-      throw new AppError(400, `roleId key "${roleDef.key}" does not match legacy role "${dto.role}"`);
+      throw new AppError(400, `Ключ роли "${roleDef.key}" не совпадает с legacy role "${dto.role}"`);
     }
     legacyRole = derivedKey ?? dto.role;
   }
-  if (!legacyRole) throw new AppError(400, 'role or roleId is required (custom roles require legacy role mapping via "role")');
+  if (!legacyRole) throw new AppError(400, 'Нужно передать role или roleId (для кастомных ролей укажите legacy role через поле "role")');
 
   const existing = await prisma.userProjectRole.findFirst({
-    where: { userId, projectId: dto.projectId, role: legacyRole },
+    where: { userId, projectId: dto.projectId },
   });
-  if (existing) throw new AppError(409, 'Role already assigned');
+  if (existing) throw new AppError(409, 'У пользователя уже есть роль в этом проекте — удалите её перед назначением новой');
 
   const roleEntry = await prisma.userProjectRole.create({
     data: {

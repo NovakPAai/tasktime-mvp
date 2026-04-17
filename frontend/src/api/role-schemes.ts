@@ -62,7 +62,7 @@ export const roleSchemesApi = {
   getPermissions: (id: string, roleId: string) =>
     api.get<ProjectRolePermission[]>(`/admin/role-schemes/${id}/roles/${roleId}/permissions`).then(r => r.data),
   updatePermissions: (id: string, roleId: string, permissions: Record<string, boolean>) =>
-    api.put<ProjectRoleDefinition>(`/admin/role-schemes/${id}/roles/${roleId}/permissions`, { permissions }).then(r => r.data),
+    api.patch<ProjectRoleDefinition>(`/admin/role-schemes/${id}/roles/${roleId}/permissions`, { permissions }).then(r => r.data),
   getForProject: (projectId: string) =>
     api.get<ProjectRoleScheme>(`/projects/${projectId}/role-scheme`).then(r => r.data),
 };

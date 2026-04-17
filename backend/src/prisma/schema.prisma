@@ -97,7 +97,7 @@ model UserProjectRole {
   // and cannot be expressed declaratively in Prisma schema.
   roleDefinition ProjectRoleDefinition? @relation(fields: [roleId, schemeId], references: [id, schemeId], onDelete: SetNull)
 
-  @@unique([userId, projectId, role])
+  @@unique([userId, projectId]) // one role per user per project — switch from (userId, projectId, role) in migration 20260418000000_user_project_role_single
   @@index([userId])
   @@index([projectId])
   @@map("user_project_roles")

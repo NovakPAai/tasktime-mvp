@@ -27,6 +27,7 @@ const { mockPrisma } = vi.hoisted(() => {
       findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -102,6 +103,12 @@ beforeEach(() => {
 // ─── getSchemeForProject ───────────────────────────────────────────────────────
 
 describe('getSchemeForProject', () => {
+  beforeEach(() => {
+    // Project existence check was added in round-8 — mock it so these tests don't fall through
+    // to the 404 branch before reaching the scheme-resolution logic under test.
+    mp.project.findUnique.mockResolvedValue({ id: 'proj-x' });
+  });
+
   it('возвращает явно привязанную схему', async () => {
     mp.projectRoleSchemeProject.findUnique.mockResolvedValue({
       projectId: 'proj-1',
@@ -132,6 +139,15 @@ describe('getSchemeForProject', () => {
     await expect(getSchemeForProject('proj-3')).rejects.toMatchObject({
       statusCode: 500,
       message: 'No default role scheme configured',
+    });
+  });
+
+  it('бросает AppError 404 если проекта не существует', async () => {
+    mp.project.findUnique.mockResolvedValueOnce(null);
+
+    await expect(getSchemeForProject('proj-missing')).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'Project not found',
     });
   });
 
@@ -253,6 +269,7 @@ describe('updatePermissions', () => {
   beforeEach(() => {
     mp.projectRoleDefinition.findFirst.mockResolvedValue(ROLE);
     mp.projectRoleDefinition.findUnique.mockResolvedValue({ ...ROLE, permissions: [{ permission: 'ISSUES_VIEW', granted: true }] });
+    mp.projectRoleDefinition.findUniqueOrThrow.mockResolvedValue({ ...ROLE, permissions: [{ permission: 'ISSUES_VIEW', granted: true }] });
     mp.projectRolePermission.deleteMany.mockResolvedValue({ count: 0 });
     mp.projectRolePermission.createMany.mockResolvedValue({ count: 2 });
     mp.projectRoleSchemeProject.findMany.mockResolvedValue([]);

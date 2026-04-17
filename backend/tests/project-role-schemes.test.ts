@@ -182,7 +182,7 @@ describe('POST /api/admin/role-schemes/:id/projects', () => {
   });
 });
 
-describe('PUT /api/admin/role-schemes/:id/roles/:roleId/permissions', () => {
+describe('PATCH /api/admin/role-schemes/:id/roles/:roleId/permissions', () => {
   it('сохраняет матрицу прав и возвращает роль с permissions', async () => {
     // Get a role from the default scheme
     const schemeRes = await request
@@ -195,7 +195,7 @@ describe('PUT /api/admin/role-schemes/:id/roles/:roleId/permissions', () => {
     const roleId = role!.id;
 
     const res = await request
-      .put(`/api/admin/role-schemes/${DEFAULT_SCHEME_ID}/roles/${roleId}/permissions`)
+      .patch(`/api/admin/role-schemes/${DEFAULT_SCHEME_ID}/roles/${roleId}/permissions`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ permissions: { ISSUES_VIEW: true, ISSUES_CREATE: false } });
 

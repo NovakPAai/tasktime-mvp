@@ -26,7 +26,7 @@ export const assignProjectRoleDto = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['role'],
-        message: 'Either role (legacy) or roleId is required',
+        message: 'Нужно передать role (legacy) или roleId',
       });
     }
   });
