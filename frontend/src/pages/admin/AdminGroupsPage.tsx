@@ -171,14 +171,15 @@ export default function AdminGroupsPage() {
         </Form>
       </Modal>
 
-      {/* Delete-with-impact modal */}
+      {/* Delete-with-impact modal. OK is disabled until the impact payload loads so the admin
+          cannot confirm blindly before seeing consequences (AI review #66 round 2 🟠). */}
       <Modal
         title={`Удалить группу «${impactFor?.name ?? ''}»?`}
         open={!!impactFor}
         onCancel={() => { setImpactFor(null); setImpact(null); }}
         onOk={confirmDelete}
         okText="Удалить"
-        okButtonProps={{ danger: true }}
+        okButtonProps={{ danger: true, disabled: !impact }}
         cancelText="Отмена"
         confirmLoading={deleting}
       >
@@ -186,7 +187,18 @@ export default function AdminGroupsPage() {
           <>
             <p>Будут отозваны следующие доступы:</p>
             <ul>
-              <li><b>{impact.memberCount}</b> участников потеряют членство</li>
+              <li>
+                <b>{impact.memberCount}</b> участников потеряют членство
+                {impact.members.length > 0 && (
+                  <ul style={{ maxHeight: 160, overflowY: 'auto', marginTop: 4 }}>
+                    {impact.members.map(m => (
+                      <li key={m.id}>
+                        {m.name} <span style={{ color: '#888' }}>· {m.email}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
               <li>
                 <b>{impact.projectCount}</b> проектных биндингов будут удалены
                 {impact.projects.length > 0 && (
