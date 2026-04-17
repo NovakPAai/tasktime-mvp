@@ -611,15 +611,22 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `DELETE` | `/api/admin/users/:id` | 🔒 |
 | `PATCH` | `/api/admin/users/:id/deactivate` | 🔒 |
 | `POST` | `/api/admin/users/:id/reset-password` | 🔒 |
+| `GET` | `/api/admin/users/:id/system-roles` | 🔒 |
+| `POST` | `/api/admin/users/:id/system-roles` | 🔒 |
+| `DELETE` | `/api/admin/users/:id/system-roles/:role` | 🔒 |
+| `PUT` | `/api/admin/users/:id/system-roles` | 🔒 |
 | `GET` | `/api/admin/users/:id/roles` | 🔒 |
 | `POST` | `/api/admin/users/:id/roles` | 🔒 |
 | `DELETE` | `/api/admin/users/:id/roles/:roleId` | 🔒 |
 | `GET` | `/api/admin/activity` | 🔒 |
 | `GET` | `/api/admin/settings/registration` | 🔒 |
 | `PATCH` | `/api/admin/settings/registration` | 🔒 |
+| `GET` | `/api/admin/settings/system` | 🔒 |
+| `PATCH` | `/api/admin/settings/system` | 🔒 |
 | `GET` | `/api/admin/uat-tests` | 🔒 |
 | `GET` | `/api/admin/reports/issues-by-status` | 🔒 |
 | `GET` | `/api/admin/reports/issues-by-assignee` | 🔒 |
+| `POST` | `/api/admin/users/reset-password` | 🔒 |
 
 ### AI Sessions
 
@@ -634,7 +641,6 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `POST` | `/api/ai/estimate` | 🔒 |
 | `POST` | `/api/ai/decompose` | 🔒 |
 | `POST` | `/api/ai/suggest-assignee` | 🔒 |
-| `POST` | `/api/sprints/:id/ai/estimate-all` | 🔒 ADMIN, MANAGER |
 
 ### Auth
 
@@ -746,7 +752,10 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `PATCH` | `/api/issues/:id/ai-flags` | 🔒 |
 | `PATCH` | `/api/issues/:id/ai-status` | 🔒 |
 | `POST` | `/api/projects/:projectId/issues/bulk` | 🔒 |
+| `POST` | `/api/projects/:projectId/issues/bulk-transition` | 🔒 |
 | `DELETE` | `/api/projects/:projectId/issues/bulk` | 🔒 |
+| `PATCH` | `/api/issues/:id/change-type` | 🔒 |
+| `POST` | `/api/issues/:id/move` | 🔒 |
 | `DELETE` | `/api/issues/:id` | 🔒 |
 | `GET` | `/api/issues/:id/children` | 🔒 |
 | `GET` | `/api/issues/:id/history` | 🔒 |
@@ -781,6 +790,24 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `PATCH` | `/api/project-categories/:id` | 🔒 |
 | `DELETE` | `/api/project-categories/:id` | 🔒 |
 
+### project-role-schemes
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PATCH` | `/api/:id` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+| `POST` | `/api/:id/projects` | 🔒 |
+| `DELETE` | `/api/:id/projects/:projectId` | 🔒 |
+| `GET` | `/api/:id/roles` | 🔒 |
+| `POST` | `/api/:id/roles` | 🔒 |
+| `PATCH` | `/api/:id/roles/:roleId` | 🔒 |
+| `DELETE` | `/api/:id/roles/:roleId` | 🔒 |
+| `GET` | `/api/:id/roles/:roleId/permissions` | 🔒 |
+| `PATCH` | `/api/:id/roles/:roleId/permissions` | 🔒 |
+
 ### Projects
 
 | Метод | Путь | Доступ |
@@ -792,22 +819,60 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `PATCH` | `/api/projects/:id` | 🔒 |
 | `DELETE` | `/api/projects/:id` | 🔒 |
 
+### releases
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PATCH` | `/api/:id` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+
+### releases
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PATCH` | `/api/:id` | 🔒 |
+| `PUT` | `/api/:id` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+| `GET` | `/api/:id/validate` | 🔒 |
+| `POST` | `/api/:id/steps` | 🔒 |
+| `PATCH` | `/api/:id/steps/:stepId` | 🔒 |
+| `DELETE` | `/api/:id/steps/:stepId` | 🔒 |
+| `POST` | `/api/:id/transitions` | 🔒 |
+| `PATCH` | `/api/:id/transitions/:tid` | 🔒 |
+| `PUT` | `/api/:id/transitions/:tid` | 🔒 |
+| `DELETE` | `/api/:id/transitions/:tid` | 🔒 |
+
 ### Releases
 
 | Метод | Путь | Доступ |
 |-------|------|--------|
-| `GET` | `/api/projects/:projectId/releases` | 🔒 |
-| `GET` | `/api/releases/:id/issues` | 🔒 |
-| `GET` | `/api/releases/:id/sprints` | 🔒 |
-| `GET` | `/api/releases/:id/readiness` | 🔒 |
-| `POST` | `/api/projects/:projectId/releases` | 🔒 |
+| `GET` | `/api/releases` | 🔒 |
+| `POST` | `/api/releases` | 🔒 |
+| `GET` | `/api/releases/:id` | 🔒 |
+| `GET` | `/api/releases/:id/history` | 🔒 |
 | `PATCH` | `/api/releases/:id` | 🔒 |
-| `POST` | `/api/releases/:id/issues` | 🔒 |
-| `POST` | `/api/releases/:id/issues/remove` | 🔒 |
-| `POST` | `/api/releases/:id/sprints` | 🔒 |
-| `POST` | `/api/releases/:id/sprints/remove` | 🔒 |
+| `DELETE` | `/api/releases/:id` | 🔒 |
+| `GET` | `/api/releases/:id/items` | 🔒 |
+| `POST` | `/api/releases/:id/items` | 🔒 |
+| `POST` | `/api/releases/:id/items/remove` | 🔒 |
+| `GET` | `/api/releases/:id/transitions` | 🔒 |
+| `POST` | `/api/releases/:id/transitions/:transitionId` | 🔒 |
+| `GET` | `/api/releases/:id/readiness` | 🔒 |
+| `POST` | `/api/releases/:id/clone` | 🔒 |
 | `POST` | `/api/releases/:id/ready` | 🔒 |
 | `POST` | `/api/releases/:id/released` | 🔒 |
+| `GET` | `/api/projects/:projectId/releases` | 🔒 |
+| `POST` | `/api/projects/:projectId/releases` | 🔒 |
+| `GET` | `/api/releases/:id/issues` | 🔒 |
+| `GET` | `/api/releases/:id/sprints` | 🔒 |
+| `POST` | `/api/releases/:id/sprints` | 🔒 |
+| `POST` | `/api/releases/:id/sprints/remove` | 🔒 |
 
 ### Sprints
 
@@ -823,6 +888,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `POST` | `/api/sprints/:id/close` | 🔒 |
 | `POST` | `/api/sprints/:id/issues` | 🔒 |
 | `POST` | `/api/projects/:projectId/backlog/issues` | 🔒 |
+| `POST` | `/api/sprints/:id/ai/estimate-all` | 🔒 |
 
 ### Teams
 
@@ -880,6 +946,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 |-------|------|--------|
 | `GET` | `/api/issues/:id/transitions` | 🔒 |
 | `POST` | `/api/issues/:id/transitions` | 🔒 |
+| `POST` | `/api/issues/batch-transitions` | 🔒 |
 
 ### workflow-schemes
 
@@ -914,6 +981,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `PUT` | `/api/:id` | 🔒 |
 | `DELETE` | `/api/:id` | 🔒 |
 | `POST` | `/api/:id/copy` | 🔒 |
+| `GET` | `/api/:id/validate` | 🔒 |
 | `POST` | `/api/:id/steps` | 🔒 |
 | `PATCH` | `/api/:id/steps/:stepId` | 🔒 |
 | `DELETE` | `/api/:id/steps/:stepId` | 🔒 |

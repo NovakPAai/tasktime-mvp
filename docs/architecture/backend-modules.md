@@ -260,6 +260,7 @@ Run `make docs` to check for staleness warnings.
 
 | Модуль | Префикс API | Файл роутера |
 |--------|-------------|--------------|
+| Webhooks | `/api` | `backend/src/modules/webhooks/webhooks.router.js.ts` |
 | Auth | `/api/auth` | `backend/src/modules/auth/auth.router.js.ts` |
 | Users | `/api/users` | `backend/src/modules/users/users.router.js.ts` |
 | Projects | `/api/projects` | `backend/src/modules/projects/projects.router.js.ts` |
@@ -274,7 +275,6 @@ Run `make docs` to check for staleness warnings.
 | Admin | `/api` | `backend/src/modules/admin/admin.router.js.ts` |
 | Ai | `/api` | `backend/src/modules/ai/ai-sessions.router.js.ts` |
 | Ai | `/api` | `backend/src/modules/ai/ai.router.js.ts` |
-| Webhooks | `/api` | `backend/src/modules/webhooks/webhooks.router.js.ts` |
 | Links | `/api` | `backend/src/modules/links/links.router.js.ts` |
 | Issue Type Configs | `/api` | `backend/src/modules/issue-type-configs/issue-type-configs.router.js.ts` |
 | Issue Type Schemes | `/api` | `backend/src/modules/issue-type-schemes/issue-type-schemes.router.js.ts` |
@@ -287,5 +287,8 @@ Run `make docs` to check for staleness warnings.
 | Workflows | `/api/admin/workflows` | `backend/src/modules/workflows/workflows.router.js.ts` |
 | Workflow Schemes | `/api/admin/workflow-schemes` | `backend/src/modules/workflow-schemes/workflow-schemes.router.js.ts` |
 | Transition Screens | `/api/admin/transition-screens` | `backend/src/modules/transition-screens/transition-screens.router.js.ts` |
+| Releases | `/api/admin/release-statuses` | `backend/src/modules/releases/release-statuses.router.js.ts` |
+| Releases | `/api/admin/release-workflows` | `backend/src/modules/releases/release-workflows-admin.router.js.ts` |
+| Project Role Schemes | `/api/admin/role-schemes` | `backend/src/modules/project-role-schemes/project-role-schemes.router.js.ts` |
 | Workflow Engine | `/api` | `backend/src/modules/workflow-engine/workflow-engine.router.js.ts` |
 <!-- AUTO-GENERATED:END -->

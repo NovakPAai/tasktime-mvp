@@ -330,7 +330,7 @@ Run `make docs` to check for staleness warnings.
 > ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
 > Обновляется автоматически при каждом изменении схемы.
 
-## Модели (35)
+## Модели (45)
 
 ### User
 
@@ -340,7 +340,6 @@ Run `make docs` to check for staleness warnings.
 | `email` | `String` | нет | UNIQUE |
 | `passwordHash` | `String` | нет |  |
 | `name` | `String` | нет |  |
-| `role` | `UserRole` | нет | default: USER |
 | `isActive` | `Boolean` | нет | default: true |
 | `isSystem` | `Boolean` | нет | default: false |
 | `mustChangePassword` | `Boolean` | нет | default: false |
@@ -357,7 +356,21 @@ Run `make docs` to check for staleness warnings.
 | `createdLinks` | `IssueLink[]` | нет |  |
 | `ownedProjects` | `Project[]` | нет |  |
 | `projectRoles` | `UserProjectRole[]` | нет |  |
+| `systemRoles` | `UserSystemRole[]` | нет |  |
 | `customFieldUpdates` | `IssueCustomFieldValue[]` | нет |  |
+| `createdReleases` | `Release[]` | нет |  |
+| `addedReleaseItems` | `ReleaseItem[]` | нет |  |
+
+### UserSystemRole
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `userId` | `String` | нет |  |
+| `role` | `SystemRoleType` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `createdBy` | `String` | да |  |
+| `user` | `User` | нет |  |
 
 ### RefreshToken
 
@@ -378,9 +391,12 @@ Run `make docs` to check for staleness warnings.
 | `userId` | `String` | нет |  |
 | `projectId` | `String` | нет |  |
 | `role` | `ProjectRole` | нет |  |
+| `roleId` | `String` | да |  |
+| `schemeId` | `String` | да |  |
 | `createdAt` | `DateTime` | нет | default: now( |
 | `user` | `User` | нет |  |
 | `project` | `Project` | нет |  |
+| `roleDefinition` | `ProjectRoleDefinition` | да |  |
 
 ### ProjectCategory
 
@@ -414,6 +430,7 @@ Run `make docs` to check for staleness warnings.
 | `userRoles` | `UserProjectRole[]` | нет |  |
 | `fieldSchemaBindings` | `FieldSchemaBinding[]` | нет |  |
 | `workflowScheme` | `WorkflowSchemeProject` | да |  |
+| `roleScheme` | `ProjectRoleSchemeProject` | да |  |
 
 ### IssueTypeConfig
 
@@ -514,6 +531,7 @@ Run `make docs` to check for staleness warnings.
 | `sourceLinks` | `IssueLink[]` | нет |  |
 | `targetLinks` | `IssueLink[]` | нет |  |
 | `customFieldValues` | `IssueCustomFieldValue[]` | нет |  |
+| `releaseItems` | `ReleaseItem[]` | нет |  |
 
 ### Sprint
 
@@ -539,20 +557,102 @@ Run `make docs` to check for staleness warnings.
 | `flowTeam` | `Team` | да |  |
 | `release` | `Release` | да |  |
 
+### ReleaseStatus
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет | UNIQUE |
+| `category` | `ReleaseStatusCategory` | нет |  |
+| `color` | `String` | нет | default: "#888888" |
+| `description` | `String` | да |  |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `releases` | `Release[]` | нет |  |
+| `workflowSteps` | `ReleaseWorkflowStep[]` | нет |  |
+| `transitionsFrom` | `ReleaseWorkflowTransition[]` | нет |  |
+| `transitionsTo` | `ReleaseWorkflowTransition[]` | нет |  |
+
+### ReleaseWorkflow
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет | UNIQUE |
+| `description` | `String` | да |  |
+| `releaseType` | `ReleaseType` | да |  |
+| `isDefault` | `Boolean` | нет | default: false |
+| `isActive` | `Boolean` | нет | default: true |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `steps` | `ReleaseWorkflowStep[]` | нет |  |
+| `transitions` | `ReleaseWorkflowTransition[]` | нет |  |
+| `releases` | `Release[]` | нет |  |
+
+### ReleaseWorkflowStep
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `workflowId` | `String` | нет |  |
+| `statusId` | `String` | нет |  |
+| `isInitial` | `Boolean` | нет | default: false |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `workflow` | `ReleaseWorkflow` | нет |  |
+| `status` | `ReleaseStatus` | нет |  |
+
+### ReleaseWorkflowTransition
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `workflowId` | `String` | нет |  |
+| `name` | `String` | нет |  |
+| `fromStatusId` | `String` | нет |  |
+| `toStatusId` | `String` | нет |  |
+| `conditions` | `Json` | да |  |
+| `isGlobal` | `Boolean` | нет | default: false |
+| `workflow` | `ReleaseWorkflow` | нет |  |
+| `fromStatus` | `ReleaseStatus` | нет |  |
+| `toStatus` | `ReleaseStatus` | нет |  |
+
+### ReleaseItem
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `releaseId` | `String` | нет |  |
+| `issueId` | `String` | нет |  |
+| `addedAt` | `DateTime` | нет | default: now( |
+| `addedById` | `String` | нет |  |
+| `release` | `Release` | нет |  |
+| `issue` | `Issue` | нет |  |
+| `addedBy` | `User` | нет |  |
+
 ### Release
 
 | Поле | Тип | Nullable | Примечание |
 |------|-----|----------|------------|
 | `id` | `String` | нет | PK, default: uuid( |
-| `projectId` | `String` | нет |  |
+| `type` | `ReleaseType` | нет | default: ATOMIC |
+| `projectId` | `String` | да |  |
 | `name` | `String` | нет |  |
 | `description` | `String` | да |  |
 | `level` | `ReleaseLevel` | нет | default: MINOR |
 | `state` | `ReleaseState` | нет | default: DRAFT |
+| `statusId` | `String` | да |  |
+| `workflowId` | `String` | да |  |
 | `releaseDate` | `DateTime` | да |  |
+| `plannedDate` | `DateTime` | да |  |
+| `createdById` | `String` | да |  |
 | `createdAt` | `DateTime` | нет | default: now( |
 | `updatedAt` | `DateTime` | нет |  |
-| `project` | `Project` | нет |  |
+| `project` | `Project` | да |  |
+| `status` | `ReleaseStatus` | да |  |
+| `workflow` | `ReleaseWorkflow` | да |  |
+| `createdBy` | `User` | да |  |
+| `items` | `ReleaseItem[]` | нет |  |
 | `issues` | `Issue[]` | нет |  |
 | `sprints` | `Sprint[]` | нет |  |
 
@@ -849,11 +949,12 @@ Run `make docs` to check for staleness warnings.
 |------|-----|----------|------------|
 | `id` | `String` | нет | PK, default: uuid( |
 | `screenId` | `String` | нет |  |
-| `customFieldId` | `String` | нет |  |
+| `customFieldId` | `String` | да |  |
+| `systemFieldKey` | `String` | да |  |
 | `isRequired` | `Boolean` | нет | default: false |
 | `orderIndex` | `Int` | нет | default: 0 |
 | `screen` | `TransitionScreen` | нет |  |
-| `customField` | `CustomField` | нет |  |
+| `customField` | `CustomField` | да |  |
 
 ### WorkflowScheme
 
@@ -891,15 +992,66 @@ Run `make docs` to check for staleness warnings.
 | `scheme` | `WorkflowScheme` | нет |  |
 | `project` | `Project` | нет |  |
 
-## Перечисления (14)
+### ProjectRoleScheme
 
-### UserRole
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `isDefault` | `Boolean` | нет | default: false |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `roles` | `ProjectRoleDefinition[]` | нет |  |
+| `projects` | `ProjectRoleSchemeProject[]` | нет |  |
+
+### ProjectRoleDefinition
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemeId` | `String` | нет |  |
+| `name` | `String` | нет |  |
+| `key` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `color` | `String` | да |  |
+| `isSystem` | `Boolean` | нет | default: false |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `scheme` | `ProjectRoleScheme` | нет |  |
+| `permissions` | `ProjectRolePermission[]` | нет |  |
+| `userProjectRoles` | `UserProjectRole[]` | нет |  |
+
+### ProjectRolePermission
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `roleId` | `String` | нет |  |
+| `permission` | `ProjectPermission` | нет |  |
+| `granted` | `Boolean` | нет | default: false |
+| `role` | `ProjectRoleDefinition` | нет |  |
+
+### ProjectRoleSchemeProject
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `schemeId` | `String` | нет |  |
+| `projectId` | `String` | нет | UNIQUE |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `scheme` | `ProjectRoleScheme` | нет |  |
+| `project` | `Project` | нет |  |
+
+## Перечисления (17)
+
+### SystemRoleType
 
 - `SUPER_ADMIN`
 - `ADMIN`
-- `MANAGER`
+- `RELEASE_MANAGER`
 - `USER`
-- `VIEWER`
+- `AUDITOR`
 
 ### ProjectRole
 
@@ -942,6 +1094,11 @@ Run `make docs` to check for staleness warnings.
 - `ACTIVE`
 - `CLOSED`
 
+### ReleaseType
+
+- `ATOMIC       // атомарный — одна система/проект`
+- `INTEGRATION  // интеграционный — кросс-проектный`
+
 ### ReleaseLevel
 
 - `MINOR   // мелкие улучшения, баг-фиксы`
@@ -952,6 +1109,13 @@ Run `make docs` to check for staleness warnings.
 - `DRAFT    // сбор задач`
 - `READY    // готов к выпуску`
 - `RELEASED // выпущен`
+
+### ReleaseStatusCategory
+
+- `PLANNING      // сбор, планирование`
+- `IN_PROGRESS   // в работе (сборка, тестирование, стабилизация)`
+- `DONE          // выпущен, закрыт`
+- `CANCELLED     // отменён`
 
 ### TimeSource
 
@@ -991,4 +1155,30 @@ Run `make docs` to check for staleness warnings.
 - `TODO`
 - `IN_PROGRESS`
 - `DONE`
+
+### ProjectPermission
+
+- `ISSUES_VIEW`
+- `ISSUES_CREATE`
+- `ISSUES_EDIT`
+- `ISSUES_DELETE`
+- `ISSUES_ASSIGN`
+- `ISSUES_CHANGE_STATUS`
+- `ISSUES_CHANGE_TYPE`
+- `SPRINTS_VIEW`
+- `SPRINTS_MANAGE`
+- `RELEASES_VIEW`
+- `RELEASES_MANAGE`
+- `MEMBERS_VIEW`
+- `MEMBERS_MANAGE`
+- `TIME_LOGS_VIEW`
+- `TIME_LOGS_CREATE`
+- `TIME_LOGS_MANAGE`
+- `COMMENTS_VIEW`
+- `COMMENTS_CREATE`
+- `COMMENTS_MANAGE`
+- `PROJECT_SETTINGS_VIEW`
+- `PROJECT_SETTINGS_EDIT`
+- `BOARDS_VIEW`
+- `BOARDS_MANAGE`
 <!-- AUTO-GENERATED:END -->

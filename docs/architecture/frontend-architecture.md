@@ -194,7 +194,6 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/projects/:id/releases` | `ReleasesPage` | `frontend/src/pages/ReleasesPage` | — |
 | `/sprints` | `GlobalSprintsPage` | `frontend/src/pages/GlobalSprintsPage` | — |
 | `/releases` | `GlobalReleasesPage` | `frontend/src/pages/GlobalReleasesPage` | — |
-| `/pipeline` | `PipelineDashboardPage` | `frontend/src/pages/PipelineDashboardPage` | Standalone Pipeline Service dashboard (batches, deploys, GitHub sync). Calls `pipeline-service` on port 3100 via `VITE_PIPELINE_URL`. |
 | `/issues/:id` | `IssueDetailPage` | `frontend/src/pages/IssueDetailPage` | — |
 | `/time` | `TimePage` | `frontend/src/pages/TimePage` | — |
 | `/teams` | `TeamsPage` | `frontend/src/pages/TeamsPage` | — |
@@ -217,9 +216,17 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/admin/workflows/:id` | `AdminWorkflowEditorPage` | `frontend/src/pages/admin/AdminWorkflowEditorPage` | — |
 | `/admin/workflow-schemes` | `AdminWorkflowSchemesPage` | `frontend/src/pages/admin/AdminWorkflowSchemesPage` | — |
 | `/admin/workflow-schemes/:id` | `AdminWorkflowSchemeEditorPage` | `frontend/src/pages/admin/AdminWorkflowSchemeEditorPage` | — |
+| `/admin/role-schemes` | `AdminRoleSchemesPage` | `frontend/src/pages/admin/AdminRoleSchemesPage` | — |
+| `/admin/role-schemes/:id` | `AdminRoleSchemeDetailPage` | `frontend/src/pages/admin/AdminRoleSchemeDetailPage` | — |
 | `/admin/transition-screens` | `AdminTransitionScreensPage` | `frontend/src/pages/admin/AdminTransitionScreensPage` | — |
 | `/admin/transition-screens/:id` | `AdminTransitionScreenEditorPage` | `frontend/src/pages/admin/AdminTransitionScreenEditorPage` | — |
+| `/admin/release-workflows` | `AdminReleaseWorkflowsPage` | `frontend/src/pages/admin/AdminReleaseWorkflowsPage` | — |
+| `/admin/release-workflows/:id` | `AdminReleaseWorkflowEditorPage` | `frontend/src/pages/admin/AdminReleaseWorkflowEditorPage` | — |
+| `/admin/release-statuses` | `AdminReleaseStatusesPage` | `frontend/src/pages/admin/AdminReleaseStatusesPage` | — |
+| `/admin/system` | `AdminSystemPage` | `frontend/src/pages/admin/AdminSystemPage` | — |
 | `/settings` | `SettingsPage` | `frontend/src/pages/SettingsPage` | — |
+| `/pipeline` | `PipelineDashboardPage` | `frontend/src/pages/PipelineDashboardPage` | — |
+| `/*` | `Navigate` | `frontend/src/pages/Navigate` | — |
 <!-- AUTO-GENERATED:END -->
 
 <!-- AUTO-GENERATED:START:stores -->
