@@ -7,3 +7,4 @@
 | [TTADM-68](./TTADM-68.md) | [Workflow Editor] null в conditions/validators/postFunctions не проходит Zod | 2026-04-07 | DONE (не закрыта на проде) | ~1.5ч |
 | [TTMP-171](./TTMP-171.md) | Сессия пользователя (sliding session + настройка в Системе) | 2026-04-07 | IN_PROGRESS | 9ч |
 | [TTMP-223](./TTMP-223.md) | [Release Mgmt] Исправление несоответствий реализации спеке | 2026-04-12 | OPEN | 8.5ч |
+| [TTSEC-2](./TTSEC-2.md) | Группы пользователей, «Безопасность» в профиле и гранулярность permission-матрицы | 2026-04-17 | OPEN | 75ч |

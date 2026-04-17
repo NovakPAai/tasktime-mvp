@@ -1,0 +1,247 @@
+{
+  "key": "TTSEC-2",
+  "title": "Группы пользователей, раздел «Безопасность» в профиле и гранулярность permission-матрицы",
+  "generatedAt": "2026-04-17T12:00:00.000Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "apiUrl": "local",
+    "issueId": null,
+    "fetchedAt": "2026-04-17T12:00:00.000Z"
+  },
+  "issue": {
+    "type": "EPIC",
+    "status": "OPEN",
+    "priority": "HIGH",
+    "project": "TTSEC+TTMP",
+    "assignee": null,
+    "creator": "Claude Code",
+    "estimatedHours": 75,
+    "description": "Сводное ТЗ: (A) UserGroup как уровень абстракции между юзером и проектной ролью + вкладка «Безопасность» в профиле + миграция UserProjectRole → Legacy-группы; (B) гранулярность permission-matrix: SPRINTS/RELEASES_CREATE|EDIT|DELETE вместо *_MANAGE; COMMENTS_DELETE_OTHERS + TIME_LOGS_DELETE_OTHERS. Единая миграция во избежание двух проходов и рассинхрона.",
+    "acceptanceCriteria": "Группы CRUD; эффективная роль детерминированно; миграция сохраняет все права; профиль показывает группы и роли с источником; granular CRUD работает через middleware; DELETE_OTHERS — OR-проверка; performance регресс ≤ 10%; audit."
+  },
+  "dependencies": {
+    "backendModules": [
+      "user-groups (новый)",
+      "users",
+      "projects",
+      "project-role-schemes",
+      "sprints",
+      "releases",
+      "comments",
+      "time",
+      "shared/auth/rbac",
+      "prisma (migration)"
+    ],
+    "frontendComponents": [
+      "pages/admin/AdminGroupsPage.tsx (новый)",
+      "pages/admin/AdminGroupDetailPage.tsx (новый)",
+      "components/admin/GroupMembersTable.tsx (новый)",
+      "components/admin/GroupProjectRolesTable.tsx (новый)",
+      "components/admin/PermissionMatrixDrawer.tsx (правка — новые колонки)",
+      "components/profile/SecurityTab.tsx (новый)",
+      "pages/ProfilePage.tsx (tabs + Security)",
+      "components/layout/Sidebar.tsx (пункт Группы)",
+      "api/user-groups.ts (новый)",
+      "api/user-security.ts (новый)"
+    ],
+    "prismaModels": [
+      "UserGroup (новая)",
+      "UserGroupMember (новая)",
+      "ProjectGroupRole (новая)",
+      "UserProjectRole (+source enum)",
+      "RoleAssignmentSource enum (новый)",
+      "ProjectPermission enum (+8 новых values)"
+    ],
+    "externalPackages": [],
+    "blockers": [
+      "TTMP-159 — project role schemes"
+    ]
+  },
+  "risks": [
+    {
+      "id": 1,
+      "description": "Миграция UserProjectRole → Legacy-группы теряет права",
+      "probability": "MEDIUM",
+      "impact": "Потеря доступов",
+      "mitigation": "Dry-run с diff-отчётом; rollback SQL; staging; pre/post snapshot"
+    },
+    {
+      "id": 2,
+      "description": "Эффективные роли через группы — регресс latency",
+      "probability": "HIGH",
+      "impact": "Медленный UI",
+      "mitigation": "Материализованная effective_project_roles + Redis cache; бенчмарк"
+    },
+    {
+      "id": 3,
+      "description": "Конфликт ролей в 2+ группах",
+      "probability": "HIGH",
+      "impact": "Неожиданные права",
+      "mitigation": "Priority: max permissions count; tiebreaker roleId asc"
+    },
+    {
+      "id": 4,
+      "description": "Удаление большой группы каскадит права",
+      "probability": "MEDIUM",
+      "impact": "Потеря доступов",
+      "mitigation": "confirm=true + список затронутых"
+    },
+    {
+      "id": 5,
+      "description": "DIRECT UserProjectRole остаются — shadow permissions",
+      "probability": "MEDIUM",
+      "impact": "Security issue",
+      "mitigation": "Feature-flag DIRECT_ROLES_DISABLED"
+    },
+    {
+      "id": 6,
+      "description": "ALTER TYPE ADD VALUE внутри транзакции",
+      "probability": "HIGH",
+      "impact": "Миграция не накатится",
+      "mitigation": "-- no transaction как первой строкой; staging"
+    },
+    {
+      "id": 7,
+      "description": "SPRINTS_MANAGE/RELEASES_MANAGE остаются в БД как мёртвый код",
+      "probability": "MEDIUM",
+      "impact": "Тех-долг",
+      "mitigation": "Плановая очистка отдельным релизом"
+    },
+    {
+      "id": 8,
+      "description": "Custom-схемы клиентов — backfill раздаст права",
+      "probability": "MEDIUM",
+      "impact": "Ожидаемое расширение",
+      "mitigation": "Проверить список custom-схем после миграции"
+    },
+    {
+      "id": 9,
+      "description": "COMMENTS_MANAGE overlap с DELETE_OTHERS",
+      "probability": "LOW",
+      "impact": "Регрессия",
+      "mitigation": "OR-helper assertProjectPermission + integration-тест"
+    },
+    {
+      "id": 10,
+      "description": "Массовые audit-записи при изменении членства",
+      "probability": "LOW",
+      "impact": "Шум в логах",
+      "mitigation": "Batch-событие user_group.members_changed с diff"
+    },
+    {
+      "id": 11,
+      "description": "Порядок миграции: Legacy-группы до backfill → получают старые *_MANAGE",
+      "probability": "HIGH",
+      "impact": "Двойная работа",
+      "mitigation": "Строгий порядок SQL: backfill permissions сначала, группы потом"
+    }
+  ],
+  "requirements": {
+    "functional": [
+      "FR-A1: CRUD групп через /admin/user-groups",
+      "FR-A2: Batch add/remove участников",
+      "FR-A3: Выдача/отзыв проектной роли группе",
+      "FR-A4: Эффективная роль = max permissions(direct + group)",
+      "FR-A5: Кэш эффективных ролей инвалидируется при изменениях",
+      "FR-A6: Вкладка Безопасность в профиле с группами и ролями + источник",
+      "FR-A7: Миграция UserProjectRole → Legacy-группы без потери прав",
+      "FR-A8: Feature-flag DIRECT_ROLES_DISABLED",
+      "FR-A9: DELETE группы требует confirm=true + список затронутых",
+      "FR-B1: Матрица SPRINTS_CREATE/EDIT/DELETE вместо SPRINTS_MANAGE",
+      "FR-B2: Матрица RELEASES_CREATE/EDIT/DELETE вместо RELEASES_MANAGE",
+      "FR-B3: COMMENTS_DELETE_OTHERS рядом с COMMENTS_MANAGE",
+      "FR-B4: TIME_LOGS_DELETE_OTHERS рядом с TIME_LOGS_MANAGE",
+      "FR-B5: Endpoints sprints/releases используют гранулярные permissions",
+      "FR-B6: DELETE comment/time log: author OR *_DELETE_OTHERS OR *_MANAGE",
+      "FR-B7: Backfill сохраняет эффективный уровень доступа",
+      "FR-C1: Diff-тест: права до и после миграции идентичны",
+      "FR-C2: USER_GROUP_VIEW / USER_GROUP_MANAGE — system-level permissions",
+      "FR-C3: Audit по всем изменениям групп/bindings/миграции"
+    ],
+    "nonFunctional": [
+      "NFR-1: GET /issues p95 регресс ≤ 10%",
+      "NFR-2: Миграция 100 юзеров × 20 проектов × 5 ролей ≤ 60 сек",
+      "NFR-3: GET /users/me/security ≤ 300ms p95",
+      "NFR-4: UI списка групп виртуализирован на 500+"
+    ],
+    "security": [
+      "SEC-1: USER_GROUP_MANAGE для CRUD групп и bindings",
+      "SEC-2: Юзер без USER_GROUP_VIEW — только свои группы",
+      "SEC-3: Миграция идемпотентна",
+      "SEC-4: Каскад delete user→Member; project→ProjectGroupRole; RoleDefinition→Restrict",
+      "SEC-5: Все мутации в AuditLog с actorId",
+      "SEC-6: /admin/users/:id/security — только USER_GROUP_VIEW",
+      "SEC-7: COMMENTS_MANAGE overlap — OR-проверка не ломает права"
+    ]
+  },
+  "acceptanceCriteria": [
+    "Миграция на staging: отчёт = реальности",
+    "Diff-тест effective permissions до/после идентичен",
+    "Админ создаёт группу + 3 юзера + Developer → permissions у всех 3",
+    "Удаление юзера из группы → права пропадают ≤ 5 сек",
+    "DELETE группы с confirm → права снимаются, audit записан",
+    "Профиль Безопасность показывает группы + роли + source",
+    "Конфликт ролей → max permissions, детерминированно",
+    "DIRECT_ROLES_DISABLED=true → POST прямых возвращает 403",
+    "USER с SPRINTS_CREATE без SPRINTS_DELETE — может создать, но не удалить",
+    "MANAGER с COMMENTS_DELETE_OTHERS без COMMENTS_MANAGE — удаляет чужие, не открывает настройки",
+    "DELETE comment автором — 200; не автором без perms — 403; с DELETE_OTHERS — 200",
+    "PermissionMatrixDrawer показывает новые колонки",
+    "Performance регресс ≤ 10% на GET /issues",
+    "E2E полный сценарий зелёный",
+    "Lint / typecheck / unit / integration зелёные",
+    "Rollback-SQL проверен на staging",
+    "docs/user-manual/features/access-schemes.md обновлён"
+  ],
+  "estimation": {
+    "analysis": 3,
+    "backend": 37,
+    "frontend": 17,
+    "testing": 10,
+    "review": 3,
+    "docs_qa": 2,
+    "performance": 3,
+    "total": 75
+  },
+  "relatedIssues": {
+    "parent": "TTMP-159",
+    "children": [
+      "TTSEC-3: Prisma schema UserGroup/Member/ProjectGroupRole + source enum + расширение ProjectPermission",
+      "TTSEC-4: Prisma migration SQL (ALTER TYPE + backfill granular + Legacy-группы)",
+      "TTSEC-5: Seed + DEFAULT_ROLE_MATRIX с новыми permissions",
+      "TTSEC-6: Backend модуль user-groups (CRUD + members + bindings)",
+      "TTSEC-7: Backend эффективные роли + кэш + assertProjectPermission helper",
+      "TTSEC-8: Backend /users/me/security + /admin/users/:id/security",
+      "TTSEC-9: Backend middleware: sprints/releases granular + comments/time DELETE_OTHERS",
+      "TTSEC-10: Backend audit-события",
+      "TTSEC-11: FE AdminGroupsPage + AdminGroupDetailPage + api",
+      "TTSEC-12: FE PermissionMatrixDrawer новые колонки",
+      "TTSEC-13: FE ProfilePage Безопасность + SecurityTab",
+      "TTSEC-14: FE Sidebar Группы",
+      "TTSEC-15: Тесты unit + integration + e2e",
+      "TTSEC-16: Performance benchmark",
+      "TTSEC-17: Docs access-schemes.md + manual QA staging",
+      "TTSEC-18: Feature-flag DIRECT_ROLES_DISABLED + prod cutover"
+    ],
+    "blocks": [],
+    "dependsOn": ["TTMP-159"]
+  },
+  "implementationOrder": [
+    "TTSEC-3",
+    "TTSEC-4",
+    "TTSEC-5",
+    "TTSEC-6",
+    "TTSEC-7",
+    "TTSEC-8",
+    "TTSEC-9",
+    "TTSEC-10",
+    "TTSEC-11",
+    "TTSEC-12",
+    "TTSEC-13",
+    "TTSEC-14",
+    "TTSEC-15",
+    "TTSEC-16",
+    "TTSEC-17",
+    "TTSEC-18"
+  ]
+}
