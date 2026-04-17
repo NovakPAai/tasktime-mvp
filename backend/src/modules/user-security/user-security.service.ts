@@ -1,6 +1,32 @@
+import type { ProjectPermission } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { computeEffectiveRolesForProjects } from '../../shared/middleware/rbac.js';
+
+/**
+ * TTSEC-2 Phase 2 security payload (spec §5.6). Exported so Phase 3 UI and tests can import
+ * the exact shape instead of inferring it.
+ */
+export interface SecurityProjectRole {
+  project: { id: string; key: string; name: string };
+  role: { id: string; name: string; key: string; permissions: ProjectPermission[] };
+  source: 'DIRECT' | 'GROUP';
+  sourceGroups: { id: string; name: string }[];
+}
+
+export interface SecurityGroupMembership {
+  id: string;
+  name: string;
+  addedAt: Date;
+  memberCount: number;
+}
+
+export interface UserSecurityPayload {
+  user: { id: string; name: string; email: string };
+  groups: SecurityGroupMembership[];
+  projectRoles: SecurityProjectRole[];
+  updatedAt: string;
+}
 
 /**
  * Build the payload for a user's «Безопасность» view (spec §5.6):
@@ -13,7 +39,7 @@ import { computeEffectiveRolesForProjects } from '../../shared/middleware/rbac.j
  * A project appears in `projectRoles` iff the user has ANY role there (direct or via a group
  * bound to the project). `source` and `sourceGroups` come from computeEffectiveRole (§5.2).
  */
-export async function getUserSecurity(userId: string) {
+export async function getUserSecurity(userId: string): Promise<UserSecurityPayload> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, email: true },
@@ -56,7 +82,7 @@ export async function getUserSecurity(userId: string) {
   // instead of 2N queries. See computeEffectiveRolesForProjects.
   const effectiveByProject = await computeEffectiveRolesForProjects(userId, Array.from(projectIds));
 
-  const projectRoles = [];
+  const projectRoles: SecurityProjectRole[] = [];
   for (const [projectId, eff] of effectiveByProject) {
     if (!eff) continue;
     const project = projectById.get(projectId);

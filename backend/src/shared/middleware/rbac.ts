@@ -17,12 +17,18 @@ import { getCachedJson, setCachedJson, delCachedJson, delCacheByPrefix } from '.
  * Among all candidates we pick the ONE role with the most `granted=true` permissions;
  * tiebreaker — roleId ascending (for determinism across replicas). This matches spec §5.2.
  *
- * Cache layout: `rbac:effective:{userId}:{projectId}` → string[] (granted perms), TTL 60s.
- * Cache is prefixed by userId first so we can drop a user's entire set on membership change.
+ * Cache layout (AI review #65 round 3): `rbac:effective:{projectId}:{userId}` → string[] (granted
+ * perms), TTL 60s. Key is projectId-first so scheme-level changes (attach/detach project, delete
+ * role, update permission matrix) can do a single prefix SCAN + delete — covering ALL cached
+ * users for the project, including ones who just lost access and no longer appear in the current
+ * bindings query. For per-user wipes (group membership change) we iterate the user's affected
+ * projects and delete pair-by-pair — bounded by the user's actual project count, not the whole
+ * keyspace.
  */
 
-const EFFECTIVE_KEY = (userId: string, projectId: string) =>
-  `rbac:effective:${userId}:${projectId}`;
+const EFFECTIVE_KEY = (projectId: string, userId: string) =>
+  `rbac:effective:${projectId}:${userId}`;
+const EFFECTIVE_PROJECT_PREFIX = (projectId: string) => `rbac:effective:${projectId}:`;
 const EFFECTIVE_TTL = 60;
 
 /**
@@ -41,7 +47,7 @@ const EFFECTIVE_TTL = 60;
 export async function invalidateProjectPermissionCache(projectId: string, userId: string): Promise<void> {
   await Promise.all([
     // New group-aware effective cache (single composite key).
-    delCachedJson(EFFECTIVE_KEY(userId, projectId)),
+    delCachedJson(EFFECTIVE_KEY(projectId, userId)),
     // Legacy per-permission cache — some callers may still hit it during deploy window.
     delCacheByPrefix(`rbac:perm:${projectId}:${userId}:`),
   ]);
@@ -50,36 +56,46 @@ export async function invalidateProjectPermissionCache(projectId: string, userId
 /**
  * Drop every cached effective-permission set for a single user across ALL projects. Called when
  * the user's group membership changes (added/removed from a group), since that affects every
- * project that group is bound to.
+ * project the user could see through direct roles or group bindings.
+ *
+ * Implementation iterates the user's currently-known projects (direct roles + groups the user
+ * is in) and deletes pair-by-pair. If the caller knows the exact projectIds affected (e.g. the
+ * group just bound/unbound), they should call `invalidateProjectPermissionCache(pid, uid)` for
+ * each pair directly — cheaper and exact. This helper is for the general "something about this
+ * user changed, flush them" case.
  */
 export async function invalidateUserEffectivePermissions(userId: string): Promise<void> {
-  await delCacheByPrefix(`rbac:effective:${userId}:`);
+  const [directProjects, groupProjects] = await Promise.all([
+    prisma.userProjectRole.findMany({ where: { userId }, select: { projectId: true } }),
+    prisma.projectGroupRole.findMany({
+      where: { group: { members: { some: { userId } } } },
+      select: { projectId: true },
+    }),
+  ]);
+  const projectIds = new Set<string>([
+    ...directProjects.map(r => r.projectId),
+    ...groupProjects.map(r => r.projectId),
+  ]);
+  await Promise.all(
+    Array.from(projectIds).map(pid => invalidateProjectPermissionCache(pid, userId)),
+  );
 }
 
 /**
- * Drop every cached effective-permission set for a project. Scans and deletes only the minority
- * of users who had their entry cached (most won't). Call when a project-level scheme/role binding
- * changes and you want to avoid iterating all group members.
+ * Drop every cached effective-permission set for a project — regardless of whether a user still
+ * has a direct/group binding.
+ *
+ * AI review #65 round 3 🟠 — scheme changes may REMOVE bindings (detach project, delete role,
+ * update matrix), and those users' stale cache entries must be wiped too. Prefix SCAN + DELETE
+ * on `rbac:effective:{projectId}:*` handles exactly this: it hits every user whose entry was
+ * ever cached for the project, not just users currently visible in the bindings query.
  */
 export async function invalidateProjectEffectivePermissions(projectId: string): Promise<void> {
-  // Redis doesn't support suffix-scan efficiently; fall back to iterating direct members + group
-  // members. For unbounded projects we could add pg_notify later; MVP uses explicit user-scan.
-  const [directUsers, groupUsers] = await Promise.all([
-    prisma.userProjectRole.findMany({ where: { projectId }, select: { userId: true } }),
-    prisma.userGroupMember.findMany({
-      where: { group: { projectRoles: { some: { projectId } } } },
-      select: { userId: true },
-    }),
+  await Promise.all([
+    delCacheByPrefix(EFFECTIVE_PROJECT_PREFIX(projectId)),
+    // Legacy per-permission cache — same treatment for deploy-window safety.
+    delCacheByPrefix(`rbac:perm:${projectId}:`),
   ]);
-  const userIds = new Set<string>([
-    ...directUsers.map(u => u.userId),
-    ...groupUsers.map(u => u.userId),
-  ]);
-  await Promise.all(
-    Array.from(userIds).map(uid => delCachedJson(EFFECTIVE_KEY(uid, projectId))),
-  );
-  // Also kill legacy prefix for safety during the Phase 2 deploy window.
-  await delCacheByPrefix(`rbac:perm:${projectId}:`);
 }
 
 type EffectiveRole = {
@@ -184,7 +200,10 @@ export async function computeEffectiveRole(
     roleKey: chosen.role.key,
     permissions: chosen.role.permissions.filter(p => p.granted).map(p => p.permission),
     source: chosen.source,
-    sourceGroups: chosen.groups,
+    // AI review #65 round 3 🟡 — when the chosen role is DIRECT, don't leak irrelevant group
+    // context. If the user also holds the same role via groups, that's informational only and
+    // unrelated to the effective grant path; keeping it would contradict `source: 'DIRECT'`.
+    sourceGroups: chosen.source === 'DIRECT' ? [] : chosen.groups,
   };
 }
 
@@ -283,7 +302,8 @@ export async function computeEffectiveRolesForProjects(
       roleKey: chosen.role.key,
       permissions: chosen.role.permissions.filter(p => p.granted).map(p => p.permission),
       source: chosen.source,
-      sourceGroups: chosen.groups,
+      // AI review #65 round 3 🟡 — see single-project variant above.
+      sourceGroups: chosen.source === 'DIRECT' ? [] : chosen.groups,
     });
   }
 
@@ -301,7 +321,7 @@ export async function getEffectiveProjectPermissions(
   userId: string,
   projectId: string,
 ): Promise<ProjectPermission[]> {
-  const key = EFFECTIVE_KEY(userId, projectId);
+  const key = EFFECTIVE_KEY(projectId, userId);
   const cached = await getCachedJson<ProjectPermission[]>(key);
   if (cached !== null) return cached;
 
