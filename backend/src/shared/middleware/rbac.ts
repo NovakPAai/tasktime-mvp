@@ -7,8 +7,21 @@ import { prisma } from '../../prisma/client.js';
 import { getSchemeForProject } from '../../modules/project-role-schemes/project-role-schemes.service.js';
 import { getCachedJson, setCachedJson, delCacheByPrefix } from '../redis.js';
 
-/** Invalidate cached permission results for a user+project pair.
- * Call this whenever a UserProjectRole is created, updated, or deleted. */
+/**
+ * Invalidate cached permission results for a user+project pair.
+ *
+ * INVARIANT: every write path that creates, updates, or deletes a UserProjectRole MUST call
+ * this helper (or `delCacheByPrefix('rbac:perm:${projectId}:')` for bulk updates). Current
+ * callers:
+ *   - admin.service.assignProjectRole / removeProjectRole — per-user invalidation
+ *   - project-role-schemes.service.attachProject / detachProject — per-project prefix invalidation
+ *     (covers all users through the composite-FK remap)
+ *   - project-role-schemes.service.updatePermissions + create/update/deleteRole — per-scheme
+ *     invalidation via `invalidatePermissionCacheForScheme`
+ *
+ * Missing a call leaves `requireProjectPermission` serving stale allow/deny decisions for up
+ * to the cache TTL (60s).
+ */
 export async function invalidateProjectPermissionCache(projectId: string, userId: string): Promise<void> {
   await delCacheByPrefix(`rbac:perm:${projectId}:${userId}:`);
 }

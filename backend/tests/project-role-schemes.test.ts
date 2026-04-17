@@ -10,8 +10,13 @@ let userToken: string;
 const DEFAULT_SCHEME_ID = '00000000-0000-0000-0000-000000000001';
 
 beforeEach(async () => {
-  // Clean up only user-created schemes; keep seeded default
+  // Explicit ordered cleanup: remove child rows first to avoid depending on cascade semantics
+  // or row ordering. Keep the seeded default scheme so tests relying on it do not have to
+  // recreate roles manually.
   await prisma.auditLog.deleteMany();
+  await prisma.userProjectRole.deleteMany();
+  await prisma.projectRoleSchemeProject.deleteMany();
+  await prisma.project.deleteMany();
   await prisma.projectRoleScheme.deleteMany({
     where: { id: { not: DEFAULT_SCHEME_ID } },
   });
@@ -164,12 +169,12 @@ describe('POST /api/admin/role-schemes/:id/projects', () => {
       .send({ projectId });
     expect(r1.status).toBe(201);
 
-    // Re-attach to scheme2 — should succeed (upsert)
+    // Re-attach to scheme2 — should succeed (upsert). 200 on update vs 201 on first attach.
     const r2 = await request
       .post(`/api/admin/role-schemes/${scheme2Id}/projects`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ projectId });
-    expect(r2.status).toBe(201);
+    expect(r2.status).toBe(200);
 
     // Verify in DB
     const binding = await prisma.projectRoleSchemeProject.findUnique({ where: { projectId } });
