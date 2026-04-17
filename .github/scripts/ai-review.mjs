@@ -372,36 +372,39 @@ function extractReviewJson(commentBody) {
 // ---------------------------------------------------------------------------
 const BOT_MARKER = 'AI Code Review ·';
 
+function findLastBotComment(comments) {
+  return comments
+    .filter((c) => c.body?.includes(BOT_MARKER))
+    .sort((a, b) => b.id - a.id)[0] ?? null;
+}
+
 async function postComment(body) {
   const existing = await githubFetch(
     `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`
   );
 
-  let previousReviewBody = null;
-  for (const c of existing) {
-    if (c.body?.includes(BOT_MARKER)) {
-      previousReviewBody = c.body;
-      await githubFetch(
-        `/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${c.id}`,
-        { method: 'DELETE' }
-      );
-      console.log(`Deleted previous review comment #${c.id}`);
-    }
-  }
+  const botComment = findLastBotComment(existing ?? []);
 
-  await githubFetch(
-    `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`,
-    { method: 'POST', body: JSON.stringify({ body }) }
-  );
-  console.log('Review comment posted.');
-  return previousReviewBody;
+  if (botComment) {
+    await githubFetch(
+      `/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${botComment.id}`,
+      { method: 'PATCH', body: JSON.stringify({ body }) }
+    );
+    console.log(`Updated existing review comment #${botComment.id}`);
+  } else {
+    await githubFetch(
+      `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`,
+      { method: 'POST', body: JSON.stringify({ body }) }
+    );
+    console.log('Review comment posted.');
+  }
 }
 
 async function fetchPreviousReview() {
   const existing = await githubFetch(
     `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`
   );
-  const botComment = existing?.find((c) => c.body?.includes(BOT_MARKER));
+  const botComment = findLastBotComment(existing ?? []);
   if (!botComment) return null;
   return extractReviewJson(botComment.body);
 }
