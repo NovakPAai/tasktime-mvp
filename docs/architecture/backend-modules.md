@@ -290,5 +290,7 @@ Run `make docs` to check for staleness warnings.
 | Releases | `/api/admin/release-statuses` | `backend/src/modules/releases/release-statuses.router.js.ts` |
 | Releases | `/api/admin/release-workflows` | `backend/src/modules/releases/release-workflows-admin.router.js.ts` |
 | Project Role Schemes | `/api/admin/role-schemes` | `backend/src/modules/project-role-schemes/project-role-schemes.router.js.ts` |
+| User Groups | `/api/admin/user-groups` | `backend/src/modules/user-groups/user-groups.router.js.ts` |
+| User Security | `/api` | `backend/src/modules/user-security/user-security.router.js.ts` |
 | Workflow Engine | `/api` | `backend/src/modules/workflow-engine/workflow-engine.router.js.ts` |
 <!-- AUTO-GENERATED:END -->

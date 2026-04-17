@@ -912,6 +912,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `GET` | `/api/users/:userId/time` | 🔒 |
 | `GET` | `/api/users/:userId/time/summary` | 🔒 |
 | `GET` | `/api/time/active` | 🔒 |
+| `DELETE` | `/api/time-logs/:id` | 🔒 |
 
 ### transition-screens
 
@@ -923,6 +924,28 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `PATCH` | `/api/:id` | 🔒 |
 | `DELETE` | `/api/:id` | 🔒 |
 | `PUT` | `/api/:id/items` | 🔒 |
+
+### user-groups
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/` | 🔒 |
+| `POST` | `/api/` | 🔒 |
+| `GET` | `/api/:id` | 🔒 |
+| `PATCH` | `/api/:id` | 🔒 |
+| `GET` | `/api/:id/impact` | 🔒 |
+| `DELETE` | `/api/:id` | 🔒 |
+| `POST` | `/api/:id/members` | 🔒 |
+| `DELETE` | `/api/:id/members/:userId` | 🔒 |
+| `POST` | `/api/:id/project-roles` | 🔒 |
+| `DELETE` | `/api/:id/project-roles/:projectId` | 🔒 |
+
+### user-security
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/users/me/security` | 🔒 |
+| `GET` | `/api/admin/users/:id/security` | 🔒 |
 
 ### Users
 
