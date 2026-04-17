@@ -125,13 +125,13 @@ export async function deleteScheme(id: string) {
 }
 
 /**
- * Remap all UserProjectRole rows of a project to the target scheme by matching the legacy `role`
- * enum to a role key in that scheme. Rejects the whole operation with 400 if any legacy role
- * currently in use on the project has no matching key in the target scheme — callers get an
- * explicit error with the list of incompatible keys instead of a silent "some users lost access"
- * outcome.
+ * Remap all UserProjectRole rows of a project to the target scheme by matching the SOURCE role
+ * key (from the joined ProjectRoleDefinition if roleId is set, else the legacy `role` enum).
+ * This preserves custom role identity across scheme switches — e.g. a "DEVOPS" role in the
+ * previous scheme maps to a "DEVOPS" role in the target scheme, not to the USER role that its
+ * legacy enum column happened to be mapped to.
  *
- * Batched: 4 `updateMany` queries — one per legacy enum value (ADMIN, MANAGER, USER, VIEWER).
+ * Rejects the whole operation with 400 if any source key is missing in the target scheme.
  * Must be called inside a transaction so the composite FK stays consistent.
  */
 async function remapProjectUserRolesToScheme(
@@ -145,14 +145,19 @@ async function remapProjectUserRolesToScheme(
   });
   const keyToId = new Map(targetRoles.map(r => [r.key, r.id]));
 
-  const usedKeys = await tx.userProjectRole.findMany({
+  const rows = await tx.userProjectRole.findMany({
     where: { projectId },
-    select: { role: true },
-    distinct: ['role'],
+    select: {
+      id: true,
+      role: true,
+      roleDefinition: { select: { key: true } }, // source scheme's role key (if roleId is set)
+    },
   });
-  const unmapped = usedKeys
-    .map(r => r.role as string)
-    .filter(key => !keyToId.has(key));
+
+  // For each row: prefer the source role's key (custom-role-aware); fall back to legacy `role`
+  // for rows that never got a roleId. A row's target is determined by this key alone.
+  const rowKey = (r: (typeof rows)[number]): string => r.roleDefinition?.key ?? (r.role as string);
+  const unmapped = Array.from(new Set(rows.map(rowKey).filter(key => !keyToId.has(key))));
   if (unmapped.length > 0) {
     throw new AppError(
       400,
@@ -160,12 +165,19 @@ async function remapProjectUserRolesToScheme(
     );
   }
 
-  for (const key of Object.values(ProjectRole)) {
-    const roleId = keyToId.get(key);
-    if (!roleId) continue;
+  // Batch updates by target role: collect row ids per key, issue one updateMany per distinct key.
+  const idsByKey = new Map<string, string[]>();
+  for (const r of rows) {
+    const key = rowKey(r);
+    const bucket = idsByKey.get(key) ?? [];
+    bucket.push(r.id);
+    idsByKey.set(key, bucket);
+  }
+  for (const [key, ids] of idsByKey) {
+    const newRoleId = keyToId.get(key)!;
     await tx.userProjectRole.updateMany({
-      where: { projectId, role: key },
-      data: { roleId, schemeId: targetSchemeId },
+      where: { id: { in: ids } },
+      data: { roleId: newRoleId, schemeId: targetSchemeId },
     });
   }
 }
@@ -250,6 +262,13 @@ export async function listRoles(schemeId: string) {
 export async function createRole(schemeId: string, dto: CreateRoleDefinitionDto) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id: schemeId } });
   if (!scheme) throw new AppError(404, 'Role scheme not found');
+  // Reserved keys: custom (non-system) roles must not shadow system-role keys, otherwise
+  // assignProjectRole's legacy fallback and remapProjectUserRolesToScheme's key-based lookup
+  // become ambiguous. System roles with these keys are created internally (isSystem: true)
+  // by the seed.
+  if ((Object.values(ProjectRole) as string[]).includes(dto.key)) {
+    throw new AppError(400, `Ключ "${dto.key}" зарезервирован за системной ролью`);
+  }
   const existing = await prisma.projectRoleDefinition.findUnique({
     where: { schemeId_key: { schemeId, key: dto.key } },
   });

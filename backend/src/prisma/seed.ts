@@ -96,9 +96,11 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   );
 
   // ===== DEFAULT PROJECT ROLE SCHEME =====
+  // Re-assert isDefault=true on update: getSchemeForProject/detachProject 500 without a default,
+  // so seed must actively restore the flag if it was ever flipped off in this DB.
   const defaultRoleScheme = await client.projectRoleScheme.upsert({
     where: { id: '00000000-0000-0000-0000-000000000001' },
-    update: {},
+    update: { isDefault: true },
     create: {
       id: '00000000-0000-0000-0000-000000000001',
       name: 'Default',
