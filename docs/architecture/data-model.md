@@ -330,7 +330,7 @@ Run `make docs` to check for staleness warnings.
 > ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
 > Обновляется автоматически при каждом изменении схемы.
 
-## Модели (45)
+## Модели (48)
 
 ### User
 
@@ -360,6 +360,8 @@ Run `make docs` to check for staleness warnings.
 | `customFieldUpdates` | `IssueCustomFieldValue[]` | нет |  |
 | `createdReleases` | `Release[]` | нет |  |
 | `addedReleaseItems` | `ReleaseItem[]` | нет |  |
+| `groupMemberships` | `UserGroupMember[]` | нет |  |
+| `addedGroupMembers` | `UserGroupMember[]` | нет |  |
 
 ### UserSystemRole
 
@@ -393,6 +395,7 @@ Run `make docs` to check for staleness warnings.
 | `role` | `ProjectRole` | нет |  |
 | `roleId` | `String` | да |  |
 | `schemeId` | `String` | да |  |
+| `source` | `RoleAssignmentSource` | нет | default: DIRECT |
 | `createdAt` | `DateTime` | нет | default: now( |
 | `user` | `User` | нет |  |
 | `project` | `Project` | нет |  |
@@ -428,6 +431,7 @@ Run `make docs` to check for staleness warnings.
 | `releases` | `Release[]` | нет |  |
 | `issueTypeScheme` | `IssueTypeSchemeProject` | да |  |
 | `userRoles` | `UserProjectRole[]` | нет |  |
+| `groupRoles` | `ProjectGroupRole[]` | нет |  |
 | `fieldSchemaBindings` | `FieldSchemaBinding[]` | нет |  |
 | `workflowScheme` | `WorkflowSchemeProject` | да |  |
 | `roleScheme` | `ProjectRoleSchemeProject` | да |  |
@@ -1021,6 +1025,7 @@ Run `make docs` to check for staleness warnings.
 | `scheme` | `ProjectRoleScheme` | нет |  |
 | `permissions` | `ProjectRolePermission[]` | нет |  |
 | `userProjectRoles` | `UserProjectRole[]` | нет |  |
+| `projectGroupRoles` | `ProjectGroupRole[]` | нет |  |
 
 ### ProjectRolePermission
 
@@ -1043,7 +1048,39 @@ Run `make docs` to check for staleness warnings.
 | `scheme` | `ProjectRoleScheme` | нет |  |
 | `project` | `Project` | нет |  |
 
-## Перечисления (17)
+### UserGroup
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+
+### UserGroupMember
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `groupId` | `String` | нет |  |
+| `userId` | `String` | нет |  |
+| `addedAt` | `DateTime` | нет | default: now( |
+| `addedById` | `String` | да |  |
+| `group` | `UserGroup` | нет |  |
+| `user` | `User` | нет |  |
+| `addedBy` | `User` | да |  |
+
+### ProjectGroupRole
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `groupId` | `String` | нет |  |
+| `projectId` | `String` | нет |  |
+| `roleId` | `String` | нет |  |
+| `schemeId` | `String` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `group` | `UserGroup` | нет |  |
+| `project` | `Project` | нет |  |
+| `roleDefinition` | `ProjectRoleDefinition` | нет |  |
+
+## Перечисления (18)
 
 ### SystemRoleType
 
@@ -1059,6 +1096,11 @@ Run `make docs` to check for staleness warnings.
 - `MANAGER`
 - `USER`
 - `VIEWER`
+
+### RoleAssignmentSource
+
+- `DIRECT`
+- `GROUP`
 
 ### IssueStatus
 
@@ -1166,19 +1208,29 @@ Run `make docs` to check for staleness warnings.
 - `ISSUES_CHANGE_STATUS`
 - `ISSUES_CHANGE_TYPE`
 - `SPRINTS_VIEW`
-- `SPRINTS_MANAGE`
+- `SPRINTS_CREATE            // TTSEC-2`
+- `SPRINTS_EDIT              // TTSEC-2`
+- `SPRINTS_DELETE            // TTSEC-2`
+- `SPRINTS_MANAGE            // deprecated: Postgres не поддерживает DROP VALUE, скрыто из UI-матрицы`
 - `RELEASES_VIEW`
-- `RELEASES_MANAGE`
+- `RELEASES_CREATE           // TTSEC-2`
+- `RELEASES_EDIT             // TTSEC-2`
+- `RELEASES_DELETE           // TTSEC-2`
+- `RELEASES_MANAGE           // deprecated`
 - `MEMBERS_VIEW`
 - `MEMBERS_MANAGE`
 - `TIME_LOGS_VIEW`
 - `TIME_LOGS_CREATE`
+- `TIME_LOGS_DELETE_OTHERS   // TTSEC-2: модерация чужих time logs`
 - `TIME_LOGS_MANAGE`
 - `COMMENTS_VIEW`
 - `COMMENTS_CREATE`
+- `COMMENTS_DELETE_OTHERS    // TTSEC-2: модерация чужих комментариев`
 - `COMMENTS_MANAGE`
 - `PROJECT_SETTINGS_VIEW`
 - `PROJECT_SETTINGS_EDIT`
 - `BOARDS_VIEW`
 - `BOARDS_MANAGE`
+- `USER_GROUP_VIEW           // TTSEC-2: system-level`
+- `USER_GROUP_MANAGE         // TTSEC-2: system-level`
 <!-- AUTO-GENERATED:END -->
