@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { request, createAdminUser, createTestUser } from './helpers.js';
+import { request, createSuperAdminUser, createTestUser } from './helpers.js';
 
 const prisma = new PrismaClient();
 
@@ -47,7 +47,8 @@ beforeEach(async () => {
     });
   }
 
-  const admin = await createAdminUser();
+  // Role-scheme admin endpoints require SUPER_ADMIN (see project-role-schemes.router.ts).
+  const admin = await createSuperAdminUser();
   adminToken = admin.accessToken;
 
   const user = await createTestUser('plain-user@test.com', 'Password123', 'Plain User');

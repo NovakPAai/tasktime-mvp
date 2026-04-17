@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
-import { requireRole } from '../../shared/middleware/rbac.js';
+import { requireSuperAdmin } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import {
@@ -17,7 +17,9 @@ import type { AuthRequest } from '../../shared/types/index.js';
 const router = Router();
 
 router.use(authenticate);
-router.use(requireRole('ADMIN'));
+// Role-scheme administration affects the global RBAC matrix for every project and every user —
+// scope to SUPER_ADMIN rather than plain ADMIN. Regular ADMIN can still assign per-project roles.
+router.use(requireSuperAdmin());
 
 router.get('/', async (_req, res, next) => {
   try { res.json(await service.listSchemes()); } catch (err) { next(err); }

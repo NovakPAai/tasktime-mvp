@@ -57,20 +57,23 @@ export async function getScheme(id: string) {
 
 export async function createScheme(dto: CreateSchemeDto) {
   const created = await prisma.$transaction(async (tx) => {
+    // Capture the current default scheme BEFORE clearing its flag — otherwise when dto.isDefault
+    // is true the updateMany wipes isDefault from the old default and the bootstrap lookup below
+    // can't find any source scheme, producing a new default scheme with no system roles.
+    const sourceScheme = await tx.projectRoleScheme.findFirst({
+      where: { isDefault: true },
+      include: { roles: { include: { permissions: true } } },
+    });
     if (dto.isDefault) {
       await tx.projectRoleScheme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
     }
     const scheme = await tx.projectRoleScheme.create({ data: dto });
-    // Bootstrap the 4 system roles with permissions cloned from the default scheme. Without this
-    // a freshly created scheme has no ADMIN/MANAGER/USER/VIEWER definitions, so attachProject
-    // (which remaps UserProjectRole rows by role key) would reject any project that already has
-    // members. Cloning keeps parity with the default scheme and works out-of-the-box.
-    const defaultScheme = await tx.projectRoleScheme.findFirst({
-      where: { isDefault: true, id: { not: scheme.id } },
-      include: { roles: { include: { permissions: true } } },
-    });
-    if (defaultScheme) {
-      for (const srcRole of defaultScheme.roles.filter(r => r.isSystem)) {
+    // Bootstrap the 4 system roles with permissions cloned from the previous default scheme.
+    // Without this a freshly created scheme has no ADMIN/MANAGER/USER/VIEWER definitions, so
+    // attachProject (which remaps UserProjectRole rows by role key) would reject any project
+    // that already has members.
+    if (sourceScheme) {
+      for (const srcRole of sourceScheme.roles.filter(r => r.isSystem)) {
         const dstRole = await tx.projectRoleDefinition.create({
           data: {
             schemeId: scheme.id,
@@ -146,8 +149,10 @@ export async function deleteScheme(id: string) {
   if (!scheme) throw new AppError(404, 'Role scheme not found');
   if (scheme.isDefault) throw new AppError(400, 'Cannot delete the default scheme');
   if (scheme._count.projects > 0) throw new AppError(400, 'SCHEME_IN_USE');
-  await prisma.projectRoleScheme.delete({ where: { id } });
+  // Invalidate BEFORE delete — otherwise any bindings are already gone (cascade) and we cannot
+  // resolve the list of projectIds whose cache still holds a reference to this scheme.
   await invalidateSchemeCache(id);
+  await prisma.projectRoleScheme.delete({ where: { id } });
   return { ok: true };
 }
 
