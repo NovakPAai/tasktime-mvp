@@ -194,14 +194,23 @@ export default function Sidebar({
     | { type: 'link'; path: string; label: string }
     | { type: 'divider'; label: string };
 
+  // TTSEC-2 Phase 3 — scoped visibility for the «Группы» entry. Phase 4 will introduce a
+  // system-level permission helper and backend will expose per-user permissions; until then
+  // `canViewUserGroups` is just an alias for the existing admin check. Keeping it named and
+  // localised here so Phase 4 only needs to update one place.
+  const canViewUserGroups = isAdmin;
+
   const adminNavItems: AdminNavItem[] = [
     { type: 'divider', label: 'Обзор' },
     { type: 'link', path: '/admin/dashboard',   label: 'Дашборд' },
     { type: 'link', path: '/admin/monitoring',  label: 'Мониторинг' },
 
     { type: 'divider', label: 'Пользователи' },
-    { type: 'link', path: '/admin/users',       label: 'Пользователи' },
-    { type: 'link', path: '/admin/roles',       label: 'Назначение ролей' },
+    { type: 'link', path: '/admin/users',        label: 'Пользователи' },
+    ...(canViewUserGroups
+      ? [{ type: 'link' as const, path: '/admin/user-groups', label: 'Группы' }]
+      : []),
+    { type: 'link', path: '/admin/roles',        label: 'Назначение ролей' },
     { type: 'link', path: '/admin/role-schemes', label: 'Схемы доступа' },
 
     { type: 'divider', label: 'Проекты' },

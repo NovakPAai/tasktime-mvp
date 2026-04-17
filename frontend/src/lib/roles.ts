@@ -28,3 +28,17 @@ export function hasAnyRequiredRole(
 ): boolean {
   return hasAnySystemRole(userRoles, requiredRoles);
 }
+
+/**
+ * TTSEC-2 Phase 3 access helper for the user-groups admin surface.
+ *
+ * Today this is just `ADMIN` system role (SUPER_ADMIN bypasses via `hasSystemRole`). Phase 4
+ * will swap the body for a real per-user permission check against `USER_GROUP_VIEW` /
+ * `USER_GROUP_MANAGE` once the backend exposes per-user permissions to the client.
+ *
+ * Keeping the call-site abstraction stable lets Phase 4 be a one-function change without
+ * hunting down inline role checks across the UI.
+ */
+export function canViewUserGroups(userRoles: SystemRoleType[] | null | undefined): boolean {
+  return hasSystemRole(userRoles, 'ADMIN');
+}

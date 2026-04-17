@@ -3,6 +3,11 @@ import { Drawer, Table, Checkbox, Button, Space, message, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { roleSchemesApi, type ProjectRoleDefinition } from '../../api/role-schemes';
 
+// TTSEC-2 Phase 3: granular sprint/release CRUD + *_DELETE_OTHERS for moderation.
+// SPRINTS_MANAGE / RELEASES_MANAGE deliberately omitted — they remain in the enum (Postgres
+// has no DROP VALUE) but are no longer surfaced in the matrix. Backfill in Phase 1 migration
+// grants equivalent granular perms to every role that had `*_MANAGE`. Additional user-group
+// admin perms (USER_GROUP_VIEW / USER_GROUP_MANAGE) live in a separate system category.
 const PERMISSION_CATEGORIES = [
   {
     category: 'Задачи',
@@ -20,14 +25,18 @@ const PERMISSION_CATEGORIES = [
     category: 'Спринты',
     permissions: [
       { key: 'SPRINTS_VIEW',   label: 'Просмотр' },
-      { key: 'SPRINTS_MANAGE', label: 'Управление' },
+      { key: 'SPRINTS_CREATE', label: 'Создание' },
+      { key: 'SPRINTS_EDIT',   label: 'Редактирование' },
+      { key: 'SPRINTS_DELETE', label: 'Удаление' },
     ],
   },
   {
     category: 'Релизы',
     permissions: [
       { key: 'RELEASES_VIEW',   label: 'Просмотр' },
-      { key: 'RELEASES_MANAGE', label: 'Управление' },
+      { key: 'RELEASES_CREATE', label: 'Создание' },
+      { key: 'RELEASES_EDIT',   label: 'Редактирование' },
+      { key: 'RELEASES_DELETE', label: 'Удаление' },
     ],
   },
   {
@@ -40,17 +49,19 @@ const PERMISSION_CATEGORIES = [
   {
     category: 'Время',
     permissions: [
-      { key: 'TIME_LOGS_VIEW',   label: 'Просмотр' },
-      { key: 'TIME_LOGS_CREATE', label: 'Создание' },
-      { key: 'TIME_LOGS_MANAGE', label: 'Управление' },
+      { key: 'TIME_LOGS_VIEW',          label: 'Просмотр' },
+      { key: 'TIME_LOGS_CREATE',        label: 'Создание' },
+      { key: 'TIME_LOGS_DELETE_OTHERS', label: 'Удаление чужих' },
+      { key: 'TIME_LOGS_MANAGE',        label: 'Управление' },
     ],
   },
   {
     category: 'Комментарии',
     permissions: [
-      { key: 'COMMENTS_VIEW',   label: 'Просмотр' },
-      { key: 'COMMENTS_CREATE', label: 'Создание' },
-      { key: 'COMMENTS_MANAGE', label: 'Управление' },
+      { key: 'COMMENTS_VIEW',          label: 'Просмотр' },
+      { key: 'COMMENTS_CREATE',        label: 'Создание' },
+      { key: 'COMMENTS_DELETE_OTHERS', label: 'Удаление чужих' },
+      { key: 'COMMENTS_MANAGE',        label: 'Управление' },
     ],
   },
   {
@@ -65,6 +76,13 @@ const PERMISSION_CATEGORIES = [
     permissions: [
       { key: 'BOARDS_VIEW',   label: 'Просмотр' },
       { key: 'BOARDS_MANAGE', label: 'Управление' },
+    ],
+  },
+  {
+    category: 'Группы пользователей',
+    permissions: [
+      { key: 'USER_GROUP_VIEW',   label: 'Просмотр' },
+      { key: 'USER_GROUP_MANAGE', label: 'Управление' },
     ],
   },
 ] as const;

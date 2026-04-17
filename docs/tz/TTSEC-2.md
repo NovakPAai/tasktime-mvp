@@ -679,19 +679,35 @@ router.delete('/:id', authenticate, async (req, res, next) => {
 - [x] TTSEC-10: audit — `user_group.{created,renamed,updated,deleted,members_changed}`, `project_group_role.{granted,revoked}`, `comment.{updated,deleted}`, `time_log.deleted`.
 - **DoD:** `npx tsc --noEmit` зелёный ✅. 24 unit-теста (rbac-effective + user-groups) ✅. Integration-тесты + perf-benchmark — в Phase 4 (требуют живой БД/Redis на CI).
 
-### Фаза 3 — Frontend — pending
-- [ ] TTSEC-11: `AdminGroupsPage` + `AdminGroupDetailPage` + `api/user-groups.ts`.
-- [ ] TTSEC-12: `PermissionMatrixDrawer` — новые колонки, убрать `*_MANAGE` для sprints/releases.
-- [ ] TTSEC-13: `ProfilePage` + `SecurityTab` + `api/user-security.ts`.
-- [ ] TTSEC-14: `Sidebar` — пункт «Группы» под `USER_GROUP_VIEW`.
-- **DoD:** `npm run typecheck` + `npm run lint` зелёные; Storybook билдится.
+### Фаза 3 — Frontend — **done (2026-04-17)**
+- [x] TTSEC-11: `api/user-groups.ts` + `AdminGroupsPage` (список + CRUD + delete-with-impact модалка) + `AdminGroupDetailPage` (табы Участники / Проектные роли, добавление/удаление, grant/revoke с фильтрацией ролей по активной схеме проекта).
+- [x] TTSEC-12: `PermissionMatrixDrawer` — гранулярные колонки для спринтов и релизов (CREATE/EDIT/DELETE), `*_DELETE_OTHERS` для комментариев и времени, новая категория «Группы пользователей» (`USER_GROUP_VIEW`/`USER_GROUP_MANAGE`); старые `SPRINTS_MANAGE`/`RELEASES_MANAGE` убраны из UI.
+- [x] TTSEC-13: `api/user-security.ts` + `components/profile/SecurityTab.tsx` (группы, таблица проект/роль/источник с tooltip на permissions, CSV-экспорт); встроено в `SettingsPage` как карточку «Безопасность».
+- [x] TTSEC-14: `Sidebar` — пункт «Группы» в секции «Пользователи» (под тем же admin-guard, что и остальные); `/admin/user-groups` + `/admin/user-groups/:id` в `App.tsx`.
+- **DoD:** `npx tsc --noEmit` ✅, `npx eslint` ✅ для новых и изменённых файлов. Storybook не трогал — новые компоненты без stories (не требуется по спецификации; Phase 4 добавит при необходимости).
 
-### Фаза 4 — QA + rollout — pending
-- [ ] TTSEC-15: unit + integration + e2e.
-- [ ] TTSEC-16: performance benchmark + фиксы.
-- [ ] TTSEC-17: `docs/user-manual/features/access-schemes.md` + manual QA на staging.
-- [ ] TTSEC-18: feature-flag `DIRECT_ROLES_DISABLED` + prod cutover.
-- **DoD:** все критерии приёмки §7 закрыты; rollback-SQL проверен на staging.
+### Фаза 4 — QA + rollout — **in progress (started 2026-04-17, план: вариант A)**
+
+Решение по варианту A (подтверждено owner-ом 2026-04-17): Фазы 1-3 мерджатся в main без ожидания Фазы 4, чтобы быстрее поймать реальные реграссии на staging. Фаза 4 разбита на follow-up PR-ы после мерджа основной трилогии.
+
+- [x] **Pre-merge unit-тесты** (часть TTSEC-15): 24 backend-unit в Phase 2 (rbac-effective + user-groups + sprints-move-issues) + 4 дополнительных на cross-project guard. Frontend — tsc + eslint. Всё зелёное.
+- [ ] TTSEC-15.1: integration-тесты на backend (`user-groups.test.ts`, `rbac-effective.int.test.ts`) — требуют живой БД в CI. Отдельный PR.
+- [ ] TTSEC-15.2: e2e сценарий (создать группу → добавить юзеров → выдать роль → проверить permissions → профиль «Безопасность»). Отдельный PR, зависит от 15.1.
+- [ ] TTSEC-16: performance benchmark `GET /issues` p95 (NFR-1: регресс ≤ 10%). **Только после deploy на staging.** Отдельный PR с benchmarkcript-ом + репортом.
+- [ ] TTSEC-17.1: `docs/user-manual/features/access-schemes.md`. Отдельный PR.
+- [ ] TTSEC-17.2: manual QA checklist по acceptance criteria §7 на staging. **После deploy, owner-driven.**
+- [ ] TTSEC-18.1: feature-flag `DIRECT_ROLES_DISABLED` в backend (`features.ts` + enforcement в `admin.service.assignProjectRole`). Отдельный PR.
+- [ ] TTSEC-18.2: prod cutover — включение флага после успешной staging-валидации.
+
+**Post-merge staging verification (обязательно перед TTSEC-18):**
+- [ ] SQL: `SELECT unnest(enum_range(NULL::"ProjectPermission"))` содержит все 10 новых значений.
+- [ ] SQL: `SELECT COUNT(*) FROM user_groups WHERE name LIKE 'Legacy:%'` — Legacy-группы созданы для каждой уникальной `(project.key, role.name)` пары из `user_project_roles`.
+- [ ] Diff-test (acceptance §7 / risk #1): effective permissions каждого пользователя до миграции = после. Скрипт сравнивает `GET /admin/users/:id/security` для всех юзеров с зафиксированным snapshot-ом.
+- [ ] Smoke: создать группу → добавить 3 участников → выдать роль в проекте → permissions появились в `GET /users/me/security` ≤ 5 сек.
+- [ ] Smoke: удалить группу с `?confirm=true` → impact-модалка показала корректные members+projects, права отозваны.
+- [ ] Rollback-SQL (`rollback.sql`) прогнан на staging-snapshot — проходит без ошибок.
+
+**DoD Фазы 4:** все критерии приёмки §7 закрыты; rollback-SQL проверен; `DIRECT_ROLES_DISABLED` включён на prod; доки обновлены.
 
 ---
 

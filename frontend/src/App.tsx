@@ -38,6 +38,10 @@ import AdminWorkflowSchemesPage from './pages/admin/AdminWorkflowSchemesPage';
 import AdminWorkflowSchemeEditorPage from './pages/admin/AdminWorkflowSchemeEditorPage';
 import AdminRoleSchemesPage from './pages/admin/AdminRoleSchemesPage';
 import AdminRoleSchemeDetailPage from './pages/admin/AdminRoleSchemeDetailPage';
+import AdminGroupsPage from './pages/admin/AdminGroupsPage';
+import AdminGroupDetailPage from './pages/admin/AdminGroupDetailPage';
+import AdminGate from './components/auth/AdminGate';
+import { canViewUserGroups } from './lib/roles';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
 import AdminReleaseWorkflowsPage from './pages/admin/AdminReleaseWorkflowsPage';
@@ -179,6 +183,15 @@ export default function App() {
             <Route path="time" element={<TimePage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="uat" element={<UatTestsPage />} />
+            {/*
+              TTSEC-2 round 16 — partial revert of round 15's global AdminGate.
+              AI review flagged that enforcing `hasSystemRole('ADMIN')` on EVERY existing admin
+              route (monitoring, release-workflows, role-schemes, etc.) could regress access for
+              roles like RELEASE_MANAGER/AUDITOR that previously relied on backend-only 403. No
+              existing access-matrix audit accompanies this PR, so the guard stays scoped to the
+              NEW user-groups routes only. Consolidation into a parent <AdminGate> wrapper
+              deserves its own PR with an explicit per-page audit.
+            */}
             <Route path="admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="admin/monitoring" element={<AdminMonitoringPage />} />
@@ -199,6 +212,8 @@ export default function App() {
             <Route path="admin/workflow-schemes/:id" element={<AdminWorkflowSchemeEditorPage />} />
             <Route path="admin/role-schemes" element={<AdminRoleSchemesPage />} />
             <Route path="admin/role-schemes/:id" element={<AdminRoleSchemeDetailPage />} />
+            <Route path="admin/user-groups" element={<AdminGate allow={canViewUserGroups}><AdminGroupsPage /></AdminGate>} />
+            <Route path="admin/user-groups/:id" element={<AdminGate allow={canViewUserGroups}><AdminGroupDetailPage /></AdminGate>} />
             <Route path="admin/transition-screens" element={<AdminTransitionScreensPage />} />
             <Route path="admin/transition-screens/:id" element={<AdminTransitionScreenEditorPage />} />
             <Route path="admin/release-workflows" element={<AdminReleaseWorkflowsPage />} />

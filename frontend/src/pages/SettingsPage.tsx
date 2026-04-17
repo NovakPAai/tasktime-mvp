@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useThemeStore } from '../store/theme.store';
 import { useAuthStore } from '../store/auth.store';
+import SecurityTab from '../components/profile/SecurityTab';
 
 const LOGO_GRAD =
   'linear-gradient(in oklab 135deg, oklab(59.3% -0.002 -0.207) 0%, oklab(54.1% 0.096 -0.227) 100%)';
@@ -749,6 +750,19 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* TTSEC-2 Phase 3: Security card — groups + effective project roles with source. */}
+          <div
+            style={{
+              background: C.bgCard,
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+              paddingBlock: 24,
+              paddingInline: 24,
+            }}
+          >
+            <SecurityTab />
           </div>
 
           {/* Notifications card */}
