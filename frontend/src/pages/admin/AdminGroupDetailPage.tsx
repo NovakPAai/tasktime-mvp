@@ -73,12 +73,22 @@ export default function AdminGroupDetailPage() {
 
   // When the admin picks a project, fetch its active scheme so the role-select only lists roles
   // that backend will actually accept (grantProjectRole rejects cross-scheme roles with 400).
+  //
+  // AI review #66 round 2 🟠 — clear scheme state at the START of a new request and on ERROR,
+  // so the previously-selected project's roles don't linger in the dropdown. Otherwise a failed
+  // fetch would leave stale options that produce a 400 on submit.
   useEffect(() => {
-    if (!grantProjectId) { setGrantProjectScheme(null); setGrantRoleId(undefined); return; }
+    setGrantProjectScheme(null);
+    setGrantRoleId(undefined);
+    if (!grantProjectId) return;
     let cancelled = false;
     roleSchemesApi.getForProject(grantProjectId)
-      .then(s => { if (!cancelled) { setGrantProjectScheme(s); setGrantRoleId(undefined); } })
-      .catch(() => { if (!cancelled) message.error('Не удалось загрузить схему проекта'); });
+      .then(s => { if (!cancelled) setGrantProjectScheme(s); })
+      .catch(() => {
+        if (cancelled) return;
+        message.error('Не удалось загрузить схему проекта');
+        // State already cleared above — nothing to roll back.
+      });
     return () => { cancelled = true; };
   }, [grantProjectId]);
 
