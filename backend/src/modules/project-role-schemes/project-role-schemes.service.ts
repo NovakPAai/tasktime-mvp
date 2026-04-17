@@ -51,7 +51,7 @@ export async function listSchemes() {
 
 export async function getScheme(id: string) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id }, include: schemeInclude });
-  if (!scheme) throw new AppError(404, 'Role scheme not found');
+  if (!scheme) throw new AppError(404, 'Схема ролей не найдена');
   return scheme;
 }
 
@@ -105,7 +105,7 @@ export async function createScheme(dto: CreateSchemeDto) {
 
 export async function updateScheme(id: string, dto: UpdateSchemeDto) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id } });
-  if (!scheme) throw new AppError(404, 'Role scheme not found');
+  if (!scheme) throw new AppError(404, 'Схема ролей не найдена');
   // Protect the "at least one default scheme" invariant — getSchemeForProject and detachProject
   // both assume one exists and fail with 500 otherwise. Only block the unset if this IS the last
   // default scheme; if another default already exists (edge case or cleanup), allow it.
@@ -147,8 +147,8 @@ export async function deleteScheme(id: string) {
     where: { id },
     include: { _count: { select: { projects: true } } },
   });
-  if (!scheme) throw new AppError(404, 'Role scheme not found');
-  if (scheme.isDefault) throw new AppError(400, 'Cannot delete the default scheme');
+  if (!scheme) throw new AppError(404, 'Схема ролей не найдена');
+  if (scheme.isDefault) throw new AppError(400, 'Нельзя удалить дефолтную схему');
   if (scheme._count.projects > 0) throw new AppError(400, 'SCHEME_IN_USE');
   // Invalidate BEFORE delete — otherwise any bindings are already gone (cascade) and we cannot
   // resolve the list of projectIds whose cache still holds a reference to this scheme.
@@ -218,35 +218,42 @@ async function remapProjectUserRolesToScheme(
 
 export async function attachProject(schemeId: string, projectId: string) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id: schemeId } });
-  if (!scheme) throw new AppError(404, 'Role scheme not found');
+  if (!scheme) throw new AppError(404, 'Схема ролей не найдена');
   const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new AppError(404, 'Project not found');
+  if (!project) throw new AppError(404, 'Проект не найден');
 
-  const { binding, created } = await prisma.$transaction(async (tx) => {
+  const { binding, created, changed } = await prisma.$transaction(async (tx) => {
     const existing = await tx.projectRoleSchemeProject.findUnique({ where: { projectId } });
+    // Idempotent re-attach to the same scheme: no data changes → skip remap and return early.
+    // Saves a findMany + updateMany per distinct source key on large projects.
+    if (existing?.schemeId === schemeId) {
+      return { binding: existing, created: false, changed: false };
+    }
     await remapProjectUserRolesToScheme(tx, projectId, schemeId);
     const binding = await tx.projectRoleSchemeProject.upsert({
       where: { projectId },
       update: { schemeId },
       create: { schemeId, projectId },
     });
-    return { binding, created: !existing };
+    return { binding, created: !existing, changed: true };
   });
 
-  await delCachedJson(PROJECT_SCHEME_KEY(projectId));
-  await delCacheByPrefix(`rbac:perm:${projectId}:`);
+  if (changed) {
+    await delCachedJson(PROJECT_SCHEME_KEY(projectId));
+    await delCacheByPrefix(`rbac:perm:${projectId}:`);
+  }
   return { binding, created };
 }
 
 export async function detachProject(schemeId: string, projectId: string) {
   await prisma.$transaction(async (tx) => {
     const binding = await tx.projectRoleSchemeProject.findFirst({ where: { schemeId, projectId } });
-    if (!binding) throw new AppError(404, 'Project not attached to this scheme');
+    if (!binding) throw new AppError(404, 'Проект не привязан к этой схеме');
     // After detach the project falls back to the default scheme. A default scheme is a system
     // invariant; without one we would leave UserProjectRole rows pointing at the now-unrelated
     // previous scheme and getSchemeForProject would already be broken. Fail fast instead.
     const defaultScheme = await tx.projectRoleScheme.findFirst({ where: { isDefault: true }, select: { id: true } });
-    if (!defaultScheme) throw new AppError(500, 'No default role scheme configured');
+    if (!defaultScheme) throw new AppError(500, 'Не настроена дефолтная схема ролей');
     await tx.projectRoleSchemeProject.delete({ where: { projectId } });
     await remapProjectUserRolesToScheme(tx, projectId, defaultScheme.id);
   });
@@ -263,7 +270,7 @@ export async function getSchemeForProject(projectId: string) {
   // /api/projects/:projectId/role-scheme endpoint would silently answer for arbitrary UUIDs
   // and the permission cache would accumulate entries for non-existent projects.
   const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
-  if (!project) throw new AppError(404, 'Project not found');
+  if (!project) throw new AppError(404, 'Проект не найден');
 
   const binding = await prisma.projectRoleSchemeProject.findUnique({
     where: { projectId },
@@ -278,14 +285,14 @@ export async function getSchemeForProject(projectId: string) {
     where: { isDefault: true },
     include: schemeInclude,
   });
-  if (!defaultScheme) throw new AppError(500, 'No default role scheme configured');
+  if (!defaultScheme) throw new AppError(500, 'Не настроена дефолтная схема ролей');
   await setCachedJson(PROJECT_SCHEME_KEY(projectId), defaultScheme, 300);
   return defaultScheme;
 }
 
 export async function listRoles(schemeId: string) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id: schemeId } });
-  if (!scheme) throw new AppError(404, 'Role scheme not found');
+  if (!scheme) throw new AppError(404, 'Схема ролей не найдена');
   return prisma.projectRoleDefinition.findMany({
     where: { schemeId },
     include: { permissions: true, _count: { select: { userProjectRoles: true } } },
@@ -295,7 +302,7 @@ export async function listRoles(schemeId: string) {
 
 export async function createRole(schemeId: string, dto: CreateRoleDefinitionDto) {
   const scheme = await prisma.projectRoleScheme.findUnique({ where: { id: schemeId } });
-  if (!scheme) throw new AppError(404, 'Role scheme not found');
+  if (!scheme) throw new AppError(404, 'Схема ролей не найдена');
   // Reserved keys: custom (non-system) roles must not shadow system-role keys, otherwise
   // assignProjectRole's legacy fallback and remapProjectUserRolesToScheme's key-based lookup
   // become ambiguous. System roles with these keys are created internally (isSystem: true)
@@ -318,7 +325,7 @@ export async function createRole(schemeId: string, dto: CreateRoleDefinitionDto)
 
 export async function updateRole(schemeId: string, roleId: string, dto: UpdateRoleDefinitionDto) {
   const role = await prisma.projectRoleDefinition.findFirst({ where: { id: roleId, schemeId } });
-  if (!role) throw new AppError(404, 'Role not found');
+  if (!role) throw new AppError(404, 'Роль не найдена');
   const updated = await prisma.projectRoleDefinition.update({
     where: { id: roleId },
     data: {
@@ -335,8 +342,8 @@ export async function updateRole(schemeId: string, roleId: string, dto: UpdateRo
 
 export async function deleteRole(schemeId: string, roleId: string) {
   const role = await prisma.projectRoleDefinition.findFirst({ where: { id: roleId, schemeId } });
-  if (!role) throw new AppError(404, 'Role not found');
-  if (role.isSystem) throw new AppError(400, 'Cannot delete a system role');
+  if (!role) throw new AppError(404, 'Роль не найдена');
+  if (role.isSystem) throw new AppError(400, 'Нельзя удалить системную роль');
   const usageCount = await prisma.userProjectRole.count({ where: { roleId } });
   if (usageCount > 0) throw new AppError(400, `ROLE_IN_USE: ${usageCount} users have this role`);
   await prisma.projectRoleDefinition.delete({ where: { id: roleId } });
@@ -350,13 +357,13 @@ export async function getPermissions(schemeId: string, roleId: string) {
     where: { id: roleId, schemeId },
     include: { permissions: true },
   });
-  if (!role) throw new AppError(404, 'Role not found');
+  if (!role) throw new AppError(404, 'Роль не найдена');
   return role.permissions;
 }
 
 export async function updatePermissions(schemeId: string, roleId: string, dto: UpdatePermissionsDto) {
   const role = await prisma.projectRoleDefinition.findFirst({ where: { id: roleId, schemeId } });
-  if (!role) throw new AppError(404, 'Role not found');
+  if (!role) throw new AppError(404, 'Роль не найдена');
   // Replace only the keys present in dto.permissions (partial update semantics).
   // Use deleteMany + createMany inside a transaction: 2 queries regardless of matrix size.
   // Store only `granted: true` rows; absence of a row means "not granted" — this keeps the

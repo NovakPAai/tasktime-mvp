@@ -138,7 +138,7 @@ describe('getSchemeForProject', () => {
 
     await expect(getSchemeForProject('proj-3')).rejects.toMatchObject({
       statusCode: 500,
-      message: 'No default role scheme configured',
+      message: 'Не настроена дефолтная схема ролей',
     });
   });
 
@@ -147,7 +147,7 @@ describe('getSchemeForProject', () => {
 
     await expect(getSchemeForProject('proj-missing')).rejects.toMatchObject({
       statusCode: 404,
-      message: 'Project not found',
+      message: 'Проект не найден',
     });
   });
 
@@ -200,7 +200,7 @@ describe('deleteScheme', () => {
 
     await expect(deleteScheme('scheme-1')).rejects.toMatchObject({
       statusCode: 400,
-      message: 'Cannot delete the default scheme',
+      message: 'Нельзя удалить дефолтную схему',
     });
     expect(mp.projectRoleScheme.delete).not.toHaveBeenCalled();
   });
@@ -239,7 +239,7 @@ describe('deleteRole', () => {
 
     await expect(deleteRole('scheme-1', 'role-1')).rejects.toMatchObject({
       statusCode: 400,
-      message: 'Cannot delete a system role',
+      message: 'Нельзя удалить системную роль',
     });
     expect(mp.projectRoleDefinition.delete).not.toHaveBeenCalled();
   });

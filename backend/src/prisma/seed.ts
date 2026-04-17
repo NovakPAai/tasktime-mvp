@@ -96,27 +96,12 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
   );
 
   // ===== DEFAULT PROJECT ROLE SCHEME =====
-  // Atomically ensure a single default: first clear isDefault on any OTHER scheme that has it,
-  // then upsert the canonical default and (re-)assert isDefault=true. Without the updateMany a
-  // pre-existing default with a different id would survive, leaving the system with multiple
-  // defaults and making findFirst({ isDefault: true }) non-deterministic.
+  // Everything below — default scheme upsert, role+permission matrix, and the legacy roleId
+  // backfill — runs inside a SINGLE interactive transaction. A partial failure here would
+  // leave the RBAC data in a mixed state (e.g. new scheme without roles, or some rows
+  // backfilled while others still carry roleId=NULL), which is hard to diagnose and can
+  // distort permission resolution until someone notices.
   const DEFAULT_SCHEME_ID = '00000000-0000-0000-0000-000000000001';
-  const defaultRoleScheme = await client.$transaction(async (tx) => {
-    await tx.projectRoleScheme.updateMany({
-      where: { isDefault: true, id: { not: DEFAULT_SCHEME_ID } },
-      data: { isDefault: false },
-    });
-    return tx.projectRoleScheme.upsert({
-      where: { id: DEFAULT_SCHEME_ID },
-      update: { isDefault: true },
-      create: {
-        id: DEFAULT_SCHEME_ID,
-        name: 'Default',
-        description: 'Схема доступа по умолчанию',
-        isDefault: true,
-      },
-    });
-  });
 
   const DEFAULT_ROLE_MATRIX: Record<string, { key: string; name: string; color: string; permissions: string[] }> = {
     ADMIN: {
@@ -188,82 +173,94 @@ async function main(prismaClient?: PrismaClient, scope?: string) {
     'BOARDS_VIEW', 'BOARDS_MANAGE',
   ] as const;
 
-  for (const [, roleDef] of Object.entries(DEFAULT_ROLE_MATRIX)) {
-    const role = await client.projectRoleDefinition.upsert({
-      where: { schemeId_key: { schemeId: defaultRoleScheme.id, key: roleDef.key } },
-      update: { name: roleDef.name, color: roleDef.color },
+  const { defaultRoleScheme, backfilled, unmappedKeys } = await client.$transaction(async (tx) => {
+    // 1. Ensure a single canonical default scheme.
+    await tx.projectRoleScheme.updateMany({
+      where: { isDefault: true, id: { not: DEFAULT_SCHEME_ID } },
+      data: { isDefault: false },
+    });
+    const defaultRoleScheme = await tx.projectRoleScheme.upsert({
+      where: { id: DEFAULT_SCHEME_ID },
+      update: { isDefault: true },
       create: {
-        schemeId: defaultRoleScheme.id,
-        name: roleDef.name,
-        key: roleDef.key,
-        color: roleDef.color,
-        isSystem: true,
+        id: DEFAULT_SCHEME_ID,
+        name: 'Default',
+        description: 'Схема доступа по умолчанию',
+        isDefault: true,
       },
     });
-    // Store only granted=true rows (absence of a row means "not granted"). Matches the service
-    // model in updatePermissions — keeps the permissions table compact and consistent.
-    const grantedPerms = ALL_PERMISSIONS.filter(p => roleDef.permissions.includes(p));
-    const revokedPerms = ALL_PERMISSIONS.filter(p => !roleDef.permissions.includes(p));
-    if (revokedPerms.length > 0) {
-      await client.projectRolePermission.deleteMany({
-        where: { roleId: role.id, permission: { in: revokedPerms as any } },
+
+    // 2. Upsert system roles and their permission matrix (granted=true rows only).
+    for (const [, roleDef] of Object.entries(DEFAULT_ROLE_MATRIX)) {
+      const role = await tx.projectRoleDefinition.upsert({
+        where: { schemeId_key: { schemeId: defaultRoleScheme.id, key: roleDef.key } },
+        update: { name: roleDef.name, color: roleDef.color },
+        create: {
+          schemeId: defaultRoleScheme.id,
+          name: roleDef.name,
+          key: roleDef.key,
+          color: roleDef.color,
+          isSystem: true,
+        },
       });
+      const grantedPerms = ALL_PERMISSIONS.filter(p => roleDef.permissions.includes(p));
+      const revokedPerms = ALL_PERMISSIONS.filter(p => !roleDef.permissions.includes(p));
+      if (revokedPerms.length > 0) {
+        await tx.projectRolePermission.deleteMany({
+          where: { roleId: role.id, permission: { in: revokedPerms as any } },
+        });
+      }
+      for (const perm of grantedPerms) {
+        await tx.projectRolePermission.upsert({
+          where: { roleId_permission: { roleId: role.id, permission: perm as any } },
+          update: { granted: true },
+          create: { roleId: role.id, permission: perm as any, granted: true },
+        });
+      }
     }
-    for (const perm of grantedPerms) {
-      await client.projectRolePermission.upsert({
-        where: { roleId_permission: { roleId: role.id, permission: perm as any } },
-        update: { granted: true },
-        create: { roleId: role.id, permission: perm as any, granted: true },
-      });
-    }
-  }
-  console.log('Default project role scheme seeded.');
 
-  // Backfill UserProjectRole.roleId / schemeId PER-PROJECT: for each row resolve the project's
-  // ACTIVE scheme (explicit binding → else default) and find the role by key in THAT scheme.
-  // Without this step rows on projects bound to a non-default scheme would be linked to roles
-  // of the wrong scheme, breaking the (schemeId matches active project scheme) invariant.
-  const bindings = await client.projectRoleSchemeProject.findMany({
-    select: { projectId: true, schemeId: true },
-  });
-  const projectToSchemeId = new Map(bindings.map(b => [b.projectId, b.schemeId]));
-
-  const allSchemeRoles = await client.projectRoleDefinition.findMany({
-    select: { id: true, key: true, schemeId: true },
-  });
-  const schemeKeyToRoleId = new Map<string, string>(
-    allSchemeRoles.map(r => [`${r.schemeId}:${r.key}`, r.id]),
-  );
-
-  const rowsToBackfill = await client.userProjectRole.findMany({
-    where: { roleId: null },
-    select: { id: true, projectId: true, role: true },
-  });
-
-  // Group rows by (effectiveSchemeId, legacyRole) so updates batch into one query per pair.
-  const groups = new Map<string, { schemeId: string; role: string; ids: string[] }>();
-  for (const r of rowsToBackfill) {
-    const effectiveSchemeId = projectToSchemeId.get(r.projectId) ?? defaultRoleScheme.id;
-    const key = `${effectiveSchemeId}:${r.role}`;
-    const bucket = groups.get(key) ?? { schemeId: effectiveSchemeId, role: r.role, ids: [] };
-    bucket.ids.push(r.id);
-    groups.set(key, bucket);
-  }
-
-  let backfilled = 0;
-  const unmappedKeys: string[] = [];
-  for (const [key, { schemeId, role, ids }] of groups) {
-    const targetRoleId = schemeKeyToRoleId.get(key);
-    if (!targetRoleId) {
-      unmappedKeys.push(`${role}@scheme:${schemeId}(${ids.length})`);
-      continue;
-    }
-    const { count } = await client.userProjectRole.updateMany({
-      where: { id: { in: ids } },
-      data: { roleId: targetRoleId, schemeId },
+    // 3. Backfill UserProjectRole.roleId/schemeId PER-PROJECT: resolve the project's active
+    // scheme (explicit binding → else default) and find the role by key in THAT scheme.
+    const bindings = await tx.projectRoleSchemeProject.findMany({
+      select: { projectId: true, schemeId: true },
     });
-    backfilled += count;
-  }
+    const projectToSchemeId = new Map(bindings.map(b => [b.projectId, b.schemeId]));
+    const allSchemeRoles = await tx.projectRoleDefinition.findMany({
+      select: { id: true, key: true, schemeId: true },
+    });
+    const schemeKeyToRoleId = new Map<string, string>(
+      allSchemeRoles.map(r => [`${r.schemeId}:${r.key}`, r.id]),
+    );
+    const rowsToBackfill = await tx.userProjectRole.findMany({
+      where: { roleId: null },
+      select: { id: true, projectId: true, role: true },
+    });
+    const groups = new Map<string, { schemeId: string; role: string; ids: string[] }>();
+    for (const r of rowsToBackfill) {
+      const effectiveSchemeId = projectToSchemeId.get(r.projectId) ?? defaultRoleScheme.id;
+      const key = `${effectiveSchemeId}:${r.role}`;
+      const bucket = groups.get(key) ?? { schemeId: effectiveSchemeId, role: r.role, ids: [] };
+      bucket.ids.push(r.id);
+      groups.set(key, bucket);
+    }
+    let backfilled = 0;
+    const unmappedKeys: string[] = [];
+    for (const [key, { schemeId, role, ids }] of groups) {
+      const targetRoleId = schemeKeyToRoleId.get(key);
+      if (!targetRoleId) {
+        unmappedKeys.push(`${role}@scheme:${schemeId}(${ids.length})`);
+        continue;
+      }
+      const { count } = await tx.userProjectRole.updateMany({
+        where: { id: { in: ids } },
+        data: { roleId: targetRoleId, schemeId },
+      });
+      backfilled += count;
+    }
+    return { defaultRoleScheme, backfilled, unmappedKeys };
+  }, { timeout: 30000 });
+
+  console.log('Default project role scheme seeded.');
   console.log(`Backfilled ${backfilled} UserProjectRole records.`);
   if (unmappedKeys.length > 0) {
     console.warn(`Unmapped legacy role values (no matching key in the project's active scheme): ${unmappedKeys.join(', ')}`);

@@ -139,7 +139,7 @@ describe('DELETE /api/admin/role-schemes/:id', () => {
       .delete(`/api/admin/role-schemes/${DEFAULT_SCHEME_ID}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Cannot delete the default scheme');
+    expect(res.body.error).toBe('Нельзя удалить дефолтную схему');
   });
 });
 
@@ -230,7 +230,7 @@ describe('DELETE /api/admin/role-schemes/:id/roles/:roleId', () => {
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Cannot delete a system role');
+    expect(res.body.error).toBe('Нельзя удалить системную роль');
   });
 
   it('204/200 удаляет кастомную роль без участников', async () => {
