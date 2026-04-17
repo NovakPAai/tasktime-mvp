@@ -278,18 +278,19 @@ describe('updatePermissions', () => {
     );
   });
 
-  it('batch-replace переданных разрешений через deleteMany + createMany', async () => {
+  it('batch-replace переданных разрешений через deleteMany + createMany (только granted=true)', async () => {
     await updatePermissions('scheme-1', 'role-1', {
       permissions: { ISSUES_VIEW: true, ISSUES_CREATE: false },
     });
 
+    // deleteMany removes rows for ALL specified keys (including the ones we flip to false).
     expect(mp.projectRolePermission.deleteMany).toHaveBeenCalledWith({
       where: { roleId: 'role-1', permission: { in: ['ISSUES_VIEW', 'ISSUES_CREATE'] } },
     });
+    // createMany inserts only granted=true rows; absence of a row means "not granted".
     expect(mp.projectRolePermission.createMany).toHaveBeenCalledWith({
       data: [
         { roleId: 'role-1', permission: 'ISSUES_VIEW', granted: true },
-        { roleId: 'role-1', permission: 'ISSUES_CREATE', granted: false },
       ],
     });
   });

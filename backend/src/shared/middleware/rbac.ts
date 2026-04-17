@@ -85,21 +85,28 @@ export function requireProjectPermission(
       if (cachedResult === true) return next();
 
       const scheme = await getSchemeForProject(projectId);
-      const userRole = await prisma.userProjectRole.findFirst({
+      // Read ALL roles the user has in this project (in the canonical one-role-per-project model
+      // this returns 0..1 rows; during the migration window or after legacy data import it may
+      // return more). Permission is granted if ANY of the user's roles grants it — most
+      // permissive wins. This also makes behavior deterministic if multiple rows ever coexist.
+      const userRoles = await prisma.userProjectRole.findMany({
         where: { userId: req.user.userId, projectId },
         select: { roleId: true, role: true },
       });
 
       let granted = false;
-      if (userRole) {
+      for (const ur of userRoles) {
         // Prefer roleId. If it's missing OR points to a role outside the active scheme
         // (e.g. the project was recently re-attached to a different scheme and the migration
         // hasn't caught up yet), fall back to matching by the legacy `role` key.
-        let roleDef = userRole.roleId ? scheme.roles.find(r => r.id === userRole.roleId) : undefined;
+        let roleDef = ur.roleId ? scheme.roles.find(r => r.id === ur.roleId) : undefined;
         if (!roleDef) {
-          roleDef = scheme.roles.find(r => r.key === userRole.role);
+          roleDef = scheme.roles.find(r => r.key === ur.role);
         }
-        granted = roleDef?.permissions.find(p => p.permission === permission)?.granted ?? false;
+        if (roleDef?.permissions.find(p => p.permission === permission)?.granted) {
+          granted = true;
+          break;
+        }
       }
 
       if (granted) await setCachedJson(cacheKey, true, 60);

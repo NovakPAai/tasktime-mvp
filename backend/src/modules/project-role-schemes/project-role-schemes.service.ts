@@ -305,16 +305,20 @@ export async function updatePermissions(schemeId: string, roleId: string, dto: U
   const role = await prisma.projectRoleDefinition.findFirst({ where: { id: roleId, schemeId } });
   if (!role) throw new AppError(404, 'Role not found');
   // Replace only the keys present in dto.permissions (partial update semantics).
-  // Use deleteMany + createMany inside a transaction instead of N per-permission upsert: 2 queries
-  // total regardless of matrix size.
+  // Use deleteMany + createMany inside a transaction: 2 queries regardless of matrix size.
+  // Store only `granted: true` rows; absence of a row means "not granted" — this keeps the
+  // permissions table compact and makes reads/caches cheaper.
   const entries = Object.entries(dto.permissions) as [ProjectPermission, boolean][];
   const keys = entries.map(([p]) => p);
+  const grantedEntries = entries.filter(([, granted]) => granted);
   const result = await prisma.$transaction(async (tx) => {
     if (keys.length > 0) {
       await tx.projectRolePermission.deleteMany({ where: { roleId, permission: { in: keys } } });
-      await tx.projectRolePermission.createMany({
-        data: entries.map(([permission, granted]) => ({ roleId, permission, granted })),
-      });
+      if (grantedEntries.length > 0) {
+        await tx.projectRolePermission.createMany({
+          data: grantedEntries.map(([permission, granted]) => ({ roleId, permission, granted })),
+        });
+      }
     }
     return tx.projectRoleDefinition.findUniqueOrThrow({
       where: { id: roleId },

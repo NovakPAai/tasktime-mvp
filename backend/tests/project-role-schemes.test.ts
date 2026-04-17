@@ -205,10 +205,11 @@ describe('PATCH /api/admin/role-schemes/:id/roles/:roleId/permissions', () => {
       p => p.permission === 'ISSUES_VIEW',
     );
     expect(permView?.granted).toBe(true);
+    // Only granted=true permissions are stored; absence of a row means "not granted".
     const permCreate = (res.body.permissions as { permission: string; granted: boolean }[]).find(
       p => p.permission === 'ISSUES_CREATE',
     );
-    expect(permCreate?.granted).toBe(false);
+    expect(permCreate).toBeUndefined();
   });
 });
 
