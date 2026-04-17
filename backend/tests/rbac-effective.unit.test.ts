@@ -34,6 +34,7 @@ const {
   computeEffectiveRole,
   assertProjectPermission,
   getEffectiveProjectPermissions,
+  computeEffectiveRolesForProjects,
 } = await import('../src/shared/middleware/rbac.js');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -148,6 +149,60 @@ describe('computeEffectiveRole', () => {
     const eff = await computeEffectiveRole(USER_ID, PROJECT_ID);
     expect(eff?.source).toBe('DIRECT'); // direct was inserted first
     expect(eff?.sourceGroups).toEqual([{ id: 'g-1', name: 'Admins' }]);
+  });
+
+  it('sourceGroups is deduplicated when the same group appears twice (AI review #65 round 2)', async () => {
+    mockPrisma.userProjectRole.findMany.mockResolvedValue([]);
+    mockPrisma.projectGroupRole.findMany.mockResolvedValue([
+      { roleId: ADMIN.id, group: { id: 'g-1', name: 'Admins' }, roleDefinition: { key: 'ADMIN' } },
+      { roleId: ADMIN.id, group: { id: 'g-1', name: 'Admins' }, roleDefinition: { key: 'ADMIN' } },
+      { roleId: ADMIN.id, group: { id: 'g-2', name: 'Leads' }, roleDefinition: { key: 'ADMIN' } },
+    ]);
+    const eff = await computeEffectiveRole(USER_ID, PROJECT_ID);
+    expect(eff?.sourceGroups).toEqual([
+      { id: 'g-1', name: 'Admins' },
+      { id: 'g-2', name: 'Leads' },
+    ]);
+  });
+});
+
+// ─── computeEffectiveRolesForProjects (batched) ──────────────────────────────
+
+describe('computeEffectiveRolesForProjects', () => {
+  it('returns empty map on empty input without any DB call', async () => {
+    const res = await computeEffectiveRolesForProjects(USER_ID, []);
+    expect(res.size).toBe(0);
+    expect(mockPrisma.userProjectRole.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.projectGroupRole.findMany).not.toHaveBeenCalled();
+  });
+
+  it('makes exactly one direct query and one group query for N projects', async () => {
+    mockPrisma.userProjectRole.findMany.mockResolvedValue([
+      { projectId: 'p1', roleId: USER.id, role: 'USER' },
+      { projectId: 'p2', roleId: ADMIN.id, role: 'ADMIN' },
+    ]);
+    mockPrisma.projectGroupRole.findMany.mockResolvedValue([]);
+
+    const res = await computeEffectiveRolesForProjects(USER_ID, ['p1', 'p2', 'p3']);
+
+    expect(mockPrisma.userProjectRole.findMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.projectGroupRole.findMany).toHaveBeenCalledTimes(1);
+    expect(res.get('p1')?.roleKey).toBe('USER');
+    expect(res.get('p2')?.roleKey).toBe('ADMIN');
+    expect(res.get('p3')).toBeNull(); // no role in p3
+  });
+
+  it('merges DIRECT + GROUP per-project with max-permissions pick', async () => {
+    mockPrisma.userProjectRole.findMany.mockResolvedValue([
+      { projectId: 'p1', roleId: USER.id, role: 'USER' },
+    ]);
+    mockPrisma.projectGroupRole.findMany.mockResolvedValue([
+      { projectId: 'p1', roleId: ADMIN.id, group: { id: 'g-1', name: 'G' }, roleDefinition: { key: 'ADMIN' } },
+    ]);
+    const res = await computeEffectiveRolesForProjects(USER_ID, ['p1']);
+    const eff = res.get('p1');
+    expect(eff?.roleKey).toBe('ADMIN');
+    expect(eff?.source).toBe('GROUP');
   });
 });
 

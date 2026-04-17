@@ -156,7 +156,12 @@ export async function computeEffectiveRole(
     if (!role) continue;
     const existing = byRoleId.get(role.id);
     if (existing) {
-      existing.groups.push(row.group);
+      // Dedup by group id — defensive: two bindings of the same group to the same role should
+      // be prevented by `@@unique([groupId, projectId])`, but data migration / join anomalies
+      // could still produce duplicates and leak to /users/me/security.
+      if (!existing.groups.some(g => g.id === row.group.id)) {
+        existing.groups.push(row.group);
+      }
     } else {
       byRoleId.set(role.id, { role, source: 'GROUP', groups: [row.group] });
     }
@@ -181,6 +186,108 @@ export async function computeEffectiveRole(
     source: chosen.source,
     sourceGroups: chosen.groups,
   };
+}
+
+/**
+ * Batched variant of computeEffectiveRole for many projects at once. Used by
+ * /users/me/security (AI review #65 round 2 — avoid N+1 when a user is in many projects).
+ *
+ * Query plan: 1× direct-roles + 1× group-roles + N× getSchemeForProject (Redis-cached, 300s TTL).
+ * Total DB queries: 2 instead of 2N; scheme reads hit Redis unless cold.
+ */
+export async function computeEffectiveRolesForProjects(
+  userId: string,
+  projectIds: string[],
+): Promise<Map<string, EffectiveRole | null>> {
+  const result = new Map<string, EffectiveRole | null>();
+  if (projectIds.length === 0) return result;
+
+  const [directRows, groupRows, schemes] = await Promise.all([
+    prisma.userProjectRole.findMany({
+      where: { userId, projectId: { in: projectIds } },
+      select: { projectId: true, roleId: true, role: true },
+    }),
+    prisma.projectGroupRole.findMany({
+      where: { projectId: { in: projectIds }, group: { members: { some: { userId } } } },
+      select: {
+        projectId: true,
+        roleId: true,
+        group: { select: { id: true, name: true } },
+        roleDefinition: { select: { key: true } },
+      },
+    }),
+    Promise.all(projectIds.map(async pid => [pid, await getSchemeForProject(pid)] as const)),
+  ]);
+
+  const schemeByProject = new Map(schemes);
+  const directByProject = new Map<string, typeof directRows>();
+  const groupByProject = new Map<string, typeof groupRows>();
+  for (const row of directRows) {
+    const arr = directByProject.get(row.projectId) ?? [];
+    arr.push(row);
+    directByProject.set(row.projectId, arr);
+  }
+  for (const row of groupRows) {
+    const arr = groupByProject.get(row.projectId) ?? [];
+    arr.push(row);
+    groupByProject.set(row.projectId, arr);
+  }
+
+  for (const projectId of projectIds) {
+    const scheme = schemeByProject.get(projectId);
+    if (!scheme) { result.set(projectId, null); continue; }
+    const rolesInScheme = scheme.roles;
+    type CandidateRole = typeof rolesInScheme[number];
+    type Candidate = { role: CandidateRole; source: 'DIRECT' | 'GROUP'; groups: { id: string; name: string }[] };
+    const byRoleId = new Map<string, Candidate>();
+
+    const resolveInScheme = (roleId: string | null | undefined, legacyKey: string | undefined): CandidateRole | undefined => {
+      if (roleId) {
+        const byId = rolesInScheme.find(r => r.id === roleId);
+        if (byId) return byId;
+      }
+      if (legacyKey) return rolesInScheme.find(r => r.key === legacyKey);
+      return undefined;
+    };
+
+    for (const row of (directByProject.get(projectId) ?? [])) {
+      const role = resolveInScheme(row.roleId, row.role);
+      if (!role) continue;
+      if (!byRoleId.has(role.id)) byRoleId.set(role.id, { role, source: 'DIRECT', groups: [] });
+    }
+    for (const row of (groupByProject.get(projectId) ?? [])) {
+      const role = resolveInScheme(row.roleId, row.roleDefinition.key);
+      if (!role) continue;
+      const existing = byRoleId.get(role.id);
+      if (existing) {
+        if (!existing.groups.some(g => g.id === row.group.id)) existing.groups.push(row.group);
+      } else {
+        byRoleId.set(role.id, { role, source: 'GROUP', groups: [row.group] });
+      }
+    }
+
+    const candidates = Array.from(byRoleId.values());
+    if (candidates.length === 0) { result.set(projectId, null); continue; }
+
+    candidates.sort((a, b) => {
+      const aGranted = a.role.permissions.filter(p => p.granted).length;
+      const bGranted = b.role.permissions.filter(p => p.granted).length;
+      const d = bGranted - aGranted;
+      return d !== 0 ? d : a.role.id.localeCompare(b.role.id);
+    });
+
+    const chosen = candidates[0]!;
+    result.set(projectId, {
+      roleId: chosen.role.id,
+      roleName: chosen.role.name,
+      roleKey: chosen.role.key,
+      permissions: chosen.role.permissions.filter(p => p.granted).map(p => p.permission),
+      source: chosen.source,
+      sourceGroups: chosen.groups,
+    });
+  }
+
+  return result;
 }
 
 /**
