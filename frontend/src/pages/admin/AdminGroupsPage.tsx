@@ -22,10 +22,16 @@ export default function AdminGroupsPage() {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
 
-  const [impact, setImpact] = useState<UserGroupImpact | null>(null);
+  // AI review #66 round 10 🟠 — bundle impact with the group id it was loaded for, so render
+  // code can only use impact when it genuinely belongs to the currently-open group. Prevents a
+  // stale impact from a previous group from enabling delete before the new fetch settles.
+  const [impact, setImpact] = useState<{ forGroupId: string; data: UserGroupImpact } | null>(null);
   const [impactFor, setImpactFor] = useState<UserGroupListItem | null>(null);
   const [impactError, setImpactError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Impact is "ready" only when it was loaded for the currently-open group and no error is set.
+  const impactReady = !!impact && !!impactFor && impact.forGroupId === impactFor.id && !impactError;
 
   // Debounce the user-typed search so we don't fire a request per keystroke
   // (AI review #66 🟡). 300ms is the usual sweet spot — feels instant, batches fast typists.
@@ -84,7 +90,7 @@ export default function AdminGroupsPage() {
     try {
       const result = await userGroupsApi.getImpact(g.id);
       setImpactFor(current => {
-        if (current?.id === g.id) setImpact(result);
+        if (current?.id === g.id) setImpact({ forGroupId: g.id, data: result });
         return current;
       });
     } catch {
@@ -200,7 +206,7 @@ export default function AdminGroupsPage() {
         onCancel={() => { setImpactFor(null); setImpact(null); setImpactError(null); }}
         onOk={confirmDelete}
         okText="Удалить"
-        okButtonProps={{ danger: true, disabled: !impact }}
+        okButtonProps={{ danger: true, disabled: !impactReady || deleting }}
         cancelText="Отмена"
         confirmLoading={deleting}
       >
@@ -209,15 +215,15 @@ export default function AdminGroupsPage() {
             <Alert type="error" message={impactError} showIcon />
             <Button onClick={() => impactFor && loadImpact(impactFor)}>Повторить</Button>
           </Space>
-        ) : impact ? (
+        ) : impactReady && impact ? (
           <>
             <p>Будут отозваны следующие доступы:</p>
             <ul>
               <li>
-                <b>{impact.memberCount}</b> участников потеряют членство
-                {impact.members.length > 0 && (
+                <b>{impact.data.memberCount}</b> участников потеряют членство
+                {impact.data.members.length > 0 && (
                   <ul style={{ maxHeight: 160, overflowY: 'auto', marginTop: 4 }}>
-                    {impact.members.map(m => (
+                    {impact.data.members.map(m => (
                       <li key={m.id}>
                         {m.name} <span style={{ color: '#888' }}>· {m.email}</span>
                       </li>
@@ -226,10 +232,10 @@ export default function AdminGroupsPage() {
                 )}
               </li>
               <li>
-                <b>{impact.projectCount}</b> проектных биндингов будут удалены
-                {impact.projects.length > 0 && (
+                <b>{impact.data.projectCount}</b> проектных биндингов будут удалены
+                {impact.data.projects.length > 0 && (
                   <ul>
-                    {impact.projects.map(p => (
+                    {impact.data.projects.map(p => (
                       // Composite key: backend currently guarantees one binding per project
                       // in a group (@@unique([groupId, projectId])), but defensive against
                       // contract extension or duplicate rows sneaking in via data migration.
