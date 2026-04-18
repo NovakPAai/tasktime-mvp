@@ -330,7 +330,7 @@ Run `make docs` to check for staleness warnings.
 > ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
 > Обновляется автоматически при каждом изменении схемы.
 
-## Модели (48)
+## Модели (54)
 
 ### User
 
@@ -362,6 +362,7 @@ Run `make docs` to check for staleness warnings.
 | `addedReleaseItems` | `ReleaseItem[]` | нет |  |
 | `groupMemberships` | `UserGroupMember[]` | нет |  |
 | `addedGroupMembers` | `UserGroupMember[]` | нет |  |
+| `checkpointTemplatesCreated` | `CheckpointTemplate[]` | нет |  |
 
 ### UserSystemRole
 
@@ -659,6 +660,8 @@ Run `make docs` to check for staleness warnings.
 | `items` | `ReleaseItem[]` | нет |  |
 | `issues` | `Issue[]` | нет |  |
 | `sprints` | `Sprint[]` | нет |  |
+| `checkpoints` | `ReleaseCheckpoint[]` | нет |  |
+| `burndownSnapshots` | `ReleaseBurndownSnapshot[]` | нет |  |
 
 ### Comment
 
@@ -1080,7 +1083,107 @@ Run `make docs` to check for staleness warnings.
 | `project` | `Project` | нет |  |
 | `roleDefinition` | `ProjectRoleDefinition` | нет |  |
 
-## Перечисления (18)
+### CheckpointType
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет | UNIQUE |
+| `description` | `String` | да |  |
+| `color` | `String` | нет | default: "#888888" |
+| `weight` | `CheckpointWeight` | нет | default: MEDIUM |
+| `offsetDays` | `Int` | нет |  |
+| `warningDays` | `Int` | нет | default: 3 |
+| `criteria` | `Json` | нет |  |
+| `webhookUrl` | `String` | да |  |
+| `minStableSeconds` | `Int` | нет | default: 300 |
+| `isActive` | `Boolean` | нет | default: true |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `templateItems` | `CheckpointTemplateItem[]` | нет |  |
+| `releaseCheckpoints` | `ReleaseCheckpoint[]` | нет |  |
+
+### CheckpointTemplate
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `name` | `String` | нет | UNIQUE |
+| `description` | `String` | да |  |
+| `createdById` | `String` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `createdBy` | `User` | да |  |
+| `items` | `CheckpointTemplateItem[]` | нет |  |
+
+### CheckpointTemplateItem
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `templateId` | `String` | нет |  |
+| `checkpointTypeId` | `String` | нет |  |
+| `orderIndex` | `Int` | нет | default: 0 |
+| `template` | `CheckpointTemplate` | нет |  |
+| `checkpointType` | `CheckpointType` | нет |  |
+
+### ReleaseCheckpoint
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `releaseId` | `String` | нет |  |
+| `checkpointTypeId` | `String` | нет |  |
+| `criteriaSnapshot` | `Json` | нет |  |
+| `offsetDaysSnapshot` | `Int` | нет |  |
+| `deadline` | `DateTime` | нет |  |
+| `state` | `CheckpointState` | нет | default: PENDING |
+| `lastEvaluatedAt` | `DateTime` | да |  |
+| `applicableIssueIds` | `Json` | нет | default: "[]" |
+| `passedIssueIds` | `Json` | нет | default: "[]" |
+| `violations` | `Json` | нет | default: "[]" |
+| `violationsHash` | `String` | нет | default: "" |
+| `lastWebhookSentAt` | `DateTime` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `release` | `Release` | нет |  |
+| `checkpointType` | `CheckpointType` | нет |  |
+| `violationEvents` | `CheckpointViolationEvent[]` | нет |  |
+
+### CheckpointViolationEvent
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `releaseCheckpointId` | `String` | нет |  |
+| `issueId` | `String` | нет |  |
+| `issueKey` | `String` | нет |  |
+| `reason` | `String` | нет |  |
+| `criterionType` | `String` | нет |  |
+| `occurredAt` | `DateTime` | нет | default: now( |
+| `resolvedAt` | `DateTime` | да |  |
+| `releaseCheckpoint` | `ReleaseCheckpoint` | нет |  |
+
+### ReleaseBurndownSnapshot
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `releaseId` | `String` | нет |  |
+| `snapshotDate` | `DateTime` | нет |  |
+| `totalIssues` | `Int` | нет |  |
+| `doneIssues` | `Int` | нет |  |
+| `openIssues` | `Int` | нет |  |
+| `cancelledIssues` | `Int` | нет |  |
+| `totalEstimatedHours` | `Decimal` | нет |  |
+| `doneEstimatedHours` | `Decimal` | нет |  |
+| `openEstimatedHours` | `Decimal` | нет |  |
+| `violatedCheckpoints` | `Int` | нет | default: 0 |
+| `totalCheckpoints` | `Int` | нет | default: 0 |
+| `capturedAt` | `DateTime` | нет | default: now( |
+| `release` | `Release` | нет |  |
+
+## Перечисления (20)
 
 ### SystemRoleType
 
@@ -1138,26 +1241,26 @@ Run `make docs` to check for staleness warnings.
 
 ### ReleaseType
 
-- `ATOMIC       // атомарный — одна система/проект`
-- `INTEGRATION  // интеграционный — кросс-проектный`
+- `ATOMIC // атомарный — одна система/проект`
+- `INTEGRATION // интеграционный — кросс-проектный`
 
 ### ReleaseLevel
 
-- `MINOR   // мелкие улучшения, баг-фиксы`
-- `MAJOR   // новые фичи`
+- `MINOR // мелкие улучшения, баг-фиксы`
+- `MAJOR // новые фичи`
 
 ### ReleaseState
 
-- `DRAFT    // сбор задач`
-- `READY    // готов к выпуску`
+- `DRAFT // сбор задач`
+- `READY // готов к выпуску`
 - `RELEASED // выпущен`
 
 ### ReleaseStatusCategory
 
-- `PLANNING      // сбор, планирование`
-- `IN_PROGRESS   // в работе (сборка, тестирование, стабилизация)`
-- `DONE          // выпущен, закрыт`
-- `CANCELLED     // отменён`
+- `PLANNING // сбор, планирование`
+- `IN_PROGRESS // в работе (сборка, тестирование, стабилизация)`
+- `DONE // выпущен, закрыт`
+- `CANCELLED // отменён`
 
 ### TimeSource
 
@@ -1208,29 +1311,42 @@ Run `make docs` to check for staleness warnings.
 - `ISSUES_CHANGE_STATUS`
 - `ISSUES_CHANGE_TYPE`
 - `SPRINTS_VIEW`
-- `SPRINTS_CREATE            // TTSEC-2`
-- `SPRINTS_EDIT              // TTSEC-2`
-- `SPRINTS_DELETE            // TTSEC-2`
-- `SPRINTS_MANAGE            // deprecated: Postgres не поддерживает DROP VALUE, скрыто из UI-матрицы`
+- `SPRINTS_CREATE // TTSEC-2`
+- `SPRINTS_EDIT // TTSEC-2`
+- `SPRINTS_DELETE // TTSEC-2`
+- `SPRINTS_MANAGE // deprecated: Postgres не поддерживает DROP VALUE, скрыто из UI-матрицы`
 - `RELEASES_VIEW`
-- `RELEASES_CREATE           // TTSEC-2`
-- `RELEASES_EDIT             // TTSEC-2`
-- `RELEASES_DELETE           // TTSEC-2`
-- `RELEASES_MANAGE           // deprecated`
+- `RELEASES_CREATE // TTSEC-2`
+- `RELEASES_EDIT // TTSEC-2`
+- `RELEASES_DELETE // TTSEC-2`
+- `RELEASES_MANAGE // deprecated`
 - `MEMBERS_VIEW`
 - `MEMBERS_MANAGE`
 - `TIME_LOGS_VIEW`
 - `TIME_LOGS_CREATE`
-- `TIME_LOGS_DELETE_OTHERS   // TTSEC-2: модерация чужих time logs`
+- `TIME_LOGS_DELETE_OTHERS // TTSEC-2: модерация чужих time logs`
 - `TIME_LOGS_MANAGE`
 - `COMMENTS_VIEW`
 - `COMMENTS_CREATE`
-- `COMMENTS_DELETE_OTHERS    // TTSEC-2: модерация чужих комментариев`
+- `COMMENTS_DELETE_OTHERS // TTSEC-2: модерация чужих комментариев`
 - `COMMENTS_MANAGE`
 - `PROJECT_SETTINGS_VIEW`
 - `PROJECT_SETTINGS_EDIT`
 - `BOARDS_VIEW`
 - `BOARDS_MANAGE`
-- `USER_GROUP_VIEW           // TTSEC-2: system-level`
-- `USER_GROUP_MANAGE         // TTSEC-2: system-level`
+- `USER_GROUP_VIEW // TTSEC-2: system-level`
+- `USER_GROUP_MANAGE // TTSEC-2: system-level`
+
+### CheckpointWeight
+
+- `CRITICAL`
+- `HIGH`
+- `MEDIUM`
+- `LOW`
+
+### CheckpointState
+
+- `PENDING`
+- `OK`
+- `VIOLATED`
 <!-- AUTO-GENERATED:END -->
