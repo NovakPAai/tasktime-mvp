@@ -41,12 +41,14 @@ import AdminRoleSchemeDetailPage from './pages/admin/AdminRoleSchemeDetailPage';
 import AdminGroupsPage from './pages/admin/AdminGroupsPage';
 import AdminGroupDetailPage from './pages/admin/AdminGroupDetailPage';
 import AdminGate from './components/auth/AdminGate';
-import { canViewUserGroups } from './lib/roles';
+import { canViewUserGroups, canManageCheckpoints } from './lib/roles';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
 import AdminReleaseWorkflowsPage from './pages/admin/AdminReleaseWorkflowsPage';
 import AdminReleaseWorkflowEditorPage from './pages/admin/AdminReleaseWorkflowEditorPage';
 import AdminReleaseStatusesPage from './pages/admin/AdminReleaseStatusesPage';
+import AdminReleaseCheckpointTypesPage from './pages/admin/AdminReleaseCheckpointTypesPage';
+import AdminReleaseCheckpointTemplatesPage from './pages/admin/AdminReleaseCheckpointTemplatesPage';
 import AdminSystemPage from './pages/admin/AdminSystemPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import SettingsPage from './pages/SettingsPage';
@@ -219,6 +221,14 @@ export default function App() {
             <Route path="admin/release-workflows" element={<AdminReleaseWorkflowsPage />} />
             <Route path="admin/release-workflows/:id" element={<AdminReleaseWorkflowEditorPage />} />
             <Route path="admin/release-statuses" element={<AdminReleaseStatusesPage />} />
+            <Route
+              path="admin/release-checkpoint-types"
+              element={<AdminGate allow={canManageCheckpoints}><AdminReleaseCheckpointTypesPage /></AdminGate>}
+            />
+            <Route
+              path="admin/release-checkpoint-templates"
+              element={<AdminGate allow={canManageCheckpoints}><AdminReleaseCheckpointTemplatesPage /></AdminGate>}
+            />
             <Route path="admin/system" element={<AdminSystemPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="pipeline" element={<PipelineDashboardPage />} />

@@ -235,6 +235,8 @@ export default function Sidebar({
     { type: 'divider', label: 'Релизы' },
     { type: 'link', path: '/admin/release-statuses',     label: 'Статусы релизов' },
     { type: 'link', path: '/admin/release-workflows',    label: 'Workflow релизов' },
+    { type: 'link', path: '/admin/release-checkpoint-types',     label: 'Типы контрольных точек' },
+    { type: 'link', path: '/admin/release-checkpoint-templates', label: 'Шаблоны контрольных точек' },
 
     ...(isSuperAdmin ? [
       { type: 'divider' as const, label: 'Администрирование' },
