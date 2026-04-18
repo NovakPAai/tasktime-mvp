@@ -108,7 +108,7 @@ app.listen(PORT, '0.0.0.0', () => {
 // Graceful shutdown
 async function shutdown() {
   for (const [sid, transport] of Object.entries(transports)) {
-    await transport.close().catch(() => {});
+    await transport.transport.close().catch(() => {});
     delete transports[sid];
   }
   process.exit(0);
