@@ -8,7 +8,7 @@ import { hashPassword } from '../../shared/utils/password.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
 import { getSchemeForProject } from '../project-role-schemes/project-role-schemes.service.js';
-import { features } from '../../shared/features.js';
+import { isDirectRolesDisabled } from '../../shared/features.js';
 import type { CreateUserDto, UpdateUserAdminDto, AssignProjectRoleDto } from './admin.dto.js';
 
 function flattenRoles<T extends { systemRoles: { role: SystemRoleType }[] }>(
@@ -369,9 +369,9 @@ export async function assignProjectRole(actorId: string, userId: string, dto: As
   // TTSEC-2 Phase 4 cutover: when `FEATURES_DIRECT_ROLES_DISABLED=true` is set (prod after
   // staging validation), new direct per-user role assignments are rejected. Admins must use
   // user groups instead. Existing direct rows stay functional — they can be migrated out or
-  // left as a break-glass escape hatch. The flag is read at runtime so ops can flip it
-  // without a redeploy once they're confident in the group-based permission flow.
-  if (features.directRolesDisabled) {
+  // left as a break-glass escape hatch. `isDirectRolesDisabled()` reads env.process lazily so
+  // ops can flip the flag without a process restart (AI review #72 🟠).
+  if (isDirectRolesDisabled()) {
     throw new AppError(
       403,
       'Прямые назначения ролей отключены. Используйте группы пользователей (/admin/user-groups).',
