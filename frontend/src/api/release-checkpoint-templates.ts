@@ -76,3 +76,23 @@ export async function cloneCheckpointTemplate(
   );
   return data;
 }
+
+// FR-21: bulk-apply one template to many releases. The backend always returns a body
+// with successful / forbidden / failed arrays; status code is 200 when fully successful
+// and 207 (Multi-Status) when partial.
+export interface ApplyBulkResult {
+  successful: Array<{ releaseId: string; releaseName: string }>;
+  forbidden: Array<{ releaseId: string; reason: string }>;
+  failed: Array<{ releaseId: string; reason: string }>;
+}
+
+export async function applyBulkCheckpointTemplate(
+  templateId: string,
+  releaseIds: string[],
+): Promise<ApplyBulkResult> {
+  const { data } = await api.post<ApplyBulkResult>(
+    `/admin/checkpoint-templates/${templateId}/apply-bulk`,
+    { releaseIds },
+  );
+  return data;
+}

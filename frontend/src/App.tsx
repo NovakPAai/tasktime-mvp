@@ -41,7 +41,11 @@ import AdminRoleSchemeDetailPage from './pages/admin/AdminRoleSchemeDetailPage';
 import AdminGroupsPage from './pages/admin/AdminGroupsPage';
 import AdminGroupDetailPage from './pages/admin/AdminGroupDetailPage';
 import AdminGate from './components/auth/AdminGate';
-import { canViewUserGroups, canManageCheckpoints } from './lib/roles';
+import {
+  canViewUserGroups,
+  canManageCheckpoints,
+  canViewCheckpointAudit,
+} from './lib/roles';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
 import AdminReleaseWorkflowsPage from './pages/admin/AdminReleaseWorkflowsPage';
@@ -49,6 +53,7 @@ import AdminReleaseWorkflowEditorPage from './pages/admin/AdminReleaseWorkflowEd
 import AdminReleaseStatusesPage from './pages/admin/AdminReleaseStatusesPage';
 import AdminReleaseCheckpointTypesPage from './pages/admin/AdminReleaseCheckpointTypesPage';
 import AdminReleaseCheckpointTemplatesPage from './pages/admin/AdminReleaseCheckpointTemplatesPage';
+import AdminCheckpointAuditPage from './pages/admin/AdminCheckpointAuditPage';
 import AdminSystemPage from './pages/admin/AdminSystemPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import SettingsPage from './pages/SettingsPage';
@@ -228,6 +233,10 @@ export default function App() {
             <Route
               path="admin/release-checkpoint-templates"
               element={<AdminGate allow={canManageCheckpoints}><AdminReleaseCheckpointTemplatesPage /></AdminGate>}
+            />
+            <Route
+              path="admin/checkpoint-audit"
+              element={<AdminGate allow={canViewCheckpointAudit}><AdminCheckpointAuditPage /></AdminGate>}
             />
             <Route path="admin/system" element={<AdminSystemPage />} />
             <Route path="settings" element={<SettingsPage />} />

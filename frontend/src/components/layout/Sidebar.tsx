@@ -5,7 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { hasRequiredRole } from '../../lib/roles';
+import { canViewCheckpointAudit, hasRequiredRole } from '../../lib/roles';
 import type { SystemRoleType, User } from '../../types';
 
 // ─── Design tokens (Paper 1KR-0 dark + computed light) ───────────────────────
@@ -106,6 +106,9 @@ export default function Sidebar({
   const isAdminOpen = openKeys.includes('admin-submenu');
   const isAdmin = hasRequiredRole(userRole, 'ADMIN');
   const isSuperAdmin = userRole?.includes('SUPER_ADMIN') ?? false;
+  // AUDITOR users also need an entry point to the admin submenu (only the audit page is
+  // reachable for them; other items filter themselves out below).
+  const canShowAdminSubmenu = isAdmin || canViewCheckpointAudit(userRole);
 
   function toggleSubmenu(key: string) {
     onOpenKeysChange(
@@ -200,7 +203,16 @@ export default function Sidebar({
   // localised here so Phase 4 only needs to update one place.
   const canViewUserGroups = isAdmin;
 
-  const adminNavItems: AdminNavItem[] = [
+  // For non-admin users with audit access only, return a minimal list so they don't see
+  // dividers for sections they can't open.
+  const adminNavItems: AdminNavItem[] = !isAdmin
+    ? canViewCheckpointAudit(userRole)
+      ? [
+          { type: 'divider', label: 'Аудит' },
+          { type: 'link', path: '/admin/checkpoint-audit', label: 'Журнал контрольных точек' },
+        ]
+      : []
+    : [
     { type: 'divider', label: 'Обзор' },
     { type: 'link', path: '/admin/dashboard',   label: 'Дашборд' },
     { type: 'link', path: '/admin/monitoring',  label: 'Мониторинг' },
@@ -237,12 +249,13 @@ export default function Sidebar({
     { type: 'link', path: '/admin/release-workflows',    label: 'Workflow релизов' },
     { type: 'link', path: '/admin/release-checkpoint-types',     label: 'Типы контрольных точек' },
     { type: 'link', path: '/admin/release-checkpoint-templates', label: 'Шаблоны контрольных точек' },
+    { type: 'link', path: '/admin/checkpoint-audit',             label: 'Журнал контрольных точек' },
 
     ...(isSuperAdmin ? [
       { type: 'divider' as const, label: 'Администрирование' },
       { type: 'link' as const, path: '/admin/system', label: 'Система' },
     ] : []),
-  ];
+    ];
 
   return (
     <>
@@ -411,8 +424,8 @@ export default function Sidebar({
           {/* Divider */}
           <div style={{ height: 1, backgroundColor: tokens.border, margin: '6px 4px' }} />
 
-          {/* Admin submenu (ADMIN only) */}
-          {isAdmin && (
+          {/* Admin submenu (ADMIN or AUDITOR — AUDITOR sees only Журнал) */}
+          {canShowAdminSubmenu && (
             <>
               <div
                 style={{ ...itemStyle('admin-submenu'), backgroundColor: hovered === 'admin-submenu' ? tokens.itemHoverBg : 'transparent' }}
