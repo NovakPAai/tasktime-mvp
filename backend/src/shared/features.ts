@@ -7,6 +7,7 @@
  *   FEATURES_MCP=true
  *   FEATURES_GITLAB=true
  *   FEATURES_TELEGRAM=true
+ *   FEATURES_DIRECT_ROLES_DISABLED=false   # TTSEC-2 Phase 4 cutover flag
  *   AI_PROVIDER=anthropic   # anthropic | heuristic
  */
 
@@ -25,3 +26,19 @@ export const features = {
 } as const;
 
 export type Features = typeof features;
+
+/**
+ * TTSEC-2 Phase 4 cutover flag. When `true`, new direct project-role assignments
+ * (admin.service.assignProjectRole) are rejected with 403 — admins must use user groups.
+ * Existing direct rows remain functional; they can be migrated out manually or left in place
+ * as a break-glass escape hatch. Default: `false`.
+ *
+ * AI review #72 🟠 — read LAZILY at each call (NOT cached into the `features` const at import
+ * time). Ops need to flip `FEATURES_DIRECT_ROLES_DISABLED=true` without a redeploy — a
+ * module-load-time snapshot would require process restart to pick up the new value.
+ *
+ * Call at the top of any code path that creates a direct UserProjectRole row.
+ */
+export function isDirectRolesDisabled(): boolean {
+  return flag('FEATURES_DIRECT_ROLES_DISABLED', false);
+}
