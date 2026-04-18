@@ -485,8 +485,18 @@ async function main() {
 
   if (APPROVE_ON_CLEAN === 'true') {
     // Formal PR review — APPROVE or REQUEST_CHANGES (gate-compatible)
+    // Falls back to plain comment if Actions isn't permitted to approve PRs
     const { head } = await githubFetch(`/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}`);
-    await submitReview(commentBody, review.verdict, head.sha);
+    try {
+      await submitReview(commentBody, review.verdict, head.sha);
+    } catch (err) {
+      if (err.message.includes('not permitted to approve') || err.message.includes('422')) {
+        console.warn('submitReview failed (Actions not permitted to approve) — falling back to comment');
+        await postComment(commentBody);
+      } else {
+        throw err;
+      }
+    }
   } else {
     // Legacy: comment-only mode
     await postComment(commentBody);
