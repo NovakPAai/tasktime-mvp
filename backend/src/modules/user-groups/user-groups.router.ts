@@ -28,7 +28,8 @@ router.use(requireRole('ADMIN'));
 router.get('/', async (req, res, next) => {
   try {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-    res.json(await service.listGroups({ search }));
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+    res.json(await service.listGroups({ search, projectId }));
   } catch (err) { next(err); }
 });
 

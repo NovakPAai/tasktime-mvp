@@ -168,6 +168,10 @@ export default function AdminRoleSchemeDetailPage() {
     },
     { title: 'Ключ', dataIndex: 'key', render: (v: string) => <code>{v}</code> },
     { title: 'Описание', dataIndex: 'description', render: (v: string | null) => v || '—' },
+    {
+      title: 'Грантов',
+      render: (_, r) => r.permissions.filter(p => p.granted).length,
+    },
     { title: 'Участников', dataIndex: ['_count', 'userProjectRoles'], render: (v: number) => v ?? 0 },
     {
       title: '',

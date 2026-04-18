@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
@@ -50,11 +51,12 @@ const detailInclude = {
   },
 } as const;
 
-export async function listGroups(query?: { search?: string }) {
+export async function listGroups(query?: { search?: string; projectId?: string }) {
+  const where: Prisma.UserGroupWhereInput = {};
+  if (query?.search) where.name = { contains: query.search, mode: 'insensitive' };
+  if (query?.projectId) where.projectRoles = { some: { projectId: query.projectId } };
   return prisma.userGroup.findMany({
-    where: query?.search
-      ? { name: { contains: query.search, mode: 'insensitive' } }
-      : undefined,
+    where,
     include: listInclude,
     orderBy: { name: 'asc' },
   });
