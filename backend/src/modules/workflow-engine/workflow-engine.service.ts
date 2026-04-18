@@ -9,6 +9,7 @@ import { runPostFunctions } from './post-functions/index.js';
 import type { ConditionRule, ValidatorRule, PostFunctionRule, AvailableTransitionsResponse, TransitionResponse } from './types.js';
 import { SYSTEM_FIELD_KEYS, SYSTEM_FIELD_META } from '../transition-screens/system-fields.js';
 import type { SystemFieldKey } from '../transition-screens/system-fields.js';
+import { scheduleRecomputeForIssue } from '../releases/checkpoints/checkpoint-triggers.service.js';
 
 // ─── Redis cache helpers ──────────────────────────────────────────────────────
 
@@ -369,6 +370,10 @@ export async function executeTransition(
       } as Prisma.InputJsonValue,
     },
   });
+
+  // TTMP-160 FR-7: workflow transition changes status + possibly custom fields. Single
+  // choke point for both direct /transitions endpoints and the `bulkTransitionIssues` path.
+  await scheduleRecomputeForIssue(issueId);
 
   return updatedIssue;
 }

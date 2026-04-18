@@ -50,6 +50,9 @@ import { getSchemeForProject } from './modules/workflow-schemes/workflow-schemes
 import { getSchemeForProject as getRoleSchemeForProject } from './modules/project-role-schemes/project-role-schemes.service.js';
 import { authenticate } from './shared/middleware/auth.js';
 import { requireRole, requireProjectPermission } from './shared/middleware/rbac.js';
+import { checkpointContextMiddleware } from './shared/middleware/request-context.js';
+// Side-effect import: registers the checkpoint flush callback with request-context.
+import './modules/releases/checkpoints/checkpoint-triggers.service.js';
 
 export function createApp() {
   const app = express();
@@ -59,6 +62,11 @@ export function createApp() {
   // CVE-15: explicit CORS origin (no wildcard)
   const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
   app.use(cors({ origin: corsOrigin.split(',').map((o) => o.trim()), credentials: true }));
+  // TTMP-160 PR-4: AsyncLocalStorage context for checkpoint recompute coalescing.
+  // Must wrap all route handlers — and any middleware that forks the async context — so
+  // event hooks deep in services see the per-request set. Placed ahead of metrics /
+  // express.json / cookieParser to be defensive against any future middleware that awaits.
+  app.use(checkpointContextMiddleware);
   app.use(metricsMiddleware);
   app.use(express.json());
   // CVE-14: signed cookies

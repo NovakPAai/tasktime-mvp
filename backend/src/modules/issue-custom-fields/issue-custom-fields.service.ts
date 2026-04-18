@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { scheduleRecomputeForIssue } from '../releases/checkpoints/checkpoint-triggers.service.js';
 import type { UpsertCustomFieldValuesDto } from './issue-custom-fields.dto.js';
 
 // ===== Scope priority (higher index = more specific = wins) =====
@@ -171,6 +172,9 @@ export async function upsertIssueCustomFields(
       }),
     ),
   );
+
+  // TTMP-160 FR-7: custom-field mutations may flip CUSTOM_FIELD_VALUE criteria.
+  await scheduleRecomputeForIssue(issueId);
 
   return getIssueCustomFields(issueId);
 }
