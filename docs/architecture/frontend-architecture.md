@@ -218,11 +218,15 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/admin/workflow-schemes/:id` | `AdminWorkflowSchemeEditorPage` | `frontend/src/pages/admin/AdminWorkflowSchemeEditorPage` | — |
 | `/admin/role-schemes` | `AdminRoleSchemesPage` | `frontend/src/pages/admin/AdminRoleSchemesPage` | — |
 | `/admin/role-schemes/:id` | `AdminRoleSchemeDetailPage` | `frontend/src/pages/admin/AdminRoleSchemeDetailPage` | — |
+| `/admin/user-groups` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
+| `/admin/user-groups/:id` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
 | `/admin/transition-screens` | `AdminTransitionScreensPage` | `frontend/src/pages/admin/AdminTransitionScreensPage` | — |
 | `/admin/transition-screens/:id` | `AdminTransitionScreenEditorPage` | `frontend/src/pages/admin/AdminTransitionScreenEditorPage` | — |
 | `/admin/release-workflows` | `AdminReleaseWorkflowsPage` | `frontend/src/pages/admin/AdminReleaseWorkflowsPage` | — |
 | `/admin/release-workflows/:id` | `AdminReleaseWorkflowEditorPage` | `frontend/src/pages/admin/AdminReleaseWorkflowEditorPage` | — |
 | `/admin/release-statuses` | `AdminReleaseStatusesPage` | `frontend/src/pages/admin/AdminReleaseStatusesPage` | — |
+| `/admin/release-checkpoint-types` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
+| `/admin/release-checkpoint-templates` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
 | `/admin/system` | `AdminSystemPage` | `frontend/src/pages/admin/AdminSystemPage` | — |
 | `/settings` | `SettingsPage` | `frontend/src/pages/SettingsPage` | — |
 | `/pipeline` | `PipelineDashboardPage` | `frontend/src/pages/PipelineDashboardPage` | — |
