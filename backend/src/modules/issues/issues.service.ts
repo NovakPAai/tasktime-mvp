@@ -15,6 +15,12 @@ import {
 } from '../../shared/utils/params.js';
 import { getApplicableFields } from '../issue-custom-fields/issue-custom-fields.service.js';
 import { resolveWorkflowForIssue, executeTransition } from '../workflow-engine/workflow-engine.service.js';
+import {
+  scheduleRecomputeForIssue,
+  scheduleRecomputeForIssues,
+  scheduleRecomputeForRelease,
+} from '../releases/checkpoints/checkpoint-triggers.service.js';
+import { getCheckpointContext } from '../../shared/middleware/request-context.js';
 import type {
   CreateIssueDto,
   UpdateIssueDto,
@@ -285,6 +291,8 @@ export async function bulkUpdateIssues(projectId: string, params: {
   });
 
   await delCacheByPrefix(`issues:list:${projectId}:`);
+  // TTMP-160 FR-7 + R-1: schedule recompute once per release (not per issue).
+  await scheduleRecomputeForIssues(params.issueIds);
   return { updatedCount: params.issueIds.length };
 }
 
@@ -458,6 +466,9 @@ export async function updateIssue(id: string, dto: UpdateIssueDto) {
   });
 
   await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  // TTMP-160 FR-7: any field change may affect release checkpoints. Hook coalesces to a
+  // single recompute per release via AsyncLocalStorage; non-HTTP callers recompute sync.
+  await scheduleRecomputeForIssue(id);
   return updated;
 }
 
@@ -538,6 +549,7 @@ export async function updateStatus(id: string, dto: UpdateStatusDto, actorId?: s
   });
 
   await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  await scheduleRecomputeForIssue(id);
   return updated;
 }
 
@@ -557,6 +569,7 @@ export async function assignIssue(id: string, dto: AssignDto) {
   });
 
   await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+  await scheduleRecomputeForIssue(id);
   return updated;
 }
 
@@ -594,21 +607,50 @@ export async function updateAiStatus(id: string, dto: UpdateAiStatusDto) {
 }
 
 export async function deleteIssue(id: string) {
-  const issue = await prisma.issue.findUnique({ where: { id } });
+  const issue = await prisma.issue.findUnique({
+    where: { id },
+    select: {
+      projectId: true,
+      releaseId: true,
+      releaseItems: { select: { releaseId: true } },
+    },
+  });
   if (!issue) throw new AppError(404, 'Issue not found');
+
+  // Resolve release ids BEFORE delete — after delete the ReleaseItem join is gone and an
+  // issueId-based schedule would be a no-op. Schedule by release id directly so the flush
+  // callback recomputes the release without needing the issue row.
+  const releaseIds = new Set<string>();
+  if (issue.releaseId) releaseIds.add(issue.releaseId);
+  for (const ri of issue.releaseItems) releaseIds.add(ri.releaseId);
 
   await prisma.issue.delete({ where: { id } });
   await delCacheByPrefix(`issues:list:${issue.projectId}:`);
+
+  for (const releaseId of releaseIds) {
+    await scheduleRecomputeForRelease(releaseId);
+  }
 }
 
 export async function bulkDeleteIssues(projectId: string, issueIds: string[]): Promise<{ deletedCount: number }> {
   const issues = await prisma.issue.findMany({
     where: { id: { in: issueIds }, projectId },
-    select: { id: true },
+    select: {
+      id: true,
+      releaseId: true,
+      releaseItems: { select: { releaseId: true } },
+    },
   });
 
   if (issues.length !== issueIds.length) {
     throw new AppError(400, 'Some issues do not belong to this project');
+  }
+
+  // Same pattern as deleteIssue — resolve releases before delete.
+  const releaseIds = new Set<string>();
+  for (const i of issues) {
+    if (i.releaseId) releaseIds.add(i.releaseId);
+    for (const ri of i.releaseItems) releaseIds.add(ri.releaseId);
   }
 
   const { count } = await prisma.issue.deleteMany({
@@ -616,6 +658,11 @@ export async function bulkDeleteIssues(projectId: string, issueIds: string[]): P
   });
 
   await delCacheByPrefix(`issues:list:${projectId}:`);
+
+  for (const releaseId of releaseIds) {
+    await scheduleRecomputeForRelease(releaseId);
+  }
+
   return { deletedCount: count };
 }
 
@@ -995,6 +1042,13 @@ export async function bulkTransitionIssues(
       const message = err instanceof Error ? err.message : 'UNKNOWN_ERROR';
       failed.push({ id, error: message });
     }
+  }
+
+  // TTMP-160 FR-7: executeTransition already enqueues each issue into the request context
+  // (inside an HTTP request). Outside a context (CLI / tests), the inner `scheduleRecompute`
+  // fans out into N sync recomputes; call the batched variant ourselves to dedupe N→releases.
+  if (!getCheckpointContext()) {
+    await scheduleRecomputeForIssues(succeeded);
   }
 
   return { succeeded, failed };

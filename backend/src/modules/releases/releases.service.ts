@@ -3,6 +3,7 @@ import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { getCachedJson, setCachedJson, delCachedJson } from '../../shared/redis.js';
 import { resolveWorkflowForRelease, getAvailableTransitions } from './release-workflow-engine.service.js';
+import { scheduleRecomputeForRelease } from './checkpoints/checkpoint-triggers.service.js';
 import type {
   CreateReleaseDto,
   UpdateReleaseDto,
@@ -252,7 +253,45 @@ export async function updateRelease(id: string, dto: UpdateReleaseDto) {
     },
   });
   await invalidateReleasesListCache();
+
+  // TTMP-160 R-3: changing `plannedDate` shifts every checkpoint's deadline (deadline is
+  // stored = plannedDate + offsetDaysSnapshot). Update deadlines in-place when a new date
+  // is set; recompute regardless (including null→non-null and non-null→null) so the state
+  // machine reflects the new schedule.
+  const plannedDateChanged =
+    dto.plannedDate !== undefined &&
+    toIsoDateOrNull(dto.plannedDate) !== toIsoDateOrNull(release.plannedDate);
+  if (plannedDateChanged) {
+    if (updated.plannedDate != null) {
+      const checkpoints = await prisma.releaseCheckpoint.findMany({
+        where: { releaseId: id },
+        select: { id: true, offsetDaysSnapshot: true },
+      });
+      await Promise.all(
+        checkpoints.map((rc) => {
+          const newDeadline = new Date(updated.plannedDate!.getTime());
+          newDeadline.setUTCDate(newDeadline.getUTCDate() + rc.offsetDaysSnapshot);
+          return prisma.releaseCheckpoint.update({
+            where: { id: rc.id },
+            data: { deadline: newDeadline },
+          });
+        }),
+      );
+    }
+    // When plannedDate is cleared we leave stale deadlines in place — they're still valid
+    // dates; recompute will re-evaluate `state` against them. The next apply-template that
+    // requires plannedDate will refresh deadlines properly.
+    await scheduleRecomputeForRelease(id);
+  }
+
   return updated;
+}
+
+function toIsoDateOrNull(v: string | Date | null | undefined): string | null {
+  if (v == null) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
 }
 
 // ─── RM-03.4: DELETE /api/releases/:id ────────────────────────────────────────
@@ -353,6 +392,10 @@ export async function addReleaseItems(releaseId: string, dto: ReleaseItemsAddDto
     })),
     skipDuplicates: true,
   });
+
+  // TTMP-160 R-4: release composition changed — recompute so violations drop / appear for
+  // the added issues.
+  await scheduleRecomputeForRelease(releaseId);
 }
 
 export async function removeReleaseItems(releaseId: string, issueIds: string[]) {
@@ -369,6 +412,9 @@ export async function removeReleaseItems(releaseId: string, issueIds: string[]) 
   await prisma.releaseItem.deleteMany({
     where: { releaseId, issueId: { in: issueIds } },
   });
+
+  // R-4: removed issues may have been in violations — recompute to drop them from the set.
+  await scheduleRecomputeForRelease(releaseId);
 }
 
 export async function listReleaseItems(releaseId: string, query: ListReleaseItemsQueryDto) {

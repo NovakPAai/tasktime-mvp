@@ -1,7 +1,7 @@
 # ТЗ: TTMP-160 — Модуль контрольных точек релизов
 
 **Дата:** 2026-04-18
-**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (2/12 PR merged) — см. §13.5
+**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (3/12 PR merged) — см. §13.5
 **Проект:** TaskTime MVP (TTMP)
 **Автор ТЗ:** Claude Code (auto-generated)
 
@@ -1144,8 +1144,8 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 |---|--------|-------|------|-----------|--------|
 | 1 | `ttmp-160/foundation` | Schema + CRUD types/templates | 10 | — | ✅ merged (#79) |
 | 2 | `ttmp-160/engine` | Engine + evaluateCriterion | 10 | PR-1 | ✅ merged (#81) |
-| 3 | `ttmp-160/release-binding` | Release API + breakdown + preview + inline | 14 | PR-2 | 🚧 open (#82) |
-| 4 | `ttmp-160/triggers` | Cron + event-hooks + node-cron | 8 | PR-3 | ⏳ next |
+| 3 | `ttmp-160/release-binding` | Release API + breakdown + preview + inline | 14 | PR-2 | ✅ merged (#82) |
+| 4 | `ttmp-160/triggers` | Cron + event-hooks + node-cron | 8 | PR-3 | 🚧 in work |
 | 5 | `ttmp-160/admin-ui` | Admin UI (types, templates, sync) | 15 | PR-3 | ⏳ |
 | 6 | `ttmp-160/release-issue-ui` | UI в релизе и задаче | 16 | PR-3 | ⏳ |
 | 7 | `ttmp-160/board-topbar` | Карточки + TopBar + Dashboard | 8 | PR-4, PR-6 | ⏳ |
@@ -1155,12 +1155,13 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 | 11 | `ttmp-160/burndown-frontend` | Burndown UI + Recharts | 6 | PR-10 | ⏳ |
 | 12 | `ttmp-160/e2e-docs` | E2E + a11y + docs | 11 | PR-1..PR-11 | ⏳ |
 
-**Итого:** 12 PR, ~126 часов. **Прогресс:** 2 / 12 merged (≈20 ч), 1 в ревью (≈14 ч), осталось 9 PR (≈92 ч).
+**Итого:** 12 PR, ~126 часов. **Прогресс:** 3 / 12 merged (≈34 ч), 1 в работе (≈8 ч), осталось 8 PR (≈84 ч).
 
 **Обновления по мере выполнения (2026-04-18):**
 - PR-1 `ttmp-160/foundation` — ✅ merged в `main` (commit `078ef57`, PR [#79](https://github.com/NovakPAai/tasktime-mvp/pull/79)). Prisma-модели + миграция `20260422000000_release_checkpoints` + CRUD `/api/admin/checkpoint-types` и `/api/admin/checkpoint-templates`.
 - PR-2 `ttmp-160/engine` — ✅ merged в `main` (commit `34d6196`, PR [#81](https://github.com/NovakPAai/tasktime-mvp/pull/81)). Pure-function `evaluate-criterion.ts` + `checkpoint-engine.service.ts` (`evaluateCheckpoint`, `computeReleaseRisk`, `computeViolationsHash`). 60 unit-тестов.
-- PR-3 `ttmp-160/release-binding` — 🚧 открыт как PR [#82](https://github.com/NovakPAai/tasktime-mvp/pull/82). Release API + preview + breakdown + inline `?include=checkpoints` + `sync-instances` + `CheckpointViolationEvent` lifecycle. 17 интеграционных тестов; полный backend-suite 475/475 зелёный.
+- PR-3 `ttmp-160/release-binding` — ✅ merged в `main` (commit `3cd854c`, PR [#82](https://github.com/NovakPAai/tasktime-mvp/pull/82)). Release API + preview + breakdown + inline `?include=checkpoints` + `sync-instances` + `CheckpointViolationEvent` lifecycle. 17 интеграционных тестов; полный backend-suite 475/475 зелёный.
+- PR-4 `ttmp-160/triggers` — 🚧 в работе. Cron-шедулер (`node-cron`) для пересчёта активных релизов + event-хуки в `issues.service` (updateIssue / bulkUpdate / updateStatus) и `issue-custom-fields.service` + хуки в `releases.service` (addReleaseItems / removeReleaseItems / смена plannedDate). Redis-lock `checkpoints:scheduler`, per-request dedup.
 
 ### 13.6 Merge-порядок и rollback
 
