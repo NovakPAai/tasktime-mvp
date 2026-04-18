@@ -690,14 +690,16 @@ router.delete('/:id', authenticate, async (req, res, next) => {
 
 Решение по варианту A (подтверждено owner-ом 2026-04-17): Фазы 1-3 мерджатся в main без ожидания Фазы 4, чтобы быстрее поймать реальные реграссии на staging. Фаза 4 разбита на follow-up PR-ы после мерджа основной трилогии.
 
-- [x] **Pre-merge unit-тесты** (часть TTSEC-15): 24 backend-unit в Phase 2 (rbac-effective + user-groups + sprints-move-issues) + 4 дополнительных на cross-project guard. Frontend — tsc + eslint. Всё зелёное.
-- [ ] TTSEC-15.1: integration-тесты на backend (`user-groups.test.ts`, `rbac-effective.int.test.ts`) — требуют живой БД в CI. Отдельный PR.
-- [ ] TTSEC-15.2: e2e сценарий (создать группу → добавить юзеров → выдать роль → проверить permissions → профиль «Безопасность»). Отдельный PR, зависит от 15.1.
-- [ ] TTSEC-16: performance benchmark `GET /issues` p95 (NFR-1: регресс ≤ 10%). **Только после deploy на staging.** Отдельный PR с benchmarkcript-ом + репортом.
-- [ ] TTSEC-17.1: `docs/user-manual/features/access-schemes.md`. Отдельный PR.
+**Phase 1-3: merged, staging deploy successful (2026-04-17)**. Три follow-up PR-а Phase 4 открыты 2026-04-18.
+
+- [x] **Pre-merge unit-тесты** (часть TTSEC-15): 24 backend-unit в Phase 2 (rbac-effective + user-groups + sprints-move-issues) + 4 на cross-project guard + 3 на direct-roles-flag. Frontend — tsc + eslint. Всё зелёное.
+- [x] TTSEC-15.1: integration-тесты `backend/tests/user-groups.test.ts` — **PR #73** (HTTP-level CRUD + members + bindings + impact + effective-role propagation через `/users/me/security`).
+- [ ] TTSEC-15.2: e2e сценарий (создать группу → добавить юзеров → выдать роль → проверить permissions → профиль «Безопасность»). Playwright spec. Отдельный follow-up PR, после того как PR #73 зелёный в CI.
+- [ ] TTSEC-16: performance benchmark `GET /issues` p95 (NFR-1: регресс ≤ 10%). **Только после deploy на staging.** Отдельный PR с script-ом + репортом.
+- [x] TTSEC-17.1: `docs/user-manual/features/access-schemes.md` — **PR #74** (группы, security tab, cutover flag, backfill).
 - [ ] TTSEC-17.2: manual QA checklist по acceptance criteria §7 на staging. **После deploy, owner-driven.**
-- [ ] TTSEC-18.1: feature-flag `DIRECT_ROLES_DISABLED` в backend (`features.ts` + enforcement в `admin.service.assignProjectRole`). Отдельный PR.
-- [ ] TTSEC-18.2: prod cutover — включение флага после успешной staging-валидации.
+- [x] TTSEC-18.1: feature-flag `FEATURES_DIRECT_ROLES_DISABLED` в backend — **PR #72** (`features.ts` + enforcement в `admin.service.assignProjectRole` + 3 unit-теста). По умолчанию `false` — мердж не меняет поведение prod.
+- [ ] TTSEC-18.2: prod cutover — включение `FEATURES_DIRECT_ROLES_DISABLED=true` сначала на staging, после валидации — на prod.
 
 **Post-merge staging verification (обязательно перед TTSEC-18):**
 - [ ] SQL: `SELECT unnest(enum_range(NULL::"ProjectPermission"))` содержит все 10 новых значений.
