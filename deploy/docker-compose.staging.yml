@@ -93,6 +93,29 @@ services:
       start_period: 20s
     # No external port — accessible only via nginx /pipeline/ proxy
 
+  mcp:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}:${IMAGE_TAG:-staging}
+    command: ["node", "dist/mcp/server.js"]
+    restart: unless-stopped
+    env_file:
+      - ./env/backend.staging.env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HTTP_PORT: "3002"
+      BACKEND_INTERNAL_URL: http://backend:3000
+      MCP_AGENT_EMAIL: agent@flow-universe.internal
+    ports:
+      - "3002:3002"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   postgres-data:
   redis-data:
