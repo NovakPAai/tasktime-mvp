@@ -215,7 +215,7 @@ export default function DashboardPage() {
     void (async () => {
       try {
         const chunks = await Promise.all(
-          projects.map(p => issuesApi.listIssues(p.id, { assigneeId: user.id }))
+          projects.map(p => issuesApi.listAllIssues(p.id, { assigneeId: user.id }))
         );
         setMyIssues(
           chunks.flat()

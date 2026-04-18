@@ -168,7 +168,7 @@ export default function ReleasesPage() {
 
   const loadProjectIssues = useCallback(async () => {
     if (!projectId) return;
-    const issues = await issuesApi.listIssues(projectId);
+    const issues = await issuesApi.listAllIssues(projectId);
     setProjectIssues(issues);
   }, [projectId]);
 

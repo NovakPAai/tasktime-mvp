@@ -19,21 +19,37 @@ export interface IssueFilters {
   search?: string;
 }
 
-export async function listIssues(projectId: string, filters?: IssueFilters): Promise<Issue[]> {
+function buildFilterParams(filters?: IssueFilters) {
+  return {
+    ...(filters?.status?.length && { status: filters.status.join(',') }),
+    ...(filters?.issueTypeConfigId?.length && { issueTypeConfigId: filters.issueTypeConfigId.join(',') }),
+    ...(filters?.priority?.length && { priority: filters.priority.join(',') }),
+    ...(filters?.assigneeId && { assigneeId: filters.assigneeId }),
+    ...(filters?.sprintId && { sprintId: filters.sprintId }),
+    ...(filters?.from && { from: filters.from }),
+    ...(filters?.to && { to: filters.to }),
+    ...(filters?.search && { search: filters.search }),
+  };
+}
+
+export async function listIssues(
+  projectId: string,
+  filters?: IssueFilters,
+  pagination?: { page: number; limit: number },
+): Promise<PaginatedResponse<Issue>> {
   const { data } = await api.get<PaginatedResponse<Issue>>(`/projects/${projectId}/issues`, {
     params: {
-      limit: 500,
-      ...(filters?.status && { status: filters.status.join(',') }),
-      ...(filters?.issueTypeConfigId && filters.issueTypeConfigId.length > 0 && { issueTypeConfigId: filters.issueTypeConfigId.join(',') }),
-      ...(filters?.priority && { priority: filters.priority.join(',') }),
-      ...(filters?.assigneeId && { assigneeId: filters.assigneeId }),
-      ...(filters?.sprintId && { sprintId: filters.sprintId }),
-      ...(filters?.from && { from: filters.from }),
-      ...(filters?.to && { to: filters.to }),
-      ...(filters?.search && { search: filters.search }),
+      page: pagination?.page ?? 1,
+      limit: pagination?.limit ?? 50,
+      ...buildFilterParams(filters),
     },
   });
-  return data.data;
+  return data;
+}
+
+export async function listAllIssues(projectId: string, filters?: IssueFilters): Promise<Issue[]> {
+  const result = await listIssues(projectId, filters, { page: 1, limit: 500 });
+  return result.data;
 }
 
 export async function listIssuesWithKanbanFields(
