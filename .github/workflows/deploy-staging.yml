@@ -48,7 +48,7 @@ jobs:
           AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MCP_SERVICE_TOKEN: ${{ secrets.STAGING_MCP_SERVICE_TOKEN }}
-          MCP_AGENT_PASSWORD: ${{ secrets.STAGING_MCP_AGENT_PASSWORD }}
+          MCP_AGENT_PASSWORD: ${{ secrets.MCP_AGENT_PASSWORD }}
         run: |
           ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
             bash -s <<'SSHEOF'
