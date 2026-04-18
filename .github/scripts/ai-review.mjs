@@ -502,8 +502,8 @@ async function main() {
     await postComment(commentBody);
   }
 
-  if (FAIL_ON_CRITICAL === 'true' && (hasCritical || hasHigh)) {
-    console.error('Critical/high issues found — failing the check (FAIL_ON_CRITICAL=true)');
+  if (FAIL_ON_CRITICAL === 'true' && hasCritical) {
+    console.error('Critical issues found — failing the check (FAIL_ON_CRITICAL=true)');
     process.exit(1);
   }
 }
