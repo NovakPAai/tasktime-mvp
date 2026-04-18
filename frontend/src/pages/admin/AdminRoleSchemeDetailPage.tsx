@@ -19,15 +19,15 @@ const ROLE_PALETTE = [
   '#607D8B', '#9E9E9E', '#795548', '#000000',
 ];
 
-function RoleColorPickerField({ value, onChange }: { value?: string; onChange?: (v: string) => void }) {
+function RoleColorPickerField({ value, onChange }: { value?: string; onChange?: (v: string | undefined) => void }) {
   return (
     <ColorPicker
       format="hex"
-      value={value || null}
+      value={value || undefined}
       presets={[{ label: 'Палитра', colors: ROLE_PALETTE }]}
       onChange={(color: Color) => onChange?.(color.toHexString())}
       allowClear
-      onClear={() => onChange?.('')}
+      onClear={() => onChange?.(undefined)}
       showText
     />
   );
@@ -170,7 +170,7 @@ export default function AdminRoleSchemeDetailPage() {
     { title: 'Описание', dataIndex: 'description', render: (v: string | null) => v || '—' },
     {
       title: 'Грантов',
-      render: (_, r) => r.permissions.filter(p => p.granted).length,
+      render: (_, r) => (r.permissions ?? []).filter(p => p.granted).length,
     },
     { title: 'Участников', dataIndex: ['_count', 'userProjectRoles'], render: (v: number) => v ?? 0 },
     {

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
@@ -12,6 +13,11 @@ import {
 } from './user-groups.dto.js';
 import * as service from './user-groups.service.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+
+const listQuerySchema = z.object({
+  search: z.string().optional(),
+  projectId: z.string().uuid().optional(),
+});
 
 /**
  * TTSEC-2 Phase 2 router. Mounted at /api/admin/user-groups.
@@ -27,9 +33,11 @@ router.use(requireRole('ADMIN'));
 
 router.get('/', async (req, res, next) => {
   try {
-    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
-    res.json(await service.listGroups({ search, projectId }));
+    const parsed = listQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      throw new AppError(400, 'Некорректные параметры фильтра', parsed.error.flatten());
+    }
+    res.json(await service.listGroups(parsed.data));
   } catch (err) { next(err); }
 });
 

@@ -21,6 +21,7 @@ export default function AdminGroupsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [projectId, setProjectId] = useState<string | undefined>();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<UserGroupListItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,7 +62,11 @@ export default function AdminGroupsPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    listProjects().then(setProjects).catch(() => { /* non-fatal — filter just stays empty */ });
+    setProjectsLoading(true);
+    listProjects()
+      .then(setProjects)
+      .catch(() => { /* non-fatal — filter just stays empty */ })
+      .finally(() => setProjectsLoading(false));
   }, []);
 
   const openCreate = () => { setEditing(null); form.resetFields(); setModalOpen(true); };
@@ -189,6 +194,7 @@ export default function AdminGroupsPage() {
             onChange={v => setProjectId(v)}
             allowClear
             showSearch
+            loading={projectsLoading}
             filterOption={(input, opt) =>
               (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())
             }
