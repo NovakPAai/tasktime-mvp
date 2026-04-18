@@ -20,23 +20,24 @@ model User {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  assignedIssues Issue[]        @relation("assignee")
-  createdIssues  Issue[]        @relation("creator")
-  refreshTokens  RefreshToken[]
-  auditLogs      AuditLog[]
-  comments       Comment[]
-  timeLogs       TimeLog[]
-  aiSessions     AiSession[]
-  teamMemberships    TeamMember[]
-  createdLinks       IssueLink[]
-  ownedProjects      Project[]               @relation("project_owner")
-  projectRoles       UserProjectRole[]
-  systemRoles        UserSystemRole[]
-  customFieldUpdates IssueCustomFieldValue[]
-  createdReleases    Release[]               @relation("releaseCreator")
-  addedReleaseItems  ReleaseItem[]           @relation("releaseItemAdder")
-  groupMemberships   UserGroupMember[]       @relation("GroupMemberUser")
-  addedGroupMembers  UserGroupMember[]       @relation("GroupMemberAddedBy")
+  assignedIssues             Issue[]                 @relation("assignee")
+  createdIssues              Issue[]                 @relation("creator")
+  refreshTokens              RefreshToken[]
+  auditLogs                  AuditLog[]
+  comments                   Comment[]
+  timeLogs                   TimeLog[]
+  aiSessions                 AiSession[]
+  teamMemberships            TeamMember[]
+  createdLinks               IssueLink[]
+  ownedProjects              Project[]               @relation("project_owner")
+  projectRoles               UserProjectRole[]
+  systemRoles                UserSystemRole[]
+  customFieldUpdates         IssueCustomFieldValue[]
+  createdReleases            Release[]               @relation("releaseCreator")
+  addedReleaseItems          ReleaseItem[]           @relation("releaseItemAdder")
+  groupMemberships           UserGroupMember[]       @relation("GroupMemberUser")
+  addedGroupMembers          UserGroupMember[]       @relation("GroupMemberAddedBy")
+  checkpointTemplatesCreated CheckpointTemplate[]    @relation("checkpointTemplateCreator")
 
   @@map("users")
 }
@@ -94,9 +95,9 @@ model UserProjectRole {
   userId    String               @map("user_id")
   projectId String               @map("project_id")
   role      ProjectRole
-  roleId    String?              @map("role_id")         // nullable на фазе 1
-  schemeId  String?              @map("scheme_id")       // must match the scheme of roleId (see migration 20260417000000_user_project_role_scheme_fk)
-  source    RoleAssignmentSource @default(DIRECT)        // TTSEC-2
+  roleId    String?              @map("role_id") // nullable на фазе 1
+  schemeId  String?              @map("scheme_id") // must match the scheme of roleId (see migration 20260417000000_user_project_role_scheme_fk)
+  source    RoleAssignmentSource @default(DIRECT) // TTSEC-2
   createdAt DateTime             @default(now()) @map("created_at")
 
   user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -139,11 +140,11 @@ model Project {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  owner    User?            @relation("project_owner", fields: [ownerId], references: [id], onDelete: SetNull)
-  category ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  issues   Issue[]
-  sprints  Sprint[]
-  releases Release[]
+  owner               User?                     @relation("project_owner", fields: [ownerId], references: [id], onDelete: SetNull)
+  category            ProjectCategory?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  issues              Issue[]
+  sprints             Sprint[]
+  releases            Release[]
   issueTypeScheme     IssueTypeSchemeProject?
   userRoles           UserProjectRole[]
   groupRoles          ProjectGroupRole[]
@@ -222,19 +223,19 @@ model IssueTypeSchemeProject {
 // ===== ISSUES (TASK HIERARCHY) =====
 
 model Issue {
-  id          String        @id @default(uuid())
-  projectId   String        @map("project_id")
-  number      Int
-  title       String
-  description String?
-  issueTypeConfigId String? @map("issue_type_config_id")
-  status      IssueStatus   @default(OPEN)
-  priority    IssuePriority @default(MEDIUM)
-  orderIndex  Int           @default(0) @map("order_index")
+  id                String        @id @default(uuid())
+  projectId         String        @map("project_id")
+  number            Int
+  title             String
+  description       String?
+  issueTypeConfigId String?       @map("issue_type_config_id")
+  status            IssueStatus   @default(OPEN)
+  priority          IssuePriority @default(MEDIUM)
+  orderIndex        Int           @default(0) @map("order_index")
 
-  aiEligible        Boolean          @default(false)     @map("ai_eligible")
+  aiEligible        Boolean           @default(false) @map("ai_eligible")
   aiExecutionStatus AiExecutionStatus @default(NOT_STARTED) @map("ai_execution_status")
-  aiAssigneeType    AiAssigneeType   @default(HUMAN)    @map("ai_assignee_type")
+  aiAssigneeType    AiAssigneeType    @default(HUMAN) @map("ai_assignee_type")
 
   parentId String? @map("parent_id")
   parent   Issue?  @relation("issueHierarchy", fields: [parentId], references: [id])
@@ -247,29 +248,29 @@ model Issue {
 
   sprintId  String?  @map("sprint_id")
   sprint    Sprint?  @relation(fields: [sprintId], references: [id])
-  releaseId String? @map("release_id")
+  releaseId String?  @map("release_id")
   release   Release? @relation(fields: [releaseId], references: [id])
 
-  estimatedHours      Decimal? @map("estimated_hours") @db.Decimal(6, 2)
-  dueDate             DateTime? @map("due_date") @db.Date
-  acceptanceCriteria  String?  @map("acceptance_criteria")
-  aiReasoning         String?  @map("ai_reasoning")
+  estimatedHours     Decimal?  @map("estimated_hours") @db.Decimal(6, 2)
+  dueDate            DateTime? @map("due_date") @db.Date
+  acceptanceCriteria String?   @map("acceptance_criteria")
+  aiReasoning        String?   @map("ai_reasoning")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   workflowStatusId String? @map("workflow_status_id")
 
-  issueTypeConfig  IssueTypeConfig?  @relation(fields: [issueTypeConfigId], references: [id])
-  workflowStatus   WorkflowStatus?   @relation(fields: [workflowStatusId], references: [id])
-  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  comments         Comment[]
-  timeLogs         TimeLog[]
-  aiSessions       AiSession[]
-  sourceLinks      IssueLink[]             @relation("linkSource")
-  targetLinks      IssueLink[]             @relation("linkTarget")
+  issueTypeConfig   IssueTypeConfig?        @relation(fields: [issueTypeConfigId], references: [id])
+  workflowStatus    WorkflowStatus?         @relation(fields: [workflowStatusId], references: [id])
+  project           Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments          Comment[]
+  timeLogs          TimeLog[]
+  aiSessions        AiSession[]
+  sourceLinks       IssueLink[]             @relation("linkSource")
+  targetLinks       IssueLink[]             @relation("linkTarget")
   customFieldValues IssueCustomFieldValue[]
-  releaseItems     ReleaseItem[]
+  releaseItems      ReleaseItem[]
 
   @@unique([projectId, number])
   @@index([projectId, status])
@@ -285,8 +286,6 @@ model Issue {
   @@index([dueDate])
   @@map("issues")
 }
-
-
 
 enum IssueStatus {
   OPEN
@@ -319,19 +318,19 @@ enum AiAssigneeType {
 // ===== SPRINTS =====
 
 model Sprint {
-  id        String      @id @default(uuid())
-  projectId String      @map("project_id")
-  name      String
-  goal      String?
-  startDate DateTime?   @map("start_date")
-  endDate   DateTime?   @map("end_date")
-  state     SprintState @default(PLANNED)
-  projectTeamId        String? @map("project_team_id")
-  businessTeamId       String? @map("business_team_id")
-  flowTeamId           String? @map("flow_team_id")
-  releaseId String? @map("release_id")
-  createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt @map("updated_at")
+  id             String      @id @default(uuid())
+  projectId      String      @map("project_id")
+  name           String
+  goal           String?
+  startDate      DateTime?   @map("start_date")
+  endDate        DateTime?   @map("end_date")
+  state          SprintState @default(PLANNED)
+  projectTeamId  String?     @map("project_team_id")
+  businessTeamId String?     @map("business_team_id")
+  flowTeamId     String?     @map("flow_team_id")
+  releaseId      String?     @map("release_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues       Issue[]
@@ -358,27 +357,27 @@ enum SprintState {
 // ===== RELEASES =====
 
 enum ReleaseType {
-  ATOMIC       // атомарный — одна система/проект
-  INTEGRATION  // интеграционный — кросс-проектный
+  ATOMIC // атомарный — одна система/проект
+  INTEGRATION // интеграционный — кросс-проектный
 }
 
 enum ReleaseLevel {
-  MINOR   // мелкие улучшения, баг-фиксы
-  MAJOR   // новые фичи
+  MINOR // мелкие улучшения, баг-фиксы
+  MAJOR // новые фичи
 }
 
 // Deprecated: replaced by ReleaseStatus + ReleaseWorkflow. Kept for migration only.
 enum ReleaseState {
-  DRAFT    // сбор задач
-  READY    // готов к выпуску
+  DRAFT // сбор задач
+  READY // готов к выпуску
   RELEASED // выпущен
 }
 
 enum ReleaseStatusCategory {
-  PLANNING      // сбор, планирование
-  IN_PROGRESS   // в работе (сборка, тестирование, стабилизация)
-  DONE          // выпущен, закрыт
-  CANCELLED     // отменён
+  PLANNING // сбор, планирование
+  IN_PROGRESS // в работе (сборка, тестирование, стабилизация)
+  DONE // выпущен, закрыт
+  CANCELLED // отменён
 }
 
 model ReleaseStatus {
@@ -466,28 +465,30 @@ model ReleaseItem {
 }
 
 model Release {
-  id          String        @id @default(uuid())
-  type        ReleaseType   @default(ATOMIC)
-  projectId   String?       @map("project_id")         // nullable для INTEGRATION
+  id          String       @id @default(uuid())
+  type        ReleaseType  @default(ATOMIC)
+  projectId   String?      @map("project_id") // nullable для INTEGRATION
   name        String
   description String?
-  level       ReleaseLevel  @default(MINOR)
-  state       ReleaseState  @default(DRAFT)             // deprecated, kept for migration
-  statusId    String?       @map("status_id")           // FK на ReleaseStatus
-  workflowId  String?       @map("workflow_id")         // FK на ReleaseWorkflow
-  releaseDate DateTime?     @map("release_date") @db.Date
-  plannedDate DateTime?     @map("planned_date") @db.Date
-  createdById String?       @map("created_by_id")       // автор релиза
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  level       ReleaseLevel @default(MINOR)
+  state       ReleaseState @default(DRAFT) // deprecated, kept for migration
+  statusId    String?      @map("status_id") // FK на ReleaseStatus
+  workflowId  String?      @map("workflow_id") // FK на ReleaseWorkflow
+  releaseDate DateTime?    @map("release_date") @db.Date
+  plannedDate DateTime?    @map("planned_date") @db.Date
+  createdById String?      @map("created_by_id") // автор релиза
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
 
-  project   Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  status    ReleaseStatus?   @relation(fields: [statusId], references: [id])
-  workflow  ReleaseWorkflow? @relation(fields: [workflowId], references: [id])
-  createdBy User?            @relation("releaseCreator", fields: [createdById], references: [id])
-  items     ReleaseItem[]
-  issues    Issue[]
-  sprints   Sprint[]
+  project           Project?                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status            ReleaseStatus?            @relation(fields: [statusId], references: [id])
+  workflow          ReleaseWorkflow?          @relation(fields: [workflowId], references: [id])
+  createdBy         User?                     @relation("releaseCreator", fields: [createdById], references: [id])
+  items             ReleaseItem[]
+  issues            Issue[]
+  sprints           Sprint[]
+  checkpoints       ReleaseCheckpoint[]
+  burndownSnapshots ReleaseBurndownSnapshot[]
 
   @@unique([projectId, name], map: "releases_project_id_name_key")
   @@index([projectId])
@@ -518,25 +519,25 @@ model Comment {
 // ===== TIME TRACKING =====
 
 model TimeLog {
-  id             String       @id @default(uuid())
-  issueId        String       @map("issue_id")
-  userId         String?      @map("user_id")
-  hours          Decimal      @db.Decimal(6, 2)
-  note           String?
-  startedAt      DateTime?    @map("started_at")
-  stoppedAt      DateTime?    @map("stopped_at")
-  logDate        DateTime     @default(now()) @map("log_date") @db.Date
-  createdAt      DateTime     @default(now()) @map("created_at")
+  id        String    @id @default(uuid())
+  issueId   String    @map("issue_id")
+  userId    String?   @map("user_id")
+  hours     Decimal   @db.Decimal(6, 2)
+  note      String?
+  startedAt DateTime? @map("started_at")
+  stoppedAt DateTime? @map("stopped_at")
+  logDate   DateTime  @default(now()) @map("log_date") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
 
   // Источник времени: человек или агент
-  source         TimeSource   @default(HUMAN)
+  source TimeSource @default(HUMAN)
 
   // Связь с сессией ИИ (если source = AGENT и лог получен из AiSession)
-  agentSessionId String?      @map("agent_session_id")
-  agentSession   AiSession?   @relation(fields: [agentSessionId], references: [id])
+  agentSessionId String?    @map("agent_session_id")
+  agentSession   AiSession? @relation(fields: [agentSessionId], references: [id])
 
-   // Денежная стоимость этого лога (для AGENT-логов — доля costMoney сессии)
-  costMoney      Decimal?     @db.Decimal(10, 4) @map("cost_money")
+  // Денежная стоимость этого лога (для AGENT-логов — доля costMoney сессии)
+  costMoney Decimal? @map("cost_money") @db.Decimal(10, 4)
 
   issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
   user  User? @relation(fields: [userId], references: [id])
@@ -556,22 +557,22 @@ enum TimeSource {
 // ===== AI SESSIONS =====
 
 model AiSession {
-  id           String    @id @default(uuid())
-  issueId      String?   @map("issue_id")
-  userId       String?   @map("user_id")
+  id           String   @id @default(uuid())
+  issueId      String?  @map("issue_id")
+  userId       String?  @map("user_id")
   model        String
   provider     String
-  startedAt    DateTime  @map("started_at")
-  finishedAt   DateTime  @map("finished_at")
-  tokensInput  Int       @map("tokens_input")
-  tokensOutput Int       @map("tokens_output")
-  costMoney    Decimal   @db.Decimal(10, 4)
+  startedAt    DateTime @map("started_at")
+  finishedAt   DateTime @map("finished_at")
+  tokensInput  Int      @map("tokens_input")
+  tokensOutput Int      @map("tokens_output")
+  costMoney    Decimal  @db.Decimal(10, 4)
   notes        String?
-  createdAt    DateTime  @default(now()) @map("created_at")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  issue  Issue? @relation(fields: [issueId], references: [id])
-  user   User?  @relation(fields: [userId], references: [id])
-  logs   TimeLog[]
+  issue Issue?    @relation(fields: [issueId], references: [id])
+  user  User?     @relation(fields: [userId], references: [id])
+  logs  TimeLog[]
 
   @@index([issueId])
   @@index([userId])
@@ -603,14 +604,14 @@ model AuditLog {
 // ===== ISSUE LINKS =====
 
 model IssueLinkType {
-  id           String      @id @default(uuid())
-  name         String      @unique
-  outboundName String      @map("outbound_name")
-  inboundName  String      @map("inbound_name")
-  isActive     Boolean     @default(true) @map("is_active")
-  isSystem     Boolean     @default(false) @map("is_system")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  name         String   @unique
+  outboundName String   @map("outbound_name")
+  inboundName  String   @map("inbound_name")
+  isActive     Boolean  @default(true) @map("is_active")
+  isSystem     Boolean  @default(false) @map("is_system")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   links IssueLink[]
 
@@ -661,13 +662,13 @@ model CustomField {
   fieldType   CustomFieldType @map("field_type")
   options     Json?
   isSystem    Boolean         @default(false) @map("is_system")
-  isEnabled   Boolean         @default(true)  @map("is_enabled")
-  orderIndex  Int             @default(0)      @map("order_index")
-  createdAt   DateTime        @default(now())  @map("created_at")
-  updatedAt   DateTime        @updatedAt       @map("updated_at")
+  isEnabled   Boolean         @default(true) @map("is_enabled")
+  orderIndex  Int             @default(0) @map("order_index")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
 
-  schemaItems          FieldSchemaItem[]
-  values               IssueCustomFieldValue[]
+  schemaItems           FieldSchemaItem[]
+  values                IssueCustomFieldValue[]
   transitionScreenItems TransitionScreenItem[]
 
   @@map("custom_fields")
@@ -714,7 +715,7 @@ model FieldSchema {
   isDefault    Boolean           @default(false) @map("is_default")
   copiedFromId String?           @map("copied_from_id")
   createdAt    DateTime          @default(now()) @map("created_at")
-  updatedAt    DateTime          @updatedAt      @map("updated_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   items      FieldSchemaItem[]
   bindings   FieldSchemaBinding[]
@@ -728,7 +729,7 @@ model FieldSchemaItem {
   id            String  @id @default(uuid())
   schemaId      String  @map("schema_id")
   customFieldId String  @map("custom_field_id")
-  orderIndex    Int     @default(0)     @map("order_index")
+  orderIndex    Int     @default(0) @map("order_index")
   isRequired    Boolean @default(false) @map("is_required")
   showOnKanban  Boolean @default(false) @map("show_on_kanban")
 
@@ -772,11 +773,11 @@ model SystemSetting {
 // ===== TEAMS =====
 
 model Team {
-  id          String        @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   description String?
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   members TeamMember[]
 
@@ -791,7 +792,7 @@ model TeamMember {
   id        String   @id @default(uuid())
   teamId    String   @map("team_id")
   userId    String   @map("user_id")
-  role      String?  // optional per-team role, e.g. "LEAD", "DEVELOPER"
+  role      String? // optional per-team role, e.g. "LEAD", "DEVELOPER"
   createdAt DateTime @default(now()) @map("created_at")
 
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -848,11 +849,11 @@ model Workflow {
 }
 
 model WorkflowStep {
-  id         String   @id @default(uuid())
-  workflowId String   @map("workflow_id")
-  statusId   String   @map("status_id")
-  isInitial  Boolean  @default(false) @map("is_initial")
-  orderIndex Int      @default(0) @map("order_index")
+  id         String  @id @default(uuid())
+  workflowId String  @map("workflow_id")
+  statusId   String  @map("status_id")
+  isInitial  Boolean @default(false) @map("is_initial")
+  orderIndex Int     @default(0) @map("order_index")
 
   workflow Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   status   WorkflowStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
@@ -862,23 +863,23 @@ model WorkflowStep {
 }
 
 model WorkflowTransition {
-  id           String   @id @default(uuid())
-  workflowId   String   @map("workflow_id")
-  name         String
-  fromStatusId String?  @map("from_status_id")
-  toStatusId   String   @map("to_status_id")
-  isGlobal     Boolean  @default(false) @map("is_global")
-  orderIndex   Int      @default(0) @map("order_index")
-  conditions   Json?
-  validators   Json?
-  postFunctions Json?   @map("post_functions")
-  screenId     String?  @map("screen_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  workflowId    String   @map("workflow_id")
+  name          String
+  fromStatusId  String?  @map("from_status_id")
+  toStatusId    String   @map("to_status_id")
+  isGlobal      Boolean  @default(false) @map("is_global")
+  orderIndex    Int      @default(0) @map("order_index")
+  conditions    Json?
+  validators    Json?
+  postFunctions Json?    @map("post_functions")
+  screenId      String?  @map("screen_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  workflow   Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  fromStatus WorkflowStatus? @relation("transitionFrom", fields: [fromStatusId], references: [id], onDelete: Restrict)
-  toStatus   WorkflowStatus  @relation("transitionTo", fields: [toStatusId], references: [id], onDelete: Restrict)
+  workflow   Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fromStatus WorkflowStatus?   @relation("transitionFrom", fields: [fromStatusId], references: [id], onDelete: Restrict)
+  toStatus   WorkflowStatus    @relation("transitionTo", fields: [toStatusId], references: [id], onDelete: Restrict)
   screen     TransitionScreen? @relation(fields: [screenId], references: [id], onDelete: SetNull)
 
   @@index([workflowId])
@@ -971,31 +972,31 @@ enum ProjectPermission {
   ISSUES_CHANGE_STATUS
   ISSUES_CHANGE_TYPE
   SPRINTS_VIEW
-  SPRINTS_CREATE            // TTSEC-2
-  SPRINTS_EDIT              // TTSEC-2
-  SPRINTS_DELETE            // TTSEC-2
-  SPRINTS_MANAGE            // deprecated: Postgres не поддерживает DROP VALUE, скрыто из UI-матрицы
+  SPRINTS_CREATE // TTSEC-2
+  SPRINTS_EDIT // TTSEC-2
+  SPRINTS_DELETE // TTSEC-2
+  SPRINTS_MANAGE // deprecated: Postgres не поддерживает DROP VALUE, скрыто из UI-матрицы
   RELEASES_VIEW
-  RELEASES_CREATE           // TTSEC-2
-  RELEASES_EDIT             // TTSEC-2
-  RELEASES_DELETE           // TTSEC-2
-  RELEASES_MANAGE           // deprecated
+  RELEASES_CREATE // TTSEC-2
+  RELEASES_EDIT // TTSEC-2
+  RELEASES_DELETE // TTSEC-2
+  RELEASES_MANAGE // deprecated
   MEMBERS_VIEW
   MEMBERS_MANAGE
   TIME_LOGS_VIEW
   TIME_LOGS_CREATE
-  TIME_LOGS_DELETE_OTHERS   // TTSEC-2: модерация чужих time logs
+  TIME_LOGS_DELETE_OTHERS // TTSEC-2: модерация чужих time logs
   TIME_LOGS_MANAGE
   COMMENTS_VIEW
   COMMENTS_CREATE
-  COMMENTS_DELETE_OTHERS    // TTSEC-2: модерация чужих комментариев
+  COMMENTS_DELETE_OTHERS // TTSEC-2: модерация чужих комментариев
   COMMENTS_MANAGE
   PROJECT_SETTINGS_VIEW
   PROJECT_SETTINGS_EDIT
   BOARDS_VIEW
   BOARDS_MANAGE
-  USER_GROUP_VIEW           // TTSEC-2: system-level
-  USER_GROUP_MANAGE         // TTSEC-2: system-level
+  USER_GROUP_VIEW // TTSEC-2: system-level
+  USER_GROUP_MANAGE // TTSEC-2: system-level
 }
 
 model ProjectRoleScheme {
@@ -1004,7 +1005,7 @@ model ProjectRoleScheme {
   description String?
   isDefault   Boolean  @default(false) @map("is_default")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt      @map("updated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   roles    ProjectRoleDefinition[]
   projects ProjectRoleSchemeProject[]
@@ -1021,7 +1022,7 @@ model ProjectRoleDefinition {
   color       String?
   isSystem    Boolean  @default(false) @map("is_system")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt      @map("updated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   scheme            ProjectRoleScheme       @relation(fields: [schemeId], references: [id], onDelete: Cascade)
   permissions       ProjectRolePermission[]
@@ -1063,7 +1064,7 @@ model ProjectRoleSchemeProject {
 // ===== USER GROUPS (TTSEC-2) =====
 
 model UserGroup {
-  id   String @id @default(uuid())
+  id          String   @id @default(uuid())
   // TTSEC-2: `name` — глобально уникален. Система single-tenant, `Project.key`
   // уже глобально уникален, поэтому Legacy-имя `Legacy: {project.key} — {role.name}`
   // детерминировано, а `ON CONFLICT (name) DO NOTHING` делает Legacy-backfill идемпотентным.
@@ -1072,7 +1073,7 @@ model UserGroup {
   name        String   @unique
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt      @map("updated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   members      UserGroupMember[]
   projectRoles ProjectGroupRole[]
@@ -1116,4 +1117,139 @@ model ProjectGroupRole {
   @@index([projectId])
   @@index([groupId])
   @@map("project_group_roles")
+}
+
+// ===== TTMP-160: RELEASE CHECKPOINTS =====
+
+enum CheckpointWeight {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum CheckpointState {
+  PENDING
+  OK
+  VIOLATED
+}
+
+model CheckpointType {
+  id               String           @id @default(uuid())
+  name             String           @unique
+  description      String?
+  color            String           @default("#888888")
+  weight           CheckpointWeight @default(MEDIUM)
+  offsetDays       Int              @map("offset_days")
+  warningDays      Int              @default(3) @map("warning_days")
+  criteria         Json // CheckpointCriterion[], AND-combined
+  webhookUrl       String?          @map("webhook_url")
+  minStableSeconds Int              @default(300) @map("min_stable_seconds")
+  isActive         Boolean          @default(true) @map("is_active")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  templateItems      CheckpointTemplateItem[]
+  releaseCheckpoints ReleaseCheckpoint[]
+
+  @@index([isActive])
+  @@map("checkpoint_types")
+}
+
+model CheckpointTemplate {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy User?                    @relation("checkpointTemplateCreator", fields: [createdById], references: [id])
+  items     CheckpointTemplateItem[]
+
+  @@map("checkpoint_templates")
+}
+
+model CheckpointTemplateItem {
+  id               String @id @default(uuid())
+  templateId       String @map("template_id")
+  checkpointTypeId String @map("checkpoint_type_id")
+  orderIndex       Int    @default(0) @map("order_index")
+
+  template       CheckpointTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  checkpointType CheckpointType     @relation(fields: [checkpointTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, checkpointTypeId])
+  @@index([templateId])
+  @@map("checkpoint_template_items")
+}
+
+model ReleaseCheckpoint {
+  id                 String          @id @default(uuid())
+  releaseId          String          @map("release_id")
+  checkpointTypeId   String          @map("checkpoint_type_id")
+  criteriaSnapshot   Json            @map("criteria_snapshot")
+  offsetDaysSnapshot Int             @map("offset_days_snapshot")
+  deadline           DateTime        @db.Date
+  state              CheckpointState @default(PENDING)
+  lastEvaluatedAt    DateTime?       @map("last_evaluated_at")
+  applicableIssueIds Json            @default("[]") @map("applicable_issue_ids")
+  passedIssueIds     Json            @default("[]") @map("passed_issue_ids")
+  violations         Json            @default("[]")
+  violationsHash     String          @default("") @map("violations_hash")
+  lastWebhookSentAt  DateTime?       @map("last_webhook_sent_at")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  release         Release                    @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  checkpointType  CheckpointType             @relation(fields: [checkpointTypeId], references: [id], onDelete: Restrict)
+  violationEvents CheckpointViolationEvent[]
+
+  @@unique([releaseId, checkpointTypeId])
+  @@index([releaseId])
+  @@index([deadline])
+  @@index([state])
+  @@map("release_checkpoints")
+}
+
+model CheckpointViolationEvent {
+  id                  String    @id @default(uuid())
+  releaseCheckpointId String    @map("release_checkpoint_id")
+  issueId             String    @map("issue_id")
+  issueKey            String    @map("issue_key")
+  reason              String
+  criterionType       String    @map("criterion_type")
+  occurredAt          DateTime  @default(now()) @map("occurred_at")
+  resolvedAt          DateTime? @map("resolved_at")
+
+  releaseCheckpoint ReleaseCheckpoint @relation(fields: [releaseCheckpointId], references: [id], onDelete: Cascade)
+
+  @@index([releaseCheckpointId])
+  @@index([issueId])
+  @@index([occurredAt])
+  @@index([resolvedAt])
+  @@map("checkpoint_violation_events")
+}
+
+model ReleaseBurndownSnapshot {
+  id                  String   @id @default(uuid())
+  releaseId           String   @map("release_id")
+  snapshotDate        DateTime @map("snapshot_date") @db.Date
+  totalIssues         Int      @map("total_issues")
+  doneIssues          Int      @map("done_issues")
+  openIssues          Int      @map("open_issues")
+  cancelledIssues     Int      @map("cancelled_issues")
+  totalEstimatedHours Decimal  @map("total_estimated_hours") @db.Decimal(8, 2)
+  doneEstimatedHours  Decimal  @map("done_estimated_hours") @db.Decimal(8, 2)
+  openEstimatedHours  Decimal  @map("open_estimated_hours") @db.Decimal(8, 2)
+  violatedCheckpoints Int      @default(0) @map("violated_checkpoints")
+  totalCheckpoints    Int      @default(0) @map("total_checkpoints")
+  capturedAt          DateTime @default(now()) @map("captured_at")
+
+  release Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, snapshotDate])
+  @@index([releaseId])
+  @@index([snapshotDate])
+  @@map("release_burndown_snapshots")
 }
