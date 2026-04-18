@@ -461,6 +461,145 @@ export async function listEventsForIssue(issueId: string): Promise<IssueCheckpoi
   }));
 }
 
+// ─── FR-26 / FR-27: release matrix (issues × checkpoints) ────────────────────
+
+export type MatrixCellState = 'passed' | 'violated' | 'pending' | 'na';
+
+export interface MatrixCell {
+  state: MatrixCellState;
+  reason?: string;
+}
+
+export interface CheckpointsMatrixResponse {
+  releaseId: string;
+  issues: Array<{ id: string; key: string; title: string }>;
+  checkpoints: Array<{
+    id: string;
+    name: string;
+    color: string;
+    weight: string;
+    deadline: string;
+    state: ReleaseCheckpoint['state'];
+  }>;
+  // Row-major: cells[i][j] corresponds to issues[i] × checkpoints[j].
+  cells: MatrixCell[][];
+}
+
+/**
+ * Build the "Issues × Checkpoints" matrix for a release. Each cell is derived from the
+ * snapshot stored on the release-checkpoint row — `applicableIssueIds`, `passedIssueIds`,
+ * and the `violations` array. We do one extra DB read to fetch the issue titles and
+ * project keys so rows render with human-readable labels.
+ *
+ * FR-26: `na` for issues that fall outside `applicableIssueIds` (e.g. checkpoint has an
+ * `issueTypes` filter that excludes this issue's type). `passed` / `violated` / `pending`
+ * strictly mirror the evaluator output.
+ */
+export async function buildCheckpointsMatrix(
+  releaseId: string,
+): Promise<CheckpointsMatrixResponse> {
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    select: { id: true },
+  });
+  if (!release) throw new AppError(404, 'Релиз не найден');
+
+  const [checkpoints, items] = await Promise.all([
+    prisma.releaseCheckpoint.findMany({
+      where: { releaseId },
+      include: { checkpointType: true },
+      orderBy: { deadline: 'asc' },
+    }),
+    prisma.releaseItem.findMany({
+      where: { releaseId },
+      select: {
+        issue: {
+          select: {
+            id: true,
+            number: true,
+            title: true,
+            project: { select: { key: true } },
+          },
+        },
+      },
+    }),
+  ]);
+
+  const issues = items
+    .map((i) => i.issue)
+    .filter((i): i is NonNullable<typeof i> => i !== null)
+    .map((i) => ({
+      id: i.id,
+      key: `${i.project.key}-${i.number}`,
+      title: i.title,
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+
+  const checkpointHeaders = checkpoints.map((cp) => ({
+    id: cp.id,
+    name: cp.checkpointType.name,
+    color: cp.checkpointType.color,
+    weight: cp.checkpointType.weight,
+    deadline: cp.deadline.toISOString().slice(0, 10),
+    state: cp.state,
+  }));
+
+  // Pre-index each checkpoint's three member lists for O(1) cell lookup.
+  const indexed = checkpoints.map((cp) => {
+    const applicable = new Set(parseStringIdArray(cp.applicableIssueIds));
+    const passed = new Set(parseStringIdArray(cp.passedIssueIds));
+    const violationsByIssue = new Map<string, string>();
+    for (const v of parseViolations(cp.violations)) {
+      if (v.issueId) violationsByIssue.set(v.issueId, v.reason);
+    }
+    return { applicable, passed, violationsByIssue };
+  });
+
+  const cells: MatrixCell[][] = issues.map((issue) =>
+    indexed.map((entry): MatrixCell => {
+      if (!entry.applicable.has(issue.id)) return { state: 'na' };
+      if (entry.passed.has(issue.id)) return { state: 'passed' };
+      const reason = entry.violationsByIssue.get(issue.id);
+      if (reason !== undefined) return { state: 'violated', reason };
+      return { state: 'pending' };
+    }),
+  );
+
+  return { releaseId, issues, checkpoints: checkpointHeaders, cells };
+}
+
+/**
+ * CSV export of the matrix (FR-26). First column is the issue key + title; subsequent
+ * columns are one per checkpoint. Cell symbols: OK / VIOLATED / PENDING / —. We include
+ * the violation `reason` as a parenthetical suffix when present so the CSV row is
+ * self-contained.
+ */
+export function checkpointsMatrixToCsv(m: CheckpointsMatrixResponse): string {
+  const escape = (s: string | null | undefined): string => {
+    if (s === null || s === undefined) return '';
+    return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const labelHeaders = ['issue_key', 'issue_title', ...m.checkpoints.map((cp) => cp.name)];
+  const lines = [labelHeaders.map(escape).join(',')];
+
+  for (let i = 0; i < m.issues.length; i++) {
+    const issue = m.issues[i]!;
+    const row: string[] = [issue.key, issue.title];
+    for (let j = 0; j < m.checkpoints.length; j++) {
+      const cell = m.cells[i]![j]!;
+      if (cell.state === 'na') row.push('—');
+      else if (cell.state === 'passed') row.push('OK');
+      else if (cell.state === 'pending') row.push('PENDING');
+      else row.push(cell.reason ? `VIOLATED (${cell.reason})` : 'VIOLATED');
+    }
+    lines.push(row.map(escape).join(','));
+  }
+
+  // UTF-8 BOM for Excel Cyrillic + CRLF per RFC 4180 (same convention as audit CSV).
+  return '\uFEFF' + lines.join('\r\n');
+}
+
 // ─── FR-11 / FR-12: "my violations" + "project violating issues" ─────────────
 
 export interface IssueViolationSummary {

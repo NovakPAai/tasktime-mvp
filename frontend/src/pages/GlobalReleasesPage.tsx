@@ -61,6 +61,7 @@ import ReleaseRiskBadge from '../components/releases/ReleaseRiskBadge';
 import ApplyCheckpointTemplateModal from '../components/releases/ApplyCheckpointTemplateModal';
 import BulkApplyTemplateModal from '../components/releases/BulkApplyTemplateModal';
 import CheckpointRiskFilter from '../components/releases/CheckpointRiskFilter';
+import CheckpointsMatrix from '../components/releases/CheckpointsMatrix';
 
 // ─── Tokens Dark (Paper 4EO-0) ──────────────────────────────────────────────
 const DARK_C = {
@@ -215,6 +216,8 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
   const [checkpointsError, setCheckpointsError] = useState(false);
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
+  // TTMP-160 PR-9 FR-26: toggle between list (CheckpointsBlock) and matrix view.
+  const [checkpointsView, setCheckpointsView] = useState<'list' | 'matrix'>('list');
   const [transitions, setTransitions] = useState<ReleaseTransition[]>([]);
   const [currentStatus, setCurrentStatus] = useState<Release['status'] | null>(null);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -789,7 +792,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
                 flexWrap: 'wrap',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {checkpointsData?.risk && (
                   <>
                     <span style={{ color: C.t3, fontSize: 12 }}>Риск релиза:</span>
@@ -799,6 +802,38 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
                     />
                   </>
                 )}
+                {/* FR-26: view toggle List / Matrix */}
+                <div
+                  role="group"
+                  aria-label="Переключатель вида контрольных точек"
+                  style={{
+                    display: 'inline-flex',
+                    marginLeft: 8,
+                    border: `1px solid ${C.borderBtn}`,
+                    borderRadius: 6,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {(['list', 'matrix'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setCheckpointsView(mode)}
+                      aria-pressed={checkpointsView === mode}
+                      style={{
+                        border: 'none',
+                        background: checkpointsView === mode ? C.acc : 'transparent',
+                        color: checkpointsView === mode ? '#fff' : C.t2,
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        fontFamily: F.sans,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {mode === 'list' ? 'Список' : 'Матрица'}
+                    </button>
+                  ))}
+                </div>
               </div>
               {canManage && (
                 <button
@@ -832,6 +867,8 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
                 message="Не удалось загрузить контрольные точки"
                 description="Попробуйте обновить страницу или повторить пересчёт."
               />
+            ) : checkpointsView === 'matrix' ? (
+              <CheckpointsMatrix releaseId={release.id} />
             ) : (
               <CheckpointsBlock
                 releaseId={release.id}

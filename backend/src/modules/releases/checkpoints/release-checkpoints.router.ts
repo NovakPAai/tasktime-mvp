@@ -104,6 +104,30 @@ router.get('/releases/:releaseId/checkpoints', async (req: AuthRequest, res, nex
   }
 });
 
+// FR-26: Matrix view of Issues × Checkpoints for a release. `?format=csv` returns the
+// same data as an attachment (UTF-8 BOM + CRLF for Excel). Anyone who can read the
+// release reads the matrix.
+router.get('/releases/:releaseId/checkpoints/matrix', async (req: AuthRequest, res, next) => {
+  try {
+    const releaseId = req.params.releaseId as string;
+    await assertReleaseRead(req, releaseId);
+    const matrix = await service.buildCheckpointsMatrix(releaseId);
+    if (req.query.format === 'csv') {
+      const csv = service.checkpointsMatrixToCsv(matrix);
+      const filename = `checkpoints-matrix-${releaseId.slice(0, 8)}-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+      return;
+    }
+    res.json(matrix);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/issues/:issueId/checkpoints', async (req: AuthRequest, res, next) => {
   try {
     const issueId = req.params.issueId as string;

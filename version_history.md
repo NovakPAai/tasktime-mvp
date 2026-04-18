@@ -2,7 +2,21 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.19**
+**Last version: 2.20**
+
+---
+
+## [2.20] [2026-04-19] feat(checkpoints): TTMP-160 PR-9 — матрица «Задачи × КТ» + CSV-экспорт
+
+**PR:** [#90](https://github.com/NovakPAai/tasktime-mvp/pull/90)
+**Ветка:** `ttmp-160/matrix`
+
+### Что изменилось
+- **Backend FR-26/FR-27 matrix:** новый `GET /api/releases/:releaseId/checkpoints/matrix` с опциональным `?format=csv`. Возвращает `{ releaseId, issues[], checkpoints[], cells[][] }` где `cells[i][j]` — `{ state: 'passed' | 'violated' | 'pending' | 'na', reason? }`. Состояние выводится из снапшотов `applicableIssueIds` / `passedIssueIds` / `violations` на каждой `ReleaseCheckpoint`. Read-gate тот же, что у `/checkpoints` (RELEASES_VIEW + global-role bypass).
+- **Backend CSV:** `checkpointsMatrixToCsv(matrix)` — одна строка на задачу (`issue_key, issue_title, <cp1_name>, <cp2_name>, ...`), ячейки `OK / VIOLATED (<reason>) / PENDING / —`. UTF-8 BOM + CRLF (совместимость с Excel Cyrillic + RFC 4180).
+- **Frontend FR-26:** `components/releases/CheckpointsMatrix.tsx` — Ant Table с sticky первой колонкой, цветными иконками (CheckCircle/CloseCircle/ClockCircle/MinusCircle) + Tooltip с reason, легендой, кнопками «Обновить» и «Экспорт CSV». Переключатель «Список / Матрица» в вкладке «Контрольные точки» на `GlobalReleasesPage` / `DetailPanel`.
+- **Frontend API:** `getCheckpointsMatrix(releaseId)` + `downloadCheckpointsMatrixCsv(releaseId)` (Blob) в `api/release-checkpoints.ts`, типы `CheckpointsMatrixResponse` / `MatrixCell` / `MatrixCellState`.
+- `backend/tests/checkpoints-matrix.test.ts`: 4 интеграционных теста — JSON shape с passed/violated/na ячейками (проверяется `issueTypes` фильтр), CSV с BOM+CRLF и правильными символами, RBAC 403 / 200 для USER без/с членством в проекте.
 
 ---
 
