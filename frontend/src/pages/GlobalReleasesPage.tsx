@@ -59,6 +59,7 @@ import {
 import CheckpointsBlock from '../components/releases/CheckpointsBlock';
 import ReleaseRiskBadge from '../components/releases/ReleaseRiskBadge';
 import ApplyCheckpointTemplateModal from '../components/releases/ApplyCheckpointTemplateModal';
+import BulkApplyTemplateModal from '../components/releases/BulkApplyTemplateModal';
 import CheckpointRiskFilter from '../components/releases/CheckpointRiskFilter';
 
 // ─── Tokens Dark (Paper 4EO-0) ──────────────────────────────────────────────
@@ -1129,6 +1130,9 @@ export default function GlobalReleasesPage() {
   // loadReleases() call. Missing entry → risk not loaded yet (render a placeholder).
   const [riskByRelease, setRiskByRelease] = useState<Record<string, ReleaseRisk>>({});
   const [riskFilter, setRiskFilter] = useState<ReleaseRiskLevel[]>([]);
+  // TTMP-160 PR-8 FR-21: bulk-apply selection + modal state.
+  const [selectedReleaseIds, setSelectedReleaseIds] = useState<string[]>([]);
+  const [bulkApplyOpen, setBulkApplyOpen] = useState(false);
   // Race guard: increments per loadReleases() call; async risk-fetch batches compare this
   // against their captured id and discard stale writes from previous pages/filters.
   const loadSeqRef = useRef(0);
@@ -1162,6 +1166,9 @@ export default function GlobalReleasesPage() {
       setTotal(res.total);
       setPage(pg);
       setRiskByRelease({}); // clear so the previous page's badges don't linger
+      // Clear bulk-apply selection on page/filter change: carrying selections across pages
+      // would leave invisible releases selected and confuse the toolbar count.
+      setSelectedReleaseIds([]);
 
       // TTMP-160 PR-6: fetch per-release risk in parallel for the current page. The endpoint
       // is cached at 60 s on the backend, so repeated fetches are cheap; a failure on any
@@ -1490,8 +1497,65 @@ export default function GlobalReleasesPage() {
         borderRadius: 10,
         overflow: 'hidden',
       }}>
+        {canManage && selectedReleaseIds.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '10px 16px',
+              borderBottom: `1px solid ${C.border}`,
+              background: isDark ? 'rgba(88, 166, 255, 0.08)' : 'rgba(9, 105, 218, 0.05)',
+            }}
+          >
+            <span style={{ color: C.t2, fontSize: 13 }}>
+              Выбрано релизов: <strong>{selectedReleaseIds.length}</strong>
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setSelectedReleaseIds([])}
+                style={{
+                  border: `1px solid ${C.borderBtn}`,
+                  background: 'transparent',
+                  color: C.t2,
+                  borderRadius: 6,
+                  padding: '5px 12px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Снять выделение
+              </button>
+              <button
+                onClick={() => setBulkApplyOpen(true)}
+                style={{
+                  border: `1px solid ${C.acc}`,
+                  background: C.acc,
+                  color: '#fff',
+                  borderRadius: 6,
+                  padding: '5px 14px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Применить шаблон
+              </button>
+            </div>
+          </div>
+        )}
         <Table<Release>
           columns={columns}
+          rowSelection={
+            canManage
+              ? {
+                  selectedRowKeys: selectedReleaseIds,
+                  onChange: (keys) => setSelectedReleaseIds(keys as string[]),
+                  preserveSelectedRowKeys: true,
+                }
+              : undefined
+          }
           dataSource={
             riskFilter.length === 0
               ? releases
@@ -1562,6 +1626,22 @@ export default function GlobalReleasesPage() {
             onReleasesRefresh={() => loadReleases(page)}
           />
         </>
+      )}
+
+      {bulkApplyOpen && (
+        <BulkApplyTemplateModal
+          open
+          selectedReleases={releases
+            .filter((r) => selectedReleaseIds.includes(r.id))
+            .map((r) => ({ id: r.id, name: r.name }))}
+          onClose={(applied) => {
+            setBulkApplyOpen(false);
+            // CLAUDE.md: always refresh on modal close. Also clear selection when something
+            // was actually applied to avoid re-acting on stale checkboxes.
+            if (applied) setSelectedReleaseIds([]);
+            void loadReleases(page);
+          }}
+        />
       )}
 
       {/* Create Release Modal */}

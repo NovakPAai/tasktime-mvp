@@ -2,7 +2,24 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.18**
+**Last version: 2.19**
+
+---
+
+## [2.19] [2026-04-18] feat(checkpoints): TTMP-160 PR-8 — bulk-apply + webhook + audit page
+
+**PR:** [#88](https://github.com/NovakPAai/tasktime-mvp/pull/88)
+**Ветка:** `ttmp-160/bulk-webhook-audit`
+
+### Что изменилось
+- **Backend FR-21 bulk-apply:** `POST /api/admin/checkpoint-templates/:id/apply-bulk` — по списку `releaseIds` применяет шаблон к каждому релизу с per-release RBAC (SEC-5). Возвращает 200 если все успешно, 207 Multi-Status при смешанных исходах: `{ successful, forbidden, failed }`. Audit action `checkpoint_template.applied_bulk`.
+- **Backend FR-17 webhook:** `webhook-notifier.service.ts` — `notifyViolation()` отправляет POST на `CheckpointType.webhookUrl` при переходе в VIOLATED. Debounce по `lastWebhookSentAt` + `minStableSeconds` для защиты от flapping. Таймаут через `CHECKPOINT_WEBHOOK_TIMEOUT_MS`. Hook в `recomputeForRelease` вызывается после commit'а транзакции.
+- **Backend FR-23 audit page:** `audit.service.ts` + `audit.router.ts`. `GET /api/admin/checkpoint-audit` с фильтрами (dateRange / project / release / checkpointType / onlyOpen / limit) + `GET /api/admin/checkpoint-audit/csv` (SEC-9 минимальный payload: event_id, occurred_at, resolved_at, project_key, release_name, checkpoint_name, issue_key, criterion_type, reason). SEC-6 gate: `SUPER_ADMIN / ADMIN / AUDITOR`.
+- **Frontend FR-21:** `BulkApplyTemplateModal.tsx` с 2-step flow (выбор шаблона → apply → Result view с `Применено / Запрещено / Ошибка`). Чекбоксы в таблице `GlobalReleasesPage` + toolbar с кнопкой «Применить шаблон» появляется при выборе релизов (canManage only). CLAUDE.md: refresh на любом закрытии модалки.
+- **Frontend FR-23:** `pages/admin/AdminCheckpointAuditPage.tsx` — таблица событий с фильтрами (date range + project/release/type UUID + onlyOpen switch), кнопка «Экспорт CSV». Route `/admin/checkpoint-audit` обёрнут в `<AdminGate allow={canViewCheckpointAudit}>`. Новая запись в Sidebar группе «Релизы».
+- **Frontend API:** `api/checkpoint-audit.ts` (listAuditEvents + downloadAuditCsv с blob), `applyBulkCheckpointTemplate` в `api/release-checkpoint-templates.ts`.
+- `frontend/src/lib/roles.ts`: `canViewCheckpointAudit(roles)` — зеркалит backend-гейт.
+- `backend/tests/checkpoints-bulk-webhook-audit.test.ts`: 11 интеграционных тестов — bulk-apply (ADMIN/RM/USER 403/non-existent/401), audit list (AUDITOR 200, USER 403, onlyOpen filter, projectId filter, CSV format), webhook debounce (с vi.spyOn(fetch) — flapping OK→VIOLATED→OK→VIOLATED внутри minStableSeconds не вызывает повторный POST).
 
 ---
 

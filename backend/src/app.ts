@@ -43,6 +43,7 @@ import checkpointTemplatesRouter from './modules/releases/checkpoints/checkpoint
 import releaseCheckpointsRouter, {
   syncRouter as checkpointTypesSyncRouter,
 } from './modules/releases/checkpoints/release-checkpoints.router.js';
+import checkpointAuditRouter from './modules/releases/checkpoints/audit.router.js';
 import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
 import userGroupsRouter from './modules/user-groups/user-groups.router.js';
 import userSecurityRouter from './modules/user-security/user-security.router.js';
@@ -158,6 +159,7 @@ export function createApp() {
   // the system-role gate is isolated from the RELEASES_EDIT project-permission gate.
   app.use('/api', releaseCheckpointsRouter);
   app.use('/api/admin/checkpoint-types', checkpointTypesSyncRouter);
+  app.use('/api/admin/checkpoint-audit', checkpointAuditRouter);
   app.use('/api/admin/role-schemes', roleSchemesRouter);
   app.use('/api/admin/user-groups', userGroupsRouter);
   app.use('/api', userSecurityRouter);

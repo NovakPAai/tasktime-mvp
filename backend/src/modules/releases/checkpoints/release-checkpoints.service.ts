@@ -22,6 +22,7 @@ import type {
 import { computeReleaseRisk, evaluateCheckpoint } from './checkpoint-engine.service.js';
 import type { LoadedRelease } from './evaluation-loader.service.js';
 import { loadEvaluationIssuesForRelease } from './evaluation-loader.service.js';
+import { notifyViolation } from './webhook-notifier.service.js';
 
 const CACHE_TTL_SECONDS = 60;
 const cacheKey = (releaseId: string) => `release:${releaseId}:checkpoints`;
@@ -283,6 +284,7 @@ export async function recomputeForRelease(
       continue;
     }
 
+    const priorState = rc.state;
     await prisma.$transaction(async (tx) => {
       await tx.releaseCheckpoint.update({
         where: { id: rc.id },
@@ -297,6 +299,15 @@ export async function recomputeForRelease(
       });
 
       await reconcileViolationEvents(tx, rc.id, result.violations, now);
+    });
+
+    // FR-17: dispatch the webhook AFTER the transaction commits so downstream consumers
+    // see a consistent state. The notifier itself handles debounce + error swallowing.
+    void notifyViolation({
+      releaseCheckpointId: rc.id,
+      priorState,
+      newState: result.state,
+      checkpointTypeId: rc.checkpointTypeId,
     });
 
     updatedCount += 1;

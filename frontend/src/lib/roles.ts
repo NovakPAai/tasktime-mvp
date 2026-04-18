@@ -50,3 +50,13 @@ export function canViewUserGroups(userRoles: SystemRoleType[] | null | undefined
 export function canManageCheckpoints(userRoles: SystemRoleType[] | null | undefined): boolean {
   return hasAnySystemRole(userRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER']);
 }
+
+/**
+ * TTMP-160 PR-8 / SEC-6: audit log access. Mirrors the backend `requireRole` gate on the
+ * `/admin/checkpoint-audit` router.
+ */
+export function canViewCheckpointAudit(
+  userRoles: SystemRoleType[] | null | undefined,
+): boolean {
+  return hasAnySystemRole(userRoles, ['SUPER_ADMIN', 'ADMIN', 'AUDITOR']);
+}
