@@ -204,3 +204,42 @@ export async function getMyCheckpointViolationsCount(): Promise<number> {
   const { data } = await api.get<{ count: number }>('/my-checkpoint-violations/count');
   return data.count;
 }
+
+// ─── FR-26 / FR-27: release matrix ────────────────────────────────────────────
+
+export type MatrixCellState = 'passed' | 'violated' | 'pending' | 'na';
+
+export interface MatrixCell {
+  state: MatrixCellState;
+  reason?: string;
+}
+
+export interface CheckpointsMatrixResponse {
+  releaseId: string;
+  issues: Array<{ id: string; key: string; title: string }>;
+  checkpoints: Array<{
+    id: string;
+    name: string;
+    color: string;
+    weight: string;
+    deadline: string;
+    state: CheckpointState;
+  }>;
+  // Row-major — cells[i][j] is issue i × checkpoint j.
+  cells: MatrixCell[][];
+}
+
+export async function getCheckpointsMatrix(releaseId: string): Promise<CheckpointsMatrixResponse> {
+  const { data } = await api.get<CheckpointsMatrixResponse>(
+    `/releases/${releaseId}/checkpoints/matrix`,
+  );
+  return data;
+}
+
+export async function downloadCheckpointsMatrixCsv(releaseId: string): Promise<Blob> {
+  const res = await api.get<Blob>(`/releases/${releaseId}/checkpoints/matrix`, {
+    params: { format: 'csv' },
+    responseType: 'blob',
+  });
+  return res.data;
+}
