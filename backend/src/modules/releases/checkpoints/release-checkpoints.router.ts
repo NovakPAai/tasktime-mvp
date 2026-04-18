@@ -125,6 +125,50 @@ router.get('/issues/:issueId/checkpoint-events', async (req: AuthRequest, res, n
   }
 });
 
+// FR-11: issues in a project that currently violate at least one VIOLATED checkpoint.
+// Powers the board / project-list red-stripe indicator. Anyone with read access to the
+// project can see the aggregate (same gate as listing project issues).
+router.get('/projects/:projectId/checkpoint-violating-issues', async (req: AuthRequest, res, next) => {
+  try {
+    const projectId = req.params.projectId as string;
+    const hasGlobalRole = hasAnySystemRole(req.user!.systemRoles, [
+      'ADMIN',
+      'RELEASE_MANAGER',
+      'SUPER_ADMIN',
+      'AUDITOR',
+    ]);
+    if (!hasGlobalRole) {
+      await assertProjectPermission(req.user!, projectId, ['ISSUES_VIEW']);
+    }
+    res.json(await service.listViolatingIssuesForProject(projectId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// FR-12 / SEC-7: authenticated user's own issues currently violating a VIOLATED checkpoint.
+// The user id + systemRoles come from the JWT; service layer applies project-membership
+// scoping (users without global read roles cannot see violations from projects they aren't
+// members of).
+router.get('/my-checkpoint-violations', async (req: AuthRequest, res, next) => {
+  try {
+    res.json(await service.listMyViolations(req.user!.userId, req.user!.systemRoles));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// FR-12 badge poll endpoint — lightweight `{ count }` shape so the TopBar can poll every
+// 60 s without dragging the full list.
+router.get('/my-checkpoint-violations/count', async (req: AuthRequest, res, next) => {
+  try {
+    const count = await service.countMyViolations(req.user!.userId);
+    res.json({ count });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Write ───────────────────────────────────────────────────────────────────
 
 router.post(

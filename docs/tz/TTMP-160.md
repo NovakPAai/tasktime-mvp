@@ -1,7 +1,7 @@
 # ТЗ: TTMP-160 — Модуль контрольных точек релизов
 
 **Дата:** 2026-04-18
-**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (5/12 PR merged) — см. §13.5
+**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (6/12 PR merged, Phase 1 MVP ✅ complete) — см. §13.5
 **Проект:** TaskTime MVP (TTMP)
 **Автор ТЗ:** Claude Code (auto-generated)
 
@@ -1147,15 +1147,15 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 | 3 | `ttmp-160/release-binding` | Release API + breakdown + preview + inline | 14 | PR-2 | ✅ merged (#82) |
 | 4 | `ttmp-160/triggers` | Cron + event-hooks + node-cron | 8 | PR-3 | ✅ merged (#84) |
 | 5 | `ttmp-160/admin-ui` | Admin UI (types, templates, sync) | 15 | PR-3 | ✅ merged (#85) |
-| 6 | `ttmp-160/release-issue-ui` | UI в релизе и задаче | 16 | PR-3 | 🚧 in work |
-| 7 | `ttmp-160/board-topbar` | Карточки + TopBar + Dashboard | 8 | PR-4, PR-6 | ⏳ |
+| 6 | `ttmp-160/release-issue-ui` | UI в релизе и задаче | 16 | PR-3 | ✅ merged (#86) |
+| 7 | `ttmp-160/board-topbar` | Карточки + TopBar + Dashboard | 8 | PR-4, PR-6 | 🚧 in work |
 | 8 | `ttmp-160/bulk-webhook-audit` | Bulk-apply + webhook + аудит-страница | 10 | PR-4 | ⏳ |
 | 9 | `ttmp-160/matrix` | Матрица задач × КТ | 8 | PR-3 | ⏳ |
 | 10 | `ttmp-160/burndown-backend` | Burndown schema + cron + API | 10 | PR-1, PR-4 | ⏳ |
 | 11 | `ttmp-160/burndown-frontend` | Burndown UI + Recharts | 6 | PR-10 | ⏳ |
 | 12 | `ttmp-160/e2e-docs` | E2E + a11y + docs | 11 | PR-1..PR-11 | ⏳ |
 
-**Итого:** 12 PR, ~126 часов. **Прогресс:** 5 / 12 merged (≈57 ч), 1 в работе (≈16 ч), осталось 6 PR (≈53 ч).
+**Итого:** 12 PR, ~126 часов. **Прогресс:** 6 / 12 merged (≈73 ч) — Фаза 1 MVP ✅ готова. 1 в работе (≈8 ч), осталось 5 PR (≈45 ч) в Фазе 2.
 
 **Обновления по мере выполнения (2026-04-18):**
 - PR-1 `ttmp-160/foundation` — ✅ merged в `main` (commit `078ef57`, PR [#79](https://github.com/NovakPAai/tasktime-mvp/pull/79)). Prisma-модели + миграция `20260422000000_release_checkpoints` + CRUD `/api/admin/checkpoint-types` и `/api/admin/checkpoint-templates`.
@@ -1163,7 +1163,8 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 - PR-3 `ttmp-160/release-binding` — ✅ merged в `main` (commit `3cd854c`, PR [#82](https://github.com/NovakPAai/tasktime-mvp/pull/82)). Release API + preview + breakdown + inline `?include=checkpoints` + `sync-instances` + `CheckpointViolationEvent` lifecycle. 17 интеграционных тестов; полный backend-suite 475/475 зелёный.
 - PR-4 `ttmp-160/triggers` — ✅ merged в `main` (commit `9232a58`, PR [#84](https://github.com/NovakPAai/tasktime-mvp/pull/84)). `node-cron` шедулер + AsyncLocalStorage coalescing + event-хуки на всех мутациях (issues / custom-fields / workflow-engine executeTransition / releases). Redis-lock `checkpoints:scheduler` TTL 540s, graceful SIGTERM drain. 5 интеграционных тестов; полный backend-suite 480/480 зелёный.
 - PR-5 `ttmp-160/admin-ui` — ✅ merged в `main` (commit `1e99122`, PR [#85](https://github.com/NovakPAai/tasktime-mvp/pull/85)). Admin-страницы типов и шаблонов с визуальным конструктором критериев, drag-drop ordering, `SyncInstancesModal` (FR-15). Backend-расширение `GET /api/admin/checkpoint-types/:id/instances`. AdminGate на роутах. Backend-suite 482/482 зелёный; frontend tsc + lint + build clean.
-- PR-6 `ttmp-160/release-issue-ui` — 🚧 в работе. `CheckpointTrafficLight` (цвет + иконка + текст + aria, FR-18), `ReleaseRiskBadge`, `CheckpointsBlock` с разбивкой N/M/K (FR-25), `ApplyCheckpointTemplateModal` с preview (FR-14), `CheckpointRiskFilter` (FR-13). Интеграция в `GlobalReleasesPage`, `ReleasesPage`, `IssueDetailPage` (FR-20, FR-22).
+- PR-6 `ttmp-160/release-issue-ui` — ✅ merged в `main` (commit `b976c79`, PR [#86](https://github.com/NovakPAai/tasktime-mvp/pull/86)). 6 новых компонентов (CheckpointTrafficLight, ReleaseRiskBadge, CheckpointsBlock, ApplyCheckpointTemplateModal, CheckpointRiskFilter, IssueCheckpointsSection), интеграция в GlobalReleasesPage и IssueDetailPage, backend `GET /api/issues/:id/checkpoint-events` (FR-22). ReleasesPage (project-scoped) deferred — будет follow-up. **Фаза 1 MVP завершена.**
+- PR-7 `ttmp-160/board-topbar` — 🚧 в работе. Фаза 2. `IssueCheckpointIndicator` (FR-11 красная полоска на карточке задачи) в `BoardPage` и `ProjectDetailPage`. TopBar badge «Мои в риске» с polling 60 с (FR-12). Фильтр «Мои в риске» в `DashboardPage` и `TimePage`.
 
 ### 13.6 Merge-порядок и rollback
 

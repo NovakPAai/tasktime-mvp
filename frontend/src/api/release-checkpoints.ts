@@ -166,3 +166,41 @@ export async function getIssueCheckpointEvents(
   );
   return data;
 }
+
+// ─── FR-11 / FR-12: project- and user-scoped violation summaries ──────────────
+
+export interface IssueViolationSummary {
+  issueId: string;
+  issueKey: string;
+  issueTitle: string;
+  projectId: string;
+  projectKey: string;
+  violations: Array<{
+    checkpointId: string;
+    checkpointName: string;
+    checkpointColor: string;
+    releaseId: string;
+    releaseName: string;
+    deadline: string;
+    reason: string;
+  }>;
+}
+
+export async function getViolatingIssuesForProject(
+  projectId: string,
+): Promise<IssueViolationSummary[]> {
+  const { data } = await api.get<IssueViolationSummary[]>(
+    `/projects/${projectId}/checkpoint-violating-issues`,
+  );
+  return data;
+}
+
+export async function getMyCheckpointViolations(): Promise<IssueViolationSummary[]> {
+  const { data } = await api.get<IssueViolationSummary[]>('/my-checkpoint-violations');
+  return data;
+}
+
+export async function getMyCheckpointViolationsCount(): Promise<number> {
+  const { data } = await api.get<{ count: number }>('/my-checkpoint-violations/count');
+  return data.count;
+}

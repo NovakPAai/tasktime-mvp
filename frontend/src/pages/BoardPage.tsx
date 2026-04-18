@@ -13,6 +13,11 @@ import type { TransitionOption } from '../api/workflow-engine';
 import { getProjectIssueTypes } from '../api/issue-type-configs';
 import { fieldSchemasApi } from '../api/field-schemas';
 import { issueCustomFieldsApi, type IssueCustomFieldValue } from '../api/issue-custom-fields';
+import {
+  getViolatingIssuesForProject,
+  type IssueViolationSummary,
+} from '../api/release-checkpoints';
+import IssueCheckpointIndicator from '../components/issues/IssueCheckpointIndicator';
 import type { Issue, IssueStatus, Sprint, Project, IssuePriority, IssueTypeConfig } from '../types';
 import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
@@ -126,6 +131,8 @@ export default function BoardPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [form] = Form.useForm<issuesApi.CreateIssueBody>();
   const [kanbanFieldsMap, setKanbanFieldsMap] = useState<Map<string, Issue['kanbanFields']>>(new Map());
+  // TTMP-160 FR-11: per-issue violation summary for the red-stripe indicator.
+  const [violatingMap, setViolatingMap] = useState<Map<string, IssueViolationSummary['violations']>>(new Map());
   const [createCustomFields, setCreateCustomFields] = useState<IssueCustomFieldValue[]>([]);
   const [createCustomFieldValues, setCreateCustomFieldValues] = useState<Record<string, unknown>>({});
   const [pendingTransition, setPendingTransition] = useState<{ issueId: string; transition: TransitionOption } | null>(null);
@@ -135,13 +142,20 @@ export default function BoardPage() {
 
   const load = useCallback(async () => {
     if (!projectId) return;
+    // Snapshot projectId so a slow load() for the previous project can't stamp its data
+    // onto the new board after the user navigates away (cross-project stale-data race).
+    const currentProjectId = projectId;
     setLoading(true);
+    // Clear stale indicators at the START of the fetch — not in the catch — so the old
+    // project's red stripes aren't visible while the new fetch is in flight.
+    setViolatingMap(new Map());
     try {
       const [board, proj, issuesWithFields] = await Promise.all([
         boardApi.getBoard(projectId, selectedSprint),
         projectsApi.getProject(projectId),
         listIssuesWithKanbanFields(projectId, selectedSprint),
       ]);
+      if (currentProjectId !== projectId) return; // user navigated to another project
       setColumns(board.columns);
       setProject(proj);
       const kMap = new Map<string, Issue['kanbanFields']>();
@@ -149,8 +163,20 @@ export default function BoardPage() {
         if (issue.kanbanFields) kMap.set(issue.id, issue.kanbanFields);
       }
       setKanbanFieldsMap(kMap);
+
+      // TTMP-160 FR-11: fire-and-forget load of violating issues for the project. Failure
+      // is silent — board renders without indicators but core flow is unaffected.
+      try {
+        const summaries = await getViolatingIssuesForProject(projectId);
+        if (currentProjectId !== projectId) return;
+        const vMap = new Map<string, IssueViolationSummary['violations']>();
+        for (const s of summaries) vMap.set(s.issueId, s.violations);
+        setViolatingMap(vMap);
+      } catch {
+        if (currentProjectId === projectId) setViolatingMap(new Map());
+      }
     } finally {
-      setLoading(false);
+      if (currentProjectId === projectId) setLoading(false);
     }
   }, [projectId, selectedSprint]);
 
@@ -475,6 +501,17 @@ export default function BoardPage() {
                                 >
                                   {issue.title}
                                 </Link>
+
+                                {/* TTMP-160 FR-11: red-stripe indicator if the issue violates any checkpoint */}
+                                {(violatingMap.get(issue.id) ?? []).length > 0 && (
+                                  <IssueCheckpointIndicator
+                                    violations={(violatingMap.get(issue.id) ?? []).map((v) => ({
+                                      checkpointName: v.checkpointName,
+                                      releaseName: v.releaseName,
+                                      reason: v.reason,
+                                    }))}
+                                  />
+                                )}
 
                                 {/* Custom fields */}
                                 {(kanbanFieldsMap.get(issue.id)?.length ?? 0) > 0 && (

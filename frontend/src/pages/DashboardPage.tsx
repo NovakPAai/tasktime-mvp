@@ -3,7 +3,9 @@
  * Artboards: 1KQ-0 (Dark) + 1R5-0 (Light). Zero CSS classes, zero Ant Design layout.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getMyCheckpointViolations, type IssueViolationSummary } from '../api/release-checkpoints';
+import { pluralize } from '../utils/pluralize';
 import { useProjectsStore } from '../store/projects.store';
 import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
@@ -175,6 +177,12 @@ export default function DashboardPage() {
   const [adminStats, setAdminStats] = useState<adminApi.AdminStats | null>(null);
   const [myIssues,   setMyIssues]   = useState<Issue[]>([]);
   const [statsReady, setStatsReady] = useState(false);
+  // TTMP-160 FR-12 filter — when the TopBar badge link opens the page, show only at-risk.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const atRiskMode = searchParams.get('filter') === 'my-checkpoint-violations';
+  const [atRiskIssues, setAtRiskIssues] = useState<IssueViolationSummary[]>([]);
+  const [atRiskLoading, setAtRiskLoading] = useState(false);
+  const [atRiskError, setAtRiskError] = useState(false);
 
   // ─── Status / Priority config (depends on C) ──────────────────────────────
   const STATUS: Record<IssueStatus, { label: string; bg: string; color: string }> = {
@@ -217,6 +225,23 @@ export default function DashboardPage() {
       } catch { /* non-critical */ }
     })();
   }, [user, projects]);
+
+  // TTMP-160 FR-12: load at-risk list when the filter is active. Refresh on mode switch.
+  useEffect(() => {
+    if (!atRiskMode) return;
+    setAtRiskLoading(true);
+    setAtRiskError(false);
+    void (async () => {
+      try {
+        setAtRiskIssues(await getMyCheckpointViolations());
+      } catch {
+        setAtRiskError(true);
+        setAtRiskIssues([]);
+      } finally {
+        setAtRiskLoading(false);
+      }
+    })();
+  }, [atRiskMode]);
 
   const projectKeyMap = useMemo(
     () => Object.fromEntries(projects.map(p => [p.id, p.key])),
@@ -277,10 +302,48 @@ export default function DashboardPage() {
         <div style={{ flex: '1.6 1 0', display: 'flex', flexDirection: 'column', borderRadius: 12, overflow: 'hidden', background: C.bgCard, border: `1px solid ${C.border}` }}>
 
           {/* Panel header — Paper: flex items-center justify-between py-4 px-5 border-b-[#161B22] */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${C.borderHd}` }}>
-            {/* Paper: text-[#E2E8F8] font-['Space_Grotesk'] font-semibold text-sm/4.5 */}
-            <span style={{ color: C.t1, fontFamily: F.display, fontWeight: 600, fontSize: 14, lineHeight: '18px', flexShrink: 0 }}>Мои задачи</span>
-            {/* Paper: text-[#4F6EF7] text-[11px]/3.5 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${C.borderHd}`, gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: C.t1, fontFamily: F.display, fontWeight: 600, fontSize: 14, lineHeight: '18px', flexShrink: 0 }}>
+                {atRiskMode ? 'Мои задачи с нарушенными КТ' : 'Мои задачи'}
+              </span>
+              {/* TTMP-160 FR-12 filter toggle */}
+              {(() => {
+                const toggleAtRisk = () => {
+                  const next = new URLSearchParams(searchParams);
+                  if (atRiskMode) next.delete('filter');
+                  else next.set('filter', 'my-checkpoint-violations');
+                  setSearchParams(next);
+                };
+                return (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={toggleAtRisk}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleAtRisk();
+                      }
+                    }}
+                    style={{
+                      color: atRiskMode ? C.red : C.t3,
+                      fontFamily: F.sans,
+                      fontSize: 11,
+                      lineHeight: '14px',
+                      cursor: 'pointer',
+                      border: `1px solid ${atRiskMode ? C.red : C.border}`,
+                      borderRadius: 10,
+                      padding: '2px 8px',
+                    }}
+                    aria-pressed={atRiskMode}
+                    aria-label={atRiskMode ? 'Выключить фильтр «в риске»' : 'Показать только задачи в риске'}
+                  >
+                    {atRiskMode ? '× В риске' : 'В риске'}
+                  </span>
+                );
+              })()}
+            </div>
             <span role="button" onClick={() => navigate('/projects')} style={{ color: C.acc, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', flexShrink: 0, cursor: 'pointer' }}>
               Все задачи →
             </span>
@@ -301,8 +364,59 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Rows */}
-          {myIssues.length === 0 ? (
+          {/* Rows — at-risk mode renders the violation list directly. */}
+          {atRiskMode ? (
+            atRiskLoading ? (
+              <div style={{ padding: '16px 20px', color: C.t3, fontFamily: F.sans, fontSize: 12 }}>Загрузка…</div>
+            ) : atRiskError ? (
+              <div style={{ padding: '16px 20px', color: C.red, fontFamily: F.sans, fontSize: 12 }}>
+                Не удалось загрузить список задач. Попробуйте обновить страницу.
+              </div>
+            ) : atRiskIssues.length === 0 ? (
+              <div style={{ padding: '16px 20px', color: C.t3, fontFamily: F.sans, fontSize: 12 }}>
+                У вас нет задач с нарушенными контрольными точками. 🎉
+              </div>
+            ) : (
+              atRiskIssues.map((it, idx) => {
+                const isLast = idx === atRiskIssues.length - 1;
+                const firstViolation = it.violations[0];
+                return (
+                  <div
+                    key={it.issueId}
+                    onClick={() => navigate(`/issues/${it.issueId}`)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 20px',
+                      gap: 8,
+                      borderBottom: isLast ? 'none' : `1px solid ${C.borderRw}`,
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <div style={{ width: 80, flexShrink: 0, color: C.indigo, fontFamily: F.display, fontWeight: 600, fontSize: 11, lineHeight: '14px' }}>
+                      {it.issueKey}
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <div style={{ color: C.t2, fontFamily: F.sans, fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {it.issueTitle}
+                      </div>
+                      {firstViolation && (
+                        <div style={{ color: C.red, fontFamily: F.sans, fontSize: 11, lineHeight: '14px', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {firstViolation.checkpointName} — {firstViolation.reason}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ width: 120, flexShrink: 0, color: C.red, fontFamily: F.sans, fontSize: 10, lineHeight: '12px' }}>
+                      {it.violations.length}{' '}
+                      {pluralize(it.violations.length, 'нарушение', 'нарушения', 'нарушений')}
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : myIssues.length === 0 ? (
             <div style={{ padding: '16px 20px', color: C.t3, fontFamily: F.sans, fontSize: 12 }}>
               Нет задач, назначенных на вас
             </div>
