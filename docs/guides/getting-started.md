@@ -197,8 +197,8 @@ make clean && make setup
 | Переменная | Пример | Описание |
 |-----------|--------|----------|
 | `DATABASE_URL` | `postgresql://tasktime:tasktime@localh...` |  |
-| `JWT_SECRET` | `change-me-in-production` |  |
-| `JWT_REFRESH_SECRET` | `change-me-refresh-secret` |  |
+| `JWT_SECRET` | `REPLACE_WITH_STRONG_SECRET_32_CHARS_MIN` | CVE-01: In production, use secrets >= 32 chars. Generate: openssl rand -base64 48 |
+| `JWT_REFRESH_SECRET` | `REPLACE_WITH_STRONG_REFRESH_SECRET_32` |  |
 | `JWT_EXPIRES_IN` | `15m` |  |
 | `JWT_REFRESH_EXPIRES_IN` | `7d` |  |
 | `PORT` | `3000` |  |
