@@ -251,6 +251,59 @@ describe('DELETE /api/admin/checkpoint-types/:id', () => {
 });
 
 // ============================================================
+// PR-5 FR-15: GET /api/admin/checkpoint-types/:id/instances
+// ============================================================
+
+describe('GET /api/admin/checkpoint-types/:id/instances', () => {
+  it('returns the list of release instances using the type', async () => {
+    const created = await request
+      .post('/api/admin/checkpoint-types')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Sync target', color: '#888888', offsetDays: -3, criteria: VALID_CRITERIA });
+
+    const project = await prisma.project.create({
+      data: { name: 'Sync test project', key: 'SYNC' },
+    });
+    const release = await prisma.release.create({
+      data: { name: '1.1.0', projectId: project.id, plannedDate: new Date('2026-07-01') },
+    });
+    await prisma.releaseCheckpoint.create({
+      data: {
+        releaseId: release.id,
+        checkpointTypeId: created.body.id,
+        criteriaSnapshot: VALID_CRITERIA,
+        offsetDaysSnapshot: -3,
+        deadline: new Date('2026-06-28'),
+      },
+    });
+
+    const res = await request
+      .get(`/api/admin/checkpoint-types/${created.body.id}/instances`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({
+      releaseId: release.id,
+      releaseName: '1.1.0',
+      projectKey: 'SYNC',
+      deadline: '2026-06-28',
+      state: 'PENDING',
+    });
+  });
+
+  it('USER cannot fetch instances (403)', async () => {
+    const created = await request
+      .post('/api/admin/checkpoint-types')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Sync forbid', color: '#888888', offsetDays: 0, criteria: VALID_CRITERIA });
+    const res = await request
+      .get(`/api/admin/checkpoint-types/${created.body.id}/instances`)
+      .set('Authorization', `Bearer ${plainToken}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+// ============================================================
 // /api/admin/checkpoint-templates
 // ============================================================
 

@@ -33,6 +33,15 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// PR-5 FR-15: list release instances that currently use this type (for sync-instances modal).
+router.get('/:id/instances', async (req, res, next) => {
+  try {
+    res.json(await service.listActiveInstances(req.params['id'] as string));
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/', validate(createCheckpointTypeDto), async (req: AuthRequest, res, next) => {
   try {
     const type = await service.createCheckpointType(req.body);

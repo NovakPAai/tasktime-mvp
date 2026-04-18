@@ -42,3 +42,11 @@ export function hasAnyRequiredRole(
 export function canViewUserGroups(userRoles: SystemRoleType[] | null | undefined): boolean {
   return hasSystemRole(userRoles, 'ADMIN');
 }
+
+/**
+ * TTMP-160 PR-5: admin access to CheckpointType / CheckpointTemplate management.
+ * Mirrors the backend `requireRole` gate on both router stacks.
+ */
+export function canManageCheckpoints(userRoles: SystemRoleType[] | null | undefined): boolean {
+  return hasAnySystemRole(userRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER']);
+}

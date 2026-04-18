@@ -28,6 +28,51 @@ export async function getCheckpointType(id: string) {
   return type;
 }
 
+/**
+ * TTMP-160 PR-5: list the release instances that use this type. Powers the FR-15
+ * "apply changes to N active instances?" modal.
+ *
+ * We intentionally return ALL states (PENDING / OK / VIOLATED), not only non-OK ones:
+ * the user edited the type's criteria and may want to propagate the change to OK
+ * instances too, because the next evaluation may produce a different result under the
+ * new criteria. The UI shows the current `state` per row so the RM can make an informed
+ * choice. Capped at 200 — if a type ends up with more instances than that, pagination
+ * should be added (TODO).
+ */
+export async function listActiveInstances(id: string) {
+  const type = await prisma.checkpointType.findUnique({ where: { id }, select: { id: true } });
+  if (!type) throw new AppError(404, 'Checkpoint type not found');
+
+  const rows = await prisma.releaseCheckpoint.findMany({
+    where: { checkpointTypeId: id },
+    select: {
+      id: true,
+      releaseId: true,
+      deadline: true,
+      state: true,
+      release: {
+        select: {
+          name: true,
+          plannedDate: true,
+          project: { select: { key: true, name: true } },
+        },
+      },
+    },
+    orderBy: { deadline: 'asc' },
+    take: 200,
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    releaseId: r.releaseId,
+    releaseName: r.release.name,
+    releasePlannedDate: r.release.plannedDate ? r.release.plannedDate.toISOString().slice(0, 10) : null,
+    projectKey: r.release.project?.key ?? null,
+    projectName: r.release.project?.name ?? null,
+    deadline: r.deadline.toISOString().slice(0, 10),
+    state: r.state,
+  }));
+}
+
 export async function createCheckpointType(dto: CreateCheckpointTypeDto) {
   try {
     return await prisma.checkpointType.create({
