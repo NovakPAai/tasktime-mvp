@@ -291,6 +291,8 @@ Run `make docs` to check for staleness warnings.
 | Releases | `/api/admin/release-workflows` | `backend/src/modules/releases/release-workflows-admin.router.js.ts` |
 | Releases | `/api/admin/checkpoint-types` | `backend/src/modules/releases/checkpoints/checkpoint-types.router.js.ts` |
 | Releases | `/api/admin/checkpoint-templates` | `backend/src/modules/releases/checkpoints/checkpoint-templates.router.js.ts` |
+| releaseCheckpointsRouter | `/api` | `—` |
+| checkpointTypesSyncRouter | `/api/admin/checkpoint-types` | `—` |
 | Project Role Schemes | `/api/admin/role-schemes` | `backend/src/modules/project-role-schemes/project-role-schemes.router.js.ts` |
 | User Groups | `/api/admin/user-groups` | `backend/src/modules/user-groups/user-groups.router.js.ts` |
 | User Security | `/api` | `backend/src/modules/user-security/user-security.router.js.ts` |
