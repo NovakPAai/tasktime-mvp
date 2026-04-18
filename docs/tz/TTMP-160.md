@@ -1,7 +1,7 @@
 # ТЗ: TTMP-160 — Модуль контрольных точек релизов
 
 **Дата:** 2026-04-18
-**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (8/12 PR merged, Phase 1 MVP ✅ complete, Phase 2 in progress) — см. §13.5
+**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (9/12 PR merged, Phase 1 MVP ✅ complete, Phase 2 in progress) — см. §13.5
 **Проект:** TaskTime MVP (TTMP)
 **Автор ТЗ:** Claude Code (auto-generated)
 
@@ -1150,12 +1150,12 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 | 6 | `ttmp-160/release-issue-ui` | UI в релизе и задаче | 16 | PR-3 | ✅ merged (#86) |
 | 7 | `ttmp-160/board-topbar` | Карточки + TopBar + Dashboard | 8 | PR-4, PR-6 | ✅ merged (#87) |
 | 8 | `ttmp-160/bulk-webhook-audit` | Bulk-apply + webhook + аудит-страница | 10 | PR-4 | ✅ merged (#89) |
-| 9 | `ttmp-160/matrix` | Матрица задач × КТ | 8 | PR-3 | 🚧 in work |
-| 10 | `ttmp-160/burndown-backend` | Burndown schema + cron + API | 10 | PR-1, PR-4 | ⏳ |
+| 9 | `ttmp-160/matrix` | Матрица задач × КТ | 8 | PR-3 | ✅ merged (#90) |
+| 10 | `ttmp-160/burndown-backend` | Burndown schema + cron + API | 10 | PR-1, PR-4 | 🚧 in work |
 | 11 | `ttmp-160/burndown-frontend` | Burndown UI + Recharts | 6 | PR-10 | ⏳ |
 | 12 | `ttmp-160/e2e-docs` | E2E + a11y + docs | 11 | PR-1..PR-11 | ⏳ |
 
-**Итого:** 12 PR, ~126 часов. **Прогресс:** 8 / 12 merged (≈91 ч) — Фаза 1 MVP ✅ готова, Фаза 2 в работе. 1 в работе (≈8 ч), осталось 3 PR (≈27 ч) в Фазе 2.
+**Итого:** 12 PR, ~126 часов. **Прогресс:** 9 / 12 merged (≈99 ч) — Фаза 1 MVP ✅ готова, Фаза 2 в работе. 1 в работе (≈10 ч), осталось 2 PR (≈17 ч) в Фазе 2.
 
 **Обновления по мере выполнения (2026-04-18):**
 - PR-1 `ttmp-160/foundation` — ✅ merged в `main` (commit `078ef57`, PR [#79](https://github.com/NovakPAai/tasktime-mvp/pull/79)). Prisma-модели + миграция `20260422000000_release_checkpoints` + CRUD `/api/admin/checkpoint-types` и `/api/admin/checkpoint-templates`.
@@ -1166,7 +1166,8 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 - PR-6 `ttmp-160/release-issue-ui` — ✅ merged в `main` (commit `b976c79`, PR [#86](https://github.com/NovakPAai/tasktime-mvp/pull/86)). 6 новых компонентов (CheckpointTrafficLight, ReleaseRiskBadge, CheckpointsBlock, ApplyCheckpointTemplateModal, CheckpointRiskFilter, IssueCheckpointsSection), интеграция в GlobalReleasesPage и IssueDetailPage, backend `GET /api/issues/:id/checkpoint-events` (FR-22). ReleasesPage (project-scoped) deferred — будет follow-up. **Фаза 1 MVP завершена.**
 - PR-7 `ttmp-160/board-topbar` — ✅ merged в `main` (commit `d38207a`, PR [#87](https://github.com/NovakPAai/tasktime-mvp/pull/87)). `IssueCheckpointIndicator` (FR-11), TopBar-бейдж + polling-хук (FR-12), Dashboard toggle-chip с keyboard a11y. Backend: `GET /api/projects/:id/checkpoint-violating-issues`, `GET /api/my-checkpoint-violations[/count]` с SEC-7 + project-membership scope, `$queryRaw` count. 9 интеграционных тестов; full suite 491/491 зелёный.
 - PR-8 `ttmp-160/bulk-webhook-audit` — ✅ merged в `main` (commit `9c5a512`, PR [#89](https://github.com/NovakPAai/tasktime-mvp/pull/89)). Bulk-apply с 207 Multi-Status + per-release SEC-5 partition (FR-21), `CHECKPOINT_WEBHOOK` с `minStableSeconds` debounce + concurrency-cap 20 (FR-17), admin page `/admin/checkpoint-audit` + CSV c BOM/CRLF (FR-23, SEC-6, SEC-9). 11 интеграционных тестов; full suite 513/513 зелёный.
-- PR-9 `ttmp-160/matrix` — 🚧 в работе. `GET /api/releases/:id/checkpoints/matrix` (JSON + `?format=csv`), `CheckpointsMatrix.tsx` с виртуализацией для релизов >100 задач, переключатель «Список / Матрица» в `DetailPanel`, CSV-экспорт (FR-26, FR-27).
+- PR-9 `ttmp-160/matrix` — ✅ merged в `main` (commit `128f279`, PR [#90](https://github.com/NovakPAai/tasktime-mvp/pull/90)). `GET /api/releases/:id/checkpoints/matrix` (JSON + `?format=csv` с UTF-8 BOM/CRLF), `CheckpointsMatrix.tsx` со sticky-первой колонкой + легендой + кнопками Обновить/Экспорт CSV, переключатель «Список / Матрица» в `DetailPanel` (aria-pressed), buildCheckpointsMatrix собирает ячейки из снапшотов без re-evaluate. 4 интеграционных теста; full suite 506/506 зелёный.
+- PR-10 `ttmp-160/burndown-backend` — 🚧 в работе. `ReleaseBurndownSnapshot` из PR-1 + `captureSnapshot` на закрытии событий нарушений, cron-тик `BURNDOWN_SNAPSHOT_CRON` + retention (FR-28). `GET /api/releases/:id/burndown?from=...` возвращает series-массив + baseline, `POST /api/releases/:id/burndown/backfill` генерирует точки из прошедших событий.
 
 ### 13.6 Merge-порядок и rollback
 
