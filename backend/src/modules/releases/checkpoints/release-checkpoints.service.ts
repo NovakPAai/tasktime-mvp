@@ -450,6 +450,239 @@ export async function listEventsForIssue(issueId: string): Promise<IssueCheckpoi
   }));
 }
 
+// ─── FR-11 / FR-12: "my violations" + "project violating issues" ─────────────
+
+export interface IssueViolationSummary {
+  issueId: string;
+  issueKey: string;
+  issueTitle: string;
+  projectId: string;
+  projectKey: string;
+  violations: Array<{
+    checkpointId: string;
+    checkpointName: string;
+    checkpointColor: string;
+    releaseId: string;
+    releaseName: string;
+    deadline: string;
+    reason: string;
+  }>;
+}
+
+/**
+ * FR-11: returns every issue in a project that is currently violating at least one
+ * VIOLATED-state release checkpoint, keyed by issue id. Powers the "red stripe" indicator
+ * on board cards and project lists.
+ */
+export async function listViolatingIssuesForProject(
+  projectId: string,
+): Promise<IssueViolationSummary[]> {
+  const checkpoints = await prisma.releaseCheckpoint.findMany({
+    where: {
+      state: 'VIOLATED',
+      release: {
+        OR: [
+          { projectId },
+          // INTEGRATION releases — pull them in if any of the checkpoint's violations
+          // references an issue belonging to this project.
+          { items: { some: { issue: { projectId } } } },
+        ],
+      },
+    },
+    select: {
+      id: true,
+      deadline: true,
+      violations: true,
+      release: { select: { id: true, name: true } },
+      checkpointType: { select: { name: true, color: true } },
+    },
+  });
+
+  // Deduplicate by issueId, attaching each violating checkpoint to the aggregate.
+  const byIssue = new Map<string, IssueViolationSummary['violations']>();
+  for (const cp of checkpoints) {
+    if (!Array.isArray(cp.violations)) continue;
+    for (const raw of cp.violations) {
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue;
+      const v = raw as Record<string, Prisma.JsonValue>;
+      const issueId = typeof v.issueId === 'string' ? v.issueId : null;
+      const reason = typeof v.reason === 'string' ? v.reason : '';
+      if (!issueId) continue;
+      const list = byIssue.get(issueId) ?? [];
+      list.push({
+        checkpointId: cp.id,
+        checkpointName: cp.checkpointType.name,
+        checkpointColor: cp.checkpointType.color,
+        releaseId: cp.release.id,
+        releaseName: cp.release.name,
+        deadline: cp.deadline.toISOString().slice(0, 10),
+        reason,
+      });
+      byIssue.set(issueId, list);
+    }
+  }
+  if (byIssue.size === 0) return [];
+
+  const issueIds = [...byIssue.keys()];
+  const issues = await prisma.issue.findMany({
+    where: { id: { in: issueIds }, projectId },
+    select: {
+      id: true,
+      number: true,
+      title: true,
+      projectId: true,
+      project: { select: { key: true } },
+    },
+  });
+
+  return issues.map((i) => ({
+    issueId: i.id,
+    issueKey: `${i.project.key}-${i.number}`,
+    issueTitle: i.title,
+    projectId: i.projectId,
+    projectKey: i.project.key,
+    violations: byIssue.get(i.id) ?? [],
+  }));
+}
+
+/**
+ * FR-12 / SEC-7: the authenticated user's own issues that are currently in a VIOLATED
+ * checkpoint. Three layers of filtering are applied:
+ *
+ *   1. Global read-role (SUPER_ADMIN/ADMIN/RELEASE_MANAGER/AUDITOR) — bypass project scope.
+ *      Other users only see checkpoints on releases tied to projects they are a member of
+ *      (directly or via a group). This closes a cross-project title-leak described in
+ *      pre-push review HIGH 3.
+ *   2. `state: 'VIOLATED'` — only active breaches surface in the badge.
+ *   3. `assigneeId === userId` on the final issue join — strictly own workload.
+ *
+ * The checkpoint scan is capped at 1000 rows as a safety ceiling; violations within a
+ * single checkpoint are unbounded, so the cap is on checkpoints, not issue rows.
+ */
+export async function listMyViolations(
+  userId: string,
+  systemRoles: Array<'SUPER_ADMIN' | 'ADMIN' | 'RELEASE_MANAGER' | 'AUDITOR' | 'USER'>,
+): Promise<IssueViolationSummary[]> {
+  const hasGlobalRead = systemRoles.some((r) =>
+    (['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'] as const).includes(r as never),
+  );
+
+  const checkpointWhere: Prisma.ReleaseCheckpointWhereInput = { state: 'VIOLATED' };
+  if (!hasGlobalRead) {
+    const accessibleProjectIds = await resolveAccessibleProjectIds(userId);
+    if (accessibleProjectIds.length === 0) return [];
+    checkpointWhere.OR = [
+      { release: { projectId: { in: accessibleProjectIds } } },
+      // INTEGRATION releases have null projectId; surface their violations only for issues
+      // the user can actually see via the final issue.assigneeId join (any INTEGRATION
+      // release references issues from various projects, and we filter by assigneeId below).
+      { release: { type: 'INTEGRATION' } },
+    ];
+  }
+
+  const checkpoints = await prisma.releaseCheckpoint.findMany({
+    where: checkpointWhere,
+    select: {
+      id: true,
+      deadline: true,
+      violations: true,
+      release: { select: { id: true, name: true } },
+      checkpointType: { select: { name: true, color: true } },
+    },
+    take: 1000, // safety cap — badge payload shouldn't explode the server
+  });
+
+  const byIssue = new Map<string, IssueViolationSummary['violations']>();
+  for (const cp of checkpoints) {
+    if (!Array.isArray(cp.violations)) continue;
+    for (const raw of cp.violations) {
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue;
+      const v = raw as Record<string, Prisma.JsonValue>;
+      const issueId = typeof v.issueId === 'string' ? v.issueId : null;
+      const reason = typeof v.reason === 'string' ? v.reason : '';
+      if (!issueId) continue;
+      const list = byIssue.get(issueId) ?? [];
+      list.push({
+        checkpointId: cp.id,
+        checkpointName: cp.checkpointType.name,
+        checkpointColor: cp.checkpointType.color,
+        releaseId: cp.release.id,
+        releaseName: cp.release.name,
+        deadline: cp.deadline.toISOString().slice(0, 10),
+        reason,
+      });
+      byIssue.set(issueId, list);
+    }
+  }
+  if (byIssue.size === 0) return [];
+
+  const issues = await prisma.issue.findMany({
+    where: {
+      id: { in: [...byIssue.keys()] },
+      assigneeId: userId,
+    },
+    select: {
+      id: true,
+      number: true,
+      title: true,
+      projectId: true,
+      project: { select: { key: true } },
+    },
+    take: 200,
+  });
+
+  return issues.map((i) => ({
+    issueId: i.id,
+    issueKey: `${i.project.key}-${i.number}`,
+    issueTitle: i.title,
+    projectId: i.projectId,
+    projectKey: i.project.key,
+    violations: byIssue.get(i.id) ?? [],
+  }));
+}
+
+/**
+ * Badge poll: TopBar calls this every 60 s, so it must be cheap. A Postgres-side count
+ * over `jsonb_array_elements(violations)` avoids pulling the JSON payload into Node at
+ * all. Filters by assigneeId via a subquery so the index on `issues.assignee_id` is used.
+ *
+ * SEC-7: only counts rows for `assigneeId === userId`. No project-membership pre-filter
+ * here — the count is just a number and leaks no titles; `listMyViolations` (which does
+ * leak titles) applies full project scoping.
+ */
+export async function countMyViolations(userId: string): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ cnt: bigint }>>`
+    SELECT COUNT(DISTINCT target.issue_id)::bigint AS cnt
+    FROM "release_checkpoints" cp,
+         LATERAL jsonb_array_elements(cp."violations") AS v
+    JOIN "issues" i ON i."id" = (v->>'issueId')
+         LEFT JOIN LATERAL (SELECT (v->>'issueId') AS issue_id) AS target ON TRUE
+    WHERE cp."state" = 'VIOLATED'
+      AND i."assignee_id" = ${userId}
+  `;
+  const first = rows[0];
+  return first ? Number(first.cnt) : 0;
+}
+
+/**
+ * Resolve the project IDs the user can see — union of direct `UserProjectRole` rows and
+ * indirect `ProjectGroupRole` via group membership. Mirrors the pattern in
+ * `shared/middleware/rbac.ts`.
+ */
+async function resolveAccessibleProjectIds(userId: string): Promise<string[]> {
+  const [direct, viaGroups] = await Promise.all([
+    prisma.userProjectRole.findMany({ where: { userId }, select: { projectId: true } }),
+    prisma.projectGroupRole.findMany({
+      where: { group: { members: { some: { userId } } } },
+      select: { projectId: true },
+    }),
+  ]);
+  const set = new Set<string>();
+  for (const r of direct) set.add(r.projectId);
+  for (const r of viaGroups) set.add(r.projectId);
+  return [...set];
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function assertReleaseWithPlannedDate(releaseId: string) {

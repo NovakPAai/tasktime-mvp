@@ -2,7 +2,28 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.17**
+**Last version: 2.18**
+
+---
+
+## [2.18] [2026-04-18] feat(checkpoints): TTMP-160 PR-7 — board indicators + TopBar badge + Dashboard filter
+
+**PR:** [#87](https://github.com/NovakPAai/tasktime-mvp/pull/87)
+**Ветка:** `ttmp-160/board-topbar`
+
+### Что изменилось
+- `frontend/src/components/issues/IssueCheckpointIndicator.tsx`: мини-индикатор FR-11 (красная полоска + иконка + счётчик + Tooltip со списком нарушенных КТ), вариант `stripe` (по умолчанию, для карточки задачи) и `compact` (для тесных мест). `role="status"` + `aria-label`.
+- `frontend/src/hooks/useMyCheckpointViolationsCount.ts`: polling-хук на 60 с, использует `setTimeout`-каскад (не `setInterval`) чтобы не накапливались запросы при медленном бэкенде.
+- `frontend/src/components/layout/TopBar.tsx`: бейдж с иконкой + счётчиком + Tooltip + переход на `/dashboard?filter=my-checkpoint-violations` (FR-12). Отображается только при `count > 0`.
+- `frontend/src/pages/BoardPage.tsx`: загрузка `getViolatingIssuesForProject(projectId)` после основного load, карта `violatingMap`, рендер `IssueCheckpointIndicator` на каждой карточке задачи между title и custom fields.
+- `frontend/src/pages/DashboardPage.tsx`: реагирует на `?filter=my-checkpoint-violations`, рендерит список из `getMyCheckpointViolations()` вместо «Мои задачи»; toggle-chip для переключения режима.
+- `frontend/src/api/release-checkpoints.ts`: `getViolatingIssuesForProject`, `getMyCheckpointViolations`, `getMyCheckpointViolationsCount` + тип `IssueViolationSummary`.
+- `backend/src/modules/releases/checkpoints/release-checkpoints.{service,router}.ts`: 
+  - `listViolatingIssuesForProject(projectId)` — дедупликация по issueId, инкл. INTEGRATION-релизы с items из проекта (FR-11).
+  - `listMyViolations(userId, systemRoles)` — SEC-7 фильтр по `assigneeId === userId` + scope по проектам-членам (прямой `UserProjectRole` + через группы); global read-роли bypass'ятся.
+  - `countMyViolations(userId)` — Postgres `$queryRaw` aggregate (`jsonb_array_elements` + issue-assignee join) для дешёвого 60-секундного polling'а бейджа.
+  - Три новых endpoint: `GET /api/projects/:projectId/checkpoint-violating-issues` (ISSUES_VIEW gate), `GET /api/my-checkpoint-violations`, `GET /api/my-checkpoint-violations/count`.
+- `backend/tests/checkpoints-board-topbar.test.ts`: 9 интеграционных тестов — FR-11 happy-path, project-membership 403, SEC-7 assignee-only, ADMIN bypass, count endpoint + 401.
 
 ---
 

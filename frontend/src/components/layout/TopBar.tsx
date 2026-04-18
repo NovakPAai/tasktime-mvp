@@ -2,13 +2,16 @@
  * TopBar — верхняя панель Flow Universe
  * TTUI-121: выделено из AppLayout.tsx монолита
  */
-import { Layout, Button, Typography, Tooltip } from 'antd';
+import { Layout, Badge, Button, Typography, Tooltip } from 'antd';
 import {
+  ExclamationCircleFilled,
   LogoutOutlined,
   MenuOutlined,
   SunFilled,
   MoonFilled,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useMyCheckpointViolationsCount } from '../../hooks/useMyCheckpointViolationsCount';
 import type { User } from '../../types';
 
 const { Header } = Layout;
@@ -30,6 +33,11 @@ export default function TopBar({
   onThemeToggle,
   onLogout,
 }: TopBarProps) {
+  const navigate = useNavigate();
+  // TTMP-160 FR-12 / SEC-7: count of MY assigned issues currently violating a checkpoint.
+  // Polls every 60 s; click → Dashboard with the "at risk" filter pre-applied.
+  const myViolationsCount = useMyCheckpointViolationsCount();
+
   return (
     <Header className="tt-topbar">
       {/* Гамбургер — виден только на мобиле */}
@@ -42,6 +50,19 @@ export default function TopBar({
       />
 
       <div className="tt-topbar-right">
+        {myViolationsCount > 0 && (
+          <Tooltip title={`Мои задачи с нарушенными КТ: ${myViolationsCount}`}>
+            <Badge count={myViolationsCount} overflowCount={99} offset={[-2, 2]}>
+              <Button
+                type="text"
+                icon={<ExclamationCircleFilled style={{ color: '#E5534B' }} />}
+                onClick={() => navigate('/dashboard?filter=my-checkpoint-violations')}
+                aria-label={`У вас ${myViolationsCount} задач с нарушенными контрольными точками`}
+              />
+            </Badge>
+          </Tooltip>
+        )}
+
         <Tooltip title={isLight ? 'Тёмная тема' : 'Светлая тема'}>
           <Button
             type="text"
