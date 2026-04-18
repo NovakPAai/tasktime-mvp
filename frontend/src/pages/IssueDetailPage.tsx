@@ -22,6 +22,7 @@ import * as aiApi from '../api/ai';
 import * as authApi from '../api/auth';
 import { getProjectIssueTypes } from '../api/issue-type-configs';
 import IssueLinksSection from '../components/issues/IssueLinksSection';
+import IssueCheckpointsSection from '../components/releases/IssueCheckpointsSection';
 import MoveIssueModal from '../components/issues/MoveIssueModal';
 import IssueCustomFieldsSection from '../components/issues/IssueCustomFieldsSection';
 import CustomFieldInput from '../components/issues/CustomFieldInput';
@@ -607,6 +608,25 @@ export default function IssueDetailPage() {
         {/* Links */}
         <IssueLinksSection issueId={issue.id} />
 
+        {/* TTMP-160 PR-6: Checkpoints */}
+        <div style={{ marginTop: 24 }}>
+          <div
+            style={{
+              color: C.t3,
+              fontFamily: '"Inter", system-ui, sans-serif',
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: '0.5px',
+              lineHeight: '16px',
+              marginBottom: 12,
+              textTransform: 'uppercase',
+            }}
+          >
+            Контрольные точки
+          </div>
+          <IssueCheckpointsSection issueId={issue.id} />
+        </div>
+
         {/* Comments */}
         <div style={{ marginTop: 4 }}>
           <div style={{ color: C.t3, fontFamily: '"Inter", system-ui, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.5px', lineHeight: '16px', marginBottom: 12, textTransform: 'uppercase' }}>
@@ -966,7 +986,7 @@ export default function IssueDetailPage() {
       <Modal
         title="Редактировать задачу"
         open={editModalOpen}
-        onCancel={() => { setEditModalOpen(false); setEditCustomFields([]); setEditCustomValues({}); }}
+        onCancel={() => { setEditModalOpen(false); setEditCustomFields([]); setEditCustomValues({}); void load(); }}
         onOk={() => editForm.submit()}
         okText="Сохранить"
         cancelText="Отмена"

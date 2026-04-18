@@ -1,7 +1,7 @@
 # ТЗ: TTMP-160 — Модуль контрольных точек релизов
 
 **Дата:** 2026-04-18
-**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (4/12 PR merged) — см. §13.5
+**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (5/12 PR merged) — см. §13.5
 **Проект:** TaskTime MVP (TTMP)
 **Автор ТЗ:** Claude Code (auto-generated)
 
@@ -1146,8 +1146,8 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 | 2 | `ttmp-160/engine` | Engine + evaluateCriterion | 10 | PR-1 | ✅ merged (#81) |
 | 3 | `ttmp-160/release-binding` | Release API + breakdown + preview + inline | 14 | PR-2 | ✅ merged (#82) |
 | 4 | `ttmp-160/triggers` | Cron + event-hooks + node-cron | 8 | PR-3 | ✅ merged (#84) |
-| 5 | `ttmp-160/admin-ui` | Admin UI (types, templates, sync) | 15 | PR-3 | 🚧 in work |
-| 6 | `ttmp-160/release-issue-ui` | UI в релизе и задаче | 16 | PR-3 | ⏳ |
+| 5 | `ttmp-160/admin-ui` | Admin UI (types, templates, sync) | 15 | PR-3 | ✅ merged (#85) |
+| 6 | `ttmp-160/release-issue-ui` | UI в релизе и задаче | 16 | PR-3 | 🚧 in work |
 | 7 | `ttmp-160/board-topbar` | Карточки + TopBar + Dashboard | 8 | PR-4, PR-6 | ⏳ |
 | 8 | `ttmp-160/bulk-webhook-audit` | Bulk-apply + webhook + аудит-страница | 10 | PR-4 | ⏳ |
 | 9 | `ttmp-160/matrix` | Матрица задач × КТ | 8 | PR-3 | ⏳ |
@@ -1155,14 +1155,15 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 | 11 | `ttmp-160/burndown-frontend` | Burndown UI + Recharts | 6 | PR-10 | ⏳ |
 | 12 | `ttmp-160/e2e-docs` | E2E + a11y + docs | 11 | PR-1..PR-11 | ⏳ |
 
-**Итого:** 12 PR, ~126 часов. **Прогресс:** 4 / 12 merged (≈42 ч), 1 в работе (≈15 ч), осталось 7 PR (≈69 ч).
+**Итого:** 12 PR, ~126 часов. **Прогресс:** 5 / 12 merged (≈57 ч), 1 в работе (≈16 ч), осталось 6 PR (≈53 ч).
 
 **Обновления по мере выполнения (2026-04-18):**
 - PR-1 `ttmp-160/foundation` — ✅ merged в `main` (commit `078ef57`, PR [#79](https://github.com/NovakPAai/tasktime-mvp/pull/79)). Prisma-модели + миграция `20260422000000_release_checkpoints` + CRUD `/api/admin/checkpoint-types` и `/api/admin/checkpoint-templates`.
 - PR-2 `ttmp-160/engine` — ✅ merged в `main` (commit `34d6196`, PR [#81](https://github.com/NovakPAai/tasktime-mvp/pull/81)). Pure-function `evaluate-criterion.ts` + `checkpoint-engine.service.ts` (`evaluateCheckpoint`, `computeReleaseRisk`, `computeViolationsHash`). 60 unit-тестов.
 - PR-3 `ttmp-160/release-binding` — ✅ merged в `main` (commit `3cd854c`, PR [#82](https://github.com/NovakPAai/tasktime-mvp/pull/82)). Release API + preview + breakdown + inline `?include=checkpoints` + `sync-instances` + `CheckpointViolationEvent` lifecycle. 17 интеграционных тестов; полный backend-suite 475/475 зелёный.
 - PR-4 `ttmp-160/triggers` — ✅ merged в `main` (commit `9232a58`, PR [#84](https://github.com/NovakPAai/tasktime-mvp/pull/84)). `node-cron` шедулер + AsyncLocalStorage coalescing + event-хуки на всех мутациях (issues / custom-fields / workflow-engine executeTransition / releases). Redis-lock `checkpoints:scheduler` TTL 540s, graceful SIGTERM drain. 5 интеграционных тестов; полный backend-suite 480/480 зелёный.
-- PR-5 `ttmp-160/admin-ui` — 🚧 в работе. Admin-страницы `/admin/release-checkpoint-types` и `/admin/release-checkpoint-templates` с визуальным конструктором критериев, модалка `ApplyToActiveInstances` для FR-15, соблюдение правила CLAUDE.md «Modal/Drawer close → refresh parent».
+- PR-5 `ttmp-160/admin-ui` — ✅ merged в `main` (commit `1e99122`, PR [#85](https://github.com/NovakPAai/tasktime-mvp/pull/85)). Admin-страницы типов и шаблонов с визуальным конструктором критериев, drag-drop ordering, `SyncInstancesModal` (FR-15). Backend-расширение `GET /api/admin/checkpoint-types/:id/instances`. AdminGate на роутах. Backend-suite 482/482 зелёный; frontend tsc + lint + build clean.
+- PR-6 `ttmp-160/release-issue-ui` — 🚧 в работе. `CheckpointTrafficLight` (цвет + иконка + текст + aria, FR-18), `ReleaseRiskBadge`, `CheckpointsBlock` с разбивкой N/M/K (FR-25), `ApplyCheckpointTemplateModal` с preview (FR-14), `CheckpointRiskFilter` (FR-13). Интеграция в `GlobalReleasesPage`, `ReleasesPage`, `IssueDetailPage` (FR-20, FR-22).
 
 ### 13.6 Merge-порядок и rollback
 

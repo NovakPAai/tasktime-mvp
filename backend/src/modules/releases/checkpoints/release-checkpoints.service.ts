@@ -398,6 +398,58 @@ export async function listForIssue(issueId: string): Promise<IssueCheckpointsGro
   return groups;
 }
 
+// ─── FR-22: issue's violation history ────────────────────────────────────────
+
+export interface IssueCheckpointEvent {
+  id: string;
+  releaseCheckpointId: string;
+  releaseId: string;
+  issueId: string;
+  issueKey: string;
+  reason: string;
+  criterionType: string;
+  occurredAt: string;
+  resolvedAt: string | null;
+  checkpointName: string;
+  releaseName: string;
+}
+
+/**
+ * FR-22: issue's violation history. Ordered newest-first and capped at 200 rows — the
+ * cap is a simple pagination ceiling; if a single issue accumulates more than 200 events
+ * (unlikely in normal flow), we'd expose a cursor here. For MVP the 200-row horizon is
+ * more than enough to surface recent activity on any issue.
+ */
+export async function listEventsForIssue(issueId: string): Promise<IssueCheckpointEvent[]> {
+  const events = await prisma.checkpointViolationEvent.findMany({
+    where: { issueId },
+    orderBy: { occurredAt: 'desc' },
+    include: {
+      releaseCheckpoint: {
+        select: {
+          releaseId: true,
+          checkpointType: { select: { name: true } },
+          release: { select: { name: true } },
+        },
+      },
+    },
+    take: 200,
+  });
+  return events.map((e) => ({
+    id: e.id,
+    releaseCheckpointId: e.releaseCheckpointId,
+    releaseId: e.releaseCheckpoint.releaseId,
+    issueId: e.issueId,
+    issueKey: e.issueKey,
+    reason: e.reason,
+    criterionType: e.criterionType,
+    occurredAt: e.occurredAt.toISOString(),
+    resolvedAt: e.resolvedAt ? e.resolvedAt.toISOString() : null,
+    checkpointName: e.releaseCheckpoint.checkpointType.name,
+    releaseName: e.releaseCheckpoint.release.name,
+  }));
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function assertReleaseWithPlannedDate(releaseId: string) {
