@@ -22,6 +22,7 @@ export interface IssueFilters {
 export async function listIssues(projectId: string, filters?: IssueFilters): Promise<Issue[]> {
   const { data } = await api.get<PaginatedResponse<Issue>>(`/projects/${projectId}/issues`, {
     params: {
+      limit: 500,
       ...(filters?.status && { status: filters.status.join(',') }),
       ...(filters?.issueTypeConfigId && filters.issueTypeConfigId.length > 0 && { issueTypeConfigId: filters.issueTypeConfigId.join(',') }),
       ...(filters?.priority && { priority: filters.priority.join(',') }),

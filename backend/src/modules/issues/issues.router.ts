@@ -73,7 +73,7 @@ router.get('/issues/search', async (req: AuthRequest, res, next) => {
 // List issues for a project with filters
 router.get('/projects/:projectId/issues', async (req, res, next) => {
   try {
-    const { status, issueTypeConfigId, priority, assigneeId, sprintId, from, to, search, includeKanbanFields } = req.query as {
+    const { status, issueTypeConfigId, priority, assigneeId, sprintId, from, to, search, includeKanbanFields, page, limit } = req.query as {
       status?: string | string[];
       issueTypeConfigId?: string | string[];
       priority?: string | string[];
@@ -83,10 +83,15 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
       to?: string;
       search?: string;
       includeKanbanFields?: string;
+      page?: string;
+      limit?: string;
     };
 
     const toArray = (value?: string | string[]) =>
       typeof value === 'string' ? value.split(',').filter(Boolean) : value;
+
+    const { parsePagination } = await import('../../shared/utils/params.js');
+    const pagination = parsePagination({ page, limit });
 
     const issues = await issuesService.listIssues(req.params.projectId as string, {
       status: toArray(status) as IssueStatus[] | undefined,
@@ -97,7 +102,7 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
       from,
       to,
       search,
-    });
+    }, pagination);
 
     if (includeKanbanFields === 'true') {
       const kanbanMap = await getKanbanFieldsForIssues(
