@@ -16,6 +16,7 @@ import {
 } from './issues.dto.js';
 import * as issuesService from './issues.service.js';
 import { getKanbanFieldsForIssues } from '../issue-custom-fields/issue-custom-fields.service.js';
+import { listForIssue as listCheckpointsForIssue } from '../releases/checkpoints/release-checkpoints.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { AuthRequest } from '../../shared/types/index.js';
@@ -170,6 +171,16 @@ router.get('/issues/:id', async (req: AuthRequest, res, next) => {
   try {
     const issue = await issuesService.getIssue(req.params.id as string);
     await requireIssueAccess(req, issue.projectId);
+
+    // FR-19: inline `checkpoints` when ?include=checkpoints. Default off to keep the payload
+    // lean; IssueDetailPage (PR-6) opts in explicitly.
+    const include = typeof req.query.include === 'string' ? req.query.include.split(',') : [];
+    if (include.includes('checkpoints')) {
+      const checkpoints = await listCheckpointsForIssue(issue.id);
+      res.json({ ...issue, checkpoints });
+      return;
+    }
+
     res.json(issue);
   } catch (err) {
     next(err);

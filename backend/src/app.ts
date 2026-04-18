@@ -40,6 +40,9 @@ import releaseStatusesRouter from './modules/releases/release-statuses.router.js
 import releaseWorkflowsAdminRouter from './modules/releases/release-workflows-admin.router.js';
 import checkpointTypesRouter from './modules/releases/checkpoints/checkpoint-types.router.js';
 import checkpointTemplatesRouter from './modules/releases/checkpoints/checkpoint-templates.router.js';
+import releaseCheckpointsRouter, {
+  syncRouter as checkpointTypesSyncRouter,
+} from './modules/releases/checkpoints/release-checkpoints.router.js';
 import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
 import userGroupsRouter from './modules/user-groups/user-groups.router.js';
 import userSecurityRouter from './modules/user-security/user-security.router.js';
@@ -142,6 +145,11 @@ export function createApp() {
   app.use('/api/admin/release-workflows', releaseWorkflowsAdminRouter);
   app.use('/api/admin/checkpoint-types', checkpointTypesRouter);
   app.use('/api/admin/checkpoint-templates', checkpointTemplatesRouter);
+  // release-scoped and issue-scoped checkpoint routes share /api prefix (paths include the
+  // resource id). The sync-instances subrouter stays under /api/admin/checkpoint-types so
+  // the system-role gate is isolated from the RELEASES_EDIT project-permission gate.
+  app.use('/api', releaseCheckpointsRouter);
+  app.use('/api/admin/checkpoint-types', checkpointTypesSyncRouter);
   app.use('/api/admin/role-schemes', roleSchemesRouter);
   app.use('/api/admin/user-groups', userGroupsRouter);
   app.use('/api', userSecurityRouter);
