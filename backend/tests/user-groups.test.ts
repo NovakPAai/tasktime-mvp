@@ -151,6 +151,39 @@ describe('GET /api/admin/user-groups', () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].name).toBe('Alpha Team');
   });
+
+  it('projectId filter returns only groups bound to the project', async () => {
+    const other = await prisma.project.create({
+      data: { name: 'P2', key: `Q${Date.now().toString(36).slice(-5).toUpperCase()}` },
+    });
+    await prisma.userGroup.create({
+      data: {
+        name: 'Bound',
+        projectRoles: { create: [{ projectId, roleId: userRoleDefId, schemeId: DEFAULT_SCHEME_ID }] },
+      },
+    });
+    await prisma.userGroup.create({
+      data: {
+        name: 'OtherProject',
+        projectRoles: { create: [{ projectId: other.id, roleId: userRoleDefId, schemeId: DEFAULT_SCHEME_ID }] },
+      },
+    });
+    await prisma.userGroup.create({ data: { name: 'Unbound' } });
+
+    const res = await request
+      .get(`/api/admin/user-groups?projectId=${projectId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].name).toBe('Bound');
+  });
+
+  it('400 when projectId query is not a UUID', async () => {
+    const res = await request
+      .get('/api/admin/user-groups?projectId=not-a-uuid')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('PATCH /api/admin/user-groups/:id', () => {

@@ -2,14 +2,36 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Input, Space, Tag, message,
-  Popconfirm, Alert, Tabs, Select, Tooltip,
+  Popconfirm, Alert, Tabs, Select, Tooltip, ColorPicker,
 } from 'antd';
+import type { Color } from 'antd/es/color-picker';
 import type { ColumnsType } from 'antd/es/table';
 import { ArrowLeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { roleSchemesApi, type ProjectRoleScheme, type ProjectRoleDefinition } from '../../api/role-schemes';
 import { listProjects } from '../../api/projects';
 import type { Project } from '../../types';
 import PermissionMatrixDrawer from '../../components/admin/PermissionMatrixDrawer';
+
+const ROLE_PALETTE = [
+  '#F44336', '#E91E63', '#FF5722', '#FF9800',
+  '#FFC107', '#FFEB3B', '#8BC34A', '#4CAF50',
+  '#00BCD4', '#2196F3', '#3F51B5', '#9C27B0',
+  '#607D8B', '#9E9E9E', '#795548', '#000000',
+];
+
+function RoleColorPickerField({ value, onChange }: { value?: string; onChange?: (v: string | undefined) => void }) {
+  return (
+    <ColorPicker
+      format="hex"
+      value={value || undefined}
+      presets={[{ label: 'Палитра', colors: ROLE_PALETTE }]}
+      onChange={(color: Color) => onChange?.(color.toHexString())}
+      allowClear
+      onClear={() => onChange?.(undefined)}
+      showText
+    />
+  );
+}
 
 export default function AdminRoleSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -146,6 +168,10 @@ export default function AdminRoleSchemeDetailPage() {
     },
     { title: 'Ключ', dataIndex: 'key', render: (v: string) => <code>{v}</code> },
     { title: 'Описание', dataIndex: 'description', render: (v: string | null) => v || '—' },
+    {
+      title: 'Грантов',
+      render: (_, r) => (r.permissions ?? []).filter(p => p.granted).length,
+    },
     { title: 'Участников', dataIndex: ['_count', 'userProjectRoles'], render: (v: number) => v ?? 0 },
     {
       title: '',
@@ -301,8 +327,8 @@ export default function AdminRoleSchemeDetailPage() {
           <Form.Item name="description" label="Описание">
             <Input.TextArea rows={2} />
           </Form.Item>
-          <Form.Item name="color" label="Цвет (hex, например #1677ff)">
-            <Input placeholder="#1677ff" />
+          <Form.Item name="color" label="Цвет">
+            <RoleColorPickerField />
           </Form.Item>
         </Form>
       </Modal>

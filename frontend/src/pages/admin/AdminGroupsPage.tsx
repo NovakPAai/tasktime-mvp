@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Tooltip, Alert } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, Space, message, Tooltip, Alert } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { userGroupsApi, type UserGroupListItem, type UserGroupImpact } from '../../api/user-groups';
+import { listProjects } from '../../api/projects';
+import type { Project } from '../../types';
 
 /**
  * TTSEC-2 Phase 3: list of user groups with CRUD.
@@ -17,6 +19,9 @@ export default function AdminGroupsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [projectId, setProjectId] = useState<string | undefined>();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<UserGroupListItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -43,15 +48,26 @@ export default function AdminGroupsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setGroups(await userGroupsApi.list(debouncedSearch.trim() || undefined));
+      setGroups(await userGroupsApi.list({
+        search: debouncedSearch.trim() || undefined,
+        projectId,
+      }));
     } catch {
       message.error('Не удалось загрузить группы');
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, projectId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setProjectsLoading(true);
+    listProjects()
+      .then(setProjects)
+      .catch(() => { /* non-fatal — filter just stays empty */ })
+      .finally(() => setProjectsLoading(false));
+  }, []);
 
   const openCreate = () => { setEditing(null); form.resetFields(); setModalOpen(true); };
   const openEdit = (g: UserGroupListItem) => {
@@ -165,12 +181,25 @@ export default function AdminGroupsPage() {
         <h2 className="tt-page-title">Группы пользователей</h2>
         <Space>
           <Input
-            placeholder="Поиск"
+            placeholder="Поиск по имени"
             prefix={<SearchOutlined />}
             value={search}
             onChange={e => setSearch(e.target.value)}
             allowClear
             style={{ width: 240 }}
+          />
+          <Select
+            placeholder="Фильтр по проекту"
+            value={projectId}
+            onChange={v => setProjectId(v)}
+            allowClear
+            showSearch
+            loading={projectsLoading}
+            filterOption={(input, opt) =>
+              (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())
+            }
+            options={projects.map(p => ({ value: p.id, label: `${p.key}: ${p.name}` }))}
+            style={{ width: 260 }}
           />
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Создать</Button>
         </Space>

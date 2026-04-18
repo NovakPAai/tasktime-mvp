@@ -45,8 +45,16 @@ export interface UserGroupImpact {
 }
 
 export const userGroupsApi = {
-  list: (search?: string) =>
-    api.get<UserGroupListItem[]>('/admin/user-groups', { params: search ? { search } : undefined }).then(r => r.data),
+  list: (filters?: { search?: string; projectId?: string }) => {
+    const params: Record<string, string> = {};
+    if (filters?.search) params.search = filters.search;
+    if (filters?.projectId) params.projectId = filters.projectId;
+    return api
+      .get<UserGroupListItem[]>('/admin/user-groups', {
+        params: Object.keys(params).length ? params : undefined,
+      })
+      .then(r => r.data);
+  },
   get: (id: string) =>
     api.get<UserGroupDetail>(`/admin/user-groups/${id}`).then(r => r.data),
   getImpact: (id: string) =>
