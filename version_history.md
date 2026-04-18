@@ -2,7 +2,17 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.10**
+**Last version: 2.11**
+
+---
+
+## [2.11] [2026-04-18] fix(deploy): down --remove-orphans перед up, fix port conflict
+
+**PR:** [#78](https://github.com/NovakPAai/tasktime-mvp/pull/78)
+**Ветка:** `claude/jack-fix-port-conflict`
+
+### Что изменилось
+- `deploy/scripts/deploy.sh`: перед `docker compose up` добавлен `docker compose down --remove-orphans` — гарантирует освобождение портов docker-proxy от старых контейнеров (фикс `port 3002 already allocated` для MCP)
 
 ---
 

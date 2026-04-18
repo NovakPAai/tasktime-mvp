@@ -111,7 +111,9 @@ if [ "${BOOTSTRAP_ENABLED:-}" = "true" ]; then
 else
   echo "Skipping bootstrap: BOOTSTRAP_ENABLED is not true in $BACKEND_ENV_FILE"
 fi
-docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" up -d --force-recreate
+# Stop and remove all stack containers first to release ports held by docker-proxy
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" up -d
 
 MAX_RETRIES=12
 RETRY_INTERVAL=5
