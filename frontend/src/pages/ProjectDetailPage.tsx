@@ -151,7 +151,7 @@ export default function ProjectDetailPage() {
   const { mode } = useThemeStore();
   const C = mode === 'light' ? LIGHT_C : DARK_C;
 
-  const { issues, loading: issuesLoading, fetchIssues, filters, setFilters, resetFilters, total, currentPage, pageSize } = useIssuesStore();
+  const { issues, loading: issuesLoading, error: issuesError, fetchIssues, filters, setFilters, resetFilters, total, currentPage, pageSize } = useIssuesStore();
   const { user } = useAuthStore();
   const [project, setProject] = useState<Project | null>(null);
   const [dashboard, setDashboard] = useState<projectsApi.ProjectDashboard | null>(null);
@@ -183,7 +183,7 @@ export default function ProjectDetailPage() {
       message.success('Issue created');
       setModalOpen(false);
       form.resetFields();
-      fetchIssues(id);
+      fetchIssues(id, 1);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
       message.error(error.response?.data?.error || 'Failed to create issue');
@@ -203,7 +203,7 @@ export default function ProjectDetailPage() {
       message.success('Исполнитель обновлён');
       setSelectedIssueIds([]);
       setBulkAssigneeId(undefined);
-      fetchIssues(id);
+      fetchIssues(id, currentPage);
     } catch {
       message.error('Failed to update assignee');
     }
@@ -215,7 +215,7 @@ export default function ProjectDetailPage() {
       const result = await issuesApi.bulkDeleteIssues(id, selectedIssueIds);
       message.success(`Удалено задач: ${result.deletedCount}`);
       setSelectedIssueIds([]);
-      fetchIssues(id);
+      fetchIssues(id, currentPage);
       projectsApi.getProjectDashboard(id).then(setDashboard);
     } catch {
       message.error('Failed to delete issues');
@@ -571,7 +571,7 @@ export default function ProjectDetailPage() {
           placeholder="Type"
           value={filters.issueTypeConfigId}
           maxTagCount={1}
-          onChange={(value) => { setFilters({ issueTypeConfigId: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ issueTypeConfigId: value }); if (id) fetchIssues(id, 1); }}
           options={issueTypeConfigs.map((c) => ({ value: c.id, label: c.name.replace(/^->\s*/, '') }))}
           style={{ minWidth: 100, fontFamily: F.sans, fontSize: 12 }}
           size="small"
@@ -581,7 +581,7 @@ export default function ProjectDetailPage() {
           placeholder="Status"
           value={filters.status}
           maxTagCount={1}
-          onChange={(value) => { setFilters({ status: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ status: value }); if (id) fetchIssues(id, 1); }}
           options={(['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'] as IssueStatus[]).map((v) => ({ value: v, label: v }))}
           style={{ minWidth: 100, fontFamily: F.sans, fontSize: 12 }}
           size="small"
@@ -591,7 +591,7 @@ export default function ProjectDetailPage() {
           placeholder="Priority"
           value={filters.priority}
           maxTagCount={1}
-          onChange={(value) => { setFilters({ priority: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ priority: value }); if (id) fetchIssues(id, 1); }}
           options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map((v) => ({ value: v, label: v }))}
           style={{ minWidth: 100, fontFamily: F.sans, fontSize: 12 }}
           size="small"
@@ -600,7 +600,7 @@ export default function ProjectDetailPage() {
           allowClear
           placeholder="Assignee"
           value={filters.assigneeId}
-          onChange={(value) => { setFilters({ assigneeId: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ assigneeId: value }); if (id) fetchIssues(id, 1); }}
           options={[
             { value: 'UNASSIGNED', label: 'Unassigned' },
             ...allUsers.map((u) => ({ value: u.id, label: u.name })),
@@ -677,6 +677,11 @@ export default function ProjectDetailPage() {
 
       {/* ── Table ── */}
       <div style={{ padding: '0 28px 28px' }}>
+        {issuesError && (
+          <div style={{ margin: '16px 0', padding: '10px 16px', background: '#2d1a1a', border: '1px solid #5c2a2a', borderRadius: 8, color: '#f87171', fontFamily: F.sans, fontSize: 13 }}>
+            {issuesError}
+          </div>
+        )}
         <div style={{
           marginTop: 16,
           background: C.bgCard,
@@ -711,7 +716,7 @@ export default function ProjectDetailPage() {
       <Modal
         title="New Issue"
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); if (id) void fetchIssues(id); }}
+        onCancel={() => { setModalOpen(false); if (id) void fetchIssues(id, currentPage); }}
         onOk={() => form.submit()}
         okText="Create"
         width={600}
@@ -783,9 +788,9 @@ export default function ProjectDetailPage() {
           onSuccess={() => {
             setBulkStatusWizardOpen(false);
             setSelectedIssueIds([]);
-            if (id) fetchIssues(id);
+            if (id) fetchIssues(id, currentPage);
           }}
-          onCancel={() => { setBulkStatusWizardOpen(false); if (id) void fetchIssues(id); }}
+          onCancel={() => { setBulkStatusWizardOpen(false); if (id) void fetchIssues(id, currentPage); }}
         />
       )}
     </div>
