@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import {
+  Alert,
   Modal,
   Form,
   Input,
@@ -49,6 +50,16 @@ import type { SystemRoleType } from '../types';
 import type { Project } from '../types/project.types';
 import type { Issue } from '../types/issue.types';
 import type { Sprint } from '../types/sprint.types';
+import {
+  getReleaseCheckpoints,
+  type ReleaseCheckpointsResponse,
+  type ReleaseRisk,
+  type ReleaseRiskLevel,
+} from '../api/release-checkpoints';
+import CheckpointsBlock from '../components/releases/CheckpointsBlock';
+import ReleaseRiskBadge from '../components/releases/ReleaseRiskBadge';
+import ApplyCheckpointTemplateModal from '../components/releases/ApplyCheckpointTemplateModal';
+import CheckpointRiskFilter from '../components/releases/CheckpointRiskFilter';
 
 // ─── Tokens Dark (Paper 4EO-0) ──────────────────────────────────────────────
 const DARK_C = {
@@ -179,7 +190,7 @@ function actionLabel(action: string): string {
 
 // ─── Detail slide panel ───────────────────────────────────────────────────────
 
-type DetailTab = 'issues' | 'sprints' | 'readiness' | 'history';
+type DetailTab = 'issues' | 'sprints' | 'readiness' | 'history' | 'checkpoints';
 
 interface DetailPanelProps {
   release: Release | null;
@@ -199,6 +210,10 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
   const [sprints, setSprints] = useState<SprintInRelease[]>([]);
   const [readiness, setReadiness] = useState<ReleaseReadiness | null>(null);
   const [history, setHistory] = useState<ReleaseAuditEntry[]>([]);
+  const [checkpointsData, setCheckpointsData] = useState<ReleaseCheckpointsResponse | null>(null);
+  const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
+  const [checkpointsError, setCheckpointsError] = useState(false);
+  const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
   const [transitions, setTransitions] = useState<ReleaseTransition[]>([]);
   const [currentStatus, setCurrentStatus] = useState<Release['status'] | null>(null);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -257,6 +272,21 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
     }
   }, []);
 
+  const loadCheckpoints = useCallback(async (id: string) => {
+    // Clear immediately so stale checkpoints from a previously selected release don't stay
+    // visible while the new fetch is in-flight.
+    setCheckpointsData(null);
+    setCheckpointsError(false);
+    setLoadingCheckpoints(true);
+    try {
+      setCheckpointsData(await getReleaseCheckpoints(id));
+    } catch {
+      setCheckpointsError(true);
+    } finally {
+      setLoadingCheckpoints(false);
+    }
+  }, []);
+
   const loadTransitions = useCallback(async (id: string) => {
     setLoadingTransitions(true);
     try {
@@ -274,6 +304,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
     if (!release) return;
     setTab('issues');
     setItems([]); setSprints([]); setReadiness(null); setHistory([]);
+    setCheckpointsData(null); setCheckpointsError(false);
     loadItems(release.id);
     loadTransitions(release.id);
   }, [release?.id]);
@@ -283,6 +314,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
     if (tab === 'sprints') loadSprints(release.id);
     if (tab === 'readiness') loadReadiness(release.id);
     if (tab === 'history') loadHistory(release.id);
+    if (tab === 'checkpoints') loadCheckpoints(release.id);
   }, [tab, release?.id]);
 
   const handleTransition = async (transitionId: string) => {
@@ -399,6 +431,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
     { key: 'issues', label: 'Задачи' },
     { key: 'sprints', label: 'Спринты' },
     { key: 'readiness', label: 'Готовность' },
+    { key: 'checkpoints', label: 'Контрольные точки' },
     { key: 'history', label: 'История' },
   ];
 
@@ -742,6 +775,90 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
           </div>
         )}
 
+        {/* ── Checkpoints tab (TTMP-160 PR-6) ─────────── */}
+        {tab === 'checkpoints' && (
+          <div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 12,
+                gap: 8,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {checkpointsData?.risk && (
+                  <>
+                    <span style={{ color: C.t3, fontSize: 12 }}>Риск релиза:</span>
+                    <ReleaseRiskBadge
+                      level={checkpointsData.risk.level}
+                      score={checkpointsData.risk.score}
+                    />
+                  </>
+                )}
+              </div>
+              {canManage && (
+                <button
+                  onClick={() => setApplyTemplateOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    border: `1px solid ${C.borderBtn}`,
+                    background: 'transparent',
+                    color: C.t2,
+                    borderRadius: 6,
+                    padding: '5px 12px',
+                    fontSize: 12,
+                    fontFamily: F.sans,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <PlusOutlined /> Применить шаблон
+                </button>
+              )}
+            </div>
+            {loadingCheckpoints ? (
+              <div style={{ textAlign: 'center', padding: 40 }}>
+                <Spin />
+              </div>
+            ) : checkpointsError ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="Не удалось загрузить контрольные точки"
+                description="Попробуйте обновить страницу или повторить пересчёт."
+              />
+            ) : (
+              <CheckpointsBlock
+                releaseId={release.id}
+                checkpoints={checkpointsData?.checkpoints ?? []}
+                canMutate={canManage}
+                onChanged={() => {
+                  void loadCheckpoints(release.id);
+                  onReleasesRefresh();
+                }}
+              />
+            )}
+
+            {applyTemplateOpen && (
+              <ApplyCheckpointTemplateModal
+                open
+                releaseId={release.id}
+                onClose={() => {
+                  // CLAUDE.md modal-close rule: always refresh parent data regardless of
+                  // whether the user applied, since the preview dry-run already roundtripped.
+                  setApplyTemplateOpen(false);
+                  void loadCheckpoints(release.id);
+                  onReleasesRefresh();
+                }}
+              />
+            )}
+          </div>
+        )}
+
         {/* ── History tab ─────────────────────────────── */}
         {tab === 'history' && (
           <div>
@@ -1008,6 +1125,14 @@ export default function GlobalReleasesPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
 
+  // TTMP-160 PR-6: per-release risk cache keyed on release id, populated after each
+  // loadReleases() call. Missing entry → risk not loaded yet (render a placeholder).
+  const [riskByRelease, setRiskByRelease] = useState<Record<string, ReleaseRisk>>({});
+  const [riskFilter, setRiskFilter] = useState<ReleaseRiskLevel[]>([]);
+  // Race guard: increments per loadReleases() call; async risk-fetch batches compare this
+  // against their captured id and discard stale writes from previous pages/filters.
+  const loadSeqRef = useRef(0);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm] = Form.useForm();
   const [createType, setCreateType] = useState<'ATOMIC' | 'INTEGRATION'>('ATOMIC');
@@ -1017,6 +1142,7 @@ export default function GlobalReleasesPage() {
 
   // ─── Load ─────────────────────────────────────────────────
   const loadReleases = useCallback(async (pg = page) => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const query: releasesApi.ListReleasesQuery = {
@@ -1031,11 +1157,32 @@ export default function GlobalReleasesPage() {
       if (filterFrom) query.from = filterFrom;
       if (filterTo) query.to = filterTo;
       const res = await releasesApi.listReleasesGlobal(query);
+      if (seq !== loadSeqRef.current) return; // stale call superseded
       setReleases(res.data);
       setTotal(res.total);
       setPage(pg);
+      setRiskByRelease({}); // clear so the previous page's badges don't linger
+
+      // TTMP-160 PR-6: fetch per-release risk in parallel for the current page. The endpoint
+      // is cached at 60 s on the backend, so repeated fetches are cheap; a failure on any
+      // single release falls back to "unknown" (no badge rendered). Guarded against races
+      // when the user changes page/filter faster than the risk batch settles.
+      const riskMap: Record<string, ReleaseRisk> = {};
+      await Promise.all(
+        res.data.map(async (r) => {
+          try {
+            const cp = await getReleaseCheckpoints(r.id);
+            if (seq !== loadSeqRef.current) return;
+            riskMap[r.id] = cp.risk;
+          } catch {
+            /* keep entry missing */
+          }
+        }),
+      );
+      if (seq !== loadSeqRef.current) return;
+      setRiskByRelease(riskMap);
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [page, sortBy, sortDir, filterType, filterProjectId, filterSearch, filterFrom, filterTo]);
 
@@ -1150,6 +1297,15 @@ export default function GlobalReleasesPage() {
       dataIndex: 'level',
       width: 90,
       render: (level: string) => levelBadge(level, isDark),
+    },
+    {
+      title: 'Риск',
+      width: 110,
+      render: (_: unknown, row) => {
+        const risk = riskByRelease[row.id];
+        if (!risk) return <span style={{ color: C.t4, fontSize: 11 }}>—</span>;
+        return <ReleaseRiskBadge level={risk.level} score={risk.score} />;
+      },
     },
     {
       title: 'Задачи',
@@ -1312,6 +1468,8 @@ export default function GlobalReleasesPage() {
           }}
         />
 
+        <CheckpointRiskFilter value={riskFilter} onChange={setRiskFilter} />
+
         <button
           onClick={() => loadReleases(page)}
           style={{
@@ -1334,17 +1492,39 @@ export default function GlobalReleasesPage() {
       }}>
         <Table<Release>
           columns={columns}
-          dataSource={releases}
+          dataSource={
+            riskFilter.length === 0
+              ? releases
+              : releases.filter((r) => {
+                  const risk = riskByRelease[r.id];
+                  return risk !== undefined && riskFilter.includes(risk.level);
+                })
+          }
           rowKey="id"
           loading={loading}
-          pagination={{
-            current: page,
-            pageSize: 20,
-            total,
-            showSizeChanger: false,
-            showTotal: (t) => `Всего ${t}`,
-            onChange: (pg) => loadReleases(pg),
-          }}
+          pagination={
+            // Server pagination is bypassed while the client-side risk filter is active:
+            // the filter only operates on the current page's data, so the correct total is
+            // the filtered count and pagination controls are disabled.
+            riskFilter.length > 0
+              ? {
+                  pageSize: 50,
+                  total: releases.filter((r) => {
+                    const risk = riskByRelease[r.id];
+                    return risk !== undefined && riskFilter.includes(risk.level);
+                  }).length,
+                  showSizeChanger: false,
+                  showTotal: (t) => `${t} на странице (фильтр риска активен)`,
+                }
+              : {
+                  current: page,
+                  pageSize: 20,
+                  total,
+                  showSizeChanger: false,
+                  showTotal: (t) => `Всего ${t}`,
+                  onChange: (pg) => loadReleases(pg),
+                }
+          }
           onChange={(_pagination, _filters, sorter) => {
             if (!Array.isArray(sorter) && sorter.field) {
               const field = Array.isArray(sorter.field) ? sorter.field.join('.') : String(sorter.field);

@@ -2,7 +2,102 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.11**
+**Last version: 2.17**
+
+---
+
+## [2.17] [2026-04-18] feat(checkpoints): TTMP-160 PR-6 — release / issue UI (traffic light, risk badge, breakdown, preview)
+
+**PR:** [#86](https://github.com/NovakPAai/tasktime-mvp/pull/86)
+**Ветка:** `ttmp-160/release-issue-ui`
+
+### Что изменилось
+- `frontend/src/components/releases/`: новые компоненты — `CheckpointTrafficLight` (FR-18: цвет+иконка+текст+aria), `ReleaseRiskBadge` (LOW/MEDIUM/HIGH/CRITICAL), `CheckpointsBlock` (разбивка N/M/K + раскрывающиеся списки + inline-actions Пересчитать/Удалить), `ApplyCheckpointTemplateModal` (FR-14 двухшаговый предпросмотр), `CheckpointRiskFilter` (FR-13), `IssueCheckpointsSection` (FR-20 группировка по релизу + FR-22 история нарушений)
+- `frontend/src/api/release-checkpoints.ts`: API-клиент — getReleaseCheckpoints, previewTemplate, applyTemplate, addCheckpoints, recomputeRelease, deleteReleaseCheckpoint, getIssueCheckpoints, getIssueCheckpointEvents
+- `frontend/src/pages/GlobalReleasesPage.tsx`: новая вкладка «Контрольные точки» в DetailPanel, риск-колонка в таблице релизов, CheckpointRiskFilter в фильтр-баре; per-release risk fetch параллельно после loadReleases с race-guard через loadSeqRef; clear state при смене release; checkpointsError + Alert
+- `frontend/src/pages/IssueDetailPage.tsx`: `IssueCheckpointsSection` между Links и Comments; `onCancel` edit-модалки теперь вызывает `load()` (CLAUDE.md)
+- `backend/src/modules/releases/checkpoints/release-checkpoints.{router,service}.ts`: новый `GET /api/issues/:id/checkpoint-events` (cap 200, joined с releaseName + checkpointName + releaseId), функция `listEventsForIssue`, gated через `assertIssueRead`
+
+---
+
+## [2.16] [2026-04-18] feat(checkpoints): TTMP-160 PR-5 — admin UI (types, templates, sync-instances)
+
+**PR:** [#85](https://github.com/NovakPAai/tasktime-mvp/pull/85)
+**Ветка:** `ttmp-160/admin-ui`
+
+### Что изменилось
+- `frontend/src/pages/admin/`: новые страницы `AdminReleaseCheckpointTypesPage` (CRUD + визуальный конструктор 6 типов критериев), `AdminReleaseCheckpointTemplatesPage` (CRUD + clone + drag-n-drop через @hello-pangea/dnd), `SyncInstancesModal` (FR-15 с default none-selected + чекбоксами релизов)
+- `frontend/src/api/`: новые клиенты `release-checkpoint-types.ts` и `release-checkpoint-templates.ts`
+- `frontend/src/App.tsx`: роуты `/admin/release-checkpoint-types` и `/admin/release-checkpoint-templates`, обернуты в `<AdminGate allow={canManageCheckpoints}>`
+- `frontend/src/components/layout/Sidebar.tsx`: две записи в группе «Релизы»
+- `frontend/src/lib/roles.ts`: `canManageCheckpoints(roles)` — зеркалит backend-гейт
+- `backend/src/modules/releases/checkpoints/checkpoint-types.{service,router}.ts`: `listActiveInstances(id)` + `GET /:id/instances` для питания sync-модалки (cap 200, все состояния, gated)
+- `backend/tests/checkpoints.test.ts`: 2 новых теста для `/instances` (happy-path + USER 403)
+
+---
+
+## [2.15] [2026-04-18] feat(checkpoints): TTMP-160 PR-4 — triggers (cron + event hooks + plannedDate sync)
+
+**PR:** [#84](https://github.com/NovakPAai/tasktime-mvp/pull/84)
+**Ветка:** `ttmp-160/triggers`
+
+### Что изменилось
+- `backend/src/shared/middleware/request-context.ts`: AsyncLocalStorage-контекст с per-request dedup (Set<releaseId> + Set<issueId>), flush на `res.on('finish')`, fire-and-forget с логированием ошибок
+- `backend/src/modules/releases/checkpoints/checkpoint-triggers.service.ts`: `scheduleRecomputeForIssue/Issues/Release` — внутри request-context кладут в pending-set, иначе синхронный recompute с дедупом по releaseId
+- `backend/src/modules/releases/checkpoints/checkpoint-scheduler.service.ts`: `node-cron` шедулер, `runOnce(job)` для тестов, Redis-lock `checkpoints:scheduler` TTL 540 с, graceful SIGTERM-drain с ожиданием in-flight тика
+- Event-хуки: `issues.service.ts` (updateIssue, updateStatus, assignIssue, bulkUpdateIssues, bulkTransitionIssues, deleteIssue, bulkDeleteIssues — резолв releaseIds до delete), `issue-custom-fields.service.ts` (upsertIssueCustomFields), `workflow-engine.service.ts` (executeTransition — единая точка), `releases.service.ts` (addReleaseItems, removeReleaseItems, updateRelease с пересчётом deadline при смене plannedDate)
+- `backend/src/config.ts`: `CHECKPOINTS_SCHEDULER_*`, `CHECKPOINTS_EVAL_WINDOW_DAYS`, `CHECKPOINT_WEBHOOK_TIMEOUT_MS`, `BURNDOWN_*` (placeholders для PR-10)
+- `backend/src/app.ts`: `checkpointContextMiddleware` до всех route-handler-ов (до metrics/express.json для защиты ALS-контекста)
+- `backend/src/server.ts`: `startCheckpointScheduler()` после listen, async SIGTERM/SIGINT с await `stopCheckpointScheduler()`
+- `backend/package.json`: `node-cron` + `@types/node-cron`
+- `backend/tests/checkpoints-triggers.test.ts`: 5 интеграционных тестов (status-hook, assignee-hook, release-items-hook, plannedDate shift, scheduler.runOnce)
+
+---
+
+## [2.14] [2026-04-18] feat(checkpoints): TTMP-160 PR-3 — release binding + breakdown + preview + inline-include
+
+**PR:** [#82](https://github.com/NovakPAai/tasktime-mvp/pull/82)
+**Ветка:** `ttmp-160/release-binding`
+
+### Что изменилось
+- `backend/src/modules/releases/checkpoints/evaluation-loader.service.ts`: batch-loader (4 запроса, без N+1) release → `EvaluationIssue[]` + `EvaluationContext` с canonical-сортировкой MULTI_SELECT массивов
+- `backend/src/modules/releases/checkpoints/release-checkpoints.service.ts`: `applyTemplate` с FR-15 snapshot, `previewTemplate` (FR-14 dry-run), `addCheckpoints`, `removeCheckpoint` (закрывает open events до delete), `recomputeForRelease` (идемпотентно через hash+state+lastEvaluatedAt), `reconcileViolationEvents` (open/close lifecycle в одной транзакции), `syncInstances`, `listForIssue`, `listForRelease` с breakdown + passedIssues + violatedIssues
+- `backend/src/modules/releases/checkpoints/release-checkpoints.router.ts`: GET/POST/DELETE `/api/releases/:id/checkpoints[/apply-template|/preview-template|/recompute|/:checkpointId]`, GET `/api/issues/:id/checkpoints`, POST `/api/admin/checkpoint-types/:id/sync-instances`; `assertReleaseMutate` (RELEASES_EDIT + global-role bypass) и `assertReleaseRead` (RELEASES_VIEW)
+- `backend/src/modules/issues/issues.router.ts`: `GET /api/issues/:id?include=checkpoints` inline (FR-19)
+- `backend/src/modules/releases/checkpoints/release-checkpoint.dto.ts`: Zod схемы (applyTemplate, previewTemplate, addCheckpoints, syncInstances)
+- Redis-кэш `release:{id}:checkpoints` TTL 60 с, инвалидация через plain DEL
+- `backend/tests/checkpoints-release-binding.test.ts`: 17 интеграционных тестов (apply/add/remove/preview/list/recompute idempotency/sync/FR-19/FR-15 snapshot/RBAC/event closure)
+
+---
+
+## [2.13] [2026-04-18] feat(checkpoints): TTMP-160 PR-2 — engine + evaluateCriterion
+
+**PR:** [#81](https://github.com/NovakPAai/tasktime-mvp/pull/81)
+**Ветка:** `ttmp-160/engine`
+
+### Что изменилось
+- `backend/src/modules/releases/checkpoints/evaluate-criterion.ts`: pure-function evaluator 6 типов критериев (STATUS_IN, DUE_BEFORE, ASSIGNEE_SET, CUSTOM_FIELD_VALUE с NOT_EMPTY/EQUALS/IN, ALL_SUBTASKS_DONE, NO_BLOCKING_LINKS), Russian reason-строки (FR-16)
+- `backend/src/modules/releases/checkpoints/checkpoint-engine.service.ts`: `evaluateCheckpoint` (state machine OK/PENDING/VIOLATED + isWarning с `Math.ceil` + breakdown + violationsHash SHA-1), `computeReleaseRisk` (веса 8/4/2/1, бэнды LOW/MEDIUM/HIGH/CRITICAL), `computeViolationsHash` (детерминированный, без issueKey/issueTitle чтобы не триггерить писать в БД при ренейме задачи)
+- `backend/tests/checkpoint-engine.unit.test.ts`: 60 unit-тестов — каждый тип критерия (applicable + passed + failed + edge), state transitions, isWarning window, hash stability, все 4 риск-бэнда + границы 0.01/0.30/0.70
+
+---
+
+## [2.12] [2026-04-18] feat(checkpoints): TTMP-160 PR-1 — schema + CRUD types/templates
+
+**PR:** [#79](https://github.com/NovakPAai/tasktime-mvp/pull/79)
+**Ветка:** `ttmp-160/foundation`
+
+### Что изменилось
+- `backend/src/prisma/schema.prisma`: enum `CheckpointWeight` (CRITICAL/HIGH/MEDIUM/LOW), `CheckpointState` (PENDING/OK/VIOLATED), модели `CheckpointType`, `CheckpointTemplate`, `CheckpointTemplateItem`, `ReleaseCheckpoint` (с `criteriaSnapshot`/`offsetDaysSnapshot`/`applicableIssueIds`/`passedIssueIds`/`violations`/`violationsHash`), `CheckpointViolationEvent`, `ReleaseBurndownSnapshot`
+- `backend/src/prisma/migrations/20260422000000_release_checkpoints/migration.sql`: миграция (append-only, после последней применённой)
+- `backend/src/modules/releases/checkpoints/`: DTO (`checkpoint.dto.ts` с Zod + discriminated union критериев, `StatusCategory` через `z.nativeEnum`), сервисы и роутеры CRUD `/api/admin/checkpoint-types` и `/api/admin/checkpoint-templates`
+- `backend/src/shared/utils/prisma-errors.ts`: общие helper'ы `isUniqueViolation` + `isForeignKeyViolation`
+- `/api/admin/checkpoint-types` DELETE — 409 CHECKPOINT_TYPE_IN_USE с `activeInstances` + P2003 TOCTOU-guard
+- `/api/admin/checkpoint-templates/:id/clone` — автосуффикс «(копия)»
+- RBAC: `requireRole('SUPER_ADMIN','ADMIN','RELEASE_MANAGER')` на все endpoint-ы
+- Audit actions: `checkpoint_type.created/updated/deleted`, `checkpoint_template.created/updated/deleted/cloned`
+- Backend mount в `app.ts`
+- `backend/tests/checkpoints{,-dto.unit}.test.ts`: 19 DTO unit + 23 интеграционных теста (RBAC, CRUD, 409 на duplicate name / in-use, clone, cascade delete, audit log)
 
 ---
 

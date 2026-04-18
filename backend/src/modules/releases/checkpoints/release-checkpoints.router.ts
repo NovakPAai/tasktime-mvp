@@ -114,6 +114,17 @@ router.get('/issues/:issueId/checkpoints', async (req: AuthRequest, res, next) =
   }
 });
 
+// FR-22: issue's checkpoint-violation history.
+router.get('/issues/:issueId/checkpoint-events', async (req: AuthRequest, res, next) => {
+  try {
+    const issueId = req.params.issueId as string;
+    await assertIssueRead(req, issueId);
+    res.json(await service.listEventsForIssue(issueId));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Write ───────────────────────────────────────────────────────────────────
 
 router.post(
