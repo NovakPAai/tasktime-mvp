@@ -3,6 +3,10 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.github/CODEOWNERS'
   workflow_dispatch:
     inputs:
       pr_number:
@@ -14,14 +18,15 @@ jobs:
   review:
     name: AI Review
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -38,9 +43,12 @@ jobs:
           # AI_REVIEW_MODEL      — default: gpt-4o-mini
           # AI_REVIEW_LANGUAGE   — default: Russian
           # AI_REVIEW_MAX_CHARS  — default: 80000
-          # AI_REVIEW_FAIL_ON_CRITICAL — default: false
-          AI_MODEL: ${{ vars.AI_REVIEW_MODEL || 'gpt-5.4' }}
+          # AI_REVIEW_FAIL_ON_CRITICAL — default: true (blocks merge on CRITICAL)
+          AI_MODEL: ${{ vars.AI_REVIEW_MODEL || 'gpt-4o-mini' }}
           REVIEW_LANGUAGE: ${{ vars.AI_REVIEW_LANGUAGE || 'Russian' }}
           MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_CHARS || '80000' }}
-          FAIL_ON_CRITICAL: ${{ vars.AI_REVIEW_FAIL_ON_CRITICAL || 'false' }}
+          FAIL_ON_CRITICAL: ${{ vars.AI_REVIEW_FAIL_ON_CRITICAL || 'true' }}
+          # APPROVE_ON_CLEAN=true → createReview APPROVE + body 'AI-APPROVED'
+          # APPROVE_ON_CLEAN=false → only comment (legacy mode)
+          APPROVE_ON_CLEAN: ${{ vars.AI_REVIEW_APPROVE_ON_CLEAN || 'true' }}
         run: node .github/scripts/ai-review.mjs

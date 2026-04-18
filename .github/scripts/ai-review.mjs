@@ -24,7 +24,8 @@ const {
   AI_MODEL = 'gpt-4o-mini',
   REVIEW_LANGUAGE = 'Russian',
   MAX_DIFF_CHARS = '80000',
-  FAIL_ON_CRITICAL = 'false',
+  FAIL_ON_CRITICAL = 'true',
+  APPROVE_ON_CLEAN = 'true',
 } = process.env;
 
 // ---------------------------------------------------------------------------
@@ -400,6 +401,29 @@ async function postComment(body) {
   }
 }
 
+async function submitReview(body, verdict, commitId) {
+  const eventMap = {
+    approve: 'APPROVE',
+    request_changes: 'REQUEST_CHANGES',
+    comment: 'COMMENT',
+  };
+  const event = eventMap[verdict] ?? 'COMMENT';
+
+  // APPROVE body must include 'AI-APPROVED' for the gate job in build-and-publish.yml to recognise it
+  const reviewBody = event === 'APPROVE'
+    ? `${body}\n\n<!-- AI-APPROVED -->`
+    : body;
+
+  await githubFetch(
+    `/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}/reviews`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ commit_id: commitId, event, body: reviewBody }),
+    }
+  );
+  console.log(`Submitted formal review: ${event}`);
+}
+
 async function fetchPreviousReview() {
   const existing = await githubFetch(
     `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PR_NUMBER}/comments`
@@ -453,15 +477,23 @@ async function main() {
   console.log(`Diff: ${diff.length} chars`);
 
   const review = await reviewWithOpenAI(diff, prTitle, prBody, previousReview);
-  const comment = embedReviewJson(formatComment(review, isFollowUp), review);
-
-  await postComment(comment);
+  const commentBody = embedReviewJson(formatComment(review, isFollowUp), review);
 
   const hasCritical = review.issues?.some((i) => i.severity === 'critical');
+  const hasHigh = review.issues?.some((i) => i.severity === 'high');
   console.log(`Done. Verdict: ${review.verdict} | Issues: ${review.issues?.length ?? 0} | Follow-up: ${isFollowUp}`);
 
-  if (FAIL_ON_CRITICAL === 'true' && hasCritical) {
-    console.error('Critical issues found — failing the check (FAIL_ON_CRITICAL=true)');
+  if (APPROVE_ON_CLEAN === 'true') {
+    // Formal PR review — APPROVE or REQUEST_CHANGES (gate-compatible)
+    const { head } = await githubFetch(`/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PR_NUMBER}`);
+    await submitReview(commentBody, review.verdict, head.sha);
+  } else {
+    // Legacy: comment-only mode
+    await postComment(commentBody);
+  }
+
+  if (FAIL_ON_CRITICAL === 'true' && (hasCritical || hasHigh)) {
+    console.error('Critical/high issues found — failing the check (FAIL_ON_CRITICAL=true)');
     process.exit(1);
   }
 }
