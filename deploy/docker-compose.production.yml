@@ -58,20 +58,28 @@ services:
       timeout: 3s
       retries: 10
 
-  # MCP-прокси (опционально, profile=mcp)
-  mcp-tasktime:
-    image: evilfreelancer/openapi-to-mcp:latest
-    profiles: ["mcp"]
+  mcp:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}:${IMAGE_TAG:?IMAGE_TAG is required}
+    command: ["node", "dist/mcp/server.js"]
     restart: unless-stopped
+    env_file:
+      - ./env/backend.production.env
     environment:
-      OPENAPI_URL: http://backend:3000/api/docs/json
-      BACKEND_URL: http://backend:3000
-      BEARER_TOKEN: ${MCP_SERVICE_TOKEN:-}
+      MCP_TRANSPORT: http
+      MCP_HTTP_PORT: "3002"
+      BACKEND_INTERNAL_URL: http://backend:3000
+      MCP_AGENT_EMAIL: agent@flow-universe.internal
     ports:
-      - "3002:3000"
+      - "3002:3002"
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   pipeline-postgres:
     image: postgres:16-alpine

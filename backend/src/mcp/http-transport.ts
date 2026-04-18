@@ -11,8 +11,20 @@ const app = express();
 app.use(express.json());
 app.use('/mcp', mcpBearerAuth);
 
-// Session store: sessionId → transport
-const transports: Record<string, StreamableHTTPServerTransport> = {};
+// Session store: sessionId → { transport, lastSeen }
+const transports: Record<string, { transport: StreamableHTTPServerTransport; lastSeen: number }> = {};
+
+// Evict sessions idle for more than 30 minutes (abandoned clients that never sent DELETE)
+const SESSION_TTL_MS = 30 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [sid, entry] of Object.entries(transports)) {
+    if (now - entry.lastSeen > SESSION_TTL_MS) {
+      entry.transport.close().catch(() => {});
+      delete transports[sid];
+    }
+  }
+}, 5 * 60 * 1000).unref();
 
 // POST /mcp — main JSON-RPC endpoint
 app.post('/mcp', async (req: Request, res: Response) => {
@@ -21,7 +33,8 @@ app.post('/mcp', async (req: Request, res: Response) => {
   try {
     // Resume existing session
     if (sessionId && transports[sessionId]) {
-      await transports[sessionId].handleRequest(req, res, req.body);
+      transports[sessionId].lastSeen = Date.now();
+      await transports[sessionId].transport.handleRequest(req, res, req.body);
       return;
     }
 
@@ -30,7 +43,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid: string) => {
-          transports[sid] = transport;
+          transports[sid] = { transport, lastSeen: Date.now() };
         },
       });
 
@@ -68,7 +81,8 @@ app.get('/mcp', async (req: Request, res: Response) => {
     res.status(400).send('Invalid or missing session ID');
     return;
   }
-  await transports[sessionId].handleRequest(req, res);
+  transports[sessionId].lastSeen = Date.now();
+  await transports[sessionId].transport.handleRequest(req, res);
 });
 
 // DELETE /mcp — explicit session termination
@@ -78,7 +92,12 @@ app.delete('/mcp', async (req: Request, res: Response) => {
     res.status(400).send('Invalid or missing session ID');
     return;
   }
-  await transports[sessionId].handleRequest(req, res);
+  await transports[sessionId].transport.handleRequest(req, res);
+});
+
+// GET /health — liveness probe for Docker healthcheck
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ ok: true, sessions: Object.keys(transports).length });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
@@ -89,7 +108,7 @@ app.listen(PORT, '0.0.0.0', () => {
 // Graceful shutdown
 async function shutdown() {
   for (const [sid, transport] of Object.entries(transports)) {
-    await transport.close().catch(() => {});
+    await transport.transport.close().catch(() => {});
     delete transports[sid];
   }
   process.exit(0);
