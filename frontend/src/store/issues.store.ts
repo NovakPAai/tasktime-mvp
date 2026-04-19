@@ -19,6 +19,7 @@ interface IssuesState {
   total: number;
   currentPage: number;
   pageSize: number;
+  currentProjectId: string | null;
   filters: IssuesFilters;
   setFilters: (filters: Partial<IssuesFilters>) => void;
   resetFilters: () => void;
@@ -40,6 +41,7 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
   total: 0,
   currentPage: 1,
   pageSize: PAGE_SIZE,
+  currentProjectId: null,
   filters: initialFilters,
 
   setFilters: (partial) => {
@@ -52,6 +54,10 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
 
   fetchIssues: async (projectId: string, page = 1) => {
     const seq = ++fetchSeq;
+    const { currentProjectId } = get();
+    if (currentProjectId !== projectId) {
+      set({ issues: [], total: 0, currentPage: 1, currentProjectId: projectId });
+    }
     set({ loading: true, error: null });
     try {
       const { filters, pageSize } = get();

@@ -138,7 +138,7 @@ export async function listIssues(
     `issues:list:${projectId}` +
     `:s=${sortedStatus}:t=${sortedType}:pr=${sortedPriority}` +
     `:a=${filters?.assigneeId ?? ''}:sp=${filters?.sprintId ?? ''}` +
-    `:fr=${filters?.from ?? ''}:to=${filters?.to ?? ''}:q=${filters?.search ?? ''}` +
+    `:fr=${filters?.from ?? ''}:to=${filters?.to ?? ''}:q=${filters?.search ? encodeURIComponent(filters.search.slice(0, 200)) : ''}` +
     `:pg=${p.page}:lm=${p.limit}`;
 
   type IssueListItem = Awaited<ReturnType<typeof prisma.issue.findMany<{

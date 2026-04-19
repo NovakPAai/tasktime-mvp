@@ -48,8 +48,16 @@ export async function listIssues(
 }
 
 export async function listAllIssues(projectId: string, filters?: IssueFilters): Promise<Issue[]> {
-  const result = await listIssues(projectId, filters, { page: 1, limit: 500 });
-  return result.data;
+  const PAGE = 500;
+  const first = await listIssues(projectId, filters, { page: 1, limit: PAGE });
+  if (first.meta.total <= first.data.length) return first.data;
+  const totalPages = Math.ceil(first.meta.total / PAGE);
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, i) =>
+      listIssues(projectId, filters, { page: i + 2, limit: PAGE }),
+    ),
+  );
+  return [first.data, ...rest.map((r) => r.data)].flat();
 }
 
 export async function listIssuesWithKanbanFields(

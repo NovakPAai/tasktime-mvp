@@ -2,7 +2,38 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.24**
+**Last version: 2.25**
+
+---
+
+## [2.25] [2026-04-19] feat: серверная пагинация списка задач
+
+**PR:** [#97](https://github.com/NovakPAai/tasktime-mvp/pull/97)
+**Ветка:** `claude/jack-fix-issues-list-truncated`
+
+### Что изменилось
+
+**Backend:**
+- `GET /projects/:projectId/issues` — принимает `page` и `limit` (по умолчанию 50), возвращает `PaginatedResponse` с `meta.total`
+- `parsePagination` из `shared/utils/params.ts` — статический импорт (ранее был динамический)
+- Cache-ключ для списка задач включает `page` и `limit`; поле `search` кодируется через `encodeURIComponent` с обрезкой до 200 символов
+
+**Frontend:**
+- `listIssues` возвращает `PaginatedResponse<Issue>` вместо `Issue[]`
+- `listAllIssues` — новая функция для пикеров (Releases, Dashboard), загружает до 500 задач; предупреждение в консоль при превышении
+- `useIssuesStore`: серверная пагинация (50/страница), race condition guard (`fetchSeq`), сброс стора при смене проекта (`currentProjectId`), поле `error` с отображением в UI
+- `ProjectDetailPage`: убран tree-mode (несовместим с серверной пагинацией), подключена пагинация таблицы, счётчик задач берётся из `total` (серверное значение)
+- Пикеры в `GlobalReleasesPage`, `ReleasesPage`, `DashboardPage` переведены на `listAllIssues`
+
+### Файлы
+- `backend/src/modules/issues/issues.router.ts`
+- `backend/src/modules/issues/issues.service.ts`
+- `frontend/src/api/issues.ts`
+- `frontend/src/store/issues.store.ts`
+- `frontend/src/pages/ProjectDetailPage.tsx`
+- `frontend/src/pages/GlobalReleasesPage.tsx`
+- `frontend/src/pages/ReleasesPage.tsx`
+- `frontend/src/pages/DashboardPage.tsx`
 
 ---
 
