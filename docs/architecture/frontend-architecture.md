@@ -253,7 +253,7 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 
 ### `issues.store`
 
-Файл: `frontend/src/store/issues.store.ts` · 7 полей состояния · 3 экшенов
+Файл: `frontend/src/store/issues.store.ts` · 8 полей состояния · 3 экшенов
 
 | Поле / Экшен | Тип | Вид |
 |-------------|-----|-----|
@@ -263,6 +263,7 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `total` | `number` | состояние |
 | `currentPage` | `number` | состояние |
 | `pageSize` | `number` | состояние |
+| `currentProjectId` | `string | null` | состояние |
 | `filters` | `IssuesFilters` | состояние |
 | `setFilters` | `(filters: Partial<IssuesFilters>) => void` | экшен |
 | `resetFilters` | `() => void` | экшен |
