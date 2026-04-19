@@ -21,6 +21,7 @@ import { logAudit } from '../../shared/middleware/audit.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import { prisma } from '../../prisma/client.js';
+import { parsePagination } from '../../shared/utils/params.js';
 
 const router = Router();
 
@@ -90,7 +91,6 @@ router.get('/projects/:projectId/issues', async (req, res, next) => {
     const toArray = (value?: string | string[]) =>
       typeof value === 'string' ? value.split(',').filter(Boolean) : value;
 
-    const { parsePagination } = await import('../../shared/utils/params.js');
     const pagination = parsePagination({ page, limit });
 
     const issues = await issuesService.listIssues(req.params.projectId as string, {
