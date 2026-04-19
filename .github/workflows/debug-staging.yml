@@ -1,0 +1,37 @@
+name: Debug Staging DB (temp)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: 'SQL to run on staging DB'
+        required: true
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.STAGING_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.STAGING_DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Query staging DB
+        env:
+          CUSTOM_SQL: ${{ github.event.inputs.sql }}
+          DEPLOY_PATH: ${{ secrets.STAGING_DEPLOY_PATH }}
+        run: |
+          SQL_B64=$(printf '%s' "$CUSTOM_SQL" | base64 -w0)
+          DEPLOY_PATH_B64=$(printf '%s' "$DEPLOY_PATH" | base64 -w0)
+          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+            bash -s "$SQL_B64" "$DEPLOY_PATH_B64" << 'REMOTE'
+          SQL=$(echo "$1" | base64 -d)
+          DEPLOY_PATH=$(echo "$2" | base64 -d)
+          set -a; . "$DEPLOY_PATH/deploy/env/.env.staging"; set +a
+          cd "$DEPLOY_PATH"
+          docker compose --env-file deploy/env/.env.staging -f deploy/docker-compose.staging.yml exec -T postgres \
+            psql -U "${POSTGRES_USER:-tasktime}" -d "${POSTGRES_DB:-tasktime_staging}" -c "$SQL"
+          REMOTE
