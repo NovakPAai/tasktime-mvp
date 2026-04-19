@@ -292,6 +292,7 @@ Run `make docs` to check for staleness warnings.
 | Releases | `/api/admin/checkpoint-types` | `backend/src/modules/releases/checkpoints/checkpoint-types.router.js.ts` |
 | Releases | `/api/admin/checkpoint-templates` | `backend/src/modules/releases/checkpoints/checkpoint-templates.router.js.ts` |
 | releaseCheckpointsRouter | `/api` | `—` |
+| Releases | `/api` | `backend/src/modules/releases/checkpoints/burndown.router.js.ts` |
 | checkpointTypesSyncRouter | `/api/admin/checkpoint-types` | `—` |
 | Releases | `/api/admin/checkpoint-audit` | `backend/src/modules/releases/checkpoints/audit.router.js.ts` |
 | Project Role Schemes | `/api/admin/role-schemes` | `backend/src/modules/project-role-schemes/project-role-schemes.router.js.ts` |
