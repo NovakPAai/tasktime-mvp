@@ -169,7 +169,7 @@
   - `GET  /api/releases/:releaseId/burndown?metric=issues|hours|violations&from=&to=` — FR-29
   - `POST /api/releases/:releaseId/burndown/backfill` — FR-31 (ADMIN/SUPER_ADMIN). Body: `{ date?: ISO }` (default — сегодня).
 - `checkpoint-engine.service.ts`:
-  - `recomputeForRelease(releaseId: string): Promise<void>` — выбирает все задачи релиза (через `ReleaseItem` + `Issue.releaseId`), для каждой КТ прогоняет критерии, собирает violations, считает state = `deadline < now() && violations.length > 0 ? VIOLATED : OK`, состояние `PENDING` пока `deadline >= now()` и нет нарушений.
+  - `recomputeForRelease(releaseId: string): Promise<void>` — выбирает все задачи релиза (через `ReleaseItem` + `Issue.releaseId`), для каждой КТ прогоняет критерии, собирает violations, считает state = `now < deadline ? PENDING : (violations.length === 0 ? OK : VIOLATED)`. До дедлайна КТ всегда `PENDING` («в процессе»); финальный вердикт `OK` / `VIOLATED` выставляется только после наступления дедлайна (см. §12.4).
   - `recomputeForIssue(issueId: string): Promise<void>` — находит все релизы с этой задачей, вызывает `recomputeForRelease` (дедуплицируя).
   - `computeReleaseRisk(releaseId: string): Promise<{ level, score }>` — агрегат по `ReleaseCheckpoint`: `score = sum(weight_of_violated) / sum(weight_of_all)`, mapping: 0% = LOW, 1-30% = MEDIUM, 31-70% = HIGH, >70% = CRITICAL.
   - `evaluateCriterion(criterion, issue, customFieldValues): { passed, reason? }` — pure function, unit-testable.
@@ -770,9 +770,17 @@ for each issue in issues:
                       criterionType: failed[0].type })
 
 state =
-  (violations.length === 0)                  ? OK
-  : (now >= deadline)                        ? VIOLATED
-  : PENDING
+  (now < deadline)           ? PENDING
+  : (violations.length === 0)? OK
+  : VIOLATED
+
+// Семантика: OK и VIOLATED — финальные вердикты, выставляются только после
+// наступления deadline. До дедлайна состояние всегда PENDING («в процессе»),
+// потому что задачи ещё могут добавляться / переоткрываться, и показывать
+// «пройдено» за 2 недели до дедлайна — дезинформация для релиз-менеджера.
+//
+// (Исторически в v1 spec было наоборот: `violations === 0 → OK` независимо от
+// deadline. Переделано в PR fix/ttmp-160-pending-before-deadline.)
 
 isWarning = (state === PENDING) && (deadline - now <= warningDays) && (violations.length > 0)
 
