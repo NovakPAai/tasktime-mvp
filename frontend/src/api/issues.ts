@@ -49,6 +49,10 @@ export async function listIssues(
 
 export async function listAllIssues(projectId: string, filters?: IssueFilters): Promise<Issue[]> {
   const result = await listIssues(projectId, filters, { page: 1, limit: 500 });
+  if (result.meta.total > result.data.length) {
+    // eslint-disable-next-line no-console
+    console.warn(`listAllIssues: project ${projectId} has ${result.meta.total} issues, only first ${result.data.length} loaded`);
+  }
   return result.data;
 }
 
