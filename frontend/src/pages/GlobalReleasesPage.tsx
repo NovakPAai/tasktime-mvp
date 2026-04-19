@@ -2,7 +2,7 @@
  * GlobalReleasesPage — TTMP-178 [RM-05] GlobalReleasesPage (frontend)
  * Artboards: 4EO-0 (Dark) + 4JG-0 (Light). Zero CSS classes, zero Ant Design layout.
  */
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { Suspense, lazy, useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import {
@@ -62,6 +62,8 @@ import ApplyCheckpointTemplateModal from '../components/releases/ApplyCheckpoint
 import BulkApplyTemplateModal from '../components/releases/BulkApplyTemplateModal';
 import CheckpointRiskFilter from '../components/releases/CheckpointRiskFilter';
 import CheckpointsMatrix from '../components/releases/CheckpointsMatrix';
+// Lazy — recharts+d3 is ~400 kB minified, only loaded when the user opens the BURNDOWN tab.
+const ReleaseBurndownChart = lazy(() => import('../components/releases/ReleaseBurndownChart'));
 
 // ─── Tokens Dark (Paper 4EO-0) ──────────────────────────────────────────────
 const DARK_C = {
@@ -192,19 +194,20 @@ function actionLabel(action: string): string {
 
 // ─── Detail slide panel ───────────────────────────────────────────────────────
 
-type DetailTab = 'issues' | 'sprints' | 'readiness' | 'history' | 'checkpoints';
+type DetailTab = 'issues' | 'sprints' | 'readiness' | 'history' | 'checkpoints' | 'burndown';
 
 interface DetailPanelProps {
   release: Release | null;
   C: typeof DARK_C;
   isDark: boolean;
   canManage: boolean;
+  canBackfillBurndown: boolean;
   onClose: () => void;
   onTransition: (releaseId: string, transitionId: string) => Promise<void>;
   onReleasesRefresh: () => void;
 }
 
-function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onReleasesRefresh }: DetailPanelProps) {
+function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClose, onTransition, onReleasesRefresh }: DetailPanelProps) {
   const [tab, setTab] = useState<DetailTab>('issues');
   const [items, setItems] = useState<ReleaseItem[]>([]);
   const [itemsTotal, setItemsTotal] = useState(0);
@@ -436,6 +439,7 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
     { key: 'sprints', label: 'Спринты' },
     { key: 'readiness', label: 'Готовность' },
     { key: 'checkpoints', label: 'Контрольные точки' },
+    { key: 'burndown', label: 'Диаграмма сгорания' },
     { key: 'history', label: 'История' },
   ];
 
@@ -897,6 +901,15 @@ function DetailPanel({ release, C, isDark, canManage, onClose, onTransition, onR
           </div>
         )}
 
+        {/* ── Burndown tab (FR-29 / FR-30 / FR-31) ──────── */}
+        {tab === 'burndown' && (
+          <div>
+            <Suspense fallback={<div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>}>
+              <ReleaseBurndownChart releaseId={release.id} canBackfill={canBackfillBurndown} />
+            </Suspense>
+          </div>
+        )}
+
         {/* ── History tab ─────────────────────────────── */}
         {tab === 'history' && (
           <div>
@@ -1143,6 +1156,9 @@ export default function GlobalReleasesPage() {
   const isDark = mode !== 'light';
   const C = isDark ? DARK_C : LIGHT_C;
   const canManage = (['SUPER_ADMIN','ADMIN','RELEASE_MANAGER'] as SystemRoleType[]).some(r => user?.systemRoles?.includes(r));
+  // FR-31 / SEC-8: backfill is reserved for SUPER_ADMIN / ADMIN only; RELEASE_MANAGER
+  // cannot rewrite burndown history. Mirrors the backend `requireRole` gate.
+  const canBackfillBurndown = (['SUPER_ADMIN','ADMIN'] as SystemRoleType[]).some(r => user?.systemRoles?.includes(r));
   const [searchParams] = useSearchParams();
 
   // ─── State ───────────────────────────────────────────────
@@ -1658,6 +1674,7 @@ export default function GlobalReleasesPage() {
             C={C}
             isDark={isDark}
             canManage={canManage}
+            canBackfillBurndown={canBackfillBurndown}
             onClose={() => { setSelectedRelease(null); void loadReleases(page); }}
             onTransition={handleTransition}
             onReleasesRefresh={() => loadReleases(page)}

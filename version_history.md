@@ -2,7 +2,23 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.21**
+**Last version: 2.22**
+
+---
+
+## [2.22] [2026-04-19] feat(checkpoints): TTMP-160 PR-11 — burndown frontend (recharts + вкладка BURNDOWN)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttmp-160/burndown-frontend`
+
+### Что изменилось
+- **Frontend FR-29:** `api/release-burndown.ts` — `getBurndown(releaseId, { metric, from?, to? })` + `backfillBurndown(releaseId, date?)` + типы `BurndownResponse` / `BurndownPoint` / `IdealPoint` / `BurndownMetric`.
+- **Frontend FR-30:** `components/releases/ReleaseBurndownChart.tsx` — recharts `<LineChart>` с двумя линиями (actual solid blue, ideal dashed grey). Переключатель метрики `Задачи / Часы / Нарушения` через Ant `Segmented`, кнопки «Обновить» и «Backfill». Пользовательский tooltip с полями `total/done` или `totalCheckpoints` (зависит от метрики). `seqRef` guard против race при быстрой смене метрики.
+- **Frontend FR-31:** CTA «Backfill» виден только для `SUPER_ADMIN` / `ADMIN` (соответствие SEC-8 бэкенда) — через новый проп `canBackfillBurndown` на `DetailPanel`. RELEASE_MANAGER не видит кнопку.
+- **Frontend новая вкладка:** «Диаграмма сгорания» в `DetailPanel` на `GlobalReleasesPage` (после «Контрольные точки», перед «История»).
+- **Frontend dep:** `recharts@^3.8.1` добавлен в `package.json` (+ обновлён `package-lock.json`).
+- **Empty-state:** при отсутствии снапшотов показывается Ant `Empty` с подсказкой «Нажмите Backfill…» (только для ADMIN/SUPER_ADMIN).
+- Frontend tsc + lint + build clean.
 
 ---
 
