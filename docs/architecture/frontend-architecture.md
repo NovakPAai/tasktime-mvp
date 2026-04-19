@@ -253,16 +253,20 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 
 ### `issues.store`
 
-Файл: `frontend/src/store/issues.store.ts` · 3 полей состояния · 3 экшенов
+Файл: `frontend/src/store/issues.store.ts` · 7 полей состояния · 3 экшенов
 
 | Поле / Экшен | Тип | Вид |
 |-------------|-----|-----|
 | `issues` | `Issue[]` | состояние |
 | `loading` | `boolean` | состояние |
+| `error` | `string | null` | состояние |
+| `total` | `number` | состояние |
+| `currentPage` | `number` | состояние |
+| `pageSize` | `number` | состояние |
 | `filters` | `IssuesFilters` | состояние |
 | `setFilters` | `(filters: Partial<IssuesFilters>) => void` | экшен |
 | `resetFilters` | `() => void` | экшен |
-| `fetchIssues` | `(projectId: string) => Promise<void>` | экшен |
+| `fetchIssues` | `(projectId: string, page?: number) => Promise<void>` | экшен |
 
 ### `projects.store`
 
@@ -296,4 +300,14 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `nextStep` | `() => void` | экшен |
 | `prevStep` | `() => void` | экшен |
 | `stopTest` | `() => void` | экшен |
+
+### `ui.store`
+
+Файл: `frontend/src/store/ui.store.ts` · 1 полей состояния · 2 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `sidebarCollapsed` | `boolean` | состояние |
+| `setSidebarCollapsed` | `(collapsed: boolean) => void` | экшен |
+| `toggleSidebar` | `() => void` | экшен |
 <!-- AUTO-GENERATED:END:stores -->
