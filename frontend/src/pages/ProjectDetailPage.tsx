@@ -10,7 +10,6 @@ import {
   AppstoreOutlined,
   ThunderboltOutlined,
   TagOutlined,
-  ApartmentOutlined,
   SearchOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
@@ -145,25 +144,6 @@ function getPriorityColor(p: IssuePriority, C: typeof DARK_C): string {
   }
 }
 
-// ─── buildTree ────────────────────────────────────────────────
-function buildTree(issues: Issue[]): Issue[] {
-  const map = new Map(issues.map((i) => [i.id, { ...i, children: [] as Issue[] }]));
-  const roots: Issue[] = [];
-  for (const issue of map.values()) {
-    if (issue.parentId && map.has(issue.parentId)) {
-      map.get(issue.parentId)!.children!.push(issue);
-    } else {
-      roots.push(issue);
-    }
-  }
-  for (const node of map.values()) {
-    if (node.children && node.children.length === 0) {
-      delete (node as Issue & { children?: Issue[] }).children;
-    }
-  }
-  return roots;
-}
-
 // ─── Component ───────────────────────────────────────────────
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -171,7 +151,7 @@ export default function ProjectDetailPage() {
   const { mode } = useThemeStore();
   const C = mode === 'light' ? LIGHT_C : DARK_C;
 
-  const { issues, loading: issuesLoading, fetchIssues, filters, setFilters, resetFilters } = useIssuesStore();
+  const { issues, loading: issuesLoading, error: issuesError, fetchIssues, filters, setFilters, resetFilters, total, currentPage, pageSize } = useIssuesStore();
   const { user } = useAuthStore();
   const [project, setProject] = useState<Project | null>(null);
   const [dashboard, setDashboard] = useState<projectsApi.ProjectDashboard | null>(null);
@@ -181,7 +161,6 @@ export default function ProjectDetailPage() {
   const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
   const [bulkAssigneeId, setBulkAssigneeId] = useState<string | undefined>(undefined);
   const [bulkStatusWizardOpen, setBulkStatusWizardOpen] = useState(false);
-  const [treeMode, setTreeMode] = useState(true);
   const [issueTypeConfigs, setIssueTypeConfigs] = useState<IssueTypeConfig[]>([]);
 
   useEffect(() => {
@@ -204,15 +183,15 @@ export default function ProjectDetailPage() {
       message.success('Issue created');
       setModalOpen(false);
       form.resetFields();
-      fetchIssues(id);
+      fetchIssues(id, 1);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
       message.error(error.response?.data?.error || 'Failed to create issue');
     }
   };
 
-  const handleApplyFilters = () => { if (id) fetchIssues(id); };
-  const handleResetFilters  = () => { if (id) { resetFilters(); fetchIssues(id); } };
+  const handleApplyFilters = () => { if (id) fetchIssues(id, 1); };
+  const handleResetFilters  = () => { if (id) { resetFilters(); fetchIssues(id, 1); } };
 
   const handleBulkAssigneeUpdate = async () => {
     if (!id || selectedIssueIds.length === 0 || bulkAssigneeId === undefined) return;
@@ -224,7 +203,7 @@ export default function ProjectDetailPage() {
       message.success('Исполнитель обновлён');
       setSelectedIssueIds([]);
       setBulkAssigneeId(undefined);
-      fetchIssues(id);
+      fetchIssues(id, currentPage);
     } catch {
       message.error('Failed to update assignee');
     }
@@ -236,7 +215,7 @@ export default function ProjectDetailPage() {
       const result = await issuesApi.bulkDeleteIssues(id, selectedIssueIds);
       message.success(`Удалено задач: ${result.deletedCount}`);
       setSelectedIssueIds([]);
-      fetchIssues(id);
+      fetchIssues(id, currentPage);
       projectsApi.getProjectDashboard(id).then(setDashboard);
     } catch {
       message.error('Failed to delete issues');
@@ -388,14 +367,6 @@ export default function ProjectDetailPage() {
       }
     : undefined;
 
-  // ─── Stats counts ──────────────────────────────────────────
-  const statusStats = [
-    { key: 'OPEN',        color: C.sOpen,     label: 'Open' },
-    { key: 'IN_PROGRESS', color: C.sProgress, label: 'In Progress' },
-    { key: 'REVIEW',      color: C.sReview,   label: 'Review' },
-    { key: 'DONE',        color: C.sDone,     label: 'Done' },
-    { key: 'CANCELLED',   color: C.sCancelled,label: 'Cancelled' },
-  ] as const;
 
   // ─── Action button style helper ───────────────────────────
   const actionBtnStyle: React.CSSProperties = {
@@ -507,18 +478,6 @@ export default function ProjectDetailPage() {
               <TagOutlined style={{ fontSize: 12 }} />
               Релизы
             </button>
-            <button
-              style={{
-                ...actionBtnStyle,
-                background: treeMode ? C.acc : C.bgCard,
-                color: treeMode ? '#FFFFFF' : C.t2,
-                border: `1px solid ${treeMode ? C.acc : C.border}`,
-              }}
-              onClick={() => setTreeMode((v) => !v)}
-            >
-              <ApartmentOutlined style={{ fontSize: 12 }} />
-              {treeMode ? 'Tree' : 'Flat'}
-            </button>
             {canCreate && (
               <button
                 data-testid="issue-create-btn"
@@ -557,17 +516,6 @@ export default function ProjectDetailPage() {
               {dashboard.totals.totalIssues}
             </strong>
           </span>
-
-          {statusStats.map(({ key, color, label }) => {
-            const count = issues.filter(i => i.status === key).length;
-            return (
-              <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: F.sans, fontSize: 12, color: C.t3 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                {label}{' '}
-                <strong style={{ fontFamily: F.display, color: C.t2, fontWeight: 600 }}>{count}</strong>
-              </span>
-            );
-          })}
 
           {dashboard.activeSprint && (
             <>
@@ -623,7 +571,7 @@ export default function ProjectDetailPage() {
           placeholder="Type"
           value={filters.issueTypeConfigId}
           maxTagCount={1}
-          onChange={(value) => { setFilters({ issueTypeConfigId: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ issueTypeConfigId: value }); if (id) fetchIssues(id, 1); }}
           options={issueTypeConfigs.map((c) => ({ value: c.id, label: c.name.replace(/^->\s*/, '') }))}
           style={{ minWidth: 100, fontFamily: F.sans, fontSize: 12 }}
           size="small"
@@ -633,7 +581,7 @@ export default function ProjectDetailPage() {
           placeholder="Status"
           value={filters.status}
           maxTagCount={1}
-          onChange={(value) => { setFilters({ status: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ status: value }); if (id) fetchIssues(id, 1); }}
           options={(['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED'] as IssueStatus[]).map((v) => ({ value: v, label: v }))}
           style={{ minWidth: 100, fontFamily: F.sans, fontSize: 12 }}
           size="small"
@@ -643,7 +591,7 @@ export default function ProjectDetailPage() {
           placeholder="Priority"
           value={filters.priority}
           maxTagCount={1}
-          onChange={(value) => { setFilters({ priority: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ priority: value }); if (id) fetchIssues(id, 1); }}
           options={(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as IssuePriority[]).map((v) => ({ value: v, label: v }))}
           style={{ minWidth: 100, fontFamily: F.sans, fontSize: 12 }}
           size="small"
@@ -652,7 +600,7 @@ export default function ProjectDetailPage() {
           allowClear
           placeholder="Assignee"
           value={filters.assigneeId}
-          onChange={(value) => { setFilters({ assigneeId: value }); if (id) fetchIssues(id); }}
+          onChange={(value) => { setFilters({ assigneeId: value }); if (id) fetchIssues(id, 1); }}
           options={[
             { value: 'UNASSIGNED', label: 'Unassigned' },
             ...allUsers.map((u) => ({ value: u.id, label: u.name })),
@@ -671,7 +619,7 @@ export default function ProjectDetailPage() {
 
         <div style={{ flex: 1 }} />
         <span style={{ fontFamily: F.sans, fontSize: 12, color: C.t3 }}>
-          {issues.length} issues
+          {total} issues
         </span>
 
         {canBulkEdit && selectedIssueIds.length > 0 && (
@@ -729,6 +677,11 @@ export default function ProjectDetailPage() {
 
       {/* ── Table ── */}
       <div style={{ padding: '0 28px 28px' }}>
+        {issuesError && (
+          <div style={{ margin: '16px 0', padding: '10px 16px', background: '#2d1a1a', border: '1px solid #5c2a2a', borderRadius: 8, color: '#f87171', fontFamily: F.sans, fontSize: 13 }}>
+            {issuesError}
+          </div>
+        )}
         <div style={{
           marginTop: 16,
           background: C.bgCard,
@@ -737,23 +690,24 @@ export default function ProjectDetailPage() {
           overflow: 'hidden',
         }}>
           <Table
-            dataSource={treeMode ? buildTree(issues) : issues}
+            dataSource={issues}
             columns={columns}
             rowKey="id"
             loading={issuesLoading}
-            pagination={{ pageSize: 25, size: 'small', showTotal: (t) => `${t} issues` }}
+            pagination={{
+              current: currentPage,
+              pageSize,
+              total,
+              size: 'small',
+              showTotal: (t) => `${t} issues`,
+              onChange: (page) => { if (id) fetchIssues(id, page); },
+            }}
             size="small"
             rowSelection={rowSelection}
             onRow={(record) => ({
-              onClick: (e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('.ant-table-row-expand-icon') || target.closest('.ant-table-row-indent')) return;
-                navigate(`/issues/${record.id}`);
-              },
+              onClick: () => navigate(`/issues/${record.id}`),
               style: { cursor: 'pointer' },
             })}
-            indentSize={24}
-            expandable={treeMode ? { defaultExpandAllRows: false } : undefined}
           />
         </div>
       </div>
@@ -762,7 +716,7 @@ export default function ProjectDetailPage() {
       <Modal
         title="New Issue"
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); if (id) void fetchIssues(id); }}
+        onCancel={() => { setModalOpen(false); if (id) void fetchIssues(id, currentPage); }}
         onOk={() => form.submit()}
         okText="Create"
         width={600}
@@ -834,9 +788,9 @@ export default function ProjectDetailPage() {
           onSuccess={() => {
             setBulkStatusWizardOpen(false);
             setSelectedIssueIds([]);
-            if (id) fetchIssues(id);
+            if (id) fetchIssues(id, currentPage);
           }}
-          onCancel={() => { setBulkStatusWizardOpen(false); if (id) void fetchIssues(id); }}
+          onCancel={() => { setBulkStatusWizardOpen(false); if (id) void fetchIssues(id, currentPage); }}
         />
       )}
     </div>

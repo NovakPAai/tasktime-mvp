@@ -395,7 +395,7 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
       setAddIssuesOpen(true);
     } else {
       if (!release?.projectId) return;
-      const issues = await issuesApi.listIssues(release.projectId);
+      const issues = await issuesApi.listAllIssues(release.projectId);
       setAllIssues(issues);
       setAddIssuesOpen(true);
     }
@@ -407,7 +407,7 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
     if (!projectId) return;
     setLoadingModalIssues(true);
     try {
-      const issues = await issuesApi.listIssues(projectId);
+      const issues = await issuesApi.listAllIssues(projectId);
       setAllIssues(issues);
     } catch {
       void message.error('Не удалось загрузить задачи проекта');
