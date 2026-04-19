@@ -1,0 +1,216 @@
+{
+  "key": "TTMP-160",
+  "title": "Модуль контрольных точек релизов",
+  "generatedAt": "2026-04-18T11:30:00.000Z",
+  "updatedAt": "2026-04-18T12:15:00.000Z",
+  "version": "v4 (+ zero-context impl details §12 + PR plan §13)",
+  "generatedBy": "claude-code",
+  "source": {
+    "apiUrl": "http://5.129.242.171:8080/api",
+    "issueId": "29a09ec2-bb96-4a27-8dc7-9908faa37e76",
+    "fetchedAt": "2026-04-18T11:30:00.000Z"
+  },
+  "issue": {
+    "type": "EPIC",
+    "status": "OPEN",
+    "priority": "HIGH",
+    "project": "TTMP",
+    "assignee": null,
+    "creator": "Admin User",
+    "estimatedHours": 126,
+    "description": "См. docs/tz/TTMP-160.md",
+    "acceptanceCriteria": "См. docs/tz/TTMP-160.md §7"
+  },
+  "dependencies": {
+    "backendModules": [
+      "releases (new subdir checkpoints/, new burndown.service)",
+      "issues (hook in updateIssue / bulk* / custom-field setter)",
+      "custom-fields (read-only metadata + blocked delete when used)",
+      "workflow-engine (reuse ValidatorRule format; extend post-functions with CHECKPOINT_WEBHOOK)",
+      "shared/redis (acquireLock for scheduler + debounce state + burndown cache)",
+      "shared/config (new env vars CHECKPOINTS_SCHEDULER_*, BURNDOWN_*)",
+      "admin (new audit page)"
+    ],
+    "frontendComponents": [
+      "GlobalReleasesPage.tsx (risk badge, CheckpointsBlock, filter, sort, bulk-apply, Burndown tab)",
+      "ReleasesPage.tsx",
+      "IssueDetailPage.tsx (grouped CheckpointsBlock + history block)",
+      "BoardPage.tsx + ProjectDetailPage.tsx (IssueCheckpointIndicator)",
+      "DashboardPage.tsx + TimePage.tsx (my-issues-at-risk filter)",
+      "layout/TopBar.tsx (violation badge)",
+      "pages/admin/AdminReleaseCheckpointTypesPage.tsx",
+      "pages/admin/AdminReleaseCheckpointTemplatesPage.tsx",
+      "pages/admin/AdminCheckpointAuditPage.tsx",
+      "components/releases/CheckpointTrafficLight.tsx (a11y)",
+      "components/releases/ReleaseRiskBadge.tsx",
+      "components/releases/CheckpointsBlock.tsx (с разбивкой N/M/K)",
+      "components/releases/CheckpointsMatrix.tsx (FR-26)",
+      "components/releases/ApplyCheckpointTemplateModal.tsx (с превью)",
+      "components/releases/CheckpointRiskFilter.tsx",
+      "components/releases/ReleaseBurndownChart.tsx (FR-29, FR-30, Recharts)",
+      "components/issues/IssueCheckpointIndicator.tsx",
+      "api/release-checkpoints.ts, api/release-checkpoint-types.ts, api/release-checkpoint-templates.ts, api/release-burndown.ts",
+      "types/release.types.ts (Checkpoint*, BurndownSnapshot, BurndownSeries)"
+    ],
+    "prismaModels": [
+      "CheckpointType",
+      "CheckpointTemplate",
+      "CheckpointTemplateItem",
+      "ReleaseCheckpoint (+ criteriaSnapshot, offsetDaysSnapshot, violationsHash, applicableIssueIds, passedIssueIds)",
+      "CheckpointViolationEvent",
+      "ReleaseBurndownSnapshot (FR-28)",
+      "enum CheckpointWeight",
+      "enum CheckpointState"
+    ],
+    "externalPackages": [
+      "node-cron (MIT, для двух cron-джобов: КТ и burndown)",
+      "recharts (MIT, для burndown-диаграммы)",
+      "axe-core (Playwright, a11y)"
+    ],
+    "blockers": []
+  },
+  "risks": [
+    { "id": 1, "description": "N+1 при массовых обновлениях", "probability": "HIGH", "mitigation": "Агрегация по releaseId." },
+    { "id": 2, "description": "Гонки cron между инстансами", "probability": "MEDIUM", "mitigation": "Redis lock 300s." },
+    { "id": 3, "description": "Смена plannedDate → устаревшие deadlines", "probability": "MEDIUM", "mitigation": "updateRelease → recompute." },
+    { "id": 4, "description": "Удалённая задача в violations", "probability": "LOW", "mitigation": "removeReleaseItems → recompute." },
+    { "id": 5, "description": "Удалённое CustomField в критерии", "probability": "LOW", "mitigation": "Блокировка удаления поля 409." },
+    { "id": 6, "description": "Перегрузка cron", "probability": "LOW", "mitigation": "Окно ±30d + пагинация 50." },
+    { "id": 7, "description": "Двойной пересчёт cron+event", "probability": "MEDIUM", "mitigation": "violationsHash diff-skip." },
+    { "id": 8, "description": "Расширение ValidatorRule ломает workflow", "probability": "LOW", "mitigation": "Отдельный union CheckpointCriterion." },
+    { "id": 9, "description": "Ретроспективное редактирование типа КТ", "probability": "HIGH", "mitigation": "FR-15 snapshot в ReleaseCheckpoint." },
+    { "id": 10, "description": "Лишний запрос на IssueDetailPage", "probability": "MEDIUM", "mitigation": "FR-19 inline include." },
+    { "id": 11, "description": "Webhook flapping", "probability": "MEDIUM", "mitigation": "FR-17 debounce minStableSeconds=300." },
+    { "id": 12, "description": "A11y светофора", "probability": "MEDIUM", "mitigation": "FR-18 цвет+иконка+текст." },
+    { "id": 13, "description": "Неограниченный рост burndown-снапшотов", "probability": "MEDIUM", "mitigation": "FR-32: 90d после DONE + weekly-aggregation после 365d." },
+    { "id": 14, "description": "Burndown без достоверного initial для старых релизов", "probability": "MEDIUM", "mitigation": "Initial = max(createdAt, now-30d); пометка даты старта снапшотов в UI." },
+    { "id": 15, "description": "Пересчёт applicable/passed для больших релизов — O(N×M)", "probability": "LOW", "mitigation": "Храним только ID; UI тянет title пачкой; Redis-кэш 60s." }
+  ],
+  "requirements": {
+    "functional": {
+      "core_mvp": [
+        "FR-1: CRUD типов КТ",
+        "FR-2: CRUD шаблонов + clone",
+        "FR-3: Применение шаблона к релизу + CRUD КТ на релизе + ручной recompute",
+        "FR-4: state/deadline/violations/lastEvaluatedAt",
+        "FR-5: Бейдж риска + список КТ со светофором",
+        "FR-6: Блок применимых КТ на задаче",
+        "FR-7: Cron + event-hook триггеры",
+        "FR-8: Риск sum(weight_violated)/sum(weight_all) → LOW/MEDIUM/HIGH/CRITICAL",
+        "FR-9: 6 типов критериев",
+        "FR-10: Аудит всех действий"
+      ],
+      "ux_phase_2": [
+        "FR-11: Индикатор на карточке задачи",
+        "FR-12: TopBar badge + DashboardPage фильтр",
+        "FR-13: Фильтр/сортировка релизов по риску",
+        "FR-14: Preview-template",
+        "FR-15: Snapshot criteria + offsetDays",
+        "FR-16: Human-readable reason + inline-actions",
+        "FR-17: CHECKPOINT_WEBHOOK с debounce",
+        "FR-18: A11y светофора",
+        "FR-19: Inline ?include=checkpoints",
+        "FR-20: Группировка КТ по релизу на задаче",
+        "FR-21: Bulk-apply шаблона",
+        "FR-22: История КТ на задаче",
+        "FR-23: /admin/checkpoint-audit + CSV",
+        "FR-24: AND между критериями"
+      ],
+      "rm_visibility": [
+        "FR-25: Разбивка N applicable / M passed / K violated в CheckpointsBlock",
+        "FR-26: Матричный вид «Задачи × КТ» с CSV",
+        "FR-27: Расширенный GET /checkpoints с passedIssues/violatedIssues"
+      ],
+      "burndown": [
+        "FR-28: Ежедневный снапшот в ReleaseBurndownSnapshot (cron 5 0 * * *)",
+        "FR-29: GET /api/releases/:id/burndown?metric=issues|hours|violations",
+        "FR-30: UI Burndown-диаграммы (вкладка в DetailPanel, Recharts, переключатель метрики)",
+        "FR-31: POST /burndown/backfill (ADMIN)",
+        "FR-32: Политика хранения (90d после DONE + weekly agg после 365d)"
+      ]
+    },
+    "nonFunctional": [
+      "API < 200ms p95",
+      "recomputeForRelease < 500ms для 200 задач × 10 КТ",
+      "Cron-тик ≤ 100 ms подряд event-loop",
+      "Event-hook не увеличивает p95 PATCH /issues/:id > 20ms",
+      "Burndown GET < 300ms с Redis-cache",
+      "Матрица с 500 задач × 10 КТ: виртуализация, рендер < 200ms"
+    ],
+    "security": [
+      "SEC-1: Типы/шаблоны — только SUPER_ADMIN/ADMIN/RELEASE_MANAGER",
+      "SEC-2: КТ на релизе — RELEASE_MANAGER или ProjectPermission.RELEASE_MANAGE",
+      "SEC-3: violations без PII",
+      "SEC-4: CustomField delete блокируется 409",
+      "SEC-5: apply-bulk per-release RBAC",
+      "SEC-6: /admin/checkpoint-audit только AUDITOR+",
+      "SEC-7: TopBar badge — только свои",
+      "SEC-8: burndown backfill — только ADMIN/SUPER_ADMIN",
+      "SEC-9: CSV без PII (только key/title/status)"
+    ]
+  },
+  "estimation": {
+    "analysis": 4,
+    "backend": 56,
+    "frontend": 56,
+    "testing": 14,
+    "review": 8,
+    "documentation": 4,
+    "total": 126
+  },
+  "phases": {
+    "phase1_mvp_hours": 79,
+    "phase1_stories": ["S-1", "S-2", "S-3", "S-4", "S-5", "S-6", "S-11 (basic)"],
+    "phase2_extension_hours": 47,
+    "phase2_stories": ["S-7", "S-8", "S-9 matrix", "S-10 burndown", "S-11 (finalize)"]
+  },
+  "stories": [
+    { "id": "S-1", "title": "DB + CRUD типов/шаблонов (snapshot, events)", "hours": 10 },
+    { "id": "S-2", "title": "Движок критериев + human reason + breakdown", "hours": 10 },
+    { "id": "S-3", "title": "Привязка к релизу + риск + превью + inline + breakdown API", "hours": 14 },
+    { "id": "S-4", "title": "Cron + event-hooks + debounce", "hours": 8 },
+    { "id": "S-5", "title": "Админ-UI (типы, шаблоны, превью, sync)", "hours": 15 },
+    { "id": "S-6", "title": "UI релиза и задачи (светофор, N/M/K, группировка, история)", "hours": 16 },
+    { "id": "S-7", "title": "Индикаторы в карточках + TopBar + DashboardPage", "hours": 8 },
+    { "id": "S-8", "title": "Bulk-apply + webhook + аудит-страница + CSV", "hours": 10 },
+    { "id": "S-9", "title": "Матрица «Задачи × КТ» + CSV", "hours": 8 },
+    { "id": "S-10", "title": "Burndown (model, cron, API, Recharts)", "hours": 16 },
+    { "id": "S-11", "title": "E2E + a11y + документация по ролям + features/burndown.md", "hours": 11 }
+  ],
+  "roles": {
+    "SUPER_ADMIN": ["CRUD всего", "sync-instances", "backfill burndown", "аудит", "recompute"],
+    "ADMIN": ["CRUD всего", "sync-instances", "backfill burndown", "аудит", "recompute"],
+    "RELEASE_MANAGER": [
+      "CRUD типов/шаблонов",
+      "Применение (одиночное и bulk)",
+      "Разбивка N/M/K для каждой КТ",
+      "Матрица «Задачи × КТ»",
+      "Burndown-диаграмма (3 метрики)",
+      "Ручной recompute"
+    ],
+    "MANAGER": [
+      "Применить готовый шаблон к своему ATOMIC-релизу",
+      "Удалить КТ",
+      "Ручной recompute",
+      "Burndown своих релизов (read-only)"
+    ],
+    "MEMBER_USER": [
+      "Блок КТ на своих задачах",
+      "Красная полоска на карточке",
+      "TopBar badge",
+      "Фильтр 'Мои в риске'",
+      "Burndown релиза (read-only)"
+    ],
+    "AUDITOR": [
+      "Просмотр /admin/checkpoint-audit",
+      "CSV-экспорт",
+      "Burndown всех релизов (read-only)"
+    ]
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [],
+    "blocks": [],
+    "dependsOn": ["TTMP-140", "TTMP-223"]
+  }
+}

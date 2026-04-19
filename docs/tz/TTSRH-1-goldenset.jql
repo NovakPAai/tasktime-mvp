@@ -1,0 +1,187 @@
+-- TTSRH-1 Golden-set JQL
+-- Каждый запрос ДОЛЖЕН успешно парситься, валидироваться и выполняться на тестовом сиде.
+-- Блокирует merge PR'ов по TTSRH-1.
+
+-- ─── 1. Мои задачи / фокус ────────────────────────────────────────────────
+-- 01
+assignee = currentUser() AND statusCategory != DONE ORDER BY priority DESC, updated DESC
+-- 02
+assignee = currentUser() AND status = "REVIEW" AND updated < "-3d"
+-- 03
+myOpenIssues() ORDER BY due ASC
+-- 04
+assignee = currentUser() AND due <= today() AND statusCategory != DONE
+
+-- ─── 2. Просрочки / дедлайны ──────────────────────────────────────────────
+-- 05
+due < now() AND statusCategory != DONE ORDER BY due ASC
+-- 06
+due >= startOfWeek() AND due <= endOfWeek() AND assignee = currentUser()
+-- 07
+due IS NOT EMPTY AND priority IN (CRITICAL, HIGH) ORDER BY due ASC, priority DESC
+
+-- ─── 3. Спринты ───────────────────────────────────────────────────────────
+-- 08
+sprint in openSprints() AND statusCategory != DONE ORDER BY priority DESC
+-- 09
+sprint IS EMPTY AND status = OPEN AND project = "TTMP"
+-- 10
+sprint in futureSprints() AND project IN (TTMP, TTUI)
+
+-- ─── 4. Релизы / версии ───────────────────────────────────────────────────
+-- 11
+release = "v2.5.0" AND statusCategory = DONE
+-- 12
+release in unreleasedVersions("TTMP") AND priority = CRITICAL
+-- 13
+release = earliestUnreleasedVersion("TTMP")
+
+-- ─── 5. Кастомные поля ────────────────────────────────────────────────────
+-- 14
+"Story Points" > 5 AND sprint in openSprints()
+-- 15
+"Story Points" IS EMPTY AND priority = HIGH
+-- 16
+cf[12345678-1234-1234-1234-123456789abc] = "Done" AND project = "TTMP"
+-- 17
+"Business Value" >= 50 AND "Effort" <= 13 ORDER BY "Business Value" DESC
+
+-- ─── 6. Связи ─────────────────────────────────────────────────────────────
+-- 18
+issue in linkedIssues("TTMP-42", "blocks") AND statusCategory != DONE
+-- 19
+issue in subtasksOf("TTMP-10")
+-- 20
+issue in epicIssues("TTMP-1") AND statusCategory != DONE
+
+-- ─── 7. Логика / группы ───────────────────────────────────────────────────
+-- 21
+NOT (status = DONE OR status = CANCELLED) AND assignee = currentUser()
+-- 22
+(priority = CRITICAL OR (priority = HIGH AND due <= "7d")) AND statusCategory != DONE
+-- 23
+assignee in membersOf("flow-team-1") AND due < now() AND statusCategory != DONE
+-- 24
+assignee IS EMPTY AND priority IN (CRITICAL, HIGH) AND project IN (TTMP, TTUI, TTSEC)
+
+-- ─── 8. Текстовый поиск ───────────────────────────────────────────────────
+-- 25
+summary ~ "аутентификация" OR description ~ "аутентификация"
+-- 26
+comment ~ "LGTM" AND updated >= "-1d"
+-- 27
+summary !~ "[DRAFT]" AND statusCategory != DONE
+
+-- ─── 9. Типы / статусы / приоритеты ───────────────────────────────────────
+-- 28
+type = EPIC AND statusCategory != DONE
+-- 29
+type IN (BUG, INCIDENT) AND priority = CRITICAL
+-- 30
+status IN ("Blocked", "Waiting for review") AND project = "TTMP"
+
+-- ─── 10. Время ────────────────────────────────────────────────────────────
+-- 31
+timeSpent > 8 AND assignee = currentUser()
+-- 32
+estimatedHours IS EMPTY AND priority = CRITICAL
+-- 33
+timeRemaining < 0 AND statusCategory = IN_PROGRESS
+
+-- ─── 11. Даты (абсолютные и относительные) ────────────────────────────────
+-- 34
+created >= startOfWeek() AND created < endOfWeek()
+-- 35
+created >= "2026-01-01" AND created < "2026-04-01"
+-- 36
+updated >= "-7d" AND assignee = currentUser()
+-- 37
+resolvedAt >= startOfMonth("-1M") AND resolvedAt < startOfMonth()
+
+-- ─── 12. AI-флаги ─────────────────────────────────────────────────────────
+-- 38
+aiEligible = true AND aiAssigneeType = AGENT AND statusCategory != DONE
+-- 39
+aiStatus = FAILED AND aiEligible = true
+
+-- ─── 13. Labels ───────────────────────────────────────────────────────────
+-- 40
+labels in ("backend", "security") AND statusCategory != DONE
+-- 41
+labels IS EMPTY AND priority = CRITICAL
+
+-- ─── 14. Иерархия ─────────────────────────────────────────────────────────
+-- 42
+parent IS EMPTY AND type IN (TASK, STORY) AND statusCategory != DONE
+-- 43
+epic = "TTMP-10" ORDER BY priority DESC
+-- 44
+hasChildren = true AND statusCategory = DONE AND type != EPIC
+
+-- ─── 15. Комплексные ──────────────────────────────────────────────────────
+-- 45
+project IN (TTMP, TTUI, TTSEC) AND assignee in membersOf("backend-guild")
+  AND priority IN (CRITICAL, HIGH) AND statusCategory != DONE
+  AND sprint in openSprints()
+  ORDER BY priority DESC, due ASC, updated DESC
+-- 46
+(assignee = currentUser() OR reporter = currentUser())
+  AND updated >= "-14d" AND statusCategory != DONE
+-- 47
+"Story Points" > 3 AND "Story Points" <= 8
+  AND sprint in openSprints() AND assignee IS EMPTY
+-- 48
+type = BUG AND priority = CRITICAL AND (labels in ("p0", "hotfix") OR due <= "2d")
+  AND statusCategory != DONE
+-- 49
+NOT (project = "ARCHIVE") AND reporter in membersOf("qa-team")
+  AND created >= startOfMonth() ORDER BY created DESC
+-- 50
+release = latestReleasedVersion("TTMP") AND type = BUG AND statusCategory != DONE
+  ORDER BY priority DESC
+
+-- ─── 16. Нарушения контрольных точек (КТ) ────────────────────────────────
+-- 51: Все задачи с активными нарушениями КТ
+issue in violatedCheckpoints() ORDER BY priority DESC
+
+-- 52: Задачи с нарушением конкретного типа КТ
+issue in violatedCheckpoints("Go-live")
+
+-- 53: То же через булев алиас
+hasCheckpointViolation = true AND assignee = currentUser()
+
+-- 54: Нарушения в конкретном релизе
+issue in violatedCheckpointsOf("REL-2.5.0")
+
+-- 55: Нарушения в релизе, только по типу «Code review»
+issue in violatedCheckpointsOf("REL-2.5.0", "Code review")
+
+-- 56: Задачи в релизах, где КТ в состоянии WARNING/OVERDUE/ERROR
+issue in checkpointsAtRisk()
+
+-- 57: То же, но только по типу «Release readiness»
+issue in checkpointsAtRisk("Release readiness")
+
+-- 58: Задачи в релизах с просроченными КТ
+issue in checkpointsInState(OVERDUE)
+
+-- 59: Мои задачи, нарушающие КТ «Deploy»
+assignee = currentUser() AND issue in violatedCheckpoints("Deploy")
+
+-- 60: Фильтр по типу нарушения (несколько)
+checkpointViolationType IN ("Go-live", "Deploy", "Release readiness")
+  AND priority IN (CRITICAL, HIGH)
+  ORDER BY priority DESC, due ASC
+
+-- 61: Поиск по причине нарушения
+checkpointViolationReason ~ "Срок задачи" AND statusCategory != DONE
+
+-- 62: Критичные задачи, не нарушающие КТ (для отчёта «всё ОК»)
+priority = CRITICAL AND hasCheckpointViolation = false
+  AND statusCategory != DONE
+
+-- 63: Комплекс: мои блокеры в просроченных КТ релиза
+assignee = currentUser()
+  AND issue in violatedCheckpointsOf("REL-2.5.0")
+  AND (priority = CRITICAL OR labels IN ("blocker"))
+  ORDER BY priority DESC, due ASC
