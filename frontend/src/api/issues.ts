@@ -47,7 +47,6 @@ export async function listIssues(
   return data;
 }
 
-// TODO: replace with cursor-pagination when projects grow beyond 500 issues (TTMP-XXX)
 export async function listAllIssues(projectId: string, filters?: IssueFilters): Promise<Issue[]> {
   const PAGE = 500;
   const first = await listIssues(projectId, filters, { page: 1, limit: PAGE });
