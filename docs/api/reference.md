@@ -1013,3 +1013,84 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `PUT` | `/api/:id/transitions/:tid` | 🔒 |
 | `DELETE` | `/api/:id/transitions/:tid` | 🔒 |
 <!-- AUTO-GENERATED:END -->
+
+---
+
+## TTMP-160 — Release Checkpoints & Burndown (manual section)
+
+> These endpoints are documented manually because the auto-generator flattens them into the
+> `/api/:id/...` shape. Last updated: 2026-04-19.
+
+### Admin — типы и шаблоны КТ
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET`  | `/api/admin/checkpoint-types` | `SUPER_ADMIN` / `ADMIN` / `RELEASE_MANAGER` |
+| `POST` | `/api/admin/checkpoint-types` | ↑ |
+| `PATCH`| `/api/admin/checkpoint-types/:id` | ↑ |
+| `DELETE`| `/api/admin/checkpoint-types/:id` | ↑ |
+| `GET`  | `/api/admin/checkpoint-types/:id/instances` | ↑ (FR-15) |
+| `POST` | `/api/admin/checkpoint-types/:id/sync-instances` | ↑ (FR-15) |
+| `GET`  | `/api/admin/checkpoint-templates` | ↑ |
+| `POST` | `/api/admin/checkpoint-templates` | ↑ |
+| `PATCH`| `/api/admin/checkpoint-templates/:id` | ↑ |
+| `DELETE`| `/api/admin/checkpoint-templates/:id` | ↑ |
+| `POST` | `/api/admin/checkpoint-templates/:id/clone` | ↑ |
+
+### Релиз-скоуп (чтение — любой с `RELEASES_VIEW`; мутации — `RELEASES_EDIT`)
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/releases/:releaseId/checkpoints` | release-read |
+| `GET` | `/api/releases/:releaseId/checkpoints/matrix[?format=csv]` | release-read (FR-26 / FR-27) |
+| `POST`| `/api/releases/:releaseId/checkpoints` body `{ checkpointTypeIds: string[] }` | release-mutate |
+| `POST`| `/api/releases/:releaseId/checkpoints/apply-template` body `{ templateId }` | release-mutate |
+| `POST`| `/api/releases/:releaseId/checkpoints/preview-template` body `{ templateId }` | release-read (FR-14) |
+| `POST`| `/api/releases/:releaseId/checkpoints/recompute` | release-mutate |
+| `DELETE`| `/api/releases/:releaseId/checkpoints/:checkpointId` | release-mutate |
+| `POST`| `/api/admin/checkpoint-templates/bulk-apply` body `{ templateId, releaseIds: string[] }` | `SUPER_ADMIN` / `ADMIN` / `RELEASE_MANAGER`; ответ `207 Multi-Status` с per-release partition (FR-21) |
+
+### Задача
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/issues/:issueId/checkpoints` | issue-read (ISSUES_VIEW или global read-role) |
+| `GET` | `/api/issues/:issueId/checkpoint-events` | issue-read (FR-22) |
+
+### User/project-scoped summaries
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/projects/:projectId/checkpoint-violating-issues` | project-read |
+| `GET` | `/api/my-checkpoint-violations` | authenticated (SEC-7: assignee + project-membership) |
+| `GET` | `/api/my-checkpoint-violations/count` | ↑ |
+
+### Аудит
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/admin/checkpoint-audit[?format=csv]` | `SUPER_ADMIN` / `ADMIN` / `AUDITOR` (SEC-6 / SEC-9) |
+
+### Burndown
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/releases/:releaseId/burndown?metric=issues\|hours\|violations&from=YYYY-MM-DD&to=YYYY-MM-DD` | release-read (FR-29) |
+| `POST`| `/api/releases/:releaseId/burndown/backfill` body `{ date?: YYYY-MM-DD }` | `SUPER_ADMIN` / `ADMIN` only (SEC-8 / FR-31) |
+
+**Response shape (`GET /burndown`):**
+
+```json
+{
+  "releaseId": "...",
+  "metric": "issues",
+  "plannedDate": "2026-06-01",
+  "releaseDate": null,
+  "initial": { "date": "2026-05-01", "total": 20, "done": 2, "open": 18, "cancelled": 0, ... },
+  "series": [{ "date": "2026-05-01", ... }, ...],
+  "idealLine": [{ "date": "2026-05-01", "value": 18 }, ..., { "date": "2026-06-01", "value": 0 }]
+}
+```
+
+CSV экспорт матрицы и аудита использует UTF-8 BOM + CRLF — читается в Excel с кириллицей без мусора (FR-23 / FR-27 / SEC-9).
+
