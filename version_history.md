@@ -2,7 +2,24 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.20**
+**Last version: 2.21**
+
+---
+
+## [2.21] [2026-04-18] feat(checkpoints): TTMP-160 PR-10 — burndown backend (snapshots + API + cron)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttmp-160/burndown-backend`
+
+### Что изменилось
+- **Backend FR-28 snapshots:** `burndown.service.ts` — `captureSnapshot(releaseId, date?)` собирает агрегаты по `ReleaseItem` (total/done/open/cancelled + сумма `estimatedHours`) + счётчики по `ReleaseCheckpoint` (`violatedCheckpoints`, `totalCheckpoints`). Upsert по `(releaseId, snapshotDate)` — одна запись в день, многократные тики идемпотентны.
+- **Backend FR-29 API:** `GET /api/releases/:releaseId/burndown?metric=issues|hours|violations&from=&to=` возвращает `{ releaseId, metric, plannedDate, releaseDate, initial, series[], idealLine[] }`. Ideal-line строится по формуле §12.4: `value = start_value * (1 − (day − start) / (end − start))` от первого снапшота до `plannedDate`. Redis-кэш `burndown:{releaseId}:{metric}:{from}:{to}` TTL 300s, инвалидация — на каждом `recomputeForRelease` + `captureSnapshot`.
+- **Backend FR-31 backfill:** `POST /api/releases/:releaseId/burndown/backfill` (ADMIN/SUPER_ADMIN — SEC-8; RELEASE_MANAGER 403) с опциональным body `{ date?: YYYY-MM-DD }`. Audit `burndown.backfilled` с `meta.snapshotDate`.
+- **Backend FR-32 retention:** `purgeOldSnapshots()` удаляет daily-снапшоты для релизов со статусом DONE/CANCELLED и `releaseDate ≤ now − BURNDOWN_RETENTION_DAYS_AFTER_DONE` (default 90 дней), **сохраняя самый свежий снапшот** на релиз, чтобы UI мог отрисовать финальную точку.
+- **Scheduler:** `checkpoint-scheduler.service.ts` расширен двумя cron-задачами — `BURNDOWN_SNAPSHOT_CRON` (default `5 0 * * *`, лок `burndown:snapshot:lock` TTL 600s) и `BURNDOWN_RETENTION_CRON` (default `0 3 * * 0`, лок `burndown:retention:lock` TTL 600s). Публичный `runOnce('burndown-snapshot' | 'burndown-retention')` для интеграционных тестов (FR-28).
+- **Router:** новый `burndown.router.ts`, смонтирован в `app.ts` на `/api` рядом с `releaseCheckpointsRouter`.
+- `backend/tests/burndown.test.ts`: 10 интеграционных тестов — backfill (ADMIN 201, RELEASE_MANAGER 403, USER 403, upsert), scheduler tick (idempotent per day), retention (оставляет newest, удаляет остальные), GET (shape + initial + idealLine) с metric=issues и metric=hours, read-gate (plain USER 403, project-member USER 200).
+- **Full backend suite:** 516 / 516 green (+10 новых тестов).
 
 ---
 

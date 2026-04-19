@@ -13,6 +13,7 @@ import type { Prisma, ReleaseCheckpoint, CheckpointType } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
 import { AppError } from '../../../shared/middleware/error-handler.js';
 import { delCachedJson, getCachedJson, setCachedJson } from '../../../shared/redis.js';
+import { invalidateBurndownCache } from './burndown.service.js';
 import type {
   CheckpointBreakdown,
   CheckpointCriterion,
@@ -932,6 +933,9 @@ async function fetchIssueIndex(issueIds: string[]) {
 async function invalidateReleaseCache(releaseId: string): Promise<void> {
   // Single exact key (no variants yet) — plain DEL, not a SCAN-based prefix scan.
   await delCachedJson(cacheKey(releaseId));
+  // PR-10: burndown.violatedCheckpoints reads live off ReleaseCheckpoint.state, so any
+  // recompute that could change violations must also blow the burndown response cache.
+  await invalidateBurndownCache(releaseId);
 }
 
 function parseStringIdArray(value: Prisma.JsonValue): string[] {
