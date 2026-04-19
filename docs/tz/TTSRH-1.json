@@ -1,0 +1,356 @@
+{
+  "key": "TTSRH-1",
+  "title": "Внутренний язык запросов TTS-QL (JQL-совместимый) + страница поиска задач с сохраняемыми фильтрами",
+  "generatedAt": "2026-04-18T00:00:00.000Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "basedOn": [
+      "backend/src/modules/issues/issues.router.ts",
+      "backend/src/modules/issues/issues.service.ts",
+      "backend/src/prisma/schema.prisma",
+      "frontend/src/components/layout/Sidebar.tsx",
+      "frontend/src/App.tsx",
+      "frontend/src/pages/ProjectDetailPage.tsx",
+      "docs/tz/TTUI-90.md"
+    ],
+    "analysedAt": "2026-04-18T00:00:00.000Z"
+  },
+  "issue": {
+    "type": "STORY",
+    "status": "OPEN",
+    "priority": "HIGH",
+    "project": "TTSRH",
+    "assignee": null,
+    "creator": "drashkinson@gmail.com",
+    "estimatedHours": 278,
+    "description": "Реализовать декларативный язык TTS-QL, максимально совместимый с JQL. Вынести поиск задач в отдельный пункт меню. UI — в UX-модели Jira Issue Navigator: basic/advanced, конфигурируемые колонки, сохраняемые фильтры, приватность/шаринг, избранное.",
+    "acceptanceCriteria": "См. раздел 7 TTSRH-1.md (Definition of Done)."
+  },
+  "currentStateIssues": [
+    {"id": "P1", "problem": "GET /issues/search ограничен подстрочным поиском по title/key (50 строк), только для связывания"},
+    {"id": "P2", "problem": "GET /projects/:id/issues требует projectId, поддерживает только AND/equals/IN для плоского набора полей"},
+    {"id": "P3", "problem": "Нет кросс-проектного продвинутого поиска"},
+    {"id": "P4", "problem": "Кастомные поля не участвуют в фильтрах"},
+    {"id": "P5", "problem": "Связи (IssueLink) не используются в поиске"},
+    {"id": "P6", "problem": "Фильтр нельзя сохранить, нет шаринга, нет избранного"},
+    {"id": "P7", "problem": "Нельзя настраивать колонки результата (включая custom fields)"},
+    {"id": "P8", "problem": "Нет модели SavedFilter / UserPreferences в Prisma"},
+    {"id": "P9", "problem": "Нет пункта «Поиск задач» в сайдбаре"}
+  ],
+  "queryLanguage": {
+    "name": "TTS-QL",
+    "compatibility": "JQL (JIRA Query Language) — максимальное покрытие операторов, функций, полей",
+    "grammarFile": "docs/tz/TTSRH-1.md#51-грамматика-tts-ql-ebnf",
+    "operators": [
+      {"op": "=", "types": ["all"]},
+      {"op": "!=", "types": ["all"]},
+      {"op": ">", "types": ["NUMBER", "DATE", "DATETIME"]},
+      {"op": ">=", "types": ["NUMBER", "DATE", "DATETIME"]},
+      {"op": "<", "types": ["NUMBER", "DATE", "DATETIME"]},
+      {"op": "<=", "types": ["NUMBER", "DATE", "DATETIME"]},
+      {"op": "~", "types": ["TEXT"], "note": "contains (ILIKE)"},
+      {"op": "!~", "types": ["TEXT"]},
+      {"op": "IN", "types": ["all"]},
+      {"op": "NOT IN", "types": ["all"]},
+      {"op": "IS EMPTY", "types": ["all nullable"]},
+      {"op": "IS NOT EMPTY", "types": ["all nullable"]},
+      {"op": "WAS", "types": ["Status"], "phase": 2},
+      {"op": "WAS NOT", "types": ["Status"], "phase": 2},
+      {"op": "WAS IN", "types": ["Status"], "phase": 2},
+      {"op": "WAS NOT IN", "types": ["Status"], "phase": 2},
+      {"op": "CHANGED", "types": ["any trackable"], "phase": 2},
+      {"op": "CHANGED FROM", "types": ["any trackable"], "phase": 2},
+      {"op": "CHANGED TO", "types": ["any trackable"], "phase": 2},
+      {"op": "CHANGED AFTER", "types": ["any trackable"], "phase": 2},
+      {"op": "CHANGED BEFORE", "types": ["any trackable"], "phase": 2},
+      {"op": "CHANGED ON", "types": ["any trackable"], "phase": 2},
+      {"op": "CHANGED DURING", "types": ["any trackable"], "phase": 2},
+      {"op": "CHANGED BY", "types": ["any trackable"], "phase": 2}
+    ],
+    "logicalOperators": ["AND", "OR", "NOT", "parentheses"],
+    "precedence": "NOT > AND > OR",
+    "orderBy": "ORDER BY field [ASC|DESC] (, field [ASC|DESC])*",
+    "fields": [
+      "project", "key", "summary", "description", "status", "statusCategory",
+      "priority", "type", "assignee", "reporter", "sprint", "release",
+      "parent", "epic", "due", "created", "updated", "resolvedAt",
+      "estimatedHours", "timeSpent", "timeRemaining",
+      "aiEligible", "aiStatus", "aiAssigneeType",
+      "labels", "comment", "orderIndex", "linkedIssue", "hasChildren",
+      "customField:cf[UUID]", "customField:\"Имя\""
+    ],
+    "functions": {
+      "mvp": [
+        "currentUser()",
+        "membersOf(\"group\")",
+        "now()", "today()",
+        "startOfDay([offset])", "endOfDay([offset])",
+        "startOfWeek([offset])", "endOfWeek([offset])",
+        "startOfMonth([offset])", "endOfMonth([offset])",
+        "startOfYear([offset])", "endOfYear([offset])",
+        "openSprints()", "closedSprints()", "futureSprints()",
+        "unreleasedVersions([project])", "releasedVersions([project])",
+        "earliestUnreleasedVersion([project])", "latestReleasedVersion([project])",
+        "linkedIssues(key[, linkType])", "subtasksOf(key)", "epicIssues(key)",
+        "myOpenIssues()",
+        "violatedCheckpoints([typeName])",
+        "violatedCheckpointsOf(releaseKeyOrId[, typeName])",
+        "checkpointsAtRisk([typeName])",
+        "checkpointsInState(state[, typeName])",
+        "releasePlannedDate() — checkpoint-context only",
+        "checkpointDeadline() — checkpoint-context only"
+      ],
+      "phase2": [
+        "watchedIssues()", "votedIssues()", "lastLogin()"
+      ]
+    }
+  },
+  "dependencies": {
+    "backendModules": [
+      {"name": "search (новый)", "files": [
+        "search.parser.ts", "search.ast.ts", "search.validator.ts",
+        "search.compiler.ts", "search.functions.ts", "search.schema.ts",
+        "search.suggest.ts", "search.service.ts", "search.router.ts"
+      ]},
+      {"name": "saved-filters (новый)", "files": [
+        "saved-filters.dto.ts", "saved-filters.service.ts", "saved-filters.router.ts"
+      ]},
+      {"name": "users", "change": "расширение: preferences JSON + PATCH /users/me/preferences"}
+    ],
+    "frontendComponents": [
+      "pages/SearchPage.tsx",
+      "components/search/JqlEditor.tsx",
+      "components/search/BasicFilterBuilder.tsx",
+      "components/search/FilterModeToggle.tsx",
+      "components/search/SavedFiltersSidebar.tsx",
+      "components/search/SaveFilterModal.tsx",
+      "components/search/FilterShareModal.tsx",
+      "components/search/ColumnConfigurator.tsx",
+      "components/search/ResultsTable.tsx",
+      "components/search/BulkActionsBar.tsx",
+      "components/search/ExportMenu.tsx",
+      "components/search/ValidationErrorBanner.tsx",
+      "store/savedFilters.store.ts",
+      "store/search.store.ts",
+      "api/search.ts",
+      "api/savedFilters.ts"
+    ],
+    "prismaChanges": [
+      "model SavedFilter { ownerId, name, description, jql, visibility, columns JSON, isFavorite, lastUsedAt, useCount }",
+      "model SavedFilterShare { filterId, userId?, groupId?, permission }",
+      "enum FilterVisibility { PRIVATE SHARED PUBLIC }",
+      "enum FilterPermission { READ WRITE }",
+      "User.preferences Json? — дефолтные колонки поиска",
+      "CheckpointType.ttqlCondition String? @db.Text — ADDITIVE к существующему criteria Json",
+      "CheckpointType.conditionMode CheckpointConditionMode @default(STRUCTURED)",
+      "enum CheckpointConditionMode { STRUCTURED TTQL COMBINED }",
+      "ReleaseCheckpoint.ttqlSnapshot String? @db.Text",
+      "ReleaseCheckpoint.conditionModeSnapshot CheckpointConditionMode @default(STRUCTURED)"
+    ],
+    "externalPackages": [
+      "@codemirror/state", "@codemirror/view", "@codemirror/language",
+      "@codemirror/autocomplete", "@codemirror/search",
+      "papaparse (если не установлен — для CSV)"
+    ],
+    "blockers": []
+  },
+  "risks": [
+    {"id": "R1", "risk": "SQL-инъекция через JQL", "probability": "MEDIUM", "impact": "CRITICAL", "mitigation": "Типизированный AST + Prisma.sql tag + fuzz 1000+ cases + security-review"},
+    {"id": "R2", "risk": "Приоритет операторов парсится некорректно", "probability": "HIGH", "impact": "MEDIUM", "mitigation": "EBNF + 80+ snapshot-тестов по JQL-reference"},
+    {"id": "R3", "risk": "Утечка задач через project = SECRET", "probability": "MEDIUM", "impact": "CRITICAL", "mitigation": "Top-level AND projectId IN (accessible) всегда"},
+    {"id": "R4", "risk": "Медленный полнотекстовый поиск", "probability": "HIGH", "impact": "HIGH", "mitigation": "MVP — ILIKE+cap 500 + timeout 5s; Phase 2 — pg_trgm GIN"},
+    {"id": "R5", "risk": "WAS/CHANGED нет истории", "probability": "HIGH", "impact": "LOW", "mitigation": "MVP — NotImplementedError с позицией; Phase 2 — FieldChangeLog"},
+    {"id": "R6", "risk": "Prisma не умеет сложные JSON-операторы", "probability": "MEDIUM", "impact": "MEDIUM", "mitigation": "Prisma.sql raw WHERE для cf + тип-aware ветвление"},
+    {"id": "R7", "risk": "Имя custom-поля неоднозначно между проектами", "probability": "MEDIUM", "impact": "MEDIUM", "mitigation": "Резолв имени при наличии project-scope; иначе warning"},
+    {"id": "R8", "risk": "CodeMirror тяжёлый bundle", "probability": "LOW", "impact": "LOW", "mitigation": "React.lazy + chunk"},
+    {"id": "R9", "risk": "Потеря структуры при Basic↔Advanced", "probability": "MEDIUM", "impact": "LOW", "mitigation": "Advanced→Basic только если AST представим; иначе disable"},
+    {"id": "R10", "risk": "Сломанные ссылки в сохранённых фильтрах (удалённый user/project)", "probability": "HIGH", "impact": "LOW", "mitigation": "Ленивая валидация + warning в результатах"},
+    {"id": "R11", "risk": "PUBLIC-фильтр утечка чувств. данных в JQL-тексте", "probability": "LOW", "impact": "MEDIUM", "mitigation": "Warning в UI; данные не утекают — enforce per-reader scope"},
+    {"id": "R12", "risk": "Bulk actions через кросс-проектную выборку", "probability": "MEDIUM", "impact": "MEDIUM", "mitigation": "Разбиение по проектам + Promise.all + агрегация результатов"},
+    {"id": "R13", "risk": "ORDER BY cf медленный", "probability": "LOW", "impact": "MEDIUM", "mitigation": "MVP — только system-поля; Phase 2 — функциональные индексы"},
+    {"id": "R14", "risk": "Diacritics insensitive отличается от Jira", "probability": "LOW", "impact": "LOW", "mitigation": "MVP — ILIKE; Phase 2 — unaccent extension"},
+    {"id": "R15", "risk": "DDoS дорогими JQL", "probability": "MEDIUM", "impact": "HIGH", "mitigation": "Rate limit 30/min/user + timeout 10s + cap 1000"},
+    {"id": "R16", "risk": "Дорогой TTS-QL в КТ замедляет scheduler", "probability": "MEDIUM", "impact": "HIGH", "mitigation": "Timeout 5s + state=ERROR + violationEvent TTQL_ERROR"},
+    {"id": "R17", "risk": "Изменение TTQL после генерации ломает историю", "probability": "MEDIUM", "impact": "MEDIUM", "mitigation": "ReleaseCheckpoint.ttqlSnapshot freeze"},
+    {"id": "R18", "risk": "now()/today() в условии дают нестабильность между тиками", "probability": "MEDIUM", "impact": "LOW", "mitigation": "Фиксированный now=scheduler.startedAt"},
+    {"id": "R19", "risk": "currentUser() в КТ всегда NULL — путаница", "probability": "HIGH", "impact": "LOW", "mitigation": "Validator WARNING + скрытие из suggester topa + документация"},
+    {"id": "R20", "risk": "Переключение режима стирает данные", "probability": "MEDIUM", "impact": "LOW", "mitigation": "Form-state сохраняет скрытые поля, backend игнорирует неактивные поля"},
+    {"id": "R21", "risk": "Автомиграция structured→TTQL не делается; пользователи ожидают", "probability": "LOW", "impact": "LOW", "mitigation": "Кнопка «Сконвертировать в TTS-QL» one-way + ручная проверка"},
+    {"id": "R22", "risk": "Preview-эндпоинт — вектор resource-abuse", "probability": "MEDIUM", "impact": "MEDIUM", "mitigation": "Rate-limit + timeout + canManageCheckpoints"}
+  ],
+  "functionalRequirements": [
+    "FR-1..33 — см. TTSRH-1.md §6",
+    "FR-20: JIRA-style value suggesters по типу поля (User/Project/Status/Sprint/Release/IssueType/Option/Issue/Enum/Date/Bool/Label/Group) с avatar/dot/icon",
+    "FR-21: Debounce 150ms для dynamic suggester'ов + SWR cache для статичных",
+    "FR-22: Дедупликация уже выбранных значений в IN-списке",
+    "FR-23: Единый ValueSuggesterPopup для Advanced и Basic режимов",
+    "FR-24: CheckpointType.conditionMode = STRUCTURED|TTQL|COMBINED (ADDITIVE к существующему criteria[])",
+    "FR-25: Backward compat — existing КТ поведение не меняется (миграция в STRUCTURED)",
+    "FR-26: ReleaseCheckpoint.ttqlSnapshot + conditionModeSnapshot — freeze на момент генерации",
+    "FR-27: Evaluator TTQL-ветка = one Prisma query (pre-computed passed-set), COMBINED = intersect",
+    "FR-28: КТ-контекст добавляет releasePlannedDate() и checkpointDeadline(); currentUser()=NULL + warning",
+    "FR-29: UI segmented control Режим условия; switch без потери form-state",
+    "FR-30: Preview-panel без сохранения — POST /admin/checkpoint-types/preview",
+    "FR-31: Timeout/compile/runtime error TTQL → state=ERROR + violationEvent(TTQL_ERROR) + UI banner",
+    "FR-32: Иконка режима (S/Q/S+Q) в таблице типов, hover — preview TTQL",
+    "FR-33: /search/validate, /suggest, /schema принимают variant=CHECKPOINT",
+    "FR-34: TTS-QL поддерживает функции/поля для нарушений КТ (violatedCheckpoints/OfRelease/AtRisk/InState + hasCheckpointViolation/checkpointViolationType/checkpointViolationReason) — источник CheckpointViolationEvent.resolvedAt IS NULL и ReleaseCheckpoint.state; скоупится по доступным проектам",
+    "FR-35: Suggester для имён типов КТ и enum CheckpointState"
+  ],
+  "valueSuggesters": {
+    "description": "JIRA-style подсказки значений по типу поля — см. §5.11 TTSRH-1.md",
+    "providers": [
+      {"field": "project", "provider": "ProjectSuggester", "dynamic": true},
+      {"field": "assignee/reporter/creator + cf USER", "provider": "UserSuggester", "dynamic": true, "topFunctions": ["currentUser()"]},
+      {"field": "status", "provider": "StatusSuggester", "dynamic": true, "renderer": "color-dot + category"},
+      {"field": "statusCategory/priority/type/aiStatus/aiAssigneeType", "provider": "EnumSuggester", "dynamic": false},
+      {"field": "sprint", "provider": "SprintSuggester", "dynamic": true, "topFunctions": ["openSprints()", "closedSprints()", "futureSprints()"]},
+      {"field": "release/fixVersion", "provider": "ReleaseSuggester", "dynamic": true, "topFunctions": ["unreleasedVersions()", "latestReleasedVersion()"]},
+      {"field": "parent/epic/key/linkedIssue", "provider": "IssueSuggester", "dynamic": true, "reuses": "searchIssuesGlobal"},
+      {"field": "labels", "provider": "LabelSuggester", "dynamic": true},
+      {"field": "cf SELECT/MULTI_SELECT", "provider": "OptionSuggester", "dynamic": false, "source": "CustomField.options"},
+      {"field": "cf REFERENCE", "provider": "ReferenceSuggester", "delegatesTo": "target type provider"},
+      {"field": "aiEligible/hasChildren", "provider": "BoolSuggester", "dynamic": false},
+      {"field": "due/created/updated/resolvedAt + DATE/DATETIME cf", "provider": "DateSuggester", "sections": ["functions", "relative", "date-picker"]},
+      {"field": "estimatedHours/timeSpent/NUMBER cf", "provider": "NumberSuggester", "dynamic": false},
+      {"field": "summary/description/comment + TEXT cf", "provider": "TextSuggester", "dynamic": false, "source": "recent queries"},
+      {"field": "membersOf(...) argument", "provider": "GroupSuggester", "dynamic": true}
+    ],
+    "caching": {
+      "enum": "client-forever",
+      "project/issueType/status": "SWR 60s",
+      "user/label": "no-cache + debounce 150ms",
+      "sprint/release": "SWR 30s"
+    },
+    "suggestEndpoint": "GET /api/search/suggest?jql=...&cursor=...[&field=...&operator=...&prefix=...]",
+    "response": "{completions: [{kind, label, insert, detail?, icon?, score}], context: {expectedField?, expectedType?, inValueList?}}"
+  },
+  "nonFunctionalRequirements": [
+    {"id": "NFR-1", "metric": "TTFB /search/issues p95 < 400ms на 10K задач"},
+    {"id": "NFR-2", "metric": "TTFB /validate p95 < 100ms"},
+    {"id": "NFR-3", "metric": "TTFB /suggest p95 < 200ms"},
+    {"id": "NFR-4", "metric": "Парсер 1KB ≤ 20ms"},
+    {"id": "NFR-5", "metric": "JqlEditor lazy, +≤160KB gzip"},
+    {"id": "NFR-6", "metric": "Layout адаптивен (>=1280 / >=900 / <900)"},
+    {"id": "NFR-7", "metric": "Chrome 139+, Yandex 25+, Edge 139+, Safari 18+"},
+    {"id": "NFR-8", "metric": "Hard timeout /search/issues 10s, /export 60s"}
+  ],
+  "security": [
+    "SEC-1..8 — см. TTSRH-1.md §6"
+  ],
+  "tests": {
+    "unit": [
+      "Parser ≥ 100 кейсов (escape, unicode, приоритет NOT, глубокая вложенность)",
+      "Compiler матрица ≥ 60 (field × operator)",
+      "Functions — моки даты и сессии"
+    ],
+    "integration": [
+      "/search/issues × 5 ролей × 5 запросов = 25",
+      "RBAC-negative: project = SECRET → 0 results",
+      "SavedFilter CRUD + sharing"
+    ],
+    "fuzz": [
+      "1000 случайных входов, 0 unhandled, 0 500"
+    ],
+    "performance": [
+      "100K задач, p95 < 400ms"
+    ],
+    "e2e": [
+      "search.spec.ts — basic→advanced→save→favorite→share→URL"
+    ],
+    "coverage": {
+      "backend.modules.search": 80,
+      "backend.modules.saved-filters": 75,
+      "frontend.search": 60
+    }
+  },
+  "endpoints": [
+    {"method": "POST", "path": "/api/search/issues"},
+    {"method": "POST", "path": "/api/search/validate"},
+    {"method": "GET",  "path": "/api/search/suggest"},
+    {"method": "POST", "path": "/api/search/export"},
+    {"method": "GET",  "path": "/api/search/schema"},
+    {"method": "GET",  "path": "/api/saved-filters"},
+    {"method": "POST", "path": "/api/saved-filters"},
+    {"method": "GET",  "path": "/api/saved-filters/:id"},
+    {"method": "PATCH","path": "/api/saved-filters/:id"},
+    {"method": "DELETE","path": "/api/saved-filters/:id"},
+    {"method": "POST", "path": "/api/saved-filters/:id/favorite"},
+    {"method": "POST", "path": "/api/saved-filters/:id/share"},
+    {"method": "PATCH","path": "/api/users/me/preferences"},
+    {"method": "POST", "path": "/api/admin/checkpoint-types/preview", "comment": "dry-run eval для отладки TTS-QL условия КТ до сохранения типа"}
+  ],
+  "checkpointConditionModes": {
+    "addedToExisting": "Current CheckpointCriterion[] механизм сохранён полностью и остаётся дефолтом.",
+    "modes": [
+      {"mode": "STRUCTURED", "evaluates": "criteria[] (существующий discriminated union, AND per issue)", "default": true},
+      {"mode": "TTQL", "evaluates": "ttqlCondition (TTS-QL текст, matcher через pre-computed passed-set)"},
+      {"mode": "COMBINED", "evaluates": "criteria[] AND ttqlCondition (intersection passed-sets)"}
+    ],
+    "checkpointContextFunctions": [
+      "releasePlannedDate() — якорь для due ≤ releasePlannedDate() + Nd",
+      "checkpointDeadline() — releasePlannedDate + offsetDays",
+      "currentUser() — resolves to NULL; validator warning"
+    ],
+    "errorHandling": {
+      "timeout": "5s на compile+exec",
+      "onError": "state=ERROR + violationEvent(criterionType=TTQL_ERROR) + UI banner",
+      "snapshot": "ReleaseCheckpoint.ttqlSnapshot/conditionModeSnapshot — freeze в момент генерации"
+    },
+    "backwardCompat": {
+      "migration": "existing CheckpointType → conditionMode='STRUCTURED', ttqlCondition=NULL",
+      "tests": "T-14 проверяет идентичность violationsHash и state после миграции",
+      "ui": "текущие e2e checkpoint-flow тесты остаются зелёными"
+    }
+  },
+  "featureFlag": "FEATURES_ADVANCED_SEARCH",
+  "uxMenu": {
+    "sidebarItem": {
+      "label": "Поиск задач",
+      "path": "/search",
+      "position": "между Projects и submenu Planning",
+      "dataTestId": "nav-search",
+      "icon": "magnifying-glass (inline SVG)",
+      "submenu": "favorite SavedFilters (до 5, сортировка useCount DESC, lastUsedAt DESC)"
+    }
+  },
+  "relatedTasks": [
+    {"key": "TTSRH-2", "title": "Tokenizer + Parser + AST + golden-set"},
+    {"key": "TTSRH-3", "title": "Field registry + Validator + Suggest"},
+    {"key": "TTSRH-4", "title": "Compiler system fields"},
+    {"key": "TTSRH-5", "title": "Compiler custom fields (JSONB raw SQL)"},
+    {"key": "TTSRH-6", "title": "Функции (currentUser/now/sprints/releases/linkedIssues)"},
+    {"key": "TTSRH-7", "title": "Endpoints /search + rate-limit + timeout"},
+    {"key": "TTSRH-8", "title": "SavedFilter CRUD + share"},
+    {"key": "TTSRH-9", "title": "User.preferences + PATCH"},
+    {"key": "TTSRH-10", "title": "Export CSV/XLSX"},
+    {"key": "TTSRH-11", "title": "Fuzz + security-review harness"},
+    {"key": "TTSRH-12", "title": "Frontend SearchPage shell + sidebar"},
+    {"key": "TTSRH-13", "title": "JqlEditor (CodeMirror 6)"},
+    {"key": "TTSRH-14", "title": "Автодополнение + inline errors"},
+    {"key": "TTSRH-15", "title": "BasicFilterBuilder + toggle"},
+    {"key": "TTSRH-16", "title": "SavedFiltersSidebar + save/share modals"},
+    {"key": "TTSRH-17", "title": "ColumnConfigurator (DnD)"},
+    {"key": "TTSRH-18", "title": "ResultsTable + bulk-actions + export UI"},
+    {"key": "TTSRH-19", "title": "URL sync + shortcuts"},
+    {"key": "TTSRH-20", "title": "E2E + perf seed"},
+    {"key": "TTSRH-21", "title": "Документация JQL"},
+    {"key": "TTSRH-22", "title": "Feature flag + cutover"},
+    {"key": "TTSRH-25", "title": "Backend Value Suggesters (13 провайдеров + scope + роутинг /suggest)"},
+    {"key": "TTSRH-26", "title": "Frontend ValueSuggesterPopup + CM6 adapter + Basic chip-popover"},
+    {"key": "TTSRH-27", "title": "Prisma миграция CheckpointType.ttqlCondition/conditionMode + ReleaseCheckpoint snapshot"},
+    {"key": "TTSRH-28", "title": "DTO superRefine + /search/validate?variant=CHECKPOINT"},
+    {"key": "TTSRH-29", "title": "КТ-функции TTS-QL: releasePlannedDate(), checkpointDeadline() + schema variant"},
+    {"key": "TTSRH-30", "title": "checkpoint-engine: TTQL-ветка + COMBINED intersect + violationsHash"},
+    {"key": "TTSRH-31", "title": "Error-handling TTQL (timeout/compile/runtime) → state=ERROR + violationEvent"},
+    {"key": "TTSRH-32", "title": "POST /admin/checkpoint-types/preview (dry-run eval)"},
+    {"key": "TTSRH-33", "title": "Frontend КТ: segmented control Режим условия + иконка в таблице"},
+    {"key": "TTSRH-34", "title": "Frontend КТ: JqlEditor variant=CHECKPOINT"},
+    {"key": "TTSRH-35", "title": "Frontend КТ: Preview-panel (applicable/passed/violated)"},
+    {"key": "TTSRH-36", "title": "Frontend КТ: structured → TTS-QL one-way converter"},
+    {"key": "TTSRH-37", "title": "TTS-QL checkpoint-functions: violatedCheckpoints/OfRelease/AtRisk/InState + поля hasCheckpointViolation/checkpointViolationType/Reason + suggesters + T-20..T-25"},
+    {"key": "TTSRH-23", "title": "(Phase 2) WAS/CHANGED + FieldChangeLog"},
+    {"key": "TTSRH-24", "title": "(Phase 2) PG FTS + pg_trgm + unaccent"}
+  ],
+  "goldensetFile": "docs/tz/TTSRH-1-goldenset.jql"
+}

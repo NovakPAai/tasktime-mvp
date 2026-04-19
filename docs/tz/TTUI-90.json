@@ -1,0 +1,246 @@
+{
+  "key": "TTUI-90",
+  "title": "Рефакторинг дашборда: role-aware фокусная рабочая область",
+  "generatedAt": "2026-04-18T00:00:00.000Z",
+  "updatedAt": "2026-04-18T12:00:00.000Z",
+  "generatedBy": "claude-code",
+  "source": {
+    "basedOn": "frontend/src/pages/DashboardPage.tsx",
+    "analysedAt": "2026-04-18T00:00:00.000Z",
+    "relatedEpic": "TTMP-160 (Модуль контрольных точек релизов, MVP complete 11/12 PR)"
+  },
+  "issue": {
+    "type": "STORY",
+    "status": "OPEN",
+    "priority": "HIGH",
+    "project": "TTUI",
+    "assignee": null,
+    "creator": "drashkinson@gmail.com",
+    "estimatedHours": 69.5,
+    "description": "Заменить статичный дашборд на role-aware виджетную рабочую область. С учётом готового функционала TTMP-160 добавляются виджеты checkpoints/burndown/releasesAtRisk с переиспользованием существующих компонентов (ReleaseRiskBadge, CheckpointTrafficLight, ReleaseBurndownChart) и API (getMyCheckpointViolations, getBurndown).",
+    "acceptanceCriteria": null
+  },
+  "currentStateIssues": [
+    {"id": "P1", "problem": "Единый layout для всех ролей — админские метрики на экране у обычного пользователя обнулены"},
+    {"id": "P2", "problem": "«+ Новая задача» делает navigate('/projects'), не открывает создание"},
+    {"id": "P3", "problem": "«Сегодня» — декоративный chip без действия"},
+    {"id": "P4", "problem": "«Мои задачи» сортируются по updatedAt, без учёта приоритета/дедлайна"},
+    {"id": "P5", "problem": "N+1 запрос: listIssues(p.id) по каждому проекту в цикле"},
+    {"id": "P6", "problem": "Activity feed без названия сущности и без ссылки"},
+    {"id": "P7", "problem": "Нет focus-виджетов: overdue, due today, in-review-for-me, sprint progress, time week, blocked, checkpoint violations"},
+    {"id": "P8", "problem": "KPI-карточки не кликабельны"},
+    {"id": "P9", "problem": "Нарушение design-system SSOT: hardcoded DARK_C/LIGHT_C вместо design-tokens.ts"},
+    {"id": "P10", "problem": "Пустые состояния без CTA"},
+    {"id": "P11", "problem": "Нет кастомизации / скрытия нерелевантных виджетов"},
+    {"id": "P12", "problem": "Нет адаптивного layout — inline padding, нет breakpoint'ов"},
+    {"id": "P13", "problem": "Нет интеграции с контрольными точками релизов — пользователь не видит своих нарушений КТ на главной"},
+    {"id": "P14", "problem": "Нет диаграммы сгорания активного релиза для USER/MANAGER"},
+    {"id": "P15", "problem": "Нет индикации релизов под угрозой срыва для MANAGER/ADMIN"}
+  ],
+  "userScenarios": {
+    "USER": "5 кликабельных KPI (assigned/overdue/due today/time this week/checkpoint violations) + Focus + MyViolations (reuse CheckpointTrafficLight) + Sprint progress + ReleaseBurndown (primary release, lazy) + Awaiting review + Activity. FAB для создания.",
+    "MANAGER": "Вместо Focus — Team Status; добавить ReleasesAtRisk (risk ≥ MEDIUM с ReleaseRiskBadge), ReleaseBurndown с селектором активных релизов, «скоро дедлайн», «блокеры», прогресс активных спринтов.",
+    "ADMIN": "Дополнительно System KPI + ReleasesAtRisk по всей системе + полный activity feed с CheckpointViolation enrichment."
+  },
+  "reusedFromTTMP160": {
+    "backendEndpoints": [
+      "GET /api/releases/:releaseId/checkpoints",
+      "GET /api/releases/:releaseId/burndown",
+      "GET /api/my-checkpoint-violations",
+      "GET /api/my-checkpoint-violations/count",
+      "GET /api/projects/:projectId/checkpoint-violating-issues"
+    ],
+    "frontendComponents": [
+      "ReleaseRiskBadge",
+      "CheckpointTrafficLight",
+      "ReleaseBurndownChart",
+      "CheckpointsBlock"
+    ],
+    "frontendApis": [
+      "getMyCheckpointViolations",
+      "getMyCheckpointViolationsCount",
+      "getReleaseCheckpoints",
+      "getBurndown"
+    ],
+    "packages": ["recharts (уже установлен TTMP-160 PR-11)"]
+  },
+  "dependencies": {
+    "backendModules": [
+      "dashboard (новый)",
+      "issues (новый эндпоинт /assigned-to-me)",
+      "activity (enrichment, включая CheckpointViolation / ReleaseCheckpoint)",
+      "time (/my-summary)",
+      "sprints (/my-active)",
+      "releases/checkpoints (reuse: getMyCheckpointViolations, getBurndown; новое: releasesAtRisk агрегация в /dashboard/me)",
+      "releases (selectPrimaryRelease для текущего пользователя)"
+    ],
+    "frontendComponents": [
+      "DashboardPage.tsx (переписан)",
+      "components/dashboard/DashboardShell.tsx",
+      "components/dashboard/widgets/WidgetCard.tsx",
+      "components/dashboard/widgets/KpiRow.tsx (+ KPI «Нарушения КТ» с poll 60s)",
+      "components/dashboard/widgets/FocusWidget.tsx",
+      "components/dashboard/widgets/SprintProgressWidget.tsx",
+      "components/dashboard/widgets/AwaitingReviewWidget.tsx",
+      "components/dashboard/widgets/TimeWeekWidget.tsx",
+      "components/dashboard/widgets/ActivityFeedWidget.tsx (+ CheckpointViolation)",
+      "components/dashboard/widgets/TeamStatusWidget.tsx",
+      "components/dashboard/widgets/SystemKpiWidget.tsx",
+      "components/dashboard/widgets/QuickCreateFab.tsx",
+      "components/dashboard/widgets/MyViolationsWidget.tsx (новый, reuse CheckpointTrafficLight)",
+      "components/dashboard/widgets/ReleasesAtRiskWidget.tsx (новый, reuse ReleaseRiskBadge)",
+      "components/dashboard/widgets/ReleaseBurndownWidget.tsx (новый, lazy wrapper над ReleaseBurndownChart)",
+      "store/dashboard.store.ts",
+      "store/user-preferences.store.ts (расширение)",
+      "lib/roles.ts (DASHBOARD_WIDGETS_BY_ROLE с новыми widget ids)",
+      "types/index.ts (DashboardMeResponse с секциями releasesAtRisk/primaryReleaseBurndown/myViolations)"
+    ],
+    "prismaModels": [
+      "User.dashboardLayout Json? (миграция add-column)",
+      "Issue(assigneeId, status) индекс (проверить/добавить)"
+    ],
+    "externalPackages": [],
+    "blockers": []
+  },
+  "risks": [
+    {"id": 1, "description": "Aggregation /dashboard/me становится медленным (6+ параллельных запросов)", "probability": "HIGH", "impact": "p95 > 500ms, деградация TTFB", "mitigation": "Promise.all + Redis cache 30s + invalidation on events; Promise.allSettled с partial: true"},
+    {"id": 2, "description": "Ролевой gate UI/API рассинхронизируется", "probability": "MEDIUM", "impact": "Пустые блоки / 403", "mitigation": "Единый источник DASHBOARD_WIDGETS_BY_ROLE"},
+    {"id": 3, "description": "Activity enrichment N lookups = медленно", "probability": "MEDIUM", "impact": "Feed > 1s", "mitigation": "Batch lookup через groupBy(entityType) + findMany({in: ids})"},
+    {"id": 4, "description": "dashboardLayout JSON-схема эволюционирует — старые данные ломаются", "probability": "LOW", "impact": "Крэш UI", "mitigation": "Версионирование; при mismatch — use defaults"},
+    {"id": 5, "description": "Рефакторинг ломает e2e тесты", "probability": "MEDIUM", "impact": "Красный CI", "mitigation": "Обновить селекторы в том же PR"},
+    {"id": 6, "description": "Новый код продолжает hardcode токены", "probability": "HIGH", "impact": "Drift design system", "mitigation": "grep-check в DoD + pre-push-reviewer"},
+    {"id": 7, "description": "Нет активного спринта у пользователя", "probability": "LOW", "impact": "Пусто", "mitigation": "Empty state c CTA"},
+    {"id": 8, "description": "Новый FAB конфликтует с существующими", "probability": "LOW", "impact": "Двойные кнопки", "mitigation": "Аудит FloatButton"},
+    {"id": 9, "description": "ReleaseBurndownChart тяжёлый (recharts ~90kB gzipped)", "probability": "MEDIUM", "impact": "FCP +200-400ms", "mitigation": "React.lazy + Suspense; skeleton сначала, chart после idle"},
+    {"id": 10, "description": "releasesAtRisk агрегация тяжёлая (N релизов × вычисление риска)", "probability": "MEDIUM", "impact": "+200ms на /dashboard/me", "mitigation": "Читать готовый risk из Redis-кэша TTMP-160 (releaseRisk:{id}); лимит 10 + сортировка на БД"},
+    {"id": 11, "description": "Мои нарушения КТ полагаются на актуальность scheduler'а TTMP-160", "probability": "LOW", "impact": "Stale count", "mitigation": "Использовать готовый countMyViolations; opt: recomputeForRelease при клике"}
+  ],
+  "requirements": {
+    "functional": [
+      "FR-1: Дашборд — один запрос /dashboard/me (burndown lazy отдельно)",
+      "FR-2: KPI кликабельны, ведут в отфильтрованные списки",
+      "FR-3: «Мой фокус» сортирует по priority × overdue × updatedAt, top-10",
+      "FR-4: «Ожидают моего ревью» — задачи REVIEW (reviewer/author)",
+      "FR-5: «Прогресс спринта» — scope + done + days left",
+      "FR-6: «Время на неделе» — сумма + spark-bar по дням",
+      "FR-7: Activity feed — название сущности + ссылка (включая CheckpointViolation/ReleaseCheckpoint)",
+      "FR-8: Role-specific виджеты (Team Status для MANAGER, System KPI для ADMIN)",
+      "FR-9: FAB «+» открывает модалку создания, после закрытия — refresh",
+      "FR-10: Пустые состояния с CTA",
+      "FR-11: Скрытие виджетов persist в User.dashboardLayout",
+      "FR-12: 0 hex-кодов, только tokens.*",
+      "FR-13: При partial: true — non-blocking banner c retry",
+      "FR-14: KPI «Нарушения КТ» для всех ролей, poll 60s через getMyCheckpointViolationsCount",
+      "FR-15: MyViolationsWidget показывает top-5 с CheckpointTrafficLight, дедлайном, именем КТ и релиза",
+      "FR-16: ReleasesAtRiskWidget (MANAGER/ADMIN) сортирует по risk.level DESC × daysLeft ASC; ReleaseRiskBadge + violatedCheckpointsCount",
+      "FR-17: ReleaseBurndownWidget: USER — primaryReleaseBurndown; MANAGER — селектор активных релизов",
+      "FR-18: ReleaseBurndownChart загружается через React.lazy, не блокирует FCP",
+      "FR-19: При отсутствии активных релизов — empty state с CTA «Перейти к релизам»",
+      "FR-20: Событие checkpoint.violation.opened/closed инвалидирует кэш dashboard:me:${userId}"
+    ],
+    "nonFunctional": [
+      "NFR-1: TTFB /dashboard/me < 300ms (p95) при ≤500 assigned",
+      "NFR-2: FCP ≤ 1.2s на 3G Fast (burndown lazy)",
+      "NFR-3: ≤ 2 fetch при входе (dashboard + profile)",
+      "NFR-4: Адаптив: ≥900px — 2 колонки, <900px — 1",
+      "NFR-5: Chrome 139+, Yandex 25+, Edge 139+, Safari 18+",
+      "NFR-6: Cache-hit ratio ≥ 60% (Redis TTL 30s)"
+    ],
+    "security": [
+      "SEC-1: Данные scope'ятся по доступным проектам (RBAC)",
+      "SEC-2: Activity feed фильтруется по доступным проектам",
+      "SEC-3: systemKpi только для ADMIN / super-admin",
+      "SEC-4: dashboardLayout валидируется Zod при PATCH",
+      "SEC-5: releasesAtRisk scope=mine по project membership; scope=all только для SUPER_ADMIN/RELEASE_MANAGER/AUDITOR",
+      "SEC-6: myViolations — reuse service.listMyViolations (scope обеспечен TTMP-160 SEC-7)",
+      "SEC-7: primaryReleaseBurndown — reuse assertReleaseRead TTMP-160"
+    ],
+    "accessibility": [
+      "A11Y-1: KPI — <a>/<button>, не div[role=button]",
+      "A11Y-2: Заголовки виджетов — <h2>, контент — <section aria-labelledby>",
+      "A11Y-3: FAB доступен с клавиатуры",
+      "A11Y-4: Контраст ≥ WCAG AA"
+    ],
+    "testing": [
+      "Unit: focus-score edge cases",
+      "Unit: enrichActivity batch + fallback (+ CheckpointViolation entity)",
+      "Unit: selectPrimaryRelease edge cases",
+      "Integration: /dashboard/me для USER/MANAGER/ADMIN (включая releasesAtRisk / primaryReleaseBurndown / myViolations)",
+      "Integration: /dashboard/me partial degradation",
+      "Integration: invalidation кэша на checkpoint.violation.opened",
+      "E2E: клик по KPI «Нарушения КТ» → страница; ReleasesAtRisk виден только MANAGER/ADMIN; ReleaseBurndownWidget рендерит chart; hide/restore widget persist",
+      "Coverage >= 60%"
+    ]
+  },
+  "acceptanceCriteria": [
+    "Новый дашборд под FEATURES_DASHBOARD_V2 в staging",
+    "Корректно рендерится для USER/MANAGER/ADMIN/VIEWER",
+    "Один API-запрос /dashboard/me (burndown lazy)",
+    "KPI кликабельны, включая KPI «Нарушения КТ»",
+    "FAB + модалка + refresh после закрытия",
+    "Activity feed c названием + ссылкой, включая CheckpointViolation",
+    "MyViolationsWidget показывает top-5 c CheckpointTrafficLight и переходом к задаче",
+    "ReleasesAtRiskWidget c ReleaseRiskBadge виден только MANAGER/ADMIN",
+    "ReleaseBurndownWidget: USER — primary release, MANAGER — селектор; recharts lazy",
+    "0 hex-кодов в новых файлах (grep-check)",
+    "Скрытие виджетов persist",
+    "Мобильный layout одной колонкой без горизонтального скролла",
+    "make test, make e2e, make lint — зелёные",
+    "Lighthouse Performance ≥ 85, Accessibility ≥ 95",
+    "Code review пройден"
+  ],
+  "estimation": {
+    "analysis": 3,
+    "backend": 20.5,
+    "frontend": 33.5,
+    "testing": 8,
+    "tokensMigration": 1,
+    "review": 3,
+    "total": 69.5
+  },
+  "relatedIssues": {
+    "parent": null,
+    "children": [
+      "TTUI-91: Backend: dashboard module + /dashboard/me",
+      "TTUI-92: Backend: /issues/assigned-to-me + index",
+      "TTUI-93: Backend: activity enrichment (+ CheckpointViolation)",
+      "TTUI-94: Backend: User.dashboardLayout + PATCH preferences",
+      "TTUI-95: Frontend: DashboardShell + WidgetCard + grid",
+      "TTUI-96: Frontend: KpiRow (+ KPI «Нарушения КТ»)",
+      "TTUI-97: Frontend: FocusWidget + score",
+      "TTUI-98: Frontend: SprintProgress + TimeWeek widgets",
+      "TTUI-99: Frontend: AwaitingReview + ActivityFeed widgets",
+      "TTUI-100: Frontend: TeamStatus + SystemKpi widgets",
+      "TTUI-101: Frontend: QuickCreateFab + modal + refresh",
+      "TTUI-102: Frontend: customization (hide/restore)",
+      "TTUI-103: Feature flag FEATURES_DASHBOARD_V2 + cutover",
+      "TTUI-104: Tests + Lighthouse",
+      "TTUI-105: Backend: releasesAtRisk + primaryReleaseBurndown + checkpoint invalidation",
+      "TTUI-106: Frontend: MyViolationsWidget (reuse TTMP-160)",
+      "TTUI-107: Frontend: ReleasesAtRiskWidget (reuse ReleaseRiskBadge)",
+      "TTUI-108: Frontend: ReleaseBurndownWidget (lazy wrapper)"
+    ],
+    "blocks": [],
+    "dependsOn": ["TTMP-160 (MVP complete) — reused backend endpoints и UI компоненты"]
+  },
+  "implementationOrder": [
+    "TTUI-91",
+    "TTUI-92",
+    "TTUI-93",
+    "TTUI-105",
+    "TTUI-94",
+    "TTUI-95",
+    "TTUI-96",
+    "TTUI-97",
+    "TTUI-98",
+    "TTUI-99",
+    "TTUI-100",
+    "TTUI-106",
+    "TTUI-107",
+    "TTUI-108",
+    "TTUI-101",
+    "TTUI-102",
+    "TTUI-103",
+    "TTUI-104"
+  ]
+}
