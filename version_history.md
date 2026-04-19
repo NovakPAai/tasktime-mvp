@@ -2,7 +2,48 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.23**
+**Last version: 2.24**
+
+---
+
+## [2.24] [2026-04-19] fix(checkpoints): TTMP-160 — КТ с будущим дедлайном больше не показывается как «Пройдено»
+
+**PR:** (to be filled after push)
+**Ветка:** `fix/ttmp-160-pending-before-deadline`
+
+### Что было
+
+Формула состояния КТ из §12.4 ТЗ давала `state = OK` сразу как только в релизе не оставалось нарушений, **независимо от deadline**. Это приводило к тому, что КТ со сроком через две недели показывалась релиз-менеджеру как «пройдено» — дезинформация: задачи ещё могут добавляться и переоткрываться.
+
+### Что теперь
+
+```ts
+function computeState(violationsCount, deadline, now): CheckpointState {
+  if (now.getTime() < deadline.getTime()) return 'PENDING';
+  return violationsCount === 0 ? 'OK' : 'VIOLATED';
+}
+```
+
+- `PENDING` — дедлайн ещё не наступил (независимо от текущего числа нарушений). КТ «в процессе».
+- `OK` — дедлайн наступил, нарушений нет. Финальный успех.
+- `VIOLATED` — дедлайн наступил, есть нарушения. Финальная неудача.
+- `isWarning` (жёлтая подсветка поверх `PENDING`) работает как и раньше: `PENDING` + близко к дедлайну + есть нарушения.
+
+### Изменения
+- `backend/src/modules/releases/checkpoints/checkpoint-engine.service.ts` — `computeState` переписан.
+- `backend/tests/checkpoint-engine.unit.test.ts` — два старых теста («empty applicable set → OK», «all pass → OK») переписаны на pre-deadline→PENDING, добавлены два зеркальных post-deadline→OK. Full unit suite 62 теста зелёные.
+- Full backend suite: **518 / 518 green**.
+- `docs/tz/TTMP-160.md §12.4` — формула обновлена + исторический комментарий.
+- `docs/user-manual/features/checkpoints.md` — новая секция «Состояния КТ» с таблицей.
+
+### Влияние на prod
+
+После деплоя на первом cron-тике (в пределах 10 мин) каждая существующая КТ с `state=OK` и `deadline>now` пересчитается в `PENDING` + запишет `lastEvaluatedAt`. Никаких схема-миграций — только значения в поле `state` поменяются в `ReleaseCheckpoint`. `CheckpointViolationEvent` не затрагивается (только open/resolve-пары при реальных нарушениях).
+
+**Контрактные уточнения:**
+- Метрика `violatedCheckpoints` в снапшотах `ReleaseBurndownSnapshot` и в ответе `GET /burndown` **не меняется** — она всегда считала только `state='VIOLATED'`. Под новой семантикой это значит «пост-дедлайн нарушения», что соответствует спеке FR-29.
+- `isWarning` на GET `/checkpoints` вычисляется от `new Date()` на каждом HTTP-запросе, а `state` приходит из БД (обновляется каждые 10 мин cron-ом). В окне ≤10 мин после перехода через deadline возможно кратковременное расхождение: `state='PENDING'` + `isWarning=true` для КТ, у которой дедлайн только что прошёл. Выравнивается на следующем cron-тике. Это не новое поведение — было и до фикса.
+- Риск-скоринг (`computeReleaseRisk`) считает только `state='VIOLATED'` → под новой семантикой в score попадают **только пост-дедлайн нарушения**. КТ с 20 нарушениями и дедлайном завтра по-прежнему даёт score=0 (как и было до этого фикса: раньше это был `state='PENDING'` тоже не попадавший в score). Поведение score на prod не меняется.
 
 ---
 

@@ -102,8 +102,13 @@ function computeState(
   deadline: Date,
   now: Date,
 ): CheckpointState {
-  if (violationsCount === 0) return 'OK';
-  return now.getTime() >= deadline.getTime() ? 'VIOLATED' : 'PENDING';
+  // Semantic: OK/VIOLATED are *final* verdicts that kick in only after the deadline has
+  // passed. Before the deadline the КТ is PENDING — "still in flight" — regardless of
+  // whether current issues satisfy the criteria, because tasks can still be re-opened
+  // or added to the release. Showing "OK" (passed) for a checkpoint whose deadline is
+  // two weeks away misleads the release manager into thinking the checkpoint is done.
+  if (now.getTime() < deadline.getTime()) return 'PENDING';
+  return violationsCount === 0 ? 'OK' : 'VIOLATED';
 }
 
 function computeIsWarning(

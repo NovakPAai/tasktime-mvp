@@ -387,7 +387,9 @@ describe('FR-17 webhook debounce', () => {
       await prisma.releaseItem.create({
         data: { releaseId: releaseA, issueId: issue.id, addedById: adminUserId },
       });
-      // Apply — triggers the first webhook (OK → VIOLATED transition).
+      // Apply — new ReleaseCheckpoint starts with `state @default(PENDING)`, then the
+      // post-deadline recompute (offsetDays=-100 → deadline far in the past) flips it to
+      // VIOLATED. Webhook fires on PENDING→VIOLATED transition.
       await request
         .post(`/api/releases/${releaseA}/checkpoints`)
         .set('Authorization', `Bearer ${adminToken}`)

@@ -483,7 +483,7 @@ describe('evaluateCriterion — NO_BLOCKING_LINKS', () => {
 describe('evaluateCheckpoint', () => {
   const STATUS_IN_DONE: CheckpointCriterion = { type: 'STATUS_IN', categories: ['DONE'] };
 
-  it('empty applicable set → OK with zero breakdown', () => {
+  it('empty applicable set, pre-deadline → PENDING with zero breakdown', () => {
     const r = evaluateCheckpoint(
       {
         criteria: [{ type: 'ASSIGNEE_SET', issueTypes: ['BUG'] }],
@@ -494,13 +494,31 @@ describe('evaluateCheckpoint', () => {
       },
       new Date('2026-05-20T00:00:00Z'),
     );
-    expect(r.state).toBe('OK');
+    // Before the deadline every КТ is PENDING — "still in flight". Issues may still be
+    // added / re-opened, so even an empty applicable set is not yet a verdict.
+    expect(r.state).toBe('PENDING');
     expect(r.breakdown).toEqual({ applicable: 0, passed: 0, violated: 0 });
     expect(r.isWarning).toBe(false);
     expect(r.violationsHash).toBe('');
   });
 
-  it('all applicable issues pass → OK', () => {
+  it('empty applicable set, post-deadline → OK with zero breakdown', () => {
+    const r = evaluateCheckpoint(
+      {
+        criteria: [{ type: 'ASSIGNEE_SET', issueTypes: ['BUG'] }],
+        deadline: new Date('2026-05-23T00:00:00Z'),
+        warningDays: 3,
+        issues: [issue({ issueTypeSystemKey: 'TASK' })],
+        context: CONTEXT,
+      },
+      new Date('2026-05-25T00:00:00Z'),
+    );
+    expect(r.state).toBe('OK');
+    expect(r.breakdown).toEqual({ applicable: 0, passed: 0, violated: 0 });
+    expect(r.isWarning).toBe(false);
+  });
+
+  it('all applicable issues pass, pre-deadline → PENDING (final verdict only after deadline)', () => {
     const r = evaluateCheckpoint(
       {
         criteria: [STATUS_IN_DONE],
@@ -514,9 +532,27 @@ describe('evaluateCheckpoint', () => {
       },
       new Date('2026-05-20T00:00:00Z'),
     );
-    expect(r.state).toBe('OK');
+    expect(r.state).toBe('PENDING');
     expect(r.breakdown).toEqual({ applicable: 2, passed: 2, violated: 0 });
     expect(r.passedIssueIds).toEqual(['a', 'b']);
+  });
+
+  it('all applicable issues pass, post-deadline → OK', () => {
+    const r = evaluateCheckpoint(
+      {
+        criteria: [STATUS_IN_DONE],
+        deadline: new Date('2026-05-23T00:00:00Z'),
+        warningDays: 3,
+        issues: [
+          issue({ id: 'a', key: 'A-1', statusCategory: 'DONE' }),
+          issue({ id: 'b', key: 'B-1', statusCategory: 'DONE' }),
+        ],
+        context: CONTEXT,
+      },
+      new Date('2026-05-25T00:00:00Z'),
+    );
+    expect(r.state).toBe('OK');
+    expect(r.breakdown).toEqual({ applicable: 2, passed: 2, violated: 0 });
   });
 
   it('pre-deadline with violations → PENDING (not yet VIOLATED)', () => {
