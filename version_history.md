@@ -2,7 +2,27 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.22**
+**Last version: 2.23**
+
+---
+
+## [2.23] [2026-04-19] feat(checkpoints): TTMP-160 PR-12 — E2E + axe-core a11y + documentation
+
+**PR:** (to be filled after push)
+**Ветка:** `ttmp-160/e2e-docs`
+
+### Что изменилось
+- **E2E:** `frontend/e2e/specs/15-checkpoints.spec.ts` — smoke на вкладках «Контрольные точки» / «Диаграмма сгорания» + RBAC-smoke (plain USER → 403 на `/api/releases/:id/checkpoints`). Тесты defensive — `test.skip` при отсутствии нужных surface-ов в окружении.
+- **a11y:** `@axe-core/playwright@^4.11.2` добавлен как dev-dep. Axe-сканы на каждой вкладке с тегами `wcag2a` / `wcag2aa`, ассёрт «no critical / serious violations». Console-лог деталей при фейле для диагностики.
+- **Docs — USER_GUIDE:** новый раздел «Контрольные точки релиза» в `docs/RU/USER_GUIDE.md` с разбивкой по ролям.
+- **Docs — API reference:** в `docs/api/reference.md` добавлена отдельная секция «TTMP-160 — Release Checkpoints & Burndown (manual section)» после AUTO-GENERATED блока с полным списком эндпоинтов и RBAC-матрицей, response shape для `/burndown`.
+- **Docs — architecture:** в `docs/architecture/backend-modules.md` добавлена секция «releases/checkpoints» с разбивкой по файлам сервисов + таблица cron-job + лок-ключей + заметка о cache invariants.
+- **Docs — user-manual:** два новых файла:
+  - `docs/user-manual/features/checkpoints.md` — полное руководство по КТ (роли, типы, шаблоны, матрица, риск-скоринг).
+  - `docs/user-manual/features/release-burndown.md` — диаграмма сгорания (метрики, backfill, retention, overdue-поведение).
+- **TZ:** `docs/tz/TTMP-160.md` §13.5 — PR-11 ✅ merged (#92), PR-12 🚧 → финал после мержа, 11/12 → 12/12.
+- **INDEX:** 10/12 → 11/12 PR merged (перейдёт в «DONE» после мержа PR-12).
+- Frontend tsc clean; e2e-spec синтаксически валиден (run требует E2E_ADMIN_PASSWORD + staging).
 
 ---
 

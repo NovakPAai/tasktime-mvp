@@ -155,6 +155,41 @@ File: `backend/src/modules/releases/`
 
 ---
 
+### releases/checkpoints — `/api` (TTMP-160)
+
+File: `backend/src/modules/releases/checkpoints/`
+
+Подмодуль контрольных точек релиза. Разбит на несколько роутеров + сервисов:
+
+| Файл | Назначение |
+|------|------------|
+| `checkpoint-types.router.ts` + `.service.ts` | CRUD типов КТ + sync-instances (FR-15) |
+| `checkpoint-templates.router.ts` + `.service.ts` | CRUD шаблонов + clone + bulk-apply (FR-21) |
+| `release-checkpoints.router.ts` + `.service.ts` | Применение / удаление / пересчёт / preview + матрица (FR-26) |
+| `burndown.router.ts` + `burndown.service.ts` | Снапшоты релиза, GET series + ideal-line, backfill, retention (FR-28 … FR-32) |
+| `audit.router.ts` + `.service.ts` | `/admin/checkpoint-audit` + CSV экспорт (FR-23 / SEC-6 / SEC-9) |
+| `webhook-notifier.service.ts` | `CHECKPOINT_WEBHOOK` с debounce + concurrency cap 20 (FR-17) |
+| `checkpoint-scheduler.service.ts` | `node-cron` для recompute + burndown snapshot + retention, Redis-локи |
+| `checkpoint-triggers.service.ts` | Event-хуки на мутациях issues / custom-fields / workflow-engine / releases |
+| `checkpoint-engine.service.ts` + `evaluate-criterion.ts` | Pure-function движок: `recomputeForRelease`, `computeReleaseRisk`, `evaluateCriterion` |
+| `evaluation-loader.service.ts` | Загрузка `EvaluationIssue[]` + context из БД (без N+1) |
+
+**Scheduler jobs (PR-10):**
+
+| Cron ключ | Default | Job | Redis lock (TTL) |
+|-----------|---------|-----|------------------|
+| `CHECKPOINTS_SCHEDULER_CRON` | `*/10 * * * *` | `tickCheckpoints` — recompute активных релизов в окне ±30 дней | `checkpoints:scheduler` (540s) |
+| `BURNDOWN_SNAPSHOT_CRON` | `5 0 * * *` | `tickBurndownSnapshot` — один снапшот в день на релиз | `burndown:snapshot:lock` (600s) |
+| `BURNDOWN_RETENTION_CRON` | `0 3 * * 0` | `tickBurndownRetention` — дроп старых снапшотов DONE-релизов | `burndown:retention:lock` (600s) |
+
+**SIGTERM drain:** `stopCheckpointScheduler()` использует `Set<Promise>` + `Promise.allSettled` — все одновременно стартовавшие тики (checkpoints + burndown-snapshot + burndown-retention могут перекрываться) дожидаются завершения.
+
+**Cache invariants (PR-10):** `invalidateReleaseCache(releaseId)` вызывает `invalidateBurndownCache(releaseId)` — `violatedCheckpoints` в снапшоте читается live от `ReleaseCheckpoint.state`, поэтому любой recompute должен сбросить кэш burndown-ответов (`burndown:{releaseId}:{metric}:{from}:{to}` TTL 300s).
+
+Подробно — см. [TTMP-160](../tz/TTMP-160.md).
+
+---
+
 ### comments — `/api`
 
 File: `backend/src/modules/comments/`

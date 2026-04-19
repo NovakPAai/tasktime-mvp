@@ -1,7 +1,7 @@
 # ТЗ: TTMP-160 — Модуль контрольных точек релизов
 
 **Дата:** 2026-04-18
-**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (10/12 PR merged, Phase 1 MVP ✅ complete, Phase 2 in progress) — см. §13.5
+**Тип:** EPIC | **Приоритет:** HIGH | **Статус:** IN_PROGRESS (11/12 PR merged, Phase 1 MVP ✅ complete, Phase 2 in progress) — см. §13.5
 **Проект:** TaskTime MVP (TTMP)
 **Автор ТЗ:** Claude Code (auto-generated)
 
@@ -1152,10 +1152,10 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 | 8 | `ttmp-160/bulk-webhook-audit` | Bulk-apply + webhook + аудит-страница | 10 | PR-4 | ✅ merged (#89) |
 | 9 | `ttmp-160/matrix` | Матрица задач × КТ | 8 | PR-3 | ✅ merged (#90) |
 | 10 | `ttmp-160/burndown-backend` | Burndown schema + cron + API | 10 | PR-1, PR-4 | ✅ merged (#91) |
-| 11 | `ttmp-160/burndown-frontend` | Burndown UI + Recharts | 6 | PR-10 | 🚧 in work |
-| 12 | `ttmp-160/e2e-docs` | E2E + a11y + docs | 11 | PR-1..PR-11 | ⏳ |
+| 11 | `ttmp-160/burndown-frontend` | Burndown UI + Recharts | 6 | PR-10 | ✅ merged (#92) |
+| 12 | `ttmp-160/e2e-docs` | E2E + a11y + docs | 11 | PR-1..PR-11 | 🚧 in work |
 
-**Итого:** 12 PR, ~126 часов. **Прогресс:** 10 / 12 merged (≈109 ч) — Фаза 1 MVP ✅ готова, Фаза 2 в работе. 1 в работе (≈6 ч), остался 1 PR (≈11 ч) в Фазе 2.
+**Итого:** 12 PR, ~126 часов. **Прогресс:** 11 / 12 merged (≈115 ч) — Фаза 1 MVP ✅ готова, Фаза 2 завершена в части runtime. 1 в работе (≈11 ч, PR-12 e2e+docs).
 
 **Обновления по мере выполнения (2026-04-18):**
 - PR-1 `ttmp-160/foundation` — ✅ merged в `main` (commit `078ef57`, PR [#79](https://github.com/NovakPAai/tasktime-mvp/pull/79)). Prisma-модели + миграция `20260422000000_release_checkpoints` + CRUD `/api/admin/checkpoint-types` и `/api/admin/checkpoint-templates`.
@@ -1168,7 +1168,8 @@ PR-1..PR-11 ──► PR-12 (e2e+a11y+docs)
 - PR-8 `ttmp-160/bulk-webhook-audit` — ✅ merged в `main` (commit `9c5a512`, PR [#89](https://github.com/NovakPAai/tasktime-mvp/pull/89)). Bulk-apply с 207 Multi-Status + per-release SEC-5 partition (FR-21), `CHECKPOINT_WEBHOOK` с `minStableSeconds` debounce + concurrency-cap 20 (FR-17), admin page `/admin/checkpoint-audit` + CSV c BOM/CRLF (FR-23, SEC-6, SEC-9). 11 интеграционных тестов; full suite 513/513 зелёный.
 - PR-9 `ttmp-160/matrix` — ✅ merged в `main` (commit `128f279`, PR [#90](https://github.com/NovakPAai/tasktime-mvp/pull/90)). `GET /api/releases/:id/checkpoints/matrix` (JSON + `?format=csv` с UTF-8 BOM/CRLF), `CheckpointsMatrix.tsx` со sticky-первой колонкой + легендой + кнопками Обновить/Экспорт CSV, переключатель «Список / Матрица» в `DetailPanel` (aria-pressed), buildCheckpointsMatrix собирает ячейки из снапшотов без re-evaluate. 4 интеграционных теста; full suite 506/506 зелёный.
 - PR-10 `ttmp-160/burndown-backend` — ✅ merged в `main` (commit `7c27875`, PR [#91](https://github.com/NovakPAai/tasktime-mvp/pull/91)). `burndown.service.ts` (captureSnapshot/getBurndown/backfill/purge) + `burndown.router.ts` (GET `/burndown` release-read-gate + POST `/backfill` SUPER_ADMIN/ADMIN SEC-8), cron-тики `tickBurndownSnapshot` / `tickBurndownRetention` с отдельными Redis-локами. Ideal-line по §12.4 (overdue → плоская 2-точечная линия), retention оставляет самый свежий снапшот. `invalidateBurndownCache` встроен в recompute-пайплайн. 10 интеграционных тестов; full suite 516/516 зелёный.
-- PR-11 `ttmp-160/burndown-frontend` — 🚧 в работе. `recharts` в зависимостях, `api/release-burndown.ts`, `components/releases/ReleaseBurndownChart.tsx` (`<LineChart>` actual+ideal, переключатель метрики, tooltip с дельтой), вкладка BURNDOWN в `DetailPanel` на `GlobalReleasesPage`, empty-state с CTA «Backfill» для ADMIN (FR-31).
+- PR-11 `ttmp-160/burndown-frontend` — ✅ merged в `main` (commit `a8b3bf0`, PR [#92](https://github.com/NovakPAai/tasktime-mvp/pull/92)). `recharts@^3.8.1` (+ code-split через `React.lazy` + `Suspense` — main bundle 847 → 737 kB gzipped), `api/release-burndown.ts` + типы, `ReleaseBurndownChart.tsx` с `<LineChart>` actual+ideal (`connectNulls` разные), `Segmented` metric switcher, custom tooltip, XAxis `interval="preserveStartEnd"` + angle для 90-дневных релизов, `accessibilityLayer` (FR-18), `seqRef` guard против race при смене метрики. Вкладка «Диаграмма сгорания» в `DetailPanel`, empty-state с CTA «Создать снапшот» только для SUPER_ADMIN/ADMIN (SEC-8).
+- PR-12 `ttmp-160/e2e-docs` — 🚧 в работе. Playwright `e2e/specs/15-checkpoints.spec.ts` с сценариями по ролям, `@axe-core/playwright` для a11y-проверок на вкладках «Контрольные точки» / «Диаграмма сгорания», документация в `docs/RU/USER_GUIDE.md` + `docs/api/reference.md` + `docs/architecture/backend-modules.md` + `docs/user-manual/features/{checkpoints,release-burndown}.md`.
 
 ### 13.6 Merge-порядок и rollback
 
