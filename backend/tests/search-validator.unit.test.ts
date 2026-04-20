@@ -213,6 +213,7 @@ describe('validator — custom fields', () => {
     name: 'Story Points',
     type: 'NUMBER',
     operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'],
+    sortable: false,
     options: null,
   };
 
@@ -253,18 +254,29 @@ describe('validator — custom fields', () => {
 // ─── ORDER BY sortable warning ──────────────────────────────────────────────
 
 describe('validator — ORDER BY on non-sortable field', () => {
-  it('description is not sortable — warning', () => {
-    const r = runValidate('x = 1 ORDER BY description');
-    // Validator emits warnings for non-sortable ORDER BY fields; parse still valid.
-    // NB: `x` is unknown → UNKNOWN_FIELD error; we check the warning independently.
-    const codes = [...r.errors, ...r.warnings].map((i) => i.code);
-    expect(codes).toContain('UNKNOWN_FIELD'); // from `x`
+  it('description is not sortable — ORDER_BY_NOT_SORTABLE warning', () => {
+    // Use a known field to isolate the ORDER BY warning from other errors.
+    const r = runValidate('description ~ "text" ORDER BY description');
+    expect(r.valid).toBe(true);
+    expect(r.warnings.map((w) => w.code)).toContain('ORDER_BY_NOT_SORTABLE');
   });
 
   it('priority IS sortable — no warning', () => {
     const r = runValidate('priority = HIGH ORDER BY priority');
     expect(r.warnings).toEqual([]);
     expect(r.valid).toBe(true);
+  });
+
+  it('custom field (always non-sortable in MVP) emits ORDER_BY_NOT_SORTABLE', () => {
+    const cf: CustomFieldDef = {
+      id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      name: 'Story Points',
+      type: 'NUMBER',
+      operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'],
+      sortable: false,
+    };
+    const r = runValidate('"Story Points" > 0 ORDER BY "Story Points"', { customFields: [cf] });
+    expect(r.warnings.map((w) => w.code)).toContain('ORDER_BY_NOT_SORTABLE');
   });
 });
 
@@ -317,10 +329,11 @@ const GOLDEN_CUSTOM_FIELDS: CustomFieldDef[] = [
     name: 'Release Status',
     type: 'TEXT',
     operators: ['EQ', 'NEQ', 'IN', 'NOT_IN', 'IS_EMPTY', 'IS_NOT_EMPTY'],
+    sortable: false,
   },
-  { id: '22222222-2222-2222-2222-222222222201', name: 'Story Points', type: 'NUMBER', operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'] },
-  { id: '22222222-2222-2222-2222-222222222202', name: 'Business Value', type: 'NUMBER', operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'] },
-  { id: '22222222-2222-2222-2222-222222222203', name: 'Effort', type: 'NUMBER', operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'] },
+  { id: '22222222-2222-2222-2222-222222222201', name: 'Story Points', type: 'NUMBER', operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'], sortable: false },
+  { id: '22222222-2222-2222-2222-222222222202', name: 'Business Value', type: 'NUMBER', operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'], sortable: false },
+  { id: '22222222-2222-2222-2222-222222222203', name: 'Effort', type: 'NUMBER', operators: ['EQ', 'NEQ', 'GT', 'GTE', 'LT', 'LTE', 'IS_EMPTY', 'IS_NOT_EMPTY'], sortable: false },
 ];
 
 describe('validator — golden-set round trip', () => {

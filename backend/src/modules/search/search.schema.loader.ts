@@ -22,7 +22,15 @@ const CACHE_TTL_SECONDS = 60;
  * straight through to Prisma — the endpoint stays functional at some latency cost.
  */
 export async function loadCustomFields(): Promise<CustomFieldDef[]> {
-  const cached = await getCachedJson<CustomFieldDef[]>(CACHE_KEY);
+  // Treat any Redis error (connection refused, READONLY, timeout) as a cache miss.
+  // If we let the exception propagate, a failing Redis would 500 both /search/validate
+  // and /search/schema — not what ops expects from a cache-layer outage.
+  let cached: CustomFieldDef[] | null = null;
+  try {
+    cached = await getCachedJson<CustomFieldDef[]>(CACHE_KEY);
+  } catch {
+    cached = null;
+  }
   if (cached) return cached;
 
   const rows = await prisma.customField.findMany({
@@ -34,8 +42,13 @@ export async function loadCustomFields(): Promise<CustomFieldDef[]> {
     name: r.name,
     type: customFieldTypeToTtql(r.fieldType),
     operators: operatorsForCustomField(r.fieldType),
+    sortable: false, // MVP — see CustomFieldDef.sortable comment
     options: r.options,
   }));
-  await setCachedJson(CACHE_KEY, defs, CACHE_TTL_SECONDS);
+  try {
+    await setCachedJson(CACHE_KEY, defs, CACHE_TTL_SECONDS);
+  } catch {
+    // Redis write failure is non-fatal — we've already computed `defs`.
+  }
   return defs;
 }

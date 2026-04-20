@@ -53,7 +53,8 @@ export type ValidationErrorCode =
   | 'AMBIGUOUS_CUSTOM_FIELD'
   | 'CUSTOM_FIELD_UUID_UNKNOWN'
   | 'CURRENTUSER_IN_CHECKPOINT'
-  | 'INVALID_OFFSET_FORMAT';
+  | 'INVALID_OFFSET_FORMAT'
+  | 'ORDER_BY_NOT_SORTABLE';
 
 export type ValidationSeverity = 'error' | 'warning';
 
@@ -94,9 +95,14 @@ export function validate(ast: QueryNode, ctx: ValidatorContext): ValidationResul
   for (const s of ast.orderBy) {
     // ORDER BY resolves fields but doesn't match an operator — just ensure field exists
     // and is sortable. Non-sortable field → warning, not error (compiler may fall back).
+    // Custom fields are never sortable in MVP (§R13 ТЗ); the check covers both kinds.
     const fd = v.resolveField(s.field);
-    if (fd && fd.kind === 'system' && !fd.def.sortable) {
-      v.warn('VALUE_TYPE_MISMATCH', `Field \`${v.fieldLabel(s.field)}\` is not sortable; ORDER BY will be ignored by the compiler.`, s.field.span);
+    if ((fd.kind === 'system' || fd.kind === 'custom') && !fd.def.sortable) {
+      v.warn(
+        'ORDER_BY_NOT_SORTABLE',
+        `Field \`${v.fieldLabel(s.field)}\` is not sortable; ORDER BY will be ignored by the compiler.`,
+        s.field.span,
+      );
     }
   }
   const errors = v.issues.filter((i) => i.severity === 'error');
@@ -215,7 +221,10 @@ class Validator {
 
   private checkOpAllowed(wanted: TtqlOpKind, field: ResolvedField, span: Span): void {
     if (field.kind === 'unknown') return; // already reported
-    const allowed = field.kind === 'system' ? field.def.operators : field.def.operators;
+    // `FieldDef` (system) and `CustomFieldDef` both expose `.operators`, so a single
+    // access works for both kinds. Don't re-split by `kind` — it creates copy-paste
+    // drift the moment one structure gains an extra permission axis.
+    const allowed = field.def.operators;
     if (!allowed.includes(wanted)) {
       this.err(
         'OPERATOR_NOT_ALLOWED_FOR_FIELD',

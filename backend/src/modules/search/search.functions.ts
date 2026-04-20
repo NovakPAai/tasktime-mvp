@@ -229,8 +229,12 @@ export function evaluatePureDateFn(
 
 /**
  * Iterate the registry filtered by variant. Used by the `/search/schema` endpoint
- * to expose only the functions legal in the caller's context.
+ * to expose only the functions legal in the caller's context. **Phase-2 functions
+ * are excluded** — they'd only confuse autocomplete (user would pick one and then
+ * hit PHASE_2_FUNCTION at validate-time).
  */
 export function functionsForVariant(variant: QueryVariant): FunctionDef[] {
-  return FUNCTION_REGISTRY.filter((f) => f.availableIn.includes(variant));
+  return FUNCTION_REGISTRY.filter(
+    (f) => f.phase === 'MVP' && f.availableIn.includes(variant),
+  );
 }

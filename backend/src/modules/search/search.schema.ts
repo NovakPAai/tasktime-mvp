@@ -46,7 +46,10 @@ export const SYSTEM_FIELDS: readonly FieldDef[] = [
   { name: 'description', synonyms: [], type: 'TEXT', operators: ['CONTAINS', 'NOT_CONTAINS', 'IS_EMPTY', 'IS_NOT_EMPTY'], sortable: false, label: 'Description' },
   { name: 'comment', synonyms: [], type: 'TEXT', operators: ['CONTAINS'], sortable: false, label: 'Comment' },
   // Status
-  { name: 'status', synonyms: [], type: 'STATUS', operators: [...CMP_REF, 'WAS', 'WAS_NOT', 'WAS_IN', 'WAS_NOT_IN', 'CHANGED'] as readonly TtqlOpKind[], sortable: true, label: 'Status' },
+  // History operators (WAS/WAS_NOT/WAS_IN/WAS_NOT_IN/CHANGED) are syntactically parsed
+  // but currently rejected by the validator with PHASE_2_OPERATOR. Add them back to the
+  // operators array when TTSRH-23 (FieldChangeLog) ships.
+  { name: 'status', synonyms: [], type: 'STATUS', operators: CMP_REF, sortable: true, label: 'Status' },
   { name: 'statuscategory', synonyms: ['category'], type: 'STATUS_CATEGORY', operators: CMP_ENUM, sortable: false, label: 'Status Category' },
   // Priority
   { name: 'priority', synonyms: [], type: 'PRIORITY', operators: CMP_ENUM, sortable: true, label: 'Priority' },
@@ -112,6 +115,13 @@ export interface CustomFieldDef {
   /** TTS-QL type derived from the Prisma `CustomFieldType`. */
   type: TtqlType;
   operators: readonly TtqlOpKind[];
+  /**
+   * MVP: custom fields are never sortable (§R13 ТЗ — sort by JSON-column is too
+   * slow without functional indexes, deferred to Phase 2). The field exists so
+   * validators and the `/search/schema` response treat system and custom fields
+   * with the same shape.
+   */
+  sortable: boolean;
   /** Options for SELECT/MULTI_SELECT — exposed to suggest but not used by validator. */
   options?: unknown;
 }

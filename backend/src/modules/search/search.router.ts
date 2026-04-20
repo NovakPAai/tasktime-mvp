@@ -109,7 +109,17 @@ router.get(
         ],
         functions: functionsForVariant(variant).map((fn) => ({
           name: fn.name,
-          args: fn.args,
+          // Map internal validator-only pseudo-types (OFFSET / ISSUE_KEY / ANY) to
+          // surface types the editor/frontend can render — they're not TTS-QL types.
+          args: fn.args.map((a) => ({
+            name: a.name,
+            type:
+              a.type === 'OFFSET' ? 'TEXT' :
+              a.type === 'ISSUE_KEY' ? 'TEXT' :
+              a.type === 'ANY' ? 'TEXT' :
+              a.type,
+            optional: a.optional,
+          })),
           returnType: fn.returnType,
           phase: fn.phase,
           description: fn.description,
