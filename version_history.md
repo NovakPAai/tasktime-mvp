@@ -20,7 +20,7 @@
 
 **Frontend:**
 - `listIssues` возвращает `PaginatedResponse<Issue>` вместо `Issue[]`
-- `listAllIssues` — новая функция для пикеров (Releases, Dashboard), загружает до 500 задач; предупреждение в консоль при превышении
+- `listAllIssues` — новая функция для пикеров (Releases, Dashboard), загружает все страницы параллельно по 500 задач за запрос через `Promise.all`
 - `useIssuesStore`: серверная пагинация (50/страница), race condition guard (`fetchSeq`), сброс стора при смене проекта (`currentProjectId`), поле `error` с отображением в UI
 - `ProjectDetailPage`: убран tree-mode (несовместим с серверной пагинацией), подключена пагинация таблицы, счётчик задач берётся из `total` (серверное значение)
 - Пикеры в `GlobalReleasesPage`, `ReleasesPage`, `DashboardPage` переведены на `listAllIssues`
