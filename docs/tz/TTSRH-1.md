@@ -1488,30 +1488,32 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 
 ### 13.9 Итог: список PR
 
-| № | Branch | Scope | Часы | Зависит от | TTSRH-сабтаски |
-|---|--------|-------|------|-----------|----------------|
-| 1 | `ttsrh-1/foundation` | Prisma schema (SavedFilter, User.preferences), feature flags, пустые модули | 6 | — | TTSRH-8 (schema), TTSRH-22 (flag) |
-| 2 | `ttsrh-1/parser` | Tokenizer + Parser + AST + golden-set | 14 | PR-1 | TTSRH-2 |
-| 3 | `ttsrh-1/validator` | Field registry + Validator + functions + `/search/schema`, `/validate` | 14 | PR-2 | TTSRH-3, TTSRH-6 |
-| 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 |
-| 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 |
-| 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 |
-| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 |
-| 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 |
-| 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 |
-| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 |
-| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 |
-| 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 |
-| 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 |
-| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 |
-| 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 |
-| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 |
-| 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 |
-| 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 |
-| 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 |
-| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 |
-| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 |
-| **Итого** | | | **199** | | |
+**Легенда статусов:** `📋 Планируется` · `🚧 В работе` · `✅ Done` (готов к merge / на ревью) · `🟢 Merged`.
+
+| № | Branch | Scope | Часы | Зависит от | TTSRH-сабтаски | Статус |
+|---|--------|-------|------|-----------|----------------|--------|
+| 1 | `ttsrh-1/foundation` | Prisma schema (SavedFilter, User.preferences), feature flags, пустые модули | 6 | — | TTSRH-8 (schema), TTSRH-22 (flag) | 🟢 Merged ([#100](https://github.com/NovakPAai/tasktime-mvp/pull/100)) |
+| 2 | `ttsrh-1/parser` | Tokenizer + Parser + AST + golden-set | 14 | PR-1 | TTSRH-2 | ✅ Done (готов к push после merge PR-1) |
+| 3 | `ttsrh-1/validator` | Field registry + Validator + functions + `/search/schema`, `/validate` | 14 | PR-2 | TTSRH-3, TTSRH-6 | 📋 Планируется |
+| 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 | 📋 Планируется |
+| 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 | 📋 Планируется |
+| 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 | 📋 Планируется |
+| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 📋 Планируется |
+| 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 📋 Планируется |
+| 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 📋 Планируется |
+| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 📋 Планируется |
+| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 📋 Планируется |
+| 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 📋 Планируется |
+| 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 📋 Планируется |
+| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 📋 Планируется |
+| 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | 📋 Планируется |
+| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 📋 Планируется |
+| 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 📋 Планируется |
+| 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 📋 Планируется |
+| 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | 📋 Планируется |
+| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | 📋 Планируется |
+| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 📋 Планируется |
+| **Итого** | | | **199** | | | |
 
 **Дельта к §8 (278ч):** план покрывает ~199ч. Недостающие ~79ч — это (a) code review + фиксы (~8ч per §8), (b) security review + фиксы (~4ч), (c) докуметация JQL полная (~6ч уже в PR-21, ~0ч дополнительно), (d) профайлинг + composite-index tuning (~4ч в PR-20), (e) fuzz-harness extended (~4ч в PR-5); остальное — buffer на unknown unknowns и Phase-2-проникновение. Реалистичный календарный план — 8–10 недель при одном fullstack-разработчике или 5–6 недель при параллельной работе двоих (backend + frontend после PR-5).
 
