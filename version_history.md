@@ -2,7 +2,22 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.31**
+**Last version: 2.32**
+
+---
+
+## [2.32] [2026-04-21] fix(ci): inject-secrets без утечки секретов в ps aux
+
+**PR:** [#99](https://github.com/NovakPAai/tasktime-mvp/pull/99)
+**Ветка:** `claude/jack-fix-issues-list-truncated`
+
+### Что изменилось
+
+**CI:**
+- `deploy-staging.yml`: заменён positional-args подход на double-quoted heredoc — секреты передаются в stdin bash (не видны через `ps aux`), `${{ secrets.* }}` раскрывается GitHub Actions до отправки по SSH
+
+### Файлы
+- `.github/workflows/deploy-staging.yml`
 
 ---
 
@@ -175,6 +190,7 @@
 - Golden-set 63/63 парсится и валидируется без ошибок
 - Pre-push review — в отдельном коммите
 
+
 ---
 
 ## [2.28] [2026-04-20] feat(search): TTSRH-1 PR-2 — TTS-QL tokenizer + parser + AST + golden-set
@@ -274,6 +290,7 @@
 ---
 
 ## [2.26] [2026-04-20] fix: коллизия кэша поиска + утечка фильтров при смене проекта
+
 
 ---
 
