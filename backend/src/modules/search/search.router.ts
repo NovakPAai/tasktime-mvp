@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
 
 /**
@@ -17,7 +17,7 @@ const router = Router();
 router.use(authenticate);
 
 function notImplemented(endpoint: string) {
-  return (_req: unknown, res: { status: (code: number) => { json: (body: unknown) => void } }) => {
+  return (_req: Request, res: Response): void => {
     res.status(501).json({
       error: 'NOT_IMPLEMENTED',
       endpoint,

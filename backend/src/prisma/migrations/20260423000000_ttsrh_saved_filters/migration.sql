@@ -20,6 +20,7 @@ CREATE TABLE "saved_filters" (
     "last_used_at" TIMESTAMP(3),
     "use_count"    INTEGER NOT NULL DEFAULT 0,
     "created_at"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- updated_at — managed by Prisma @updatedAt; must always be set by ORM on insert/update.
     "updated_at"   TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "saved_filters_pkey" PRIMARY KEY ("id")
