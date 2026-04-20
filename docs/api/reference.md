@@ -890,11 +890,11 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 
 | Метод | Путь | Доступ |
 |-------|------|--------|
-| `POST` | `/api/search/issues` | 🔒 |
 | `POST` | `/api/search/validate` | 🔒 |
+| `GET` | `/api/search/schema` | 🔒 |
+| `POST` | `/api/search/issues` | 🔒 |
 | `GET` | `/api/search/suggest` | 🔒 |
 | `POST` | `/api/search/export` | 🔒 |
-| `GET` | `/api/search/schema` | 🔒 |
 
 ### Sprints
 
