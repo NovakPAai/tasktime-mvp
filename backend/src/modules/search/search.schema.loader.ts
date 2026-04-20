@@ -41,6 +41,7 @@ export async function loadCustomFields(): Promise<CustomFieldDef[]> {
     id: r.id,
     name: r.name,
     type: customFieldTypeToTtql(r.fieldType),
+    fieldType: r.fieldType,
     operators: operatorsForCustomField(r.fieldType),
     sortable: false, // MVP — see CustomFieldDef.sortable comment
     options: r.options,
