@@ -45,22 +45,19 @@ jobs:
 
       - name: Inject secrets into backend env
         run: |
-          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
-            bash -s -- \
-              "${{ secrets.AI_PROVIDER }}" \
-              "${{ secrets.ANTHROPIC_API_KEY }}" \
-              "${{ secrets.STAGING_MCP_SERVICE_TOKEN }}" \
-              "${{ secrets.MCP_AGENT_PASSWORD }}" \
-              "${{ secrets.STAGING_DEPLOY_PATH }}" \
-            <<'SSHEOF'
-            ENV_FILE="$5/deploy/env/backend.staging.env"
-            TMP_FILE=$(mktemp "${ENV_FILE}.XXXXXX")
-            grep -v '^AI_PROVIDER=\|^ANTHROPIC_API_KEY=\|^MCP_SERVICE_TOKEN=\|^MCP_AGENT_PASSWORD=' \
-              "$ENV_FILE" > "$TMP_FILE" || true
-            printf 'AI_PROVIDER=%s\nANTHROPIC_API_KEY=%s\nMCP_SERVICE_TOKEN=%s\nMCP_AGENT_PASSWORD=%s\n' \
-              "$1" "$2" "$3" "$4" \
-              >> "$TMP_FILE"
-            mv -f "$TMP_FILE" "$ENV_FILE"
+          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" bash -s <<SSHEOF
+          set -euo pipefail
+          ENV_FILE="${{ secrets.STAGING_DEPLOY_PATH }}/deploy/env/backend.staging.env"
+          TMP_FILE=\$(mktemp "\${ENV_FILE}.XXXXXX")
+          grep -v '^AI_PROVIDER=\|^ANTHROPIC_API_KEY=\|^MCP_SERVICE_TOKEN=\|^MCP_AGENT_PASSWORD=' \
+            "\$ENV_FILE" > "\$TMP_FILE" || true
+          printf 'AI_PROVIDER=%s\nANTHROPIC_API_KEY=%s\nMCP_SERVICE_TOKEN=%s\nMCP_AGENT_PASSWORD=%s\n' \
+            "${{ secrets.AI_PROVIDER }}" \
+            "${{ secrets.ANTHROPIC_API_KEY }}" \
+            "${{ secrets.STAGING_MCP_SERVICE_TOKEN }}" \
+            "${{ secrets.MCP_AGENT_PASSWORD }}" \
+            >> "\$TMP_FILE"
+          mv -f "\$TMP_FILE" "\$ENV_FILE"
           SSHEOF
 
       - name: Run remote deploy
