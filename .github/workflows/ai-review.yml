@@ -3,10 +3,6 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-      - '.github/CODEOWNERS'
   workflow_dispatch:
     inputs:
       pr_number:

@@ -122,9 +122,10 @@ export async function listIssues(
     where.createdAt = createdAt;
   }
   if (filters?.search) {
+    const searchQ = filters.search.slice(0, 200);
     where.OR = [
-      { title: { contains: filters.search, mode: 'insensitive' } },
-      { description: { contains: filters.search, mode: 'insensitive' } },
+      { title: { contains: searchQ, mode: 'insensitive' } },
+      { description: { contains: searchQ, mode: 'insensitive' } },
     ];
   }
 

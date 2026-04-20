@@ -56,7 +56,7 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
     const seq = ++fetchSeq;
     const { currentProjectId } = get();
     if (currentProjectId !== projectId) {
-      set({ issues: [], total: 0, currentPage: 1, currentProjectId: projectId });
+      set({ issues: [], total: 0, currentPage: 1, currentProjectId: projectId, filters: initialFilters });
     }
     set({ loading: true, error: null });
     try {

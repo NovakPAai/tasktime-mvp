@@ -2,7 +2,30 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.25**
+**Last version: 2.26**
+
+---
+
+## [2.26] [2026-04-20] fix: коллизия кэша поиска + утечка фильтров при смене проекта
+
+**PR:** [#98](https://github.com/NovakPAai/tasktime-mvp/pull/98)
+**Ветка:** `claude/jack-fix-issues-list-truncated`
+
+### Что изменилось
+
+**Backend:**
+- `issues.service.ts`: `search` обрезается до 200 символов перед передачей в Prisma-предикат — теперь совпадает с Redis-ключом (устранена коллизия кэша при длинных запросах)
+
+**Frontend:**
+- `issues.store.ts`: `filters` сбрасываются в `initialFilters` при смене проекта — устранена утечка `issueTypeConfigId`/`assigneeId` из одного проекта в другой
+
+**CI:**
+- `ai-review.yml`: убран `paths-ignore` — AI Code Review запускается на каждый PR без исключений
+
+### Файлы
+- `backend/src/modules/issues/issues.service.ts`
+- `frontend/src/store/issues.store.ts`
+- `.github/workflows/ai-review.yml`
 
 ---
 
@@ -20,7 +43,7 @@
 
 **Frontend:**
 - `listIssues` возвращает `PaginatedResponse<Issue>` вместо `Issue[]`
-- `listAllIssues` — новая функция для пикеров (Releases, Dashboard), загружает до 500 задач; предупреждение в консоль при превышении
+- `listAllIssues` — новая функция для пикеров (Releases, Dashboard), загружает все страницы параллельно по 500 задач за запрос через `Promise.all`
 - `useIssuesStore`: серверная пагинация (50/страница), race condition guard (`fetchSeq`), сброс стора при смене проекта (`currentProjectId`), поле `error` с отображением в UI
 - `ProjectDetailPage`: убран tree-mode (несовместим с серверной пагинацией), подключена пагинация таблицы, счётчик задач берётся из `total` (серверное значение)
 - Пикеры в `GlobalReleasesPage`, `ReleasesPage`, `DashboardPage` переведены на `listAllIssues`
