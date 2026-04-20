@@ -309,6 +309,7 @@ DB-backed провайдеры тестируются в integration layer (тр
 - `npx tsc --noEmit` — чисто
 - `npm run lint` — 0 errors, 0 new warnings
 - `npm run test:parser` — **433 passing**
+**Last version: 2.32**
 
 ---
 
