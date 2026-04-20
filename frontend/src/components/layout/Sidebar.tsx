@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { canViewCheckpointAudit, hasRequiredRole } from '../../lib/roles';
+import { features as frontendFeatures } from '../../lib/features';
 import type { SystemRoleType, User } from '../../types';
 
 // ─── Design tokens (Paper 1KR-0 dark + computed light) ───────────────────────
@@ -348,6 +349,18 @@ export default function Sidebar({
             </svg>
             <span style={textStyle('/flow-teams')}>Потоковые команды</span>
           </div>
+
+          {/* TTSRH-1 PR-1: «Поиск задач» (/search). Стоит перед Planning-submenu — см. §5.7 ТЗ.
+              Полный sidebar-item с submenu «Избранные фильтры» будет в PR-9. */}
+          {frontendFeatures.advancedSearch && (
+            <div data-testid="nav-search" style={itemStyle('/search')} onClick={() => onNavigate('/search')} onMouseEnter={() => setHovered('/search')} onMouseLeave={() => setHovered(null)}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+                <circle cx="7" cy="7" r="4.5" stroke={itemColor('/search')} strokeWidth="1.5" />
+                <path d="M10.5 10.5l3 3" stroke={itemColor('/search')} strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span style={textStyle('/search')}>Поиск задач</span>
+            </div>
+          )}
 
           {/* Planning submenu */}
           <div

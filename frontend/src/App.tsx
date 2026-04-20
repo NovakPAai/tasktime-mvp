@@ -60,6 +60,8 @@ import SettingsPage from './pages/SettingsPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import UatTestsPage from './pages/UatTestsPage';
 import PipelineDashboardPage from './pages/PipelineDashboardPage';
+import SearchPage from './pages/SearchPage';
+import { features as frontendFeatures } from './lib/features';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -189,6 +191,9 @@ export default function App() {
             <Route path="issues/:id" element={<IssueDetailPage />} />
             <Route path="time" element={<TimePage />} />
             <Route path="teams" element={<TeamsPage />} />
+            {/* TTSRH-1 PR-1: /search mounted only when advanced-search flag is on.
+                When disabled, the <Route path="*"> catch-all below redirects to "/". */}
+            {frontendFeatures.advancedSearch && <Route path="search" element={<SearchPage />} />}
             <Route path="uat" element={<UatTestsPage />} />
             {/*
               TTSEC-2 round 16 — partial revert of round 15's global AdminGate.

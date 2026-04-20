@@ -1169,3 +1169,357 @@ due IS NOT EMPTY ORDER BY due ASC, priority DESC
 - [ ] Обновить [docs/api/reference.md](docs/api/reference.md) эндпоинтами из 5.6.
 - [ ] Обновить [version_history.md](version_history.md) записью о TTSRH-1 в том же коммите, что функциональный код (memory rule).
 - [ ] Добавить в [docs/MCP_GUIDE.html](docs/MCP_GUIDE.html) упоминание `search_issues` MCP-tool, если решим покрыть и MCP (отдельный тикет TTSRH-25, опционально).
+
+---
+
+## 13. План реализации (PR / ветки / merge plan)
+
+### 13.1 Стратегия
+
+- **База:** все ветки создаются от свежего `main`, PR-ы мерджатся напрямую в `main` (консистентно с TTMP-160).
+- **Feature flag:** `FEATURES_ADVANCED_SEARCH=false` в production до PR-21 (UAT cutover). Пункт сайдбара, страница `/search` и Admin-секция «TTS-QL в КТ» при выключенном флаге не рендерятся / 404. Бекенд-эндпоинты `/api/search/*` и `/api/saved-filters/*` защищены тем же флагом (middleware → 404) чтобы не предлагать недокументированный API. КТ-TTQL ветка в evaluator'е — отдельный sub-flag `FEATURES_CHECKPOINT_TTQL=false` на случай, если core-поиск выкатим раньше.
+- **Именование веток:** `ttsrh-1/<scope>` (совместимо с `ttmp-160/<scope>`, `ttadm-68/<scope>`).
+- **Имя коммита:** `feat(search): TTSRH-1 — <scope>`, `feat(checkpoints): TTSRH-1 — <scope>`, `chore(search): …` для вспомогательных.
+- **Размер PR:** целимся 400–900 строк diff. PR-10 и PR-15 потенциально крупнее — при 1000+ строк разбиваем на два.
+- **CI:** каждый PR — `make lint`, `make test`, Playwright e2e (кроме PR, не меняющих UI). Начиная с PR-5 CI обязан прогонять fuzz-harness (5 мин, 1000 случайных JQL, 0 unhandled / 0 500).
+- **Staging deploy:** авто-деплой на `main`; smoke-check по чек-листу PR (см. чек-листы в каждой карточке).
+- **Security review gate:** merge PR-5 и PR-16 (анти-инъекция, скоуп, raw SQL в `Prisma.sql`) требует apprоv'а отдельного security-review человека (R1, R3).
+- **Миграции:** каждая Prisma-миграция — отдельный PR (PR-1, PR-15), чтобы `prisma migrate deploy` был проверяем на staging перед follow-up кодом.
+- **Backward compat:** PR-15 **не конвертирует** existing `CheckpointType.criteria` в TTQL — все существующие КТ остаются `conditionMode='STRUCTURED'`, поведение неизменно (R21, FR-25).
+
+### 13.2 DAG зависимостей
+
+```
+PR-1 (schema+flag) ─► PR-2 (parser) ─► PR-3 (validator+schema) ─► PR-4 (compiler) ─► PR-5 (endpoints+fuzz)
+                                                                                      │
+                                                                                      ├─► PR-6 (suggesters backend)
+                                                                                      ├─► PR-7 (SavedFilter API + user prefs)
+                                                                                      └─► PR-8 (export CSV/XLSX)
+
+PR-5 ─► PR-9  (SearchPage shell + sidebar + route)
+PR-6 ─► PR-10 (JqlEditor + highlight + inline errors)
+PR-6 ─► PR-11 (ValueSuggesterPopup + CM6 adapter)
+PR-9+PR-10+PR-11 ─► PR-12 (BasicFilterBuilder + toggle)
+PR-7 ─► PR-13 (SavedFiltersSidebar + modals + store)
+PR-5 ─► PR-14 (ColumnConfigurator + ResultsTable + bulk + export UI + shortcuts)
+
+PR-1 ─► PR-15 (Checkpoint Prisma + DTO + КТ-функции) ─► PR-16 (engine TTQL-ветка + error handling)
+PR-16 ─► PR-17 (/preview + violatedCheckpoints* функции + checkpoint-поля)
+PR-5+PR-15 ─► PR-18 (КТ UI: segment-mode + JqlEditor + Preview panel + mode-icon)
+PR-18 ─► PR-19 (structured→TTQL converter)
+
+PR-12+PR-13+PR-14+PR-17+PR-19 ─► PR-20 (E2E + perf seed + Lighthouse)
+PR-20 ─► PR-21 (docs + feature flag cutover)
+```
+
+Параллелизм: после merge PR-5 — PR-6/PR-7/PR-8 параллельно; после PR-6 — PR-10/PR-11 параллельно; после PR-1 — PR-15 параллельно со всей core-цепочкой (backend КТ не зависит от завершённого frontend поиска).
+
+### 13.3 PR-ы Фазы 0 — Foundation (~6ч)
+
+#### PR-1: Prisma schema + feature flag
+- **Branch:** `ttsrh-1/foundation`
+- **Scope:**
+  - Миграция `YYYYMMDDHHMMSS_ttsrh_saved_filters_and_checkpoint_ttql` — модели `SavedFilter`, `SavedFilterShare`, enum `FilterVisibility`, `FilterPermission`, `User.preferences Json?`. (§3.3)
+  - env-флаги `FEATURES_ADVANCED_SEARCH`, `FEATURES_CHECKPOINT_TTQL` в [shared/config.ts](backend/src/shared/config.ts).
+  - Пустой модуль `backend/src/modules/search/` и `backend/src/modules/saved-filters/` с `search.router.ts`/`saved-filters.router.ts`, возвращающими 404 при выключенном флаге; mount в `app.ts`.
+  - Пустой файл `frontend/src/pages/SearchPage.tsx` (placeholder «Feature disabled»), условный рендер пункта сайдбара (только при флаге).
+  - `prisma generate`, тесты `make test`.
+- **Не включает:** ни грамматики, ни UI, ни CRUD SavedFilter — только инфраструктуру.
+- **Merge-ready check:** миграция применяется/откатывается на чистой БД; при `FEATURES_ADVANCED_SEARCH=true` эндпоинты возвращают 501 (`Not implemented`); пункт сайдбара появляется.
+- **Оценка:** ~6ч.
+
+### 13.4 PR-ы Фазы 1 — TTS-QL Backend Core (~50ч)
+
+#### PR-2: Tokenizer + Parser + AST + golden-set
+- **Branch:** `ttsrh-1/parser`
+- **Scope:** (§5.1, TTSRH-2)
+  - `backend/src/modules/search/search.ast.ts` — типы `Node`, `OrNode`, `AndNode`, `NotNode`, `ClauseNode`, `FunctionCall`, `Literal`, `OrderBy`, `Span`.
+  - `search.tokenizer.ts` — regex-лексер (STRING с escape, NUMBER, IDENT, KEYWORD, OP, RELATIVE_DATE, CUSTOM_FIELD), позиции `{start, end}`.
+  - `search.parser.ts` — recursive descent, приоритет `( > NOT > AND > OR > ORDER BY`; ошибки с позицией (recovery-режим для частичного AST — подготовка к suggest).
+  - Unit: **100+ кейсов** (экранирование, NOT-приоритет, глубокая вложенность, комментарии `--`, unicode, RTL, null-byte) + snapshot-тесты AST.
+  - Golden-set: [docs/tz/TTSRH-1-goldenset.jql](docs/tz/TTSRH-1-goldenset.jql) — все 50 запросов парсятся без ошибок; выделить под это тест-файл `parser-goldenset.test.ts`.
+- **Не включает:** валидатор, компилятор, эндпоинты.
+- **Merge-ready check:** T-1, T-7 (1000-fuzz через базовый harness — 0 unhandled) зелёные; покрытие парсера ≥ 95%.
+- **Оценка:** ~14ч.
+
+#### PR-3: Field registry + Validator + функции + /search/schema
+- **Branch:** `ttsrh-1/validator`
+- **Scope:** (§5.2, §5.4, TTSRH-3, TTSRH-6)
+  - `search.schema.ts` — реестр полей (system из 5.2) + динамическая подгрузка custom fields через `CustomField.findMany({where: {isEnabled: true}})` с кэшем 60с.
+  - `search.functions.ts` — реализация MVP-функций (`currentUser()`, `now()`, `today()`, `startOfDay/Week/Month/Year`, `openSprints()`, `closedSprints()`, `futureSprints()`, `unreleasedVersions()`, `releasedVersions()`, `linkedIssues()`, `subtasksOf()`, `epicIssues()`, `myOpenIssues()`, `membersOf()`).
+  - `search.validator.ts` — ходит по AST, резолвит field↔type, operator↔type-compatibility, function arity/types; возвращает `{valid, errors: [{start, end, code, message, hint?}]}` без прерывания (для UX автокомплита).
+  - `GET /api/search/schema` (`?variant=default`) — структура для UI-подсказок: `{fields: [{name, type, operators, sortable, synonyms}], functions: [...]}`.
+  - `POST /api/search/validate` — stub, делегирует в validator (без выполнения).
+  - Unit T-3 (функции с моком даты), snapshot-тесты validator-ошибок.
+- **Не включает:** компилятор (нет SQL/where), suggest (только schema).
+- **Merge-ready check:** T-3 зелёные; `/search/validate` на 50 golden-set-запросов возвращает `valid: true`; все Phase-2 операторы (`WAS`, `CHANGED`) возвращают `NotImplemented` с позицией.
+- **Оценка:** ~14ч.
+
+#### PR-4: Compiler (system + custom fields → Prisma where)
+- **Branch:** `ttsrh-1/compiler`
+- **Scope:** (§5.5, TTSRH-4, TTSRH-5)
+  - `search.compiler.ts`:
+    - AST → `Prisma.IssueWhereInput` для system-полей.
+    - Custom fields — `Prisma.sql` raw-fragment с JSON-операторами (`->>`, `@>`, числовые касты) в `id IN (SELECT issue_id FROM issue_custom_field_values WHERE ...)`. Диспетчеризация по `CustomFieldType` (§5.3).
+    - **Scope-фильтр на верхнем AND** (R3): `projectId IN (:accessibleProjectIds)` — всегда добавляется компилятором, не парсером. Извлекаем `accessibleProjectIds` тем же паттерном, что `issues.router.ts:57-65` (R3).
+    - Ambiguity-резолв для `"Story Points"` (R7): если без `project = X` и поле есть в нескольких scoped `FieldSchemaBinding` — warning через `warnings[]` в ответе, компилятор выбирает union всех совпадений.
+    - Композитные индексы, обоснованные профайлингом (`@@index([projectId, assigneeId, status])`, `@@index([sprintId, status])`) — в follow-up миграции после perf-seed (PR-20).
+  - Unit T-2 (per-field × per-operator матрица ≥ 60), integration T-5 (RBAC negative — 0 задач при `project = "SECRET"` без доступа).
+  - Property-based тест: fuzzer→parser→validator→compiler не падает на 1000 random inputs (расширение fuzz-harness).
+- **Не включает:** эндпоинты (`/search/issues` пока недоступен), suggest, history-операторы.
+- **Merge-ready check:** T-2, T-5 зелёные; security-review gate — все raw-SQL через `Prisma.sql`; покрытие compiler ≥ 85%.
+- **Оценка:** ~18ч.
+
+#### PR-5: Endpoints + rate-limit + timeout + fuzz-harness
+- **Branch:** `ttsrh-1/endpoints`
+- **Scope:** (§5.6, §5.9, TTSRH-7, TTSRH-11)
+  - `POST /api/search/issues` — pipeline `parse → validate → compile → prisma.findMany` с pagination (`startAt ≤ 10000`, `limit ≤ 100`, total count), scope-фильтр из context.
+  - Rate-limit middleware 30/min/user (паттерн существующих middlewares), hard-timeout 10с (504 gateway-timeout, не 500), cap-результат 500 для «только-текстовых» запросов (R4). Middleware пишет в `AuditLog` medium-debug.
+  - Fuzz-harness `backend/tests/search-fuzz.test.ts`: 1000 случайных JQL (экранируемые кавычки, null-bytes, unicode RTL, SQL-payloads), 0 unhandled, 0 500.
+  - Security-review checklist `docs/security/search-ttql-review.md`: raw-SQL paths, scope-enforcement, rate-limit, timeout, CSRF/CORS.
+  - Integration T-4 (5 ролей × 5 запросов), T-8 (perf на 100K задач — выносится сидер в `backend/tests/fixtures/search-100k.ts`).
+- **Не включает:** `/suggest`, `/export`, SavedFilter.
+- **Merge-ready check:** T-4, T-5, T-7, T-8 зелёные; **security-review approver** подписал; staging под флагом работает для golden-set.
+- **Оценка:** ~10ч.
+
+### 13.5 PR-ы Фазы 2 — Suggest + SavedFilter + Export (~22ч)
+
+#### PR-6: Value Suggesters backend + /search/suggest
+- **Branch:** `ttsrh-1/suggesters`
+- **Scope:** (§5.11, TTSRH-25)
+  - `search.suggest.ts`:
+    - Позиционный парсер (recovery-режим из PR-2): определяет `expectedField | expectedOperator | expectedValue | inValueList`.
+    - Реестр провайдеров: `ProjectSuggester`, `UserSuggester`, `StatusSuggester`, `EnumSuggester`, `IssueTypeSuggester`, `SprintSuggester`, `ReleaseSuggester`, `IssueSuggester`, `LabelSuggester`, `OptionSuggester`, `ReferenceSuggester`, `DateSuggester`, `NumberSuggester`, `TextSuggester`, `BoolSuggester`, `GroupSuggester`.
+    - Scope-фильтр для dynamic-provider'ов (scoped user-set, project-set).
+    - Fuzzy-ranking (exact → startsWith → contains → subsequence); user-suggester приоритизирует по `AuditLog.lastInteractedAt` (или считаем per-request top-50 без истории).
+    - Дедупликация в `IN (…)` (R7).
+  - `GET /api/search/suggest?jql=...&cursor=N[&field=&operator=&prefix=]` — §5.11 контракт.
+  - Integration T-11 (13 suggester'ов × prefix-ранжирование + scope).
+- **Не включает:** frontend-адаптер — он в PR-11.
+- **Merge-ready check:** T-11 зелёные; /suggest p95 < 200ms на seed (NFR-3).
+- **Оценка:** ~10ч.
+
+#### PR-7: SavedFilter CRUD + sharing + favorite + User.preferences
+- **Branch:** `ttsrh-1/saved-filters`
+- **Scope:** (§5.6, TTSRH-8, TTSRH-9)
+  - `saved-filters.dto.ts`, `saved-filters.service.ts`, `saved-filters.router.ts`:
+    - `GET /api/saved-filters?scope=mine|shared|public|favorite`.
+    - `POST /api/saved-filters` с Zod-валидацией visibility/sharedWith.
+    - `GET/PATCH/DELETE /api/saved-filters/:id` (403 на чужое, 200 на SHARED-WRITE).
+    - `POST /api/saved-filters/:id/favorite`, `POST /api/saved-filters/:id/share`.
+    - Инкремент `useCount`/`lastUsedAt` при `GET /:id/execute` (или при фронт-оркестрированном `POST /search/issues` с `savedFilterId=` — выбрать паттерн, зафиксировать в PR).
+    - `AuditLog` на create/update/delete/share (SEC-7).
+  - `users.service.ts` — расширение `GET/PATCH /api/users/me/preferences` для `{searchDefaults: {columns: string[], pageSize: number}}`. JSON-схема с версионированием (паттерн TTUI-90 §5.4).
+  - Integration T-6 (CRUD + sharing + RBAC negative).
+- **Merge-ready check:** T-6 зелёные; SavedFilter PUBLIC + невидимые проекты → 0 задач (SEC-8).
+- **Оценка:** ~8ч.
+
+#### PR-8: Export CSV/XLSX
+- **Branch:** `ttsrh-1/export`
+- **Scope:** (§5.6, TTSRH-10)
+  - `POST /api/search/export { jql, format: 'csv'|'xlsx', columns }` — streaming response, hard-timeout 60с (NFR-8).
+  - `papaparse` для CSV (проверить наличие в deps, иначе добавить), `exceljs` или `xlsx` для XLSX — минимизировать зависимость (можно стримом из JSON).
+  - Respect колонок (включая кастомные поля через JSON-extract).
+  - Integration: negative-test на закрытый проект — строки не попадают в экспорт (SEC-1).
+- **Merge-ready check:** /export для 10K задач укладывается в 60с, респонс 200 OK.
+- **Оценка:** ~4ч.
+
+### 13.6 PR-ы Фазы 3 — Frontend Search Page (~50ч)
+
+#### PR-9: SearchPage shell + route + sidebar + URL sync base
+- **Branch:** `ttsrh-1/frontend-shell`
+- **Scope:** (§5.7, TTSRH-12, частично TTSRH-19)
+  - Роут `/search` + `/search/saved/:filterId` в [App.tsx](frontend/src/App.tsx); условный рендер по флагу.
+  - Пункт сайдбара «Поиск задач» с `data-testid="nav-search"` между «Projects» и «Planning»; иконка-лупа 16×16 SVG (§5.7).
+  - Submenu «Избранные фильтры» — раскрывается при активной странице (до 5, сорт `useCount DESC`, `lastUsedAt DESC`); читает из `savedFilters.store.ts` (пустая реализация в этом PR).
+  - 3-колоночный layout `SidebarFilters | ResultsArea | DetailPreview` (пустые placeholder'ы).
+  - URL-синхронизация: `?jql=<encoded>&view=table&columns=...&page=N` — чтение на mount, запись на каждое успешное выполнение.
+  - `frontend/src/api/search.ts`, `frontend/src/api/savedFilters.ts` (тонкие клиенты для PR-5, PR-6, PR-7).
+- **Merge-ready check:** страница открывается, URL-sync работает на пустом JQL, снэпшот-тест layout.
+- **Оценка:** ~6ч.
+
+#### PR-10: JqlEditor (CodeMirror 6) + inline errors
+- **Branch:** `ttsrh-1/jql-editor`
+- **Scope:** (§5.7, TTSRH-13, TTSRH-14)
+  - `frontend/src/components/search/JqlEditor.tsx` — CodeMirror 6 + `StreamLanguage` с нашими токенами (подсветка keywords/strings/numbers/functions/IDENT), lazy-load через `React.lazy` + `Suspense` (R8, NFR-5 ≤ 160KB gzip).
+  - Добавить deps `@codemirror/state`, `@codemirror/view`, `@codemirror/language`, `@codemirror/autocomplete`, `@codemirror/search` в [frontend/package.json](frontend/package.json).
+  - Inline-errors: подключаем `/search/validate` (debounce 300ms), рендерим `Decoration.mark` squiggle + gutter-marker по `{start, end}`.
+  - ValidationErrorBanner для error-sum.
+  - Shortcut `/` → focus editor (глобально, регистрируется через `window.addEventListener('keydown')` с респектом input-focus); `Ctrl+Enter` → выполнить.
+  - Бандл-аудит в CI: `npx source-map-explorer` на chunk `/search` или Lighthouse budget (NFR-5).
+- **Merge-ready check:** NFR-5 не превышен; a11y A11Y-1 (ARIA-live для ошибок) покрыт.
+- **Оценка:** ~13ч.
+
+#### PR-11: ValueSuggesterPopup + CM6 autocomplete adapter
+- **Branch:** `ttsrh-1/value-suggester`
+- **Scope:** (§5.11, TTSRH-26)
+  - `frontend/src/components/search/ValueSuggesterPopup.tsx` — unified-компонент: renderer по `kind` (avatar/color-dot/svg/emoji), keyboard navigation, debounce 150ms для dynamic-provider'ов, SWR-кэш 60с для Project/IssueType/Status, 30с для Sprint/Release.
+  - CM6 `CompletionSource` adapter, который маппит `/search/suggest` → `CompletionResult` с `apply` (вставка raw) и `info` (detail + icon). Автоматически открывается после `=`/`!=`/`,`/`(` и при Ctrl+Space.
+  - Первый раунд интеграции с BasicFilterBuilder — попап используется в chip-popover (mode=multi для IN-clause).
+  - E2E T-12 (автокомплит assignee+status).
+- **Merge-ready check:** T-12 зелёный; визуальный снапшот popup для 5 suggester'ов.
+- **Оценка:** ~10ч.
+
+#### PR-12: BasicFilterBuilder + Basic↔Advanced toggle
+- **Branch:** `ttsrh-1/basic-builder`
+- **Scope:** (§5.7, TTSRH-15)
+  - `BasicFilterBuilder.tsx` — chip-add с каскадным меню полей (Задача / Даты / Пользователи / Планирование / AI / Кастомные). Каждый chip = popover с `ValueSuggesterPopup`.
+  - Canonicalizer AST → canonical JQL → Basic-chips (и обратно); Advanced→Basic disabled при OR/NOT-с-группами/custom-operators (R9) + tooltip.
+  - `FilterModeToggle.tsx`.
+  - Snapshot T-10 (Basic → canonical JQL).
+- **Merge-ready check:** 80% golden-set-запросов строится в Basic без перехода в Advanced (FR-12).
+- **Оценка:** ~12ч.
+
+#### PR-13: SavedFiltersSidebar + Save/Share modals + store
+- **Branch:** `ttsrh-1/saved-filters-ui`
+- **Scope:** (§5.7, TTSRH-16)
+  - `frontend/src/store/savedFilters.store.ts` (Zustand, паттерн существующих); `search.store.ts` для runtime-состояния.
+  - `SavedFiltersSidebar.tsx` — списки «Мои» / «Избранные» / «Общедоступные» / «Поделены со мной» / «Недавние».
+  - `SaveFilterModal.tsx` — имя/описание/visibility/shared-with; warning при PUBLIC (R11).
+  - `FilterShareModal.tsx` — copy-link, visibility switch, users/groups picker.
+  - **CLAUDE.md правило:** `onCancel`/`onClose` всех модалок вызывают `load()` родительского `SavedFiltersSidebar` (FR-18).
+  - Shortcut `Ctrl+S` → Save (или SaveAs если не назван); `Ctrl+Shift+S` → SaveAs.
+- **Merge-ready check:** E2E create → favorite → share → copy-link.
+- **Оценка:** ~8ч.
+
+#### PR-14: ColumnConfigurator + ResultsTable + bulk + export UI
+- **Branch:** `ttsrh-1/results`
+- **Scope:** (§5.7, §5.8, TTSRH-17, TTSRH-18, остаток TTSRH-19)
+  - `ColumnConfigurator.tsx` — drag-n-drop (react-dnd или нативный HTML5 DnD — выбрать по наличию в deps) двух списков Available/Selected; сохранение в `SavedFilter.columns` или `User.preferences.searchDefaults.columns`.
+  - `ResultsTable.tsx` — Ant Table с virtualized rows при >200, клик по заголовку → перегенерация `ORDER BY` в JQL (canonical re-parse).
+  - `BulkActionsBar.tsx` — разбивает выделенные задачи по `projectId`, вызывает `bulkUpdateIssues` на каждый в `Promise.all`, агрегирует `{succeeded, failed}` (R12).
+  - `ExportMenu.tsx` — вызов `POST /search/export` с текущим `jql` + `columns`.
+  - `/` focus, `Esc` blur, `Ctrl+Enter` — выполнить (часть уже в PR-10; финализируем здесь).
+- **Merge-ready check:** E2E search → sort → выделить 3 → bulk-status; кросс-проектный bulk не валит транзакцию.
+- **Оценка:** ~11ч.
+
+### 13.7 PR-ы Фазы 4 — Checkpoint TTQL Integration (~30ч)
+
+Параллельно с Фазой 3 (зависит только от PR-1 и PR-5).
+
+#### PR-15: Checkpoint Prisma + DTO + КТ-функции + schema variant
+- **Branch:** `ttsrh-1/checkpoint-foundation`
+- **Scope:** (§5.12.1–5.12.4, TTSRH-27, TTSRH-28, TTSRH-29)
+  - Миграция `YYYYMMDDHHMMSS_ttsrh_checkpoint_ttql`: `CheckpointType.ttqlCondition` (Text?), `CheckpointType.conditionMode` (enum default STRUCTURED), `ReleaseCheckpoint.ttqlSnapshot` (Text?), `ReleaseCheckpoint.conditionModeSnapshot` (enum default STRUCTURED). Backfill: все existing рядки получают `STRUCTURED`, `NULL`.
+  - Zod `checkpoint.dto.ts` — `conditionMode`/`ttqlCondition` + `superRefine` для cross-field валидации (§5.12.3).
+  - Функции КТ-контекста в `search.functions.ts`: `releasePlannedDate()`, `checkpointDeadline()` — доступны только при `variant=CHECKPOINT`; вне контекста — validator-ошибка.
+  - `/search/validate?variant=CHECKPOINT`, `/search/schema?variant=CHECKPOINT`, `/search/suggest?variant=CHECKPOINT` — возвращают расширенный реестр.
+  - `currentUser()` в CHECKPOINT-контексте → warning при save (не ошибка) (§5.12.4, R19).
+  - Unit-тесты validator'а по variant; integration T-14 (backward-compat: existing КТ → `violationsHash` не меняется).
+- **Не включает:** engine TTQL-ветку, UI.
+- **Merge-ready check:** T-14 зелёный; миграция идемпотентна.
+- **Оценка:** ~10ч.
+
+#### PR-16: Checkpoint engine TTQL branch + error handling
+- **Branch:** `ttsrh-1/checkpoint-engine`
+- **Scope:** (§5.12.5, TTSRH-30, TTSRH-31)
+  - Расширение [checkpoint-engine.service.ts](backend/src/modules/releases/checkpoints/checkpoint-engine.service.ts) — ветка `TTQL` + `COMBINED` (алгоритм §5.12.5).
+  - **Единичный** `prisma.issue.findMany` с compiled `where` + `{id: {in: applicableIds}}` — не per-issue.
+  - `compileTtql(ttqlSnapshot, checkpointContext)` — `{now: scheduler.startedAt, release, checkpointType}`, детерминистичный `now` на весь тик (R18).
+  - `violationsHash` стабилен (порядок reasons: структурные → `TTQL_MISMATCH`).
+  - Timeout 5с на compile+exec; превышение / compile-error / runtime-error → `ReleaseCheckpoint.state='ERROR'` + `CheckpointViolationEvent` с `criterionType='TTQL_ERROR'`, `reason` из сообщения (R16, FR-31).
+  - **Под флагом `FEATURES_CHECKPOINT_TTQL=false`** в production: ветка TTQL не выполняется, `conditionMode=TTQL/COMBINED` саммится как NOOP (state=OK) до включения флага; чтобы security-review уже merged без ожидания UAT.
+  - Integration T-13, T-14, T-15 (эквивалентность DUE_BEFORE), T-16 (timeout → ERROR).
+  - Security-review gate — RBAC отдельный подписывает (R3 + R16).
+- **Merge-ready check:** T-13..T-16 зелёные; existing КТ-тесты не ломаются (FR-25); security-review.
+- **Оценка:** ~10ч.
+
+#### PR-17: /admin/checkpoint-types/preview + TTS-QL checkpoint-функции/поля
+- **Branch:** `ttsrh-1/checkpoint-search-integration`
+- **Scope:** (§5.2 строки checkpoint-*, §5.4 строки violatedCheckpoints*, §5.12.6, TTSRH-32, TTSRH-37)
+  - `POST /api/admin/checkpoint-types/preview { releaseId, conditionMode, criteria?, ttqlCondition? }` — dry-run, без записи. Тот же rate-limit + timeout + RBAC `canManageCheckpoints` (R22).
+  - Функции в TTS-QL (вне КТ-контекста, доступны обычному поиску!): `violatedCheckpoints([typeName])`, `violatedCheckpointsOf(releaseKeyOrId[, typeName])`, `checkpointsAtRisk([typeName])`, `checkpointsInState(state[, typeName])` (§5.4.1). Scope-фильтр (R3) применяется к результатам.
+  - Поля: `hasCheckpointViolation`, `checkpointViolationType`, `checkpointViolationReason`.
+  - `CheckpointTypeSuggester` (CheckpointType.findMany с color-dot + weight), `CheckpointStateSuggester` (enum).
+  - Индекс `@@index([resolvedAt, releaseCheckpointId])` — if profiling подтверждает (§5.4.1).
+  - Integration T-18, T-20..T-25.
+- **Merge-ready check:** T-18, T-20..T-25 зелёные; `hasCheckpointViolation=true` и `issue IN violatedCheckpoints()` дают одинаковый normalized where (T-24).
+- **Оценка:** ~6ч.
+
+#### PR-18: Frontend КТ — segmented control + JqlEditor + Preview panel + mode-icon
+- **Branch:** `ttsrh-1/checkpoint-admin-ui`
+- **Scope:** (§5.12.6, TTSRH-33, TTSRH-34, TTSRH-35)
+  - В [AdminReleaseCheckpointTypesPage.tsx](frontend/src/pages/admin/AdminReleaseCheckpointTypesPage.tsx):
+    - Segmented control «Режим условия» (Structured / TTQL / Combined).
+    - Show/hide секций структурных criteria / TTQL editor без стирания form-state (R20).
+    - Интеграция `JqlEditor` с `variant=CHECKPOINT` (КТ-функции в автокомплите, `currentUser()` с warning-иконкой).
+    - Preview-панель (disclosure) — выбор релиза → `POST /api/admin/checkpoint-types/preview` → {applicable, passed, violated}.
+    - Иконка режима в таблице типов КТ (S / Q / S+Q), hover — preview TTS-QL.
+    - Баннер при `state=ERROR` с кнопкой «Открыть тип и исправить» (FR-31).
+  - **CLAUDE.md правило** для всех модалок — `onCancel`/`onClose` → `load()`.
+- **Merge-ready check:** E2E T-19 (создать TTQL-тип → видеть violations → перейти в COMBINED → добавить structured → regen → обновлённый preview).
+- **Оценка:** ~11ч.
+
+#### PR-19: Structured → TTQL converter (frontend)
+- **Branch:** `ttsrh-1/checkpoint-converter`
+- **Scope:** (§R21, TTSRH-36)
+  - Кнопка «Сконвертировать в TTS-QL» на existing structured-типах → one-way generator (`criteria[] → canonical JQL`). Открывает TTQL-редактор для **ручной проверки** перед save (не автоматический switch).
+  - Snapshot-тест: каждый тип `CheckpointCriterion` → ожидаемая строка JQL (пример в §5.12.9).
+- **Merge-ready check:** конверсия `[STATUS_IN, ASSIGNEE_SET, DUE_BEFORE]` → ожидаемый канонический JQL; ручное ревью админа требуется (кнопка save не автосохраняется без взаимодействия).
+- **Оценка:** ~3ч.
+
+### 13.8 PR-ы Фазы 5 — Release (~15ч)
+
+#### PR-20: E2E + perf seed + Lighthouse budget
+- **Branch:** `ttsrh-1/e2e-perf`
+- **Scope:** (TTSRH-20)
+  - `frontend/e2e/specs/20-search.spec.ts` — basic→advanced→save→favorite→share→URL→open in new tab + T-9, T-12.
+  - `frontend/e2e/specs/21-checkpoints-ttql.spec.ts` — T-19 (КТ-TTQL end-to-end).
+  - `backend/tests/fixtures/search-seed-100k.ts` — 100K задач seed для perf-теста T-8 (p95 < 400ms).
+  - Lighthouse budget в CI для `/search` (NFR-5 ≤ 160KB gzip lazy-chunk; initial без JqlEditor).
+  - axe-core для A11Y-1..A11Y-4.
+  - Композитные индексы, если profiling подтверждает (§3.3) — отдельная follow-up миграция.
+- **Merge-ready check:** T-8, T-9, T-12, T-19 зелёные; Lighthouse budget не перевышен.
+- **Оценка:** ~9ч.
+
+#### PR-21: Документация + feature flag cutover
+- **Branch:** `ttsrh-1/docs-cutover`
+- **Scope:** (TTSRH-21, TTSRH-22, §12)
+  - [docs/user-manual/jql.md](docs/user-manual/jql.md) — полный reference TTS-QL: §5.1 грамматика, §5.2 поля, §5.4 функции, примеры из golden-set.
+  - [docs/user-manual/search.md](docs/user-manual/search.md) — руководство по странице «Поиск задач», сохранению фильтров, шарингу, колонкам.
+  - [docs/api/reference.md](docs/api/reference.md) — эндпоинты из §5.6 + §5.12.7.
+  - [docs/architecture/backend-modules.md](docs/architecture/backend-modules.md) — модуль `search` и `saved-filters`.
+  - Раздел про КТ-TTQL в `docs/user-manual/checkpoints.md` (существующий файл из TTMP-160).
+  - [version_history.md](version_history.md) — запись о TTSRH-1 (memory rule).
+  - Feature flag cutover: `FEATURES_ADVANCED_SEARCH=true` в staging → UAT → production; `FEATURES_CHECKPOINT_TTQL=true` после отдельного UAT.
+  - Опциональный пункт: MCP-tool `search_issues` — вынести в отдельный follow-up тикет TTSRH-38, **не** в этот PR.
+- **Merge-ready check:** все Definition of Done пункты из §7 зелёные; UAT-чек-лист подписан.
+- **Оценка:** ~6ч.
+
+### 13.9 Итог: список PR
+
+| № | Branch | Scope | Часы | Зависит от | TTSRH-сабтаски |
+|---|--------|-------|------|-----------|----------------|
+| 1 | `ttsrh-1/foundation` | Prisma schema (SavedFilter, User.preferences), feature flags, пустые модули | 6 | — | TTSRH-8 (schema), TTSRH-22 (flag) |
+| 2 | `ttsrh-1/parser` | Tokenizer + Parser + AST + golden-set | 14 | PR-1 | TTSRH-2 |
+| 3 | `ttsrh-1/validator` | Field registry + Validator + functions + `/search/schema`, `/validate` | 14 | PR-2 | TTSRH-3, TTSRH-6 |
+| 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 |
+| 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 |
+| 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 |
+| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 |
+| 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 |
+| 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 |
+| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 |
+| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 |
+| 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 |
+| 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 |
+| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 |
+| 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 |
+| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 |
+| 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 |
+| 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 |
+| 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 |
+| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 |
+| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 |
+| **Итого** | | | **199** | | |
+
+**Дельта к §8 (278ч):** план покрывает ~199ч. Недостающие ~79ч — это (a) code review + фиксы (~8ч per §8), (b) security review + фиксы (~4ч), (c) докуметация JQL полная (~6ч уже в PR-21, ~0ч дополнительно), (d) профайлинг + composite-index tuning (~4ч в PR-20), (e) fuzz-harness extended (~4ч в PR-5); остальное — buffer на unknown unknowns и Phase-2-проникновение. Реалистичный календарный план — 8–10 недель при одном fullstack-разработчике или 5–6 недель при параллельной работе двоих (backend + frontend после PR-5).
+
+### 13.10 Phase 2 (не включена в TTSRH-1)
+
+- **TTSRH-23** — `WAS`/`CHANGED` + модель `FieldChangeLog` — отдельный story-ticket.
+- **TTSRH-24** — `pg_trgm` GIN-индексы + `unaccent` extension + Postgres FTS.
+- **TTSRH-38** — *(опционально)* MCP-tool `search_issues` для Agent SDK consumers.
+
+Phase 2 не блокирует MVP-релиз TTSRH-1.
+

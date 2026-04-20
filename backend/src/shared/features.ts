@@ -7,6 +7,8 @@
  *   FEATURES_MCP=true
  *   FEATURES_GITLAB=true
  *   FEATURES_TELEGRAM=true
+ *   FEATURES_ADVANCED_SEARCH=false         # TTSRH-1 cutover flag (TTS-QL + страница поиска)
+ *   FEATURES_CHECKPOINT_TTQL=false         # TTSRH-1 sub-flag: TTQL-ветка evaluator'а КТ
  *   FEATURES_DIRECT_ROLES_DISABLED=false   # TTSEC-2 Phase 4 cutover flag
  *   AI_PROVIDER=anthropic   # anthropic | heuristic
  */
@@ -22,6 +24,11 @@ export const features = {
   mcp: flag('FEATURES_MCP', true),
   gitlab: flag('FEATURES_GITLAB', true),
   telegram: flag('FEATURES_TELEGRAM', false),
+  // TTSRH-1: off by default until UAT cutover (см. §13.1 в docs/tz/TTSRH-1.md).
+  advancedSearch: flag('FEATURES_ADVANCED_SEARCH', false),
+  // TTSRH-1 sub-flag: TTQL-ветка evaluator'а КТ. Отдельно от advancedSearch, чтобы
+  // core-поиск можно было раскатить раньше, не влияя на scheduler КТ (см. PR-16 в §13).
+  checkpointTtql: flag('FEATURES_CHECKPOINT_TTQL', false),
   aiProvider: (process.env.AI_PROVIDER ?? 'heuristic') as 'anthropic' | 'heuristic',
 } as const;
 

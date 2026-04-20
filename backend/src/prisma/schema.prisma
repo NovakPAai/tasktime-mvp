@@ -17,6 +17,7 @@ model User {
   isActive           Boolean  @default(true) @map("is_active")
   isSystem           Boolean  @default(false) @map("is_system")
   mustChangePassword Boolean  @default(false) @map("must_change_password")
+  preferences        Json?
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -38,6 +39,8 @@ model User {
   groupMemberships           UserGroupMember[]       @relation("GroupMemberUser")
   addedGroupMembers          UserGroupMember[]       @relation("GroupMemberAddedBy")
   checkpointTemplatesCreated CheckpointTemplate[]    @relation("checkpointTemplateCreator")
+  savedFilters               SavedFilter[]           @relation("savedFilterOwner")
+  savedFilterShares          SavedFilterShare[]      @relation("savedFilterShareUser")
 
   @@map("users")
 }
@@ -1075,8 +1078,9 @@ model UserGroup {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  members      UserGroupMember[]
-  projectRoles ProjectGroupRole[]
+  members           UserGroupMember[]
+  projectRoles      ProjectGroupRole[]
+  savedFilterShares SavedFilterShare[] @relation("savedFilterShareGroup")
 
   @@index([name])
   @@map("user_groups")
@@ -1252,4 +1256,62 @@ model ReleaseBurndownSnapshot {
   @@index([releaseId])
   @@index([snapshotDate])
   @@map("release_burndown_snapshots")
+}
+
+// ===== TTSRH-1: SAVED FILTERS (TTS-QL) =====
+
+enum FilterVisibility {
+  PRIVATE
+  SHARED
+  PUBLIC
+}
+
+enum FilterPermission {
+  READ
+  WRITE
+}
+
+model SavedFilter {
+  id          String           @id @default(uuid())
+  ownerId     String           @map("owner_id")
+  name        String
+  description String?
+  jql         String           @db.Text
+  visibility  FilterVisibility @default(PRIVATE)
+  columns     Json?
+  isFavorite  Boolean          @default(false) @map("is_favorite")
+  lastUsedAt  DateTime?        @map("last_used_at")
+  useCount    Int              @default(0) @map("use_count")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  owner  User               @relation("savedFilterOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  shares SavedFilterShare[]
+
+  @@index([ownerId])
+  @@index([visibility])
+  @@map("saved_filters")
+}
+
+model SavedFilterShare {
+  id         String           @id @default(uuid())
+  filterId   String           @map("filter_id")
+  userId     String?          @map("user_id")
+  groupId    String?          @map("group_id")
+  permission FilterPermission @default(READ)
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  filter SavedFilter @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  user   User?       @relation("savedFilterShareUser", fields: [userId], references: [id], onDelete: Cascade)
+  group  UserGroup?  @relation("savedFilterShareGroup", fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Postgres PK cannot contain nullable columns, so we use a surrogate id. The business
+  // uniqueness (filter × subject) is enforced via two partial unique indexes declared in
+  // the migration SQL — one for (filterId, userId) WHERE groupId IS NULL, one for
+  // (filterId, groupId) WHERE userId IS NULL. A CHECK constraint enforces that exactly
+  // one of userId/groupId is set (XOR).
+  @@index([filterId])
+  @@index([userId])
+  @@index([groupId])
+  @@map("saved_filter_shares")
 }
