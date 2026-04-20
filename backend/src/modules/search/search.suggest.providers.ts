@@ -6,10 +6,12 @@
  * the query level (never client-side) — a user searching `assignee = al` must
  * not see `alice@othercorp.com` if they share no projects.
  *
- * Providers are synchronous contract-wise but async by impl; the orchestrator
- * fans them out via `Promise.all` for the current position context.
+ * Providers are async by impl. The orchestrator routes a single provider per
+ * request based on the resolved field's type, so each endpoint call executes
+ * exactly one provider — no concurrent fan-out here.
  */
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import type { Completion } from './search.suggest.types.js';
 import { rankByPrefix } from './search.suggest.rank.js';
@@ -23,9 +25,11 @@ export async function suggestUsers(
   accessibleProjectIds: readonly string[],
 ): Promise<Completion[]> {
   const prefixLc = prefix.toLowerCase();
-  // Users scoped to projects the caller can see. ADMIN / RELEASE_MANAGER would
-  // see everyone via the system-role path upstream; here we play conservative
-  // and stick to `UserProjectRole` join.
+  // Deliberate: this filter only returns users with an explicit UserProjectRole
+  // row. System-role ADMIN/SUPER_ADMIN users without direct project memberships
+  // are excluded — an admin can still self-assign by typing their email, but
+  // including every admin in every project's autocomplete would inflate the
+  // list and confuse users. Revisit if UX feedback flags this as surprising.
   const users = accessibleProjectIds.length > 0
     ? await prisma.user.findMany({
         where: {
@@ -112,7 +116,11 @@ export async function suggestStatuses(
     detail: 'system key',
     score: 0,
   }));
-  // WorkflowStatus entries — scoped to project list via workflow_schemes.
+  // WorkflowStatus rows are tenant-global (no `projectId` column — they form a
+  // shared catalogue referenced via WorkflowScheme). Returning all of them here
+  // is intentional: the compiler's top-level scope filter (R3) still clips the
+  // final issue result to accessible projects, so a leak at suggest layer is
+  // bounded to "user sees a status name they can't actually match against".
   if (accessibleProjectIds.length > 0) {
     const statuses = await prisma.workflowStatus.findMany({
       where: prefix
@@ -288,17 +296,25 @@ export async function suggestLabels(
   accessibleProjectIds: readonly string[],
 ): Promise<Completion[]> {
   if (accessibleProjectIds.length === 0) return [];
-  // Distinct raw-SQL — Prisma can't express DISTINCT on a JSON path in typed API.
-  // We use `$queryRaw` with safe parameter binding (R1).
+  // Distinct raw-SQL — Prisma typed API can't express DISTINCT on a JSON path.
+  // Two R1-critical details:
+  //   1. Project-scope filter is the FIRST AND clause with NO bare `OR` at its
+  //      level. Splitting it across an OR would bypass scope (pre-push review
+  //      caught this as a silent cross-project leak).
+  //   2. Array parameters go through `IN (Prisma.join(...))`, not `ANY(...::uuid[])`
+  //      — Prisma's template tag serialises JS arrays as positional parameter
+  //      placeholders, which `ANY()` cannot consume.
   type Row = { label: string };
-  const prefixParam = prefix ? `%${prefix.toLowerCase()}%` : '%';
+  const prefixFilter = prefix
+    ? Prisma.sql`AND (icfv.value->'v')::text ILIKE ${`%${prefix.toLowerCase()}%`}`
+    : Prisma.empty;
   const rows = await prisma.$queryRaw<Row[]>`
     SELECT DISTINCT jsonb_array_elements_text(icfv.value->'v') AS label
     FROM issue_custom_field_values icfv
     JOIN custom_fields cf ON cf.id = icfv.custom_field_id AND cf.field_type = 'LABEL'
     JOIN issues i ON i.id = icfv.issue_id
-    WHERE i.project_id = ANY(${[...accessibleProjectIds]}::uuid[])
-      AND (${prefix ? 1 : 0}) = 0 OR (icfv.value->'v')::text ILIKE ${prefixParam}
+    WHERE i.project_id IN (${Prisma.join([...accessibleProjectIds])})
+      ${prefixFilter}
     LIMIT ${MAX_RESULTS}
   `;
   return rankByPrefix(

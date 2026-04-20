@@ -198,5 +198,8 @@ export function suggestOperators(allowed: readonly string[], prefix: string): Co
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function describeType(t: TtqlType): string {
-  return t.toLowerCase().replace('_', ' ');
+  // `AI_ASSIGNEE_TYPE` → `ai assignee type` — replace ALL underscores, not just
+  // the first. Previous `.replace('_', ' ')` (string literal) missed every
+  // underscore after position 0.
+  return t.toLowerCase().replace(/_/g, ' ');
 }
