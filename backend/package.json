@@ -26,7 +26,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:parser": "vitest run --config vitest.parser-only.config.ts tests/search-tokenizer.unit.test.ts tests/search-parser.unit.test.ts tests/search-parser-goldenset.unit.test.ts tests/search-parser-fuzz.unit.test.ts",
+    "test:parser": "vitest run --config vitest.parser-only.config.ts tests/search-tokenizer.unit.test.ts tests/search-parser.unit.test.ts tests/search-parser-goldenset.unit.test.ts tests/search-parser-fuzz.unit.test.ts tests/search-functions.unit.test.ts tests/search-validator.unit.test.ts",
     "lint": "eslint src/ --ext .ts",
     "format": "prettier --write 'src/**/*.ts'",
     "mcp": "tsx src/mcp/server.ts"

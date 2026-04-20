@@ -2,7 +2,59 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.28**
+**Last version: 2.29**
+
+---
+
+## [2.29] [2026-04-20] feat(search): TTSRH-1 PR-3 — field registry + validator + функции + /search/schema + /search/validate
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/validator`
+
+### Что было
+
+После PR-2 был только синтаксический парсер — любой `foo = bar AND bogus = 1` считался корректным. Эндпоинты `/search/validate` и `/search/schema` возвращали 501.
+
+### Что теперь
+
+Добавлен семантический слой поверх AST:
+
+- **`search.types.ts`** — общий словарь типов для TTS-QL: `TtqlType` (16 вариантов: TEXT / NUMBER / DATE / DATETIME / USER / PROJECT / ISSUE / SPRINT / RELEASE / STATUS / STATUS_CATEGORY / PRIORITY / ISSUE_TYPE / AI_STATUS / AI_ASSIGNEE_TYPE / CHECKPOINT_STATE / CHECKPOINT_TYPE / LABEL / GROUP / JSON), `TtqlOpKind` (17 категорий операторов), `TtqlReturnType` (scalar / list), `QueryVariant` (default / checkpoint).
+- **`search.schema.ts`** (pure-core) — реестр из 30+ system-полей из §5.2 ТЗ с label, synonyms, operators, sortable. Индекс для case-insensitive lookup по имени и синонимам. `CustomFieldDef`/`CustomFieldIndex` с detection ambiguous-имён (R7). Мапперы `CustomFieldType → TtqlType` и `→ allowed operators`. **Без импортов Prisma/Redis** — валидатор и тесты переносимы без БД.
+- **`search.schema.loader.ts`** — Prisma+Redis loader для custom fields с 60с кэшем (ключ `search:custom-fields:enabled`). Изолирован от pure-core.
+- **`search.functions.ts`** — реестр из 25 MVP-функций из §5.4 ТЗ: identity (currentUser/membersOf), time (now/today/startOfX/endOfX × 4 единицы), sprints (openSprints/closedSprints/futureSprints), releases (4 функции), relations (linkedIssues/subtasksOf/epicIssues/myOpenIssues), checkpoint-functions (violatedCheckpoints/violatedCheckpointsOf/checkpointsAtRisk/checkpointsInState), checkpoint-context-only (releasePlannedDate/checkpointDeadline). Plus 3 Phase-2 функции (watched/voted/lastLogin) с явным rejection. **Чистые date-эваулюаторы** с offset-syntax `"-7d"/"1M"/"3h"`, calendar-aware month/year арифметика, ISO-week boundaries, UTC-детерминизм.
+- **`search.validator.ts`** — обход AST с накоплением ошибок (не short-circuit). Коды: UNKNOWN_FIELD, UNKNOWN_FUNCTION, OPERATOR_NOT_ALLOWED_FOR_FIELD, VALUE_TYPE_MISMATCH, ARITY_MISMATCH, PHASE_2_OPERATOR, PHASE_2_FUNCTION, FUNCTION_NOT_ALLOWED_IN_CONTEXT, AMBIGUOUS_CUSTOM_FIELD, CUSTOM_FIELD_UUID_UNKNOWN, CURRENTUSER_IN_CHECKPOINT (warning), INVALID_OFFSET_FORMAT. Разделение severity error/warning. `validate()` **никогда не бросает**.
+- **`search.router.ts`** — `POST /search/validate` (Zod-валидация body: `{jql, variant?}`) и `GET /search/schema?variant=default|checkpoint` заменили stubs на реальную реализацию. `POST /search/issues`, `POST /search/export`, `GET /search/suggest` остаются 501 до PR-5/6.
+
+### Тесты (341 passing, +148 к PR-2)
+
+- **`tests/search-functions.unit.test.ts`** (42 кейса) — resolveFunction case-insensitive, functionsForVariant filter, parseOffset/applyOffset calendar arithmetic, start/endOf{Day,Week,Month,Year} UTC-детерминизм (тестируются с anchor 2026-04-15 Wed), evaluatePureDateFn для 10 комбинаций, null для DB-зависимых функций.
+- **`tests/search-validator.unit.test.ts`** (106 кейсов) — happy path (12 запросов), unknown field/function, operator × field compatibility (4 случая), value type compatibility (4), function arity/arg-types (6), Phase-2 rejection (3), checkpoint variant (3, включая currentUser-warning), custom fields (5 — resolution by name/UUID, ambiguous, type propagation), ORDER BY sortable warning, и **golden-set round-trip — все 63 запроса парсятся И валидируются без ошибок**.
+
+### Изменения
+
+- `backend/src/modules/search/search.types.ts` — новый.
+- `backend/src/modules/search/search.schema.ts` — новый (pure).
+- `backend/src/modules/search/search.schema.loader.ts` — новый (Prisma+Redis).
+- `backend/src/modules/search/search.functions.ts` — новый.
+- `backend/src/modules/search/search.validator.ts` — новый.
+- `backend/src/modules/search/search.router.ts` — обновлён (live `/validate` и `/schema`).
+- `backend/tests/search-functions.unit.test.ts` — новый.
+- `backend/tests/search-validator.unit.test.ts` — новый.
+- `backend/package.json` — `test:parser` включает новые тесты.
+- `docs/tz/TTSRH-1.md` §13.9 — статус PR-3 → ✅ Done.
+
+### Влияние на prod
+
+0. Feature flag `FEATURES_ADVANCED_SEARCH=false` по-прежнему активен — эндпоинты под флагом. При включении `POST /api/search/validate` и `GET /api/search/schema` становятся доступны с типизированными ответами для UI-подсказок.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run test:parser` — **341 passing** локально без Postgres/Redis
+- Golden-set 63/63 парсится и валидируется без ошибок
+- Pre-push review — в отдельном коммите
 
 ---
 
