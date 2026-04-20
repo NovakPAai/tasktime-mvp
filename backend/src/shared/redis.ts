@@ -84,6 +84,33 @@ export async function delCachedJson(key: string): Promise<void> {
 }
 
 /**
+ * Atomic `INCR` + `EXPIRE` for counter-style use cases (rate limiting etc.).
+ * Returns the post-increment count, or `null` if Redis is unavailable. Callers
+ * should treat `null` as "fail open" — never block traffic when the cache layer
+ * is down (TTSRH-1 §R15 pattern).
+ *
+ * Atomic via MULTI — `INCR` + `EXPIRE ... NX` are pipelined in one round-trip.
+ * `EXPIRE NX` sets the TTL only when the key has none, so back-to-back requests
+ * in the same window don't reset the expiry. This closes the immortal-key
+ * window (PR-5 pre-push review).
+ */
+export async function incrWithTtl(key: string, ttlSeconds: number): Promise<number | null> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return null;
+  try {
+    const replies = await redis
+      .multi()
+      .incr(key)
+      .expire(key, ttlSeconds, 'NX')
+      .exec();
+    return Number(replies[0]);
+  } catch (err) {
+    console.error('Redis INCR failed:', err);
+    return null;
+  }
+}
+
+/**
  * Delete all keys whose name starts with `prefix`.
  * Uses SCAN to avoid blocking the server; safe on large keyspaces.
  */

@@ -2,7 +2,67 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.30**
+**Last version: 2.31**
+
+---
+
+## [2.31] [2026-04-20] feat(search): TTSRH-1 PR-5 — endpoint /search/issues + rate-limit + timeout + fuzz-harness
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/endpoints`
+
+### Что было
+
+После PR-4 был pure compiler, но `POST /search/issues` оставался 501. Custom-field placeholders в `where` не исполнялись.
+
+### Что теперь
+
+`POST /api/search/issues` live — полный pipeline `parse → validate → resolve-functions → compile → execute-CF → prisma.findMany`:
+
+- **`search.custom-field.executor.ts`** — executor для `CustomFieldPredicate`: параллельные `$queryRaw` вызовы получают id-sets, затем recursive `substituteAliases` заменяет placeholder'ы `{ __ttql_custom_predicate__: alias }` на `{ id: { in: ids } }` (или `{ NOT: ... }` при negated). `assertNoUnresolvedPlaceholders` guard вызывается до и после substitution.
+- **`search.rate-limit.ts`** — Redis-backed sliding-minute лимитер 30/min/user (§R15 ТЗ). Bucket `search:rate:<userId>:<minute>` через `INCR` + 60s TTL. При Redis outage **fails open** (не блокирует трафик). 429 с `Retry-After: 60` при превышении.
+- **`search.service.ts`** — оркестрация всего pipeline. Timeout 10s через `Promise.race` (NFR-8, R16) — возвращает 504, не 500. Typed `SearchIssuesOutput = SearchIssuesResult | SearchIssuesError` — router не нуждается в try/catch для бизнес-ошибок, только для инфраструктурных. Pagination clamp: `limit ≤ 100`, `startAt ≤ 10000`.
+- **`search.router.ts` / POST /search/issues** — Zod DTO на вход (`jql.max(10_000)`, startAt/limit ранжи), `searchRateLimit` middleware, resolution `accessibleProjectIds` по тому же паттерну как `issues.router.ts:requireIssueAccess` (global-read роли → всё, остальные → direct memberships). Ответ: `{total, startAt, limit, issues, warnings}` или `{error, message, parseErrors?, validationErrors?, compileErrors?}`.
+- **`shared/redis.ts`** — добавлен `incrWithTtl(key, ttlSeconds)` atomic helper для counter-style use-cases. Возвращает `null` при Redis outage — caller fails open.
+
+### Тесты (397 passing, +2 к PR-4)
+
+- **`tests/search-pipeline-fuzz.unit.test.ts`** (T-7) — 1000 random inputs через весь pipeline parse→validate→compile. Инварианты:
+  1. Никакой throw в pipeline.
+  2. R3 scope filter всегда present в result.where.
+  3. Все error-спаны in-bounds.
+- Adversarial payloads: SQL-injection strings, `A`×10000, 500-deep parens, null-byte + RTL marks — всё safe.
+
+### Security
+
+Создан [docs/security/search-ttql-review.md](docs/security/search-ttql-review.md) — чек-лист для security-reviewer на каждом PR эпика TTSRH-1:
+- R1 — нет `Prisma.raw()` в модуле, все `$queryRaw` через `Prisma.Sql`.
+- R3 — scope filter AND[0] и во всех function-resolvers.
+- R15 — rate-limit, timeout, pagination caps, MAX_DEPTH=256.
+- R11 — PUBLIC SavedFilter не расширяет доступ.
+
+### Изменения
+
+- `backend/src/modules/search/search.custom-field.executor.ts` — новый.
+- `backend/src/modules/search/search.rate-limit.ts` — новый.
+- `backend/src/modules/search/search.service.ts` — новый.
+- `backend/src/modules/search/search.router.ts` — подключение `POST /search/issues`.
+- `backend/src/shared/redis.ts` — `incrWithTtl` helper.
+- `backend/tests/search-pipeline-fuzz.unit.test.ts` — новый.
+- `backend/package.json` — `test:parser` включает pipeline-fuzz.
+- `docs/security/search-ttql-review.md` — новый.
+- `docs/tz/TTSRH-1.md` §13.9 — статус PR-5 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_ADVANCED_SEARCH=false` (default) — эндпоинт недоступен, 0 эффекта. При включении — все security-checklist пункты подтверждены.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run test:parser` — **397 passing**
+- Fuzz 1000 random + 7 adversarial payloads — 0 throws, R3 holds на всех успешных compile.
 
 ---
 
