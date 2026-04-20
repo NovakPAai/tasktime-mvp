@@ -2,7 +2,30 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.25**
+**Last version: 2.26**
+
+---
+
+## [2.26] [2026-04-20] fix: коллизия кэша поиска + утечка фильтров при смене проекта
+
+**PR:** [#98](https://github.com/NovakPAai/tasktime-mvp/pull/98)
+**Ветка:** `claude/jack-fix-issues-list-truncated`
+
+### Что изменилось
+
+**Backend:**
+- `issues.service.ts`: `search` обрезается до 200 символов перед передачей в Prisma-предикат — теперь совпадает с Redis-ключом (устранена коллизия кэша при длинных запросах)
+
+**Frontend:**
+- `issues.store.ts`: `filters` сбрасываются в `initialFilters` при смене проекта — устранена утечка `issueTypeConfigId`/`assigneeId` из одного проекта в другой
+
+**CI:**
+- `ai-review.yml`: убран `paths-ignore` — AI Code Review запускается на каждый PR без исключений
+
+### Файлы
+- `backend/src/modules/issues/issues.service.ts`
+- `frontend/src/store/issues.store.ts`
+- `.github/workflows/ai-review.yml`
 
 ---
 
