@@ -2,7 +2,58 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.27**
+**Last version: 2.28**
+
+---
+
+## [2.28] [2026-04-20] feat(search): TTSRH-1 PR-2 — TTS-QL tokenizer + parser + AST + golden-set
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/parser`
+
+### Что было
+
+После PR-1 (foundation) в модуле `backend/src/modules/search/` были только stub-эндпоинты, возвращавшие 501. Парсер для TTS-QL отсутствовал.
+
+### Что теперь
+
+Добавлен полноценный parse-pipeline `source → tokens → AST` без сторонних зависимостей:
+
+- **`search.ast.ts`** — типы AST: `QueryNode`, `OrNode`/`AndNode`/`NotNode`, `ClauseNode` с 5 вариантами `ClauseOp` (`Compare`/`In`/`InFunction`/`IsEmpty`/`History`), `FieldRef` (Ident / CustomField / QuotedField), `Expr` (String / Number / RelativeDate / Ident / Bool / Null / Empty / FunctionCall), `SortItem`, `ParseError` со стабильными кодами. Каждая нода несёт `span: {start, end}` для inline-подчёркивания ошибок в CodeMirror.
+- **`search.tokenizer.ts`** — hand-written char-by-char лексер. Токены: String (с escape-последовательностями `\"` `\\` `\n` `\t` `\r` `\u{HEX}` и `\uHHHH`), Number, RelativeDate (`-?\d+[dwMyhm]`), Ident (с поддержкой `-`/`.` в середине), CustomField (`cf[UUID]`), Op (8 compare), LParen/RParen/Comma. Комментарии `-- ...` до EOL. Контрол-символы в строках запрещены (кроме `\t`). Безопасные ошибки на контрольных / null-byte / RTL символах.
+- **`search.parser.ts`** — recursive descent, приоритет `( ) > NOT > AND > OR > ORDER BY`. Keywords (`AND/OR/NOT/IN/IS/EMPTY/NULL/ORDER/BY/ASC/DESC/WAS/CHANGED/FROM/TO/AFTER/BEFORE/ON/DURING/TRUE/FALSE`) распознаются case-insensitive. Поддержаны формы `IN (list)`, `IN funcCall()` (без outer-парeнов, JIRA-style), `IS [NOT] EMPTY|NULL`, history-операторы (парсятся, валидатор отклонит в PR-3). Bare function shorthand из §5.4.1 ТЗ — `myOpenIssues()`, `violatedCheckpoints()` — десугарится парсером в `issue IN funcCall()`. Публичный API — `parse(source)` возвращает `{ast, errors}` и **никогда не бросает** (контракт для fuzz-harness + suggest-pipeline).
+
+### Тесты (186 passing)
+
+- **`tests/search-tokenizer.unit.test.ts`** (49 кейсов) — токен-типы, спаны, escape-последовательности, unicode/RTL/emoji, edge-случаи `5days`, `cf[UUID]` валидация, контрол-символы, негативные числа, относительные даты.
+- **`tests/search-parser.unit.test.ts`** (71 кейс) — все compare-ops × типы значений, IN / NOT IN / `IN funcCall()`, IS EMPTY / NOT EMPTY / IS NULL, precedence AND > OR, NOT унарный, deep nesting, ORDER BY с множеством полей и ASC/DESC, кастом-поля `cf[...]` и `"Story Points"`, history-операторы, bare function shorthand, snapshots спанов, 15+ error-cases с проверкой кодов и позиций.
+- **`tests/search-parser-goldenset.unit.test.ts`** — загружает `docs/tz/TTSRH-1-goldenset.jql`, парсит каждую из 63 золотых запросов, assert zero errors.
+- **`tests/search-parser-fuzz.unit.test.ts`** (T-7 §6 ТЗ) — 1000 seeded random inputs (mulberry32) + SQL-injection-style payloads + extreme nesting — assert `parse()` НИКОГДА не бросает и все error-спаны in-bounds.
+
+### Изменения
+
+- `backend/src/modules/search/search.ast.ts` — новый файл (AST + error-codes).
+- `backend/src/modules/search/search.tokenizer.ts` — новый файл.
+- `backend/src/modules/search/search.parser.ts` — новый файл.
+- `backend/tests/search-tokenizer.unit.test.ts` — новый.
+- `backend/tests/search-parser.unit.test.ts` — новый.
+- `backend/tests/search-parser-goldenset.unit.test.ts` — новый.
+- `backend/tests/search-parser-fuzz.unit.test.ts` — новый.
+- `backend/vitest.parser-only.config.ts` — новый; локальный dev-конфиг для запуска чистых unit-тестов без Postgres (CI использует `vitest.config.ts` как раньше).
+- `docs/tz/TTSRH-1.md` §13.9 — статус PR-2 → ✅ Done.
+
+### Влияние на prod
+
+0. Ни одна existing функция не затронута — новые файлы добавляются, существующие stub-роутеры остаются. Парсер не экспонируется через HTTP до PR-5.
+
+### Проверки
+
+- Backend `npx tsc --noEmit` — чисто.
+- Backend `npm run lint` — 0 errors, 0 new warnings.
+- 186 unit-тестов зелёные локально (через `vitest.parser-only.config.ts`, без Postgres).
+- 63 golden-set запроса парсятся без ошибок.
+- Fuzz 1000 random inputs — 0 unhandled throws.
+- `npm test` в CI — использует main config с Postgres, тест-сьют сам себя бутстрапит.
 
 ---
 
