@@ -1492,7 +1492,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 
 | № | Branch | Scope | Часы | Зависит от | TTSRH-сабтаски | Статус |
 |---|--------|-------|------|-----------|----------------|--------|
-| 1 | `ttsrh-1/foundation` | Prisma schema (SavedFilter, User.preferences), feature flags, пустые модули | 6 | — | TTSRH-8 (schema), TTSRH-22 (flag) | ✅ Done ([#100](https://github.com/NovakPAai/tasktime-mvp/pull/100)) |
+| 1 | `ttsrh-1/foundation` | Prisma schema (SavedFilter, User.preferences), feature flags, пустые модули | 6 | — | TTSRH-8 (schema), TTSRH-22 (flag) | 🟢 Merged ([#100](https://github.com/NovakPAai/tasktime-mvp/pull/100)) |
 | 2 | `ttsrh-1/parser` | Tokenizer + Parser + AST + golden-set | 14 | PR-1 | TTSRH-2 | ✅ Done (готов к push после merge PR-1) |
 | 3 | `ttsrh-1/validator` | Field registry + Validator + functions + `/search/schema`, `/validate` | 14 | PR-2 | TTSRH-3, TTSRH-6 | 📋 Планируется |
 | 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 | 📋 Планируется |
