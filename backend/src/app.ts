@@ -45,6 +45,8 @@ import releaseCheckpointsRouter, {
 } from './modules/releases/checkpoints/release-checkpoints.router.js';
 import checkpointAuditRouter from './modules/releases/checkpoints/audit.router.js';
 import burndownRouter from './modules/releases/checkpoints/burndown.router.js';
+import searchRouter from './modules/search/search.router.js';
+import savedFiltersRouter from './modules/saved-filters/saved-filters.router.js';
 import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
 import userGroupsRouter from './modules/user-groups/user-groups.router.js';
 import userSecurityRouter from './modules/user-security/user-security.router.js';
@@ -166,6 +168,15 @@ export function createApp() {
   app.use('/api/admin/user-groups', userGroupsRouter);
   app.use('/api', userSecurityRouter);
   app.use('/api', workflowEngineRouter);
+
+  // TTSRH-1 PR-1: TTS-QL search + saved filters — mounted only under feature flag.
+  // When disabled, requests to /api/search/* and /api/saved-filters/* fall through to the
+  // 404 handler (Express default), which is what we want for not-yet-cutover features.
+  // See docs/tz/TTSRH-1.md §13.1.
+  if (features.advancedSearch) {
+    app.use('/api', searchRouter);
+    app.use('/api', savedFiltersRouter);
+  }
 
   // Public: project workflow scheme
   app.get('/api/projects/:projectId/workflow-scheme', authenticate, async (req, res, next) => {

@@ -2,7 +2,56 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.26**
+**Last version: 2.27**
+
+---
+
+## [2.27] [2026-04-20] feat(search): TTSRH-1 PR-1 — foundation для TTS-QL (schema + feature flags)
+
+**PR:** [#100](https://github.com/NovakPAai/tasktime-mvp/pull/100)
+**Ветка:** `ttsrh-1/foundation`
+
+### Что было
+
+Глобального продвинутого поиска по задачам нет — только плоский фильтр по одному проекту в `ProjectDetailPage` и 50-записный `/issues/search` для виджета связывания. JQL-совместимый язык и сохраняемые фильтры отсутствуют (см. §1 и §2 в [docs/tz/TTSRH-1.md](docs/tz/TTSRH-1.md)).
+
+### Что теперь
+
+Заложена инфраструктура TTSRH-1 без продуктового эффекта:
+
+- **Prisma**: добавлены модели `SavedFilter`, `SavedFilterShare` + enums `FilterVisibility`, `FilterPermission`; поле `User.preferences Json?` для будущих UI-дефолтов (колонки, pageSize). Миграция `20260423000000_ttsrh_saved_filters` включает XOR-CHECK и два partial-unique-индекса для shares (user OR group, не оба).
+- **Feature flags**: `FEATURES_ADVANCED_SEARCH` и `FEATURES_CHECKPOINT_TTQL` в [backend/src/shared/features.ts](backend/src/shared/features.ts) (оба `false` по умолчанию). Frontend-зеркало — `VITE_FEATURES_ADVANCED_SEARCH` в [frontend/src/lib/features.ts](frontend/src/lib/features.ts).
+- **Backend-модули**: пустые [backend/src/modules/search/search.router.ts](backend/src/modules/search/search.router.ts) и [backend/src/modules/saved-filters/saved-filters.router.ts](backend/src/modules/saved-filters/saved-filters.router.ts) с эндпоинтами-стабами (501 Not Implemented). Монтируются в [app.ts](backend/src/app.ts) только при включённом `features.advancedSearch`.
+- **Frontend**: роут `/search` + placeholder-страница [SearchPage.tsx](frontend/src/pages/SearchPage.tsx) + пункт сайдбара «Поиск задач» с `data-testid="nav-search"` (SVG-лупа, между Flow Teams и Planning-submenu). Всё под `frontendFeatures.advancedSearch`.
+
+### Изменения
+
+- [backend/src/prisma/schema.prisma](backend/src/prisma/schema.prisma) — модели `SavedFilter`, `SavedFilterShare`, enums, обратные связи в `User` и `UserGroup`.
+- [backend/src/prisma/migrations/20260423000000_ttsrh_saved_filters/migration.sql](backend/src/prisma/migrations/20260423000000_ttsrh_saved_filters/migration.sql) — миграция SQL.
+- [backend/src/shared/features.ts](backend/src/shared/features.ts) — `advancedSearch`, `checkpointTtql` флаги.
+- [backend/src/modules/search/search.router.ts](backend/src/modules/search/search.router.ts), [backend/src/modules/saved-filters/saved-filters.router.ts](backend/src/modules/saved-filters/saved-filters.router.ts) — stub-роутеры.
+- [backend/src/app.ts](backend/src/app.ts) — условный mount.
+- [frontend/src/lib/features.ts](frontend/src/lib/features.ts), [frontend/src/pages/SearchPage.tsx](frontend/src/pages/SearchPage.tsx), [frontend/src/App.tsx](frontend/src/App.tsx), [frontend/src/components/layout/Sidebar.tsx](frontend/src/components/layout/Sidebar.tsx) — route + sidebar-item + placeholder.
+- [docs/tz/TTSRH-1.md](docs/tz/TTSRH-1.md) §13 — план из 21 PR добавлен в ТЗ.
+- [frontend/.env.example](frontend/.env.example) — `VITE_FEATURES_ADVANCED_SEARCH=false`.
+
+### Влияние на prod
+
+При штатной конфигурации (`FEATURES_ADVANCED_SEARCH=false`) — 0 эффекта. Новые таблицы создаются пустыми, эндпоинты `/api/search/*` возвращают 404 (Express fallback), пункт сайдбара не рендерится. Feature flag флипается **с перезапуском контейнера** (backend читает env на import-time; frontend — на build-time).
+
+### Проверки
+
+- `npx prisma validate` — schema valid.
+- `npx prisma generate` — клиент генерируется.
+- Backend `npm run lint` — 0 ошибок, 2 pre-existing warnings (не в новых файлах).
+- Frontend `npm run lint` — 0 ошибок, pre-existing warnings (не в новых файлах).
+- Backend/frontend `npx tsc --noEmit` — зелёные.
+- `npm test` — не запускался локально (требует Postgres); пойдёт в CI.
+- `pre-push-reviewer` — LGTM, 2 medium-фикса применены в follow-up коммите.
+
+---
+
+## [2.26] [2026-04-20] fix: коллизия кэша поиска + утечка фильтров при смене проекта
 
 ---
 
