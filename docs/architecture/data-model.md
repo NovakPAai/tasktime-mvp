@@ -330,7 +330,7 @@ Run `make docs` to check for staleness warnings.
 > ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
 > Обновляется автоматически при каждом изменении схемы.
 
-## Модели (54)
+## Модели (56)
 
 ### User
 
@@ -343,6 +343,7 @@ Run `make docs` to check for staleness warnings.
 | `isActive` | `Boolean` | нет | default: true |
 | `isSystem` | `Boolean` | нет | default: false |
 | `mustChangePassword` | `Boolean` | нет | default: false |
+| `preferences` | `Json` | да |  |
 | `createdAt` | `DateTime` | нет | default: now( |
 | `updatedAt` | `DateTime` | нет |  |
 | `assignedIssues` | `Issue[]` | нет |  |
@@ -363,6 +364,8 @@ Run `make docs` to check for staleness warnings.
 | `groupMemberships` | `UserGroupMember[]` | нет |  |
 | `addedGroupMembers` | `UserGroupMember[]` | нет |  |
 | `checkpointTemplatesCreated` | `CheckpointTemplate[]` | нет |  |
+| `savedFilters` | `SavedFilter[]` | нет |  |
+| `savedFilterShares` | `SavedFilterShare[]` | нет |  |
 
 ### UserSystemRole
 
@@ -1183,7 +1186,40 @@ Run `make docs` to check for staleness warnings.
 | `capturedAt` | `DateTime` | нет | default: now( |
 | `release` | `Release` | нет |  |
 
-## Перечисления (20)
+### SavedFilter
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `ownerId` | `String` | нет |  |
+| `name` | `String` | нет |  |
+| `description` | `String` | да |  |
+| `jql` | `String` | нет |  |
+| `visibility` | `FilterVisibility` | нет | default: PRIVATE |
+| `columns` | `Json` | да |  |
+| `isFavorite` | `Boolean` | нет | default: false |
+| `lastUsedAt` | `DateTime` | да |  |
+| `useCount` | `Int` | нет | default: 0 |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `updatedAt` | `DateTime` | нет |  |
+| `owner` | `User` | нет |  |
+| `shares` | `SavedFilterShare[]` | нет |  |
+
+### SavedFilterShare
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `filterId` | `String` | нет |  |
+| `userId` | `String` | да |  |
+| `groupId` | `String` | да |  |
+| `permission` | `FilterPermission` | нет | default: READ |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `filter` | `SavedFilter` | нет |  |
+| `user` | `User` | да |  |
+| `group` | `UserGroup` | да |  |
+
+## Перечисления (22)
 
 ### SystemRoleType
 
@@ -1349,4 +1385,15 @@ Run `make docs` to check for staleness warnings.
 - `PENDING`
 - `OK`
 - `VIOLATED`
+
+### FilterVisibility
+
+- `PRIVATE`
+- `SHARED`
+- `PUBLIC`
+
+### FilterPermission
+
+- `READ`
+- `WRITE`
 <!-- AUTO-GENERATED:END -->

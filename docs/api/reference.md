@@ -874,6 +874,28 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `POST` | `/api/releases/:id/sprints` | 🔒 |
 | `POST` | `/api/releases/:id/sprints/remove` | 🔒 |
 
+### saved-filters
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/saved-filters` | 🔒 |
+| `POST` | `/api/saved-filters` | 🔒 |
+| `GET` | `/api/saved-filters/:id` | 🔒 |
+| `PATCH` | `/api/saved-filters/:id` | 🔒 |
+| `DELETE` | `/api/saved-filters/:id` | 🔒 |
+| `POST` | `/api/saved-filters/:id/favorite` | 🔒 |
+| `POST` | `/api/saved-filters/:id/share` | 🔒 |
+
+### search
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `POST` | `/api/search/issues` | 🔒 |
+| `POST` | `/api/search/validate` | 🔒 |
+| `GET` | `/api/search/suggest` | 🔒 |
+| `POST` | `/api/search/export` | 🔒 |
+| `GET` | `/api/search/schema` | 🔒 |
+
 ### Sprints
 
 | Метод | Путь | Доступ |

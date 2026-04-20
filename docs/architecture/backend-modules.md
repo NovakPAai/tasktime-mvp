@@ -334,4 +334,6 @@ Run `make docs` to check for staleness warnings.
 | User Groups | `/api/admin/user-groups` | `backend/src/modules/user-groups/user-groups.router.js.ts` |
 | User Security | `/api` | `backend/src/modules/user-security/user-security.router.js.ts` |
 | Workflow Engine | `/api` | `backend/src/modules/workflow-engine/workflow-engine.router.js.ts` |
+| Search | `/api` | `backend/src/modules/search/search.router.js.ts` |
+| Saved Filters | `/api` | `backend/src/modules/saved-filters/saved-filters.router.js.ts` |
 <!-- AUTO-GENERATED:END -->

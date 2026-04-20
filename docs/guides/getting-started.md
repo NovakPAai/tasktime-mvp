@@ -220,6 +220,7 @@ make clean && make setup
 | Переменная | Значение | Описание |
 |-----------|---------|----------|
 | `VITE_API_URL` | `/api` |  |
+| `VITE_FEATURES_ADVANCED_SEARCH` | `false` | бэкенд вернёт 404 на /api/search/*. |
 <!-- AUTO-GENERATED:END:env -->
 
 <!-- AUTO-GENERATED:START:makefile -->
