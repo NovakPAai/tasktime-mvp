@@ -12,6 +12,7 @@ import { loadCustomFields } from './search.schema.loader.js';
 import { functionsForVariant } from './search.functions.js';
 import { searchIssues } from './search.service.js';
 import { searchRateLimit } from './search.rate-limit.js';
+import { suggest } from './search.suggest.js';
 import type { QueryVariant } from './search.types.js';
 
 /**
@@ -234,9 +235,44 @@ async function resolveAccessibleProjectIds(req: AuthRequest): Promise<Accessible
   };
 }
 
+// ─── GET /search/suggest ────────────────────────────────────────────────────
+
+router.get(
+  '/search/suggest',
+  async (req: Request, res: Response, next): Promise<void> => {
+    try {
+      const auth = req as AuthRequest;
+      if (!auth.user) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const { projectIds } = await resolveAccessibleProjectIds(auth);
+      const { jql = '', cursor: cursorRaw, field, operator, prefix, variant } =
+        req.query as Record<string, string | undefined>;
+      const cursor = Number.parseInt(cursorRaw ?? '0', 10);
+      const customFields = await loadCustomFields();
+      const result = await suggest(
+        typeof jql === 'string' ? jql.slice(0, 10_000) : '',
+        Number.isFinite(cursor) ? cursor : 0,
+        {
+          userId: auth.user.userId,
+          accessibleProjectIds: projectIds,
+          variant: (variant === 'checkpoint' ? 'checkpoint' : 'default') as QueryVariant,
+          field,
+          operator,
+          prefix,
+        },
+        customFields,
+      );
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── Still-stubbed endpoints ────────────────────────────────────────────────
 
-router.get('/search/suggest', notImplemented('GET /search/suggest'));
 router.post('/search/export', notImplemented('POST /search/export'));
 
 export default router;
