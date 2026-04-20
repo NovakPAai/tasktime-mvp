@@ -6,10 +6,14 @@
  * `/search/schema`) are NOT limited — they don't touch Postgres heavily and a
  * throttle would harm the editor's real-time feedback loop.
  *
- * Implementation: sliding-minute bucket via Redis `INCR` with a 60s TTL. If
- * Redis is unavailable, `incrWithTtl` returns `null` and we **fail open** —
- * a broken cache shouldn't block legitimate traffic (existing monitoring
- * alerts on Redis down).
+ * Implementation: **fixed-window bucket** via Redis `INCR` with a 60s TTL.
+ * Key format `search:rate:<userId>:<unix-minute>` rolls over at minute
+ * boundaries. A true sliding window (sorted set + ZADD/ZREMRANGEBYSCORE) is
+ * a Phase-2 upgrade if burst-at-boundary abuse becomes an observed problem.
+ *
+ * If Redis is unavailable, `incrWithTtl` returns `null` and we **fail open**
+ * — a broken cache shouldn't block legitimate traffic. The fail-open branch
+ * logs once per request so ops can correlate bypass events with Redis health.
  */
 
 import type { Request, Response, NextFunction } from 'express';
@@ -39,7 +43,9 @@ export function searchRateLimit(req: Request, res: Response, next: NextFunction)
     try {
       const count = await incrWithTtl(bucketKey, WINDOW_SECONDS);
       if (count === null) {
-        // Redis unavailable — fail open.
+        // Redis unavailable — fail open. Log once per request so ops can
+        // correlate a sustained bypass window with Redis health metrics.
+        console.warn('search.rate-limit: Redis unavailable, bypassing limit for user', userId);
         next();
         return;
       }

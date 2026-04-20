@@ -36,13 +36,33 @@ export interface SearchIssuesContext {
   now?: Date;
 }
 
+/**
+ * Shape of a single issue in the `/search/issues` response. Mirrors the fixed
+ * Prisma `include` below. When PR-9+ adds a user-configurable column set, this
+ * type will need to become generic over the include payload.
+ */
+export type IssueSearchResult = Prisma.IssueGetPayload<{
+  include: {
+    assignee: { select: { id: true; name: true; email: true } };
+    project: { select: { id: true; key: true; name: true } };
+    workflowStatus: { select: { id: true; name: true; category: true; color: true; systemKey: true } };
+  };
+}>;
+
 export interface SearchIssuesResult {
   kind: 'ok';
   total: number;
   startAt: number;
   limit: number;
-  issues: unknown[];
+  issues: IssueSearchResult[];
+  /** Validator warnings — carry real span positions for CodeMirror squiggles. */
   warnings: ValidationIssue[];
+  /**
+   * Compiler warnings — emitted as a separate key because they don't carry
+   * token positions (the compiler has consumed spans by this stage). Frontend
+   * renders these as a top-of-results banner rather than inline squiggles.
+   */
+  compileWarnings: CompileIssue[];
 }
 
 export interface SearchIssuesError {
@@ -131,10 +151,20 @@ export async function searchIssues(
   try {
     const output = await withTimeout(
       async () => {
-        const where = await executeCustomFieldPredicates(compiled.where, compiled.customPredicates);
+        const exec = await executeCustomFieldPredicates(
+          compiled.where,
+          compiled.customPredicates,
+          ctx.accessibleProjectIds,
+        );
+        if (exec.errors.length > 0) {
+          // Report CF-executor failures as compile-time errors. They usually mean
+          // a malformed Prisma.sql fragment (compiler bug) or a Postgres error on
+          // JSON extract (invalid type cast for the custom-field).
+          return { execErrors: exec.errors, where: exec.where, issues: [], total: 0 };
+        }
         const [issues, total] = await Promise.all([
           prisma.issue.findMany({
-            where,
+            where: exec.where,
             orderBy: compiled.orderBy.length > 0 ? compiled.orderBy : [{ updatedAt: 'desc' }],
             skip: startAt,
             take: limit,
@@ -144,22 +174,40 @@ export async function searchIssues(
               workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
             },
           }),
-          prisma.issue.count({ where }),
+          prisma.issue.count({ where: exec.where }),
         ]);
-        return { issues, total };
+        return { issues, total, where: exec.where, execErrors: [] as CompileIssue[] };
       },
       QUERY_TIMEOUT_MS,
     );
+    if (output.execErrors.length > 0) {
+      return {
+        kind: 'error',
+        status: 422,
+        code: 'EXECUTOR_ERROR',
+        message: 'One or more custom-field predicates failed to execute.',
+        compileErrors: output.execErrors,
+      };
+    }
     return {
       kind: 'ok',
       total: output.total,
       startAt,
       limit,
-      issues: output.issues,
-      warnings: [...validation.warnings, ...compileIssuesToValidationWarnings(compiled.warnings)],
+      issues: output.issues as IssueSearchResult[],
+      warnings: validation.warnings,
+      compileWarnings: compiled.warnings,
     };
   } catch (err) {
     if (err instanceof TimeoutError) {
+      // Log the JQL (truncated) + user so ops can correlate recurring timeouts
+      // with specific queries — the user-facing 504 stays terse.
+      console.warn('search timeout', {
+        userId: ctx.userId,
+        jql: input.jql.slice(0, 200),
+        limit,
+        startAt,
+      });
       return {
         kind: 'error',
         status: 504,
@@ -183,22 +231,6 @@ export async function searchIssues(
 function clampInt(n: number, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;
   return Math.max(min, Math.min(max, Math.trunc(n)));
-}
-
-/**
- * Re-shape a compiler warning into the validator's issue shape so the HTTP
- * response has a single `warnings` array — consumers don't need to know that
- * warnings came from two different internal stages.
- */
-function compileIssuesToValidationWarnings(issues: readonly CompileIssue[]): ValidationIssue[] {
-  return issues.map((i) => ({
-    code: 'VALUE_TYPE_MISMATCH',
-    severity: 'warning' as const,
-    message: `[${i.code}] ${i.message}`,
-    hint: i.hint,
-    start: 0,
-    end: 0,
-  }));
 }
 
 class TimeoutError extends Error {
@@ -227,5 +259,3 @@ async function withTimeout<T>(fn: () => Promise<T>, ms: number): Promise<T> {
   }
 }
 
-// Silence "unused" for Prisma import — kept for future typed-where assertions.
-void ({} as Prisma.IssueWhereInput);

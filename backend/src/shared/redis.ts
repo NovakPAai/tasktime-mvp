@@ -88,18 +88,22 @@ export async function delCachedJson(key: string): Promise<void> {
  * Returns the post-increment count, or `null` if Redis is unavailable. Callers
  * should treat `null` as "fail open" — never block traffic when the cache layer
  * is down (TTSRH-1 §R15 pattern).
+ *
+ * Atomic via MULTI — `INCR` + `EXPIRE ... NX` are pipelined in one round-trip.
+ * `EXPIRE NX` sets the TTL only when the key has none, so back-to-back requests
+ * in the same window don't reset the expiry. This closes the immortal-key
+ * window (PR-5 pre-push review).
  */
 export async function incrWithTtl(key: string, ttlSeconds: number): Promise<number | null> {
   const redis = await getRedisClientInternal();
   if (!redis) return null;
   try {
-    const count = await redis.incr(key);
-    // Only arm the TTL on the first hit — subsequent INCRs keep the existing
-    // expiry, giving us a proper sliding-window bucket.
-    if (count === 1) {
-      await redis.expire(key, ttlSeconds);
-    }
-    return count;
+    const replies = await redis
+      .multi()
+      .incr(key)
+      .expire(key, ttlSeconds, 'NX')
+      .exec();
+    return Number(replies[0]);
   } catch (err) {
     console.error('Redis INCR failed:', err);
     return null;

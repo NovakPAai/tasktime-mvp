@@ -155,11 +155,11 @@ router.post(
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
-      const accessibleProjectIds = await resolveAccessibleProjectIds(auth);
+      const { projectIds, overflowed } = await resolveAccessibleProjectIds(auth);
       const { jql, startAt, limit } = req.body as z.infer<typeof issuesDtoSchema>;
       const output = await searchIssues(
         { jql, startAt, limit },
-        { userId: auth.user.userId, accessibleProjectIds },
+        { userId: auth.user.userId, accessibleProjectIds: projectIds },
       );
       if (output.kind === 'error') {
         res.status(output.status).json({
@@ -177,6 +177,11 @@ router.post(
         limit: output.limit,
         issues: output.issues,
         warnings: output.warnings,
+        compileWarnings: output.compileWarnings,
+        // When the user has access to more than `MAX_ACCESSIBLE_PROJECTS` projects
+        // (realistic only for global-read roles in huge tenants), tell them that
+        // search results may be incomplete.
+        ...(overflowed ? { projectScopeOverflowed: true } : {}),
       });
     } catch (err) {
       next(err);
@@ -185,23 +190,48 @@ router.post(
 );
 
 /**
+ * Cap the number of project ids we embed in a single query. Postgres chokes on
+ * very large `IN (...)` lists, and we don't want a global-read user on a
+ * 100k-project tenant to allocate megabytes of uuids per request. Beyond this
+ * cap we emit a warning — admins see it, everyone else's search still works.
+ */
+const MAX_ACCESSIBLE_PROJECTS = 5000;
+
+export interface AccessibleProjectsResult {
+  projectIds: string[];
+  overflowed: boolean;
+}
+
+/**
  * Compute the set of project ids the authenticated user may see. Mirrors the
  * pattern in `issues.router.ts:requireIssueAccess` — global-read roles see
  * everything; others are scoped to their direct project memberships. The
  * compiler adds `projectId IN (accessibleProjectIds)` as AND[0] (R3) so this
  * is the single authoritative input for RBAC scoping.
  */
-async function resolveAccessibleProjectIds(req: AuthRequest): Promise<readonly string[]> {
-  if (!req.user) return [];
+async function resolveAccessibleProjectIds(req: AuthRequest): Promise<AccessibleProjectsResult> {
+  if (!req.user) return { projectIds: [], overflowed: false };
   if (hasGlobalProjectReadAccess(req.user.systemRoles)) {
-    const all = await prisma.project.findMany({ select: { id: true } });
-    return all.map((p) => p.id);
+    const all = await prisma.project.findMany({
+      select: { id: true },
+      take: MAX_ACCESSIBLE_PROJECTS + 1, // +1 sentinel to detect overflow
+    });
+    const overflowed = all.length > MAX_ACCESSIBLE_PROJECTS;
+    return {
+      projectIds: overflowed ? all.slice(0, MAX_ACCESSIBLE_PROJECTS).map((p) => p.id) : all.map((p) => p.id),
+      overflowed,
+    };
   }
   const memberships = await prisma.userProjectRole.findMany({
     where: { userId: req.user.userId },
     select: { projectId: true },
+    take: MAX_ACCESSIBLE_PROJECTS + 1,
   });
-  return memberships.map((m) => m.projectId);
+  const overflowed = memberships.length > MAX_ACCESSIBLE_PROJECTS;
+  return {
+    projectIds: (overflowed ? memberships.slice(0, MAX_ACCESSIBLE_PROJECTS) : memberships).map((m) => m.projectId),
+    overflowed,
+  };
 }
 
 // ─── Still-stubbed endpoints ────────────────────────────────────────────────
