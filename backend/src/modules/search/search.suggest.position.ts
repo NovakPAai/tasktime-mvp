@@ -22,7 +22,6 @@ import { tokenize, type Token } from './search.tokenizer.js';
 import type { PositionContext } from './search.suggest.types.js';
 
 const BOOLEAN_CONTINUATION = new Set(['AND', 'OR', 'NOT']);
-const IN_OPS = new Set(['IN', 'NOT']); // "NOT IN" handled specially via lookahead
 
 /**
  * Analyse `source` with a cursor at byte offset `cursor`. Returns a
