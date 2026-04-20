@@ -2,7 +2,66 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.29**
+**Last version: 2.30**
+
+---
+
+## [2.30] [2026-04-20] feat(search): TTSRH-1 PR-4 — compiler (AST → Prisma + custom-field raw SQL + scope R3)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/compiler`
+
+### Что было
+
+После PR-3 был validator, но ничего не умело превратить AST в Prisma-запрос. `/search/issues` оставался 501.
+
+### Что теперь
+
+Готов pure compiler AST → `Prisma.IssueWhereInput` с полной поддержкой system-полей, custom-полей через raw SQL, pre-resolved function-ов, и scope-фильтра.
+
+- **`search.compile-context.ts`** — `CompileContext` (accessibleProjectIds, customFields, resolved, now, variant), `FunctionCallKey` canonical serialisation, `FunctionCallValue` (scalar-id / id-list / scalar-datetime / resolve-failed). `buildFunctionCallKey(name, args)` дедупит повторяющиеся вызовы в одном AST.
+- **`search.compiler.ts`** (pure, no Prisma runtime — только types) — `compile(ast, ctx) → CompileResult { where, orderBy, customPredicates, warnings, errors }`. Visitor обходит Or/And/Not/Clause, каждая clause переводится в Prisma-предикат. Scope-фильтр `projectId IN accessibleProjectIds` добавляется как `AND[0]` всегда (R3). Функции в значениях резолвятся через `ctx.resolved.calls` — компилятор сам не хитит БД. Pure date helpers (now/today/startOfX/endOfX) вычисляются через `evaluatePureDateFn`. `compile()` никогда не бросает — на внутренних ошибках возвращает `MATCH_NONE`.
+- **`search.custom-field.ts`** — custom-field clauses компилируются в `Prisma.sql` фрагменты (`SELECT issue_id FROM issue_custom_field_values WHERE ...`). Диспетчеризация по `CustomFieldType`: TEXT/TEXTAREA/URL → `value->>'v'`, NUMBER/DECIMAL → `(value->>'n')::numeric`, DATE → `(value->>'d')::date`, CHECKBOX → `(value->>'b')::boolean`, LABEL/MULTI_SELECT → `value @> to_jsonb(?::text)` (array containment). **Все значения через `${...}` Prisma interpolation — 0 string-concat, R1-safe.** IS EMPTY компилируется в `NOT EXISTS` sub-query.
+- **`search.function-resolver.ts`** — DB-wired layer. `collectFunctionCalls(ast)` вытаскивает уникальные вызовы по canonical-key; `resolveFunctions(ast, ctx)` queries Prisma по одному разу на уникальный вызов. Реализовано 11 DB-зависимых функций: membersOf, openSprints/closedSprints/futureSprints, unreleasedVersions/releasedVersions, earliestUnreleased/latestReleased, linkedIssues, subtasksOf, epicIssues, myOpenIssues. Ошибки резолва → `resolve-failed` с reason, компилятор эмитит `UNRESOLVED_FUNCTION` и MATCH_NONE.
+
+### Тесты (392 passing, +50 к PR-3)
+
+- **`tests/search-compiler.unit.test.ts`** (50 кейсов) — **T-2 per-field×per-operator матрица**:
+  - Scope R3 (3 кейса): empty query, always first in AND, empty projects → match none.
+  - Compare operators (4+7+2+3 = 16 кейсов): string equality/inequality, numeric compare <=, >=, >, <, =, !=, date compare с Prisma filter, text ~/!~ с `mode: 'insensitive'`.
+  - IN/NOT IN (3).
+  - IS EMPTY/IS NOT EMPTY/IS NULL/IS NOT NULL (4).
+  - Boolean structure (5): AND, OR, NOT, precedence, parens.
+  - Function values (5): currentUser mapping, pure date, relative date, pre-resolved id-list, empty id-list → MATCH_NONE, unresolved → error.
+  - ORDER BY (3).
+  - Custom fields (7): resolve by name/UUID, IN, NOT IN, text ~, IS EMPTY, unknown UUID.
+  - Error paths (2).
+  - **Property-based fuzz** (1): 500 random parseable queries compile без throw.
+
+### Изменения
+
+- `backend/src/modules/search/search.compile-context.ts` — новый.
+- `backend/src/modules/search/search.compiler.ts` — новый.
+- `backend/src/modules/search/search.custom-field.ts` — новый.
+- `backend/src/modules/search/search.function-resolver.ts` — новый.
+- `backend/src/modules/search/search.schema.ts` — `CustomFieldDef.fieldType` добавлен.
+- `backend/src/modules/search/search.schema.loader.ts` — заполняет `fieldType` из Prisma.
+- `backend/tests/search-compiler.unit.test.ts` — новый.
+- `backend/package.json` — `test:parser` включает compiler-тест.
+- `docs/tz/TTSRH-1.md` §13.9 — статус PR-4 → ✅ Done.
+
+### Влияние на prod
+
+0. Без feature-flag cutover — compiler ещё не подключен к `/search/issues` (это PR-5). Существующие эндпоинты не затронуты.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run test:parser` — **392 passing** локально без Postgres
+- **R1 проверен**: весь raw SQL в custom-field.ts через `Prisma.sql` template с `${...}` interpolation — 0 string concat.
+- **R3 проверен**: scope-фильтр всегда `AND[0]` (тест `scope filter is always the top-level AND prefix`).
+- Golden-set 63/63 parse + validate без изменений.
 
 ---
 

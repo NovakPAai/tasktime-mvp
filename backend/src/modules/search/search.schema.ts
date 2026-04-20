@@ -112,8 +112,14 @@ export function resolveSystemField(name: string): FieldDef | null {
 export interface CustomFieldDef {
   id: string;
   name: string;
-  /** TTS-QL type derived from the Prisma `CustomFieldType`. */
+  /** TTS-QL type derived from the Prisma `CustomFieldType` — used by the validator. */
   type: TtqlType;
+  /**
+   * Original Prisma `CustomFieldType` — retained so the compiler (PR-4) can pick
+   * the correct JSON extraction / cast when building raw SQL. `MULTI_SELECT` vs
+   * `LABEL` collapse to the same `TtqlType` but differ in storage encoding.
+   */
+  fieldType: CustomFieldType;
   operators: readonly TtqlOpKind[];
   /**
    * MVP: custom fields are never sortable (§R13 ТЗ — sort by JSON-column is too

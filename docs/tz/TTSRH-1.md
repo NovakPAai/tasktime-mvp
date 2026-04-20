@@ -1495,7 +1495,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 1 | `ttsrh-1/foundation` | Prisma schema (SavedFilter, User.preferences), feature flags, пустые модули | 6 | — | TTSRH-8 (schema), TTSRH-22 (flag) | 🟢 Merged ([#100](https://github.com/NovakPAai/tasktime-mvp/pull/100)) |
 | 2 | `ttsrh-1/parser` | Tokenizer + Parser + AST + golden-set | 14 | PR-1 | TTSRH-2 | 🟢 Merged ([#101](https://github.com/NovakPAai/tasktime-mvp/pull/101)) |
 | 3 | `ttsrh-1/validator` | Field registry + Validator + functions + `/search/schema`, `/validate` | 14 | PR-2 | TTSRH-3, TTSRH-6 | ✅ Done (готов к push после merge PR-2) |
-| 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 | 📋 Планируется |
+| 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 | ✅ Done (готов к push после merge PR-3) |
 | 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 | 📋 Планируется |
 | 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 | 📋 Планируется |
 | 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 📋 Планируется |
