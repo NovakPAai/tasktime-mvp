@@ -130,6 +130,15 @@ COMMENTS=$(curl -s "$API_URL/issues/$ISSUE_ID/comments" -H "Authorization: Beare
 - Кэширование Redis
 - Совместимость браузеров
 
+**Декомпозиция на PR (обязательно):**
+- Разбей работу на последовательность PR-ов размером ~400–900 строк diff.
+- Для каждого PR определи: ветку (`{KEY-LOWER}/<scope>`), scope (что входит), что НЕ входит, зависимости (от каких PR ждёт merge), merge-ready check, оценку в часах.
+- Построй DAG зависимостей между PR (где параллельно, где последовательно).
+- Раздели PR по фазам: Foundation → Backend core → Frontend → E2E / docs / cutover (если применимо).
+- Миграции Prisma — всегда отдельный PR (чтобы `migrate deploy` проверялся на staging перед follow-up кодом).
+- Если задача покрывается одним PR (<900 строк, нет миграций, один слой) — опиши один PR-1 и явно пометь «Single-PR task».
+- Feature flag — если задача меняет production-поведение и нужен постепенный cutover.
+
 ---
 
 ## Шаг 3: Генерация ТЗ
@@ -267,6 +276,74 @@ COMMENTS=$(curl -s "$API_URL/issues/$ISSUE_ID/comments" -H "Authorization: Beare
 ## 10. Иерархия задач
 
 {Дерево: EPIC → STORY → TASK → SUBTASK}
+
+---
+
+## 11. Замечания к документации
+
+- [ ] Обновить [docs/user-manual/](docs/user-manual/) (если затрагивает UX)
+- [ ] Обновить [docs/api/reference.md](docs/api/reference.md) (если меняется API)
+- [ ] Обновить [version_history.md](version_history.md) записью о {KEY} в том же коммите, что функциональный код
+- [ ] {другие документы: ADR, MCP_GUIDE.html, security/*}
+
+---
+
+## 12. План реализации (PR / ветки / merge plan)
+
+### 12.1 Стратегия
+
+- **База:** все ветки создаются от свежего `main`, PR-ы мерджатся напрямую в `main`.
+- **Именование веток:** `{KEY-LOWER}/<scope>` (например `ttsrh-1/parser`).
+- **Имя коммита:** `{type}({module}): {KEY} — <scope>` (feat/fix/chore/docs/refactor).
+- **Размер PR:** целимся 400–900 строк diff. При 1000+ — разбиваем на два.
+- **CI:** каждый PR — `make lint`, `make test`, Playwright e2e (если меняется UI).
+- **Миграции:** каждая Prisma-миграция — отдельный PR (чтобы `prisma migrate deploy` был проверяем на staging перед follow-up кодом).
+- **Feature flag:** {имя флага} — если задача меняет production-поведение; cutover в финальном PR. Иначе раздел опустить.
+- **Security review gate:** {какие PR требуют apprоv'а security-review} — если есть raw SQL, RBAC, anti-injection. Иначе раздел опустить.
+
+### 12.2 DAG зависимостей
+
+```
+PR-1 ({scope}) ─► PR-2 ({scope}) ─► PR-3 ({scope})
+                                   │
+                                   ├─► PR-4 ({scope})
+                                   └─► PR-5 ({scope}) ─► PR-6 ({scope})
+```
+
+Параллелизм: {явно указать, какие PR могут делаться параллельно после merge общего предка}.
+
+### 12.3 PR-ы по фазам
+
+#### Фаза 0 — Foundation (~Nч)
+
+##### PR-1: {scope заголовок}
+- **Branch:** `{KEY-LOWER}/{scope}`
+- **Зависит от:** — (или `PR-X`)
+- **Scope:**
+  - {файл/модуль — что именно}
+  - {миграция, если есть}
+  - {тесты — unit/integration}
+- **Не включает:** {что явно вынесено в следующие PR — чтобы reviewer не просил расширения scope}
+- **Merge-ready check:** {конкретные проверки — какие тесты зелёные, что работает на staging, какие чек-листы пройдены}
+- **Оценка:** ~Nч
+
+#### Фаза 1 — {название} (~Nч)
+
+##### PR-2: {scope заголовок}
+{…аналогично…}
+
+{…повторить для всех PR…}
+
+### 12.4 Итого по PR
+
+| PR | Scope | Оценка (ч) | Зависимости |
+|----|-------|------------|-------------|
+| PR-1 | {scope} | N | — |
+| PR-2 | {scope} | N | PR-1 |
+| … | … | … | … |
+| **Итого** | | **N** | |
+
+> Если задача Single-PR: указать в разделе 12.3 только PR-1 с полным scope и пометкой «Single-PR task: полная реализация в одном PR, размер ~N строк diff».
 ```
 
 ### JSON: `docs/tz/{KEY}.json`
@@ -328,6 +405,42 @@ COMMENTS=$(curl -s "$API_URL/issues/$ISSUE_ID/comments" -H "Authorization: Beare
     "children": ["{childKey}"],
     "blocks": [],
     "dependsOn": []
+  },
+  "implementationPlan": {
+    "strategy": {
+      "branchPattern": "{key-lower}/<scope>",
+      "commitPattern": "{type}({module}): {KEY} — <scope>",
+      "targetBranch": "main",
+      "prSizeTarget": "400-900 lines diff",
+      "featureFlag": "{FLAG_NAME или null}",
+      "securityReviewRequired": ["PR-X", "PR-Y"]
+    },
+    "singlePR": false,
+    "phases": [
+      {
+        "name": "Foundation",
+        "estimatedHours": 0,
+        "prs": [
+          {
+            "id": "PR-1",
+            "title": "{scope заголовок}",
+            "branch": "{key-lower}/{scope}",
+            "dependsOn": [],
+            "scope": ["{что входит}"],
+            "notIncluded": ["{что явно вынесено}"],
+            "mergeReadyCheck": ["{проверки перед merge}"],
+            "estimatedHours": 0
+          }
+        ]
+      }
+    ],
+    "dag": {
+      "edges": [
+        {"from": "PR-1", "to": "PR-2"}
+      ],
+      "parallelizable": [["PR-3", "PR-4"]]
+    },
+    "totalHours": 0
   }
 }
 ```
@@ -377,8 +490,9 @@ curl -s -X POST "$API_URL/issues/$ISSUE_ID/comments" \
 - Количество зависимостей и рисков
 - Оценка трудоёмкости (итого часов)
 - Критические блокеры (если есть)
+- **План реализации:** количество PR, фазы, критический путь (самая длинная цепочка в DAG)
 
-Затем спроси: **«ТЗ готово и записано в задачу $KEY. Приступить к реализации?»**
+Затем спроси: **«ТЗ готово и записано в задачу $KEY. Приступить к реализации?»** (для multi-PR задач — рекомендовать `/implement-tz $KEY`).
 
 - **Если да** → выполни следующий флоу (реализация по `tasktime-issues-gateway`):
 
@@ -398,10 +512,7 @@ curl -s -X POST "$API_URL/issues/$ISSUE_ID/comments" \
        -d '{"body": "🤖 Взято в работу агентом (Claude Code). Начинаю реализацию по ТЗ."}'
      ```
 
-  3. Создать план реализации в `docs/plans/YYYY-MM-DD-{KEY}-plan.md` по структуре из `tasktime-workflow`:
-     - Цель / Архитектура / Стек
-     - Декомпозиция на шаги: тест (RED) → реализация (GREEN) → коммит
-     - Блок UAT / Приёмочные тесты
+  3. План реализации уже в §12 ТЗ (`docs/tz/{KEY}.md`). Если multi-PR — использовать `/implement-tz {KEY}` для итеративного цикла. Если Single-PR — работать по разделу §12.3 PR-1 напрямую, доп. план в `docs/plans/` не создавать.
 
   4. Реализовать по флоу из `tasktime-workflow`:
      - Backend (router → service → Prisma)
