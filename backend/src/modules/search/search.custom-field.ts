@@ -59,8 +59,8 @@ export function compileCustomFieldClause(
   builder: FunctionResolver,
 ): CustomClauseCompiled {
   const errors: CompileIssue[] = [];
-  const empty = (reason: string): CustomClauseCompiled => {
-    errors.push({ code: 'UNRESOLVED_VALUE', message: reason, field: cf.name });
+  const empty = (reason: string, code: CompileIssue['code'] = 'UNRESOLVED_VALUE'): CustomClauseCompiled => {
+    errors.push({ code, message: reason, field: cf.name });
     return {
       predicate: {
         alias,
@@ -139,20 +139,38 @@ function buildCompareSql(
   }
 
   // For LABEL / MULTI_SELECT — EQ / NEQ checks membership in the JSON array.
+  // Storage format per issue-custom-fields.service.ts: `{ "v": ["tag1", "tag2"] }`.
+  // The containment operator `@>` must descend into `value->'v'` — applying it on
+  // the outer wrapper `{ "v": [...] }` against a bare string would always be false.
   if ((cf.fieldType === 'LABEL' || cf.fieldType === 'MULTI_SELECT') && (op === '=' || op === '!=')) {
-    const containment = Prisma.sql`icfv.value @> to_jsonb(${value}::text)`;
+    const containment = Prisma.sql`(icfv.value->'v') @> to_jsonb(${value}::text)`;
     const body = op === '=' ? containment : Prisma.sql`NOT (${containment})`;
     return selectWhere(cf.id, body);
   }
 
-  // Default: comparator on typed body.
+  // Default: comparator on typed body. `COMPARATOR_SQL` is a constant map of
+  // `Prisma.Sql` so we never call `Prisma.raw()` on user-adjacent input (R1).
   const body = valueTypedForCompare(cf.fieldType, value);
   if (!body) return null;
-  const comparator = sqlComparator(op);
-  if (!comparator) return null;
-  const filter = Prisma.sql`${body} ${Prisma.raw(comparator)} ${value}`;
+  const comparatorSql = COMPARATOR_SQL[op];
+  if (!comparatorSql) return null;
+  const filter = Prisma.sql`${body} ${comparatorSql} ${value}`;
   return selectWhere(cf.id, filter);
 }
+
+/**
+ * Whitelist of SQL comparator operators. Typed as `Prisma.Sql` so interpolation
+ * into `Prisma.sql\`...\`` templates is safe — no `Prisma.raw()` call site exists
+ * in this module, eliminating an R1 audit surface.
+ */
+const COMPARATOR_SQL: Record<string, Prisma.Sql> = {
+  '=':  Prisma.sql`=`,
+  '!=': Prisma.sql`<>`,
+  '>':  Prisma.sql`>`,
+  '>=': Prisma.sql`>=`,
+  '<':  Prisma.sql`<`,
+  '<=': Prisma.sql`<=`,
+};
 
 function buildInSql(
   cf: CustomFieldDef,
@@ -167,8 +185,9 @@ function buildInSql(
     resolved.push(r);
   }
   // LABEL/MULTI_SELECT — match if any of the values is contained in the array.
+  // See buildCompareSql for the `value->'v'` descent rationale.
   if (cf.fieldType === 'LABEL' || cf.fieldType === 'MULTI_SELECT') {
-    const orParts = resolved.map((v) => Prisma.sql`icfv.value @> to_jsonb(${v as string}::text)`);
+    const orParts = resolved.map((v) => Prisma.sql`(icfv.value->'v') @> to_jsonb(${v as string}::text)`);
     const joined = Prisma.join(orParts, ' OR ');
     return selectWhere(cf.id, joined);
   }
@@ -228,18 +247,6 @@ function valueTypedForCompare(ft: CustomFieldType, sample: unknown): Prisma.Sql 
   }
 }
 
-function sqlComparator(op: string): string | null {
-  switch (op) {
-    case '=': return '=';
-    case '!=': return '<>';
-    case '>': return '>';
-    case '>=': return '>=';
-    case '<': return '<';
-    case '<=': return '<=';
-    default: return null;
-  }
-}
-
 function selectWhere(cfId: string, filter: Prisma.Sql): Prisma.Sql {
   return Prisma.sql`SELECT icfv.issue_id FROM issue_custom_field_values icfv WHERE icfv.custom_field_id = ${cfId}::uuid AND (${filter})`;
 }
@@ -265,8 +272,11 @@ function literalToSqlValue(expr: Expr, ft: CustomFieldType, builder: FunctionRes
       }
       return expr.value;
     case 'RelativeDate': {
-      // Not supported directly on custom-field values in MVP (compiler lacks `now`
-      // here). Caller should switch to `startOfDay("-7d")` or explicit ISO date.
+      // Deliberately not supported in MVP on custom-field values. The compiler
+      // doesn't thread `now` into this module yet; switching CF clauses to
+      // `startOfDay("-7d")` or an explicit ISO date is the recommended fix. The
+      // caller surfaces a DATE_PARSE_FAILED error instead of silently matching
+      // nothing.
       return undefined;
     }
     case 'Ident':

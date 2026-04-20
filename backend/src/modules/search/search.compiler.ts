@@ -596,6 +596,23 @@ const MATCH_NONE: Prisma.IssueWhereInput = { id: { in: [] } };
 const MATCH_ALL: Prisma.IssueWhereInput = {};
 export const PLACEHOLDER_KEY = '__ttql_custom_predicate__';
 
+/**
+ * Assert that the given `where` contains no unresolved custom-field placeholders.
+ * Callable from the executor (PR-5) as a development-time guard — if PR-5's
+ * substitution logic has a wiring gap, Prisma would either silently ignore the
+ * unknown key (dropping the CF predicate — a correctness bug) or throw at
+ * runtime; this assertion catches the mistake loudly at test time instead.
+ */
+export function assertNoUnresolvedPlaceholders(where: Prisma.IssueWhereInput): void {
+  const serialised = JSON.stringify(where);
+  if (serialised.includes(PLACEHOLDER_KEY)) {
+    throw new Error(
+      `BUG: unresolved TTS-QL custom-field placeholder in where-input (\`${PLACEHOLDER_KEY}\`). ` +
+        `Executor must substitute every CustomFieldPredicate alias before querying Prisma.`,
+    );
+  }
+}
+
 function wrapColumn(col: string, predicate: unknown): Prisma.IssueWhereInput {
   // The compiler intentionally widens predicate types to `unknown` here — by the
   // time we reach this helper, `col` is one of the audited `SYSTEM_FIELD_COLUMN`

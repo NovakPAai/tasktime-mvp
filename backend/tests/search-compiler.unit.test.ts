@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parse } from '../src/modules/search/search.parser.js';
-import { compile, type CompileResult } from '../src/modules/search/search.compiler.js';
+import { assertNoUnresolvedPlaceholders, compile, PLACEHOLDER_KEY, type CompileResult } from '../src/modules/search/search.compiler.js';
 import type { CompileContext, ResolvedFunctions } from '../src/modules/search/search.compile-context.js';
 import { buildFunctionCallKey } from '../src/modules/search/search.compile-context.js';
 import type { CustomFieldDef } from '../src/modules/search/search.schema.js';
@@ -344,6 +344,47 @@ describe('compiler — custom fields', () => {
       makeCtx({ customFields: [storyPoints] }),
     );
     expect(r.errors[0]?.code).toBe('UNRESOLVED_FIELD');
+  });
+
+  // Pre-push review found a silent bug: `value @> to_jsonb(text)` on the outer
+  // wrapper `{ "v": [...] }` is always false. The fix descends into `value->'v'`.
+  it('LABEL/MULTI_SELECT: JSON containment uses `value->\'v\'`, not outer wrapper', () => {
+    const labelField: CustomFieldDef = {
+      id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+      name: 'Priority Tags',
+      type: 'LABEL',
+      fieldType: 'LABEL',
+      operators: ['EQ', 'NEQ', 'IN', 'NOT_IN', 'IS_EMPTY', 'IS_NOT_EMPTY'],
+      sortable: false,
+    };
+    // `=` path
+    const eq = compileFromSource(
+      `"Priority Tags" = "bug"`,
+      makeCtx({ customFields: [labelField] }),
+    );
+    expect(eq.customPredicates[0]!.rawSql.sql).toMatch(/value->'v'[^@]*@>/);
+    // `IN` path
+    const inRes = compileFromSource(
+      `"Priority Tags" IN ("bug", "hotfix")`,
+      makeCtx({ customFields: [labelField] }),
+    );
+    expect(inRes.customPredicates[0]!.rawSql.sql).toMatch(/value->'v'[^@]*@>/);
+  });
+});
+
+// ─── Placeholder guard ──────────────────────────────────────────────────────
+
+describe('compiler — assertNoUnresolvedPlaceholders', () => {
+  it('throws when the placeholder key leaks to Prisma', () => {
+    expect(() =>
+      assertNoUnresolvedPlaceholders({ [PLACEHOLDER_KEY]: 'cf_0' } as unknown as Parameters<typeof assertNoUnresolvedPlaceholders>[0]),
+    ).toThrow(/unresolved TTS-QL custom-field placeholder/);
+  });
+
+  it('passes for a substituted where-input', () => {
+    expect(() =>
+      assertNoUnresolvedPlaceholders({ id: { in: ['issue-a', 'issue-b'] } }),
+    ).not.toThrow();
   });
 });
 

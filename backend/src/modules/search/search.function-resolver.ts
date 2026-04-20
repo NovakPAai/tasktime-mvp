@@ -10,6 +10,7 @@
  * the compiler via `CompileContext.resolved`.
  */
 
+import { IssueStatus } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import type {
   BoolExpr,
@@ -116,15 +117,19 @@ export async function resolveFunctions(
   fnCtx: FunctionResolverContext,
 ): Promise<ResolvedFunctions> {
   const calls = collectFunctionCalls(ast);
-  const resolved = new Map<FunctionCallKey, FunctionCallValue>();
 
-  for (const [key, call] of calls) {
+  // Parallelise independent DB lookups — a typical saved filter can reference
+  // 3-5 functions; serial awaits here add 3-5× latency for no reason. Prisma's
+  // connection pool (default 10) handles the concurrency comfortably.
+  const dbEntries = [...calls.entries()].filter(([, call]) => {
     const lc = call.name.toLowerCase();
-    // Pure functions are evaluated by the compiler — skip DB query here.
-    if (PURE_DATE_FNS.has(lc) || lc === 'currentuser') continue;
+    return !PURE_DATE_FNS.has(lc) && lc !== 'currentuser';
+  });
+  const values = await Promise.all(dbEntries.map(([, call]) => resolveOne(call, fnCtx)));
 
-    const value = await resolveOne(call, fnCtx);
-    resolved.set(key, value);
+  const resolved = new Map<FunctionCallKey, FunctionCallValue>();
+  for (let i = 0; i < dbEntries.length; i++) {
+    resolved.set(dbEntries[i]![0], values[i]!);
   }
 
   return {
@@ -172,8 +177,11 @@ async function resolveOne(call: FunctionCall, ctx: FunctionResolverContext): Pro
 async function resolveMembersOf(call: FunctionCall): Promise<FunctionCallValue> {
   const groupName = stringArg(call, 0);
   if (!groupName) return { kind: 'resolve-failed', reason: '`membersOf()` requires a group name argument.' };
+  // Case-insensitive match — `buildFunctionCallKey` serialises args verbatim, so
+  // `membersOf("Team")` and `membersOf("team")` have distinct cache keys. Doing the
+  // DB lookup case-insensitively still gives both the same resolved id-list.
   const group = await prisma.userGroup.findFirst({
-    where: { name: groupName },
+    where: { name: { equals: groupName, mode: 'insensitive' } },
     select: {
       members: { select: { userId: true } },
     },
@@ -271,36 +279,62 @@ async function resolveLinkedIssues(call: FunctionCall, ctx: FunctionResolverCont
     },
     select: { sourceIssueId: true, targetIssueId: true },
   });
-  const ids = new Set<string>();
+  const candidateIds = new Set<string>();
   for (const l of links) {
-    if (l.sourceIssueId !== source.id) ids.add(l.sourceIssueId);
-    if (l.targetIssueId !== source.id) ids.add(l.targetIssueId);
+    if (l.sourceIssueId !== source.id) candidateIds.add(l.sourceIssueId);
+    if (l.targetIssueId !== source.id) candidateIds.add(l.targetIssueId);
   }
-  return { kind: 'id-list', ids: [...ids] };
+  if (candidateIds.size === 0) return { kind: 'id-list', ids: [] };
+  // Defense in depth (R3): even though the top-level compiler adds
+  // `projectId IN accessibleProjectIds` to every query — which strips any
+  // cross-project link targets from the final result — we also scope the
+  // resolver's id-list so ids from inaccessible projects never even leave this
+  // function. Any future executor that logs, traces, or bounds id-sets won't
+  // leak uuids the caller shouldn't see.
+  const scoped = await prisma.issue.findMany({
+    where: {
+      id: { in: [...candidateIds] },
+      projectId: { in: [...ctx.accessibleProjectIds] },
+    },
+    select: { id: true },
+  });
+  return { kind: 'id-list', ids: scoped.map((i) => i.id) };
+}
+
+/**
+ * `subtasksOf(key)` and `epicIssues(key)` are structurally identical — both look up
+ * children of the given issue via `parentId`. The schema's ALLOWED_PARENT_KEYS
+ * already enforces that only SUBTASKs have STORY/TASK parents, and only STORY/TASK/
+ * BUG have EPIC parents — so `subtasksOf(storyKey)` returns its subtasks and
+ * `epicIssues(epicKey)` returns its stories/tasks/bugs. We keep both functions
+ * rather than a single generic `childrenOf` because the JQL vocabulary distinguishes
+ * them and users expect the familiar Jira names.
+ */
+async function resolveChildrenOf(
+  call: FunctionCall,
+  ctx: FunctionResolverContext,
+  functionName: string,
+): Promise<FunctionCallValue> {
+  const key = stringArg(call, 0);
+  if (!key) return { kind: 'resolve-failed', reason: `\`${functionName}()\` requires an issue-key argument.` };
+  const parent = await findIssueByKey(key, ctx);
+  if (!parent) return { kind: 'id-list', ids: [] };
+  const children = await prisma.issue.findMany({
+    where: {
+      parentId: parent.id,
+      projectId: { in: [...ctx.accessibleProjectIds] },
+    },
+    select: { id: true },
+  });
+  return { kind: 'id-list', ids: children.map((i) => i.id) };
 }
 
 async function resolveSubtasksOf(call: FunctionCall, ctx: FunctionResolverContext): Promise<FunctionCallValue> {
-  const key = stringArg(call, 0);
-  if (!key) return { kind: 'resolve-failed', reason: '`subtasksOf()` requires an issue-key argument.' };
-  const parent = await findIssueByKey(key, ctx);
-  if (!parent) return { kind: 'id-list', ids: [] };
-  const subtasks = await prisma.issue.findMany({
-    where: { parentId: parent.id },
-    select: { id: true },
-  });
-  return { kind: 'id-list', ids: subtasks.map((i) => i.id) };
+  return resolveChildrenOf(call, ctx, 'subtasksOf');
 }
 
 async function resolveEpicIssues(call: FunctionCall, ctx: FunctionResolverContext): Promise<FunctionCallValue> {
-  const key = stringArg(call, 0);
-  if (!key) return { kind: 'resolve-failed', reason: '`epicIssues()` requires an issue-key argument.' };
-  const epic = await findIssueByKey(key, ctx);
-  if (!epic) return { kind: 'id-list', ids: [] };
-  const issues = await prisma.issue.findMany({
-    where: { parentId: epic.id },
-    select: { id: true },
-  });
-  return { kind: 'id-list', ids: issues.map((i) => i.id) };
+  return resolveChildrenOf(call, ctx, 'epicIssues');
 }
 
 async function resolveMyOpenIssues(ctx: FunctionResolverContext): Promise<FunctionCallValue> {
@@ -308,7 +342,7 @@ async function resolveMyOpenIssues(ctx: FunctionResolverContext): Promise<Functi
   const issues = await prisma.issue.findMany({
     where: {
       assigneeId: ctx.userId,
-      status: { not: 'DONE' },
+      status: { not: IssueStatus.DONE },
       projectId: { in: [...ctx.accessibleProjectIds] },
     },
     select: { id: true },
