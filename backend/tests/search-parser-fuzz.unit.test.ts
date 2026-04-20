@@ -125,6 +125,10 @@ describe('parser — fuzz harness (T-7)', () => {
       `status IN ("${'A'.repeat(10000)}")`,
       `x = 1 ${'AND y = 2 '.repeat(500)}`,
       `${'('.repeat(200)}x = 1${')'.repeat(200)}`,
+      // Deep nesting that would overflow the V8 call stack without the MAX_DEPTH
+      // guard in the parser. This payload failed before the guard was added (see
+      // pre-push review). After the fix, it must return a clean ParseResult.
+      `${'('.repeat(500)}x = 1${')'.repeat(500)}`,
     ];
     for (const p of payloads) {
       expect(() => parse(p)).not.toThrow();

@@ -126,6 +126,10 @@ export function tokenize(source: string): Token[] {
     }
 
     // CustomField: cf[UUID]. Match before Ident because `cf` alone is a valid Ident.
+    // We validate the UUID shape at tokenizer level (not at parser/validator) because
+    // a malformed `cf[...]` is unambiguously invalid — there's no user-facing reason to
+    // defer. This is an intentional deviation from the "value-agnostic tokenizer"
+    // principle documented in §5.5 ТЗ; see pre-push review.
     if (ch === 'c' && source[pos + 1] === 'f' && source[pos + 2] === '[') {
       const close = source.indexOf(']', pos + 3);
       if (close < 0) {
@@ -198,9 +202,18 @@ function isIdentPart(ch: string): boolean {
 
 /**
  * Read a double- or single-quoted string. Supports these escapes inside the quotes:
- *   \"  \'  \\  \n  \t  \r  \u{HEX}
+ *   \"  \'  \\  \n  \t  \r  \u{HEX}  \uHHHH
  * Any other `\X` pair is rejected with INVALID_ESCAPE — we want authors to notice
  * typos rather than silently interpreting `\n` as a literal `n`.
+ *
+ * Cross-quote escapes (`\'` inside `"..."` and `\"` inside `'...'`) are **accepted**.
+ * This is intentionally more permissive than stock Jira JQL — they're harmless and
+ * reduce friction when copy-pasting queries from documentation.
+ *
+ * **Rejected codepoints**: lone surrogates (U+D800–U+DFFF) and the null codepoint
+ * (U+0000). The former would produce invalid UTF-8 downstream (Postgres text columns
+ * reject lone surrogates); the latter is the C-string terminator and breaks Prisma's
+ * parameter binding in rare cases. Pre-push review flagged both as latent hazards.
  */
 function readString(source: string, pos: number, quote: string): [Token, number] {
   const start = pos;
@@ -252,6 +265,7 @@ function readString(source: string, pos: number, quote: string): [Token, number]
                 close + 1,
               );
             }
+            rejectForbiddenCodepoint(code, pos, close + 1);
             value += String.fromCodePoint(code);
             pos = close + 1;
           } else {
@@ -264,7 +278,9 @@ function readString(source: string, pos: number, quote: string): [Token, number]
                 Math.min(pos + 6, n),
               );
             }
-            value += String.fromCharCode(Number.parseInt(hex, 16));
+            const code = Number.parseInt(hex, 16);
+            rejectForbiddenCodepoint(code, pos, pos + 6);
+            value += String.fromCharCode(code);
             pos += 6;
           }
           break;
@@ -293,12 +309,39 @@ function readString(source: string, pos: number, quote: string): [Token, number]
     pos++;
   }
 
+  // Clamp the end of the reported span — underlining from the opening quote to EOF
+  // spams CodeMirror with noise for long queries. One-quote span is enough for the
+  // editor to place a squiggle at the offending character.
   throw new TokenizerError(
     'UNTERMINATED_STRING',
     `String starting at position ${start} is not terminated.`,
     start,
-    n,
+    Math.min(start + 1, n),
   );
+}
+
+/**
+ * Reject codepoints that would create trouble downstream:
+ *   - surrogates (U+D800..U+DFFF): Postgres UTF-8 text columns reject them;
+ *   - null byte (U+0000): terminates C strings, unsafe in some binding paths.
+ */
+function rejectForbiddenCodepoint(code: number, start: number, end: number): void {
+  if (code === 0) {
+    throw new TokenizerError(
+      'INVALID_ESCAPE',
+      'Null codepoint (U+0000) is not allowed in a string literal.',
+      start,
+      end,
+    );
+  }
+  if (code >= 0xd800 && code <= 0xdfff) {
+    throw new TokenizerError(
+      'INVALID_ESCAPE',
+      `Codepoint U+${code.toString(16).toUpperCase()} is a surrogate and cannot appear in a string literal.`,
+      start,
+      end,
+    );
+  }
 }
 
 /**

@@ -412,10 +412,16 @@ describe('parser — error reporting', () => {
     expect(r.errors[0]?.code).toBe('EXPECTED_FIELD');
   });
 
-  it('trailing input after ORDER BY', () => {
+  it('trailing input after ORDER BY with unknown direction word', () => {
     const r = parse('x = 1 ORDER BY priority WHERE y');
-    // `WHERE` is not a known keyword — it's an ident. It becomes a second sort item field.
-    // Then `y` is trailing. The parser surfaces a trailing-input error.
+    // `WHERE` is not an ASC/DESC direction — pre-push review feedback made us emit
+    // a specific code rather than leaking through as TRAILING_INPUT.
+    expect(r.errors[0]?.code).toBe('INVALID_SORT_DIRECTION');
+  });
+
+  it('trailing input after the end of an expression', () => {
+    const r = parse('x = 1 foo');
+    // No ORDER BY — `foo` comes after a complete clause. That's still TRAILING_INPUT.
     expect(r.errors[0]?.code).toBe('TRAILING_INPUT');
   });
 
@@ -444,10 +450,43 @@ describe('parser — error reporting', () => {
     expect(r.errors[0]?.code).toBe('UNEXPECTED_CHARACTER');
   });
 
-  it('error span points at the offending token', () => {
+  it('error span points at the offending token (UNTERMINATED_STRING clamped to opening quote)', () => {
     const r = parse('x = "unterminated');
-    // String starts at position 4 (the opening quote), runs to end of input.
-    expect(r.errors[0]).toMatchObject({ start: 4, end: 17 });
+    // Span is clamped to [opening-quote, opening-quote+1] so CodeMirror doesn't
+    // underline the entire rest of the file (see pre-push review).
+    expect(r.errors[0]).toMatchObject({ start: 4, end: 5 });
+  });
+
+  it('rejects `\\u{D800}` (lone high surrogate)', () => {
+    const r = parse('x = "\\u{D800}"');
+    expect(r.errors[0]?.code).toBe('INVALID_ESCAPE');
+  });
+
+  it('rejects `\\uD800` (lone surrogate, 4-hex form)', () => {
+    const r = parse('x = "\\uD800"');
+    expect(r.errors[0]?.code).toBe('INVALID_ESCAPE');
+  });
+
+  it('rejects null codepoint `\\u{0}`', () => {
+    const r = parse('x = "\\u{0}"');
+    expect(r.errors[0]?.code).toBe('INVALID_ESCAPE');
+  });
+
+  it('rejects null codepoint `\\u0000` (4-hex form)', () => {
+    const r = parse('x = "\\u0000"');
+    expect(r.errors[0]?.code).toBe('INVALID_ESCAPE');
+  });
+
+  it('emits INVALID_SORT_DIRECTION when ORDER BY field has unknown direction word', () => {
+    const r = parse('x = 1 ORDER BY priority foo');
+    expect(r.errors[0]).toMatchObject({ code: 'INVALID_SORT_DIRECTION' });
+  });
+
+  it('deep nesting beyond MAX_DEPTH returns UNEXPECTED_TOKEN, not stack overflow', () => {
+    const src = '('.repeat(500) + 'x = 1' + ')'.repeat(500);
+    const r = parse(src);
+    expect(r.errors[0]).toMatchObject({ code: 'UNEXPECTED_TOKEN' });
+    expect(r.errors[0]!.message).toMatch(/nested too deeply/);
   });
 });
 

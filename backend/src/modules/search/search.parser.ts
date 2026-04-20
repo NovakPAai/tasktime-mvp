@@ -76,12 +76,37 @@ export function parse(source: string): ParseResult {
     if (err instanceof ParserBailout) {
       return { ast: null, errors: [...parser.errors, err.err] };
     }
-    throw err;
+    // Safety net — no unhandled exception escapes `parse()`. This backstops the
+    // `parse()`-never-throws invariant against stack overflows (`RangeError`) or any
+    // other JS runtime error we didn't foresee. Downstream consumers (suggest, fuzz)
+    // rely on this. See pre-push review for PR-2.
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ast: null,
+      errors: [
+        ...parser.errors,
+        {
+          code: 'UNEXPECTED_TOKEN',
+          message: `Internal parser error: ${message}`,
+          start: 0,
+          end: source.length,
+        },
+      ],
+    };
   }
 }
 
+/**
+ * Maximum nesting depth for parenthesised/NOT expressions. Prevents a crafted query
+ * with 10K `(` chars from blowing the call stack (V8 defaults to ~10K frames). Value
+ * chosen to comfortably exceed any legitimate query — the deepest golden-set query
+ * uses depth 2. See pre-push review.
+ */
+const MAX_DEPTH = 256;
+
 class Parser {
   private pos = 0;
+  private depth = 0;
   readonly errors: ParseError[] = [];
 
   constructor(private readonly tokens: Token[], private readonly source: string) {}
@@ -193,17 +218,30 @@ class Parser {
 
   private parseAtom(): BoolExpr {
     if (this.tok().kind === 'LParen') {
-      const lparen = this.advance();
-      if (this.tok().kind === 'RParen') {
+      if (this.depth >= MAX_DEPTH) {
         this.fail(
-          'EMPTY_PAREN_GROUP',
-          'Parenthesized expression cannot be empty.',
-          { start: lparen.span.start, end: this.tok().span.end },
+          'UNEXPECTED_TOKEN',
+          `Query is nested too deeply (max ${MAX_DEPTH} levels).`,
+          this.tok().span,
+          'Flatten your parentheses — such deeply nested groupings are almost never what you meant.',
         );
       }
-      const inner = this.parseOrExpr();
-      this.expect('RParen', 'EXPECTED_RPAREN', 'Expected closing `)`.');
-      return inner;
+      this.depth++;
+      try {
+        const lparen = this.advance();
+        if (this.tok().kind === 'RParen') {
+          this.fail(
+            'EMPTY_PAREN_GROUP',
+            'Parenthesized expression cannot be empty.',
+            { start: lparen.span.start, end: this.tok().span.end },
+          );
+        }
+        const inner = this.parseOrExpr();
+        this.expect('RParen', 'EXPECTED_RPAREN', 'Expected closing `)`.');
+        return inner;
+      } finally {
+        this.depth--;
+      }
     }
     return this.parseClause();
   }
@@ -509,10 +547,19 @@ class Parser {
         direction = upper;
         endSpan = this.tok().span;
         this.advance();
-      } else if (KEYWORDS.has(upper) && upper !== 'AND' && upper !== 'OR') {
-        // Guard against misplaced keywords like "ORDER BY foo WHERE". Let the trailing-
-        // input check at top-level produce the friendlier error message.
+      } else if (!KEYWORDS.has(upper)) {
+        // Unrecognised word where ASC/DESC was expected — `ORDER BY priority foo`.
+        // Surface a typed error so the CodeMirror editor can highlight exactly the
+        // bad token (pre-push review flagged that this used to leak through as a
+        // generic TRAILING_INPUT after the ORDER BY list).
+        this.fail(
+          'INVALID_SORT_DIRECTION',
+          `Expected \`ASC\` or \`DESC\` (or another sort field after a comma), got \`${this.tok().value}\`.`,
+          this.tok().span,
+        );
       }
+      // Known keywords (AND/OR/...) are left intact — the top-level trailing-input
+      // check will surface a friendlier error if the query is malformed.
     }
     return { field, direction, span: joinSpan(field.span, endSpan) };
   }
