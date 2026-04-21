@@ -299,25 +299,27 @@ export async function recomputeForRelease(
 
   let updatedCount = 0;
   let unchangedCount = 0;
-  // Lazily loaded once if any checkpoint uses TTQL path — no cost for STRUCTURED-only releases.
+  // Lazily loaded once if any checkpoint actually fires the TTQL resolver —
+  // zero DB cost for STRUCTURED-only releases (which is every release in prod
+  // until FEATURES_CHECKPOINT_TTQL flips on).
   let ttqlProjectIds: string[] | null = null;
+  // Hoist out of the loop: every checkpoint operates on the same issue set.
+  const releaseIssueIds = loaded.issues.map((i) => i.id);
 
   for (const rc of existing) {
     const criteria = rc.criteriaSnapshot as unknown as CheckpointCriterion[];
-    // TTSRH-1 PR-16: resolve TTQL matches per-checkpoint if snapshot mode
-    // requires it. STRUCTURED fast-path returns {null, null, false} — original
-    // behavior preserved.
-    // Scheduler runs system-level — R3 scope is bypassed by the `id IN
-    // (applicableIssueIds)` narrowing the resolver applies (see
-    // checkpoint-ttql-evaluator.service.ts). We still need to feed the compiler
-    // a non-empty `accessibleProjectIds` list or the baseline scope becomes
-    // `projectId: {in: []}` (matches nothing). Fetch all project-ids lazily.
-    const projectIdsForScope = ttqlProjectIds ?? (ttqlProjectIds = await loadAllProjectIds());
+    // TTSRH-1 PR-16: only fetch project-list when this checkpoint would actually
+    // run the TTQL resolver — STRUCTURED snapshot + flag-off short-circuit.
+    const needsProjects =
+      rc.conditionModeSnapshot !== 'STRUCTURED' && features.checkpointTtql;
+    const projectIdsForScope = needsProjects
+      ? (ttqlProjectIds ?? (ttqlProjectIds = await loadAllProjectIds()))
+      : [];
     const ttqlOutcome = await maybeResolveTtqlIds(
       rc.ttqlSnapshot,
       rc.conditionModeSnapshot,
       now,
-      loaded.issues.map((i) => i.id),
+      releaseIssueIds,
       projectIdsForScope,
     );
     const result = evaluateCheckpoint(
@@ -948,13 +950,19 @@ async function reconcileViolationEvents(
   currentViolations: CheckpointViolation[],
   now: Date,
 ): Promise<void> {
+  // TTSRH-1 PR-16: filter out TTQL_ERROR synthetic violations (issueId: '').
+  // Они не привязаны к реальной задаче и не должны попадать в
+  // CheckpointViolationEvent — timeline будет врать о нарушениях задач.
+  // `state=ERROR` на ReleaseCheckpoint сам по себе — достаточный signal.
+  const realViolations = currentViolations.filter((v) => v.issueId !== '');
+
   const openEvents = await tx.checkpointViolationEvent.findMany({
     where: { releaseCheckpointId, resolvedAt: null },
     select: { id: true, issueId: true },
   });
   const openByIssue = new Map(openEvents.map((e) => [e.issueId, e.id]));
 
-  const currentIssueIds = new Set(currentViolations.map((v) => v.issueId));
+  const currentIssueIds = new Set(realViolations.map((v) => v.issueId));
 
   // Resolve events whose issue is no longer violating.
   const toResolve = openEvents.filter((e) => !currentIssueIds.has(e.issueId)).map((e) => e.id);
@@ -966,7 +974,7 @@ async function reconcileViolationEvents(
   }
 
   // Open a new event for each newly-violating issue that has no open event yet.
-  const toOpen = currentViolations.filter((v) => !openByIssue.has(v.issueId));
+  const toOpen = realViolations.filter((v) => !openByIssue.has(v.issueId));
   if (toOpen.length > 0) {
     await tx.checkpointViolationEvent.createMany({
       data: toOpen.map((v) => ({

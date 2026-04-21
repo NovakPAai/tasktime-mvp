@@ -76,8 +76,11 @@ export async function resolveTtqlMatchedIds(
       }
 
       // Phase 3: resolve DB functions (`membersOf`, sprint/release shortcuts, etc.).
+      // userId: '' wrong — `currentUser()` branch в checkpoint variant should
+      // resolve to NULL per §5.12.4. Pass null explicitly; consumers должны
+      // treat empty-string as user identifier, not as "no user".
       const resolved = await resolveFunctions(parseResult.ast, {
-        userId: '',
+        userId: null,
         accessibleProjectIds: ctx.accessibleProjectIds,
         now: ctx.now,
         variant: 'checkpoint',
