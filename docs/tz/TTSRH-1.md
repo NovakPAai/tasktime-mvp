@@ -1475,7 +1475,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Snapshot-тест: каждый тип `CheckpointCriterion` → ожидаемая строка JQL (пример в §5.12.9).
 - **Merge-ready check:** конверсия `[STATUS_IN, ASSIGNEE_SET, DUE_BEFORE]` → ожидаемый канонический JQL; ручное ревью админа требуется (кнопка save не автосохраняется без взаимодействия).
 - **Оценка:** ~3ч.
-- **Статус: ✅ Done** — `convertCriteriaToTtql.ts` — pure-function конвертер для всех 6 типов CheckpointCriterion (§5.12.9). STATUS_IN → `statusCategory IN (...)`, ASSIGNEE_SET → `assignee IS NOT EMPTY`, DUE_BEFORE → `due < checkpointDeadline() +/- Nd`, CUSTOM_FIELD_VALUE → `cf["id"] op value`, ALL_SUBTASKS_DONE / NO_BLOCKING_LINKS → TODO placeholder (нет прямого выражения, ручное ревью). issueTypes фильтр → префикс `type IN (...)`. Кнопка «Сконвертировать structured-критерии в TTS-QL (draft)» в форме admin — one-way generator, переключает режим в COMBINED и вставляет draft в TTQL-editor для ручного ревью (R21 explicitly requires manual save).
+- **Статус: 🟢 Merged** ([#121](https://github.com/NovakPAai/tasktime-mvp/pull/121)) — `convertCriteriaToTtql.ts` — pure-function конвертер для всех 6 типов CheckpointCriterion (§5.12.9). STATUS_IN → `statusCategory IN (...)`, ASSIGNEE_SET → `assignee IS NOT EMPTY`, DUE_BEFORE → `due < checkpointDeadline() +/- Nd`, CUSTOM_FIELD_VALUE → `cf["id"] op value`, ALL_SUBTASKS_DONE / NO_BLOCKING_LINKS → TODO placeholder (нет прямого выражения, ручное ревью). issueTypes фильтр → префикс `type IN (...)`. Кнопка «Сконвертировать structured-критерии в TTS-QL (draft)» в форме admin — one-way generator, переключает режим в COMBINED и вставляет draft в TTQL-editor для ручного ревью (R21 explicitly requires manual save).
 
 ### 13.8 PR-ы Фазы 5 — Release (~15ч)
 
@@ -1490,6 +1490,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Композитные индексы, если profiling подтверждает (§3.3) — отдельная follow-up миграция.
 - **Merge-ready check:** T-8, T-9, T-12, T-19 зелёные; Lighthouse budget не перевышен.
 - **Оценка:** ~9ч.
+- **Статус: 🚧 В работе** — `frontend/e2e/specs/20-search.spec.ts` (shell + URL-sync T-9 + save-modal + axe); `frontend/e2e/specs/21-checkpoints-ttql.spec.ts` (admin-page smoke + condition-mode-control visible + axe — T-19 full-flow отложен до wiring полных data-testid в admin/form); `backend/tests/fixtures/search-seed-100k.ts` (mulberry32-seeded, chunked createMany 5K, idempotent prefix `TT_PERF_SEED_`) + npm script `db:seed:search-100k`; `.lighthouserc.json` (desktop preset, performance ≥ 0.85 warn, accessibility ≥ 0.9 error, resource-summary script ≤ 500K) + GitHub workflow `lighthouse.yml` (continue-on-error advisory). T-12 (shared URL cross-user) и полный T-19 взаимодействие отложены — нужен второй session-fixture и data-testid на admin-form.
 
 #### PR-21: Документация + feature flag cutover
 - **Branch:** `ttsrh-1/docs-cutover`
@@ -1530,9 +1531,9 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 🟢 Merged ([#118](https://github.com/NovakPAai/tasktime-mvp/pull/118)) |
 | 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 🟢 Merged ([#119](https://github.com/NovakPAai/tasktime-mvp/pull/119)) |
 | 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 🟢 Merged ([#120](https://github.com/NovakPAai/tasktime-mvp/pull/120)) |
-| 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | ✅ Done (готов к push после merge PR-18) |
+| 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | 🟢 Merged ([#121](https://github.com/NovakPAai/tasktime-mvp/pull/121)) |
 | 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | ✅ Done ([#122](https://github.com/NovakPAai/tasktime-mvp/pull/122)) |
-| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 🚧 В работе |
+| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 🟢 Merged ([#123](https://github.com/NovakPAai/tasktime-mvp/pull/123)) |
 | **Итого** | | | **199** | | | |
 
 **Дельта к §8 (278ч):** план покрывает ~199ч. Недостающие ~79ч — это (a) code review + фиксы (~8ч per §8), (b) security review + фиксы (~4ч), (c) докуметация JQL полная (~6ч уже в PR-21, ~0ч дополнительно), (d) профайлинг + composite-index tuning (~4ч в PR-20), (e) fuzz-harness extended (~4ч в PR-5); остальное — buffer на unknown unknowns и Phase-2-проникновение. Реалистичный календарный план — 8–10 недель при одном fullstack-разработчике или 5–6 недель при параллельной работе двоих (backend + frontend после PR-5).
