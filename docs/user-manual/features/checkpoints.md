@@ -203,9 +203,68 @@
 
 ---
 
+## Режим условия: Structured / TTQL / Combined (TTSRH-1, 2026-04-21)
+
+С эпика TTSRH-1 у каждого **типа контрольной точки** появилось поле «Режим условия» — segmented control в форме админки `Администрирование → Контрольные точки → Типы`:
+
+| Режим | Что настраивается | Когда использовать |
+|-------|-------------------|--------------------|
+| `STRUCTURED` (default) | список criteria[] (STATUS_IN, DUE_BEFORE, ASSIGNEE_SET, CUSTOM_FIELD_VALUE, ALL_SUBTASKS_DONE, NO_BLOCKING_LINKS) | простые детерминированные условия, которые нужны всем |
+| `TTQL` | одно TTS-QL выражение в текстовом редакторе | комплексные условия (OR, сложные подзапросы, `violatedCheckpoints()`, кастомные поля) |
+| `COMBINED` | и structured-critera, и TTQL (логическое AND) | нужна combo: «все подзадачи закрыты **И** custom-field проставлен» |
+
+Backward-compat: все существующие КТ остаются в `STRUCTURED` после миграции — поведение идентично пред-TTSRH-1.
+
+### TTS-QL редактор в форме типа КТ
+
+В режимах `TTQL` / `COMBINED` появляется поле «TTS-QL условие» — тот же `JqlEditor` из страницы `/search`, но в контексте **КТ-variant**:
+- Автокомплит расширен функциями `releasePlannedDate()`, `checkpointDeadline()` — доступны только здесь.
+- `currentUser()` — **предупреждение** при save (не ошибка): CT эвалуируется scheduler'ом, в этом контексте `currentUser()` обычно не то, что имеется в виду.
+- Валидация — та же, что в поиске: inline-ошибки в редакторе.
+
+Полный reference TTS-QL — [jql.md](./jql.md).
+
+### Preview-панель
+
+Под формой — disclosure «Preview» — позволяет выбрать релиз и увидеть **без сохранения**, сколько задач окажется в каждой категории:
+
+- **applicable** — задачи, к которым применимо условие (по `issueTypes`, попаданию в релиз).
+- **passed** — удовлетворяют условию (`status = OK`).
+- **violated** — нарушают (`state = WARNING` / `OVERDUE`).
+
+Preview использует тот же path, что production scheduler — zero drift между preview и реальной эвалуацией.
+
+### Конвертер Structured → TTQL
+
+Кнопка «Сконвертировать structured-критерии в TTS-QL (draft)» — one-way генератор:
+
+- Читает текущие `criteria[]` + фильтр `issueTypes`.
+- Конвертирует каждый тип критерия в канонический TTS-QL (§5.12.9 в TZ).
+- Переключает режим в `COMBINED` и вставляет draft в TTQL-editor.
+- **Не** сохраняет автоматически — требует ручного ревью и подтверждения (**R21**).
+
+Критерии `ALL_SUBTASKS_DONE` и `NO_BLOCKING_LINKS` пока не имеют прямого TTS-QL-эквивалента (требуют рекурсии) — конвертер вставляет `-- TODO:` placeholder для ручной доработки.
+
+### Feature flag `FEATURES_CHECKPOINT_TTQL`
+
+Под отдельным флагом:
+- `false` (default): TTQL/COMBINED checkpoints эвалуируются как STRUCTURED (безопасный no-op). Preview показывает баннер «TTQL skipped by flag».
+- `true` (после UAT): полная эвалуация TTQL.
+
+Флаг позволяет мержить security-review ДО завершения UAT — fail-safe в production.
+
+### Ошибки TTQL-эвалуации
+
+Compile / runtime error / 5s timeout в TTQL → checkpoint переходит в `state = ERROR` + единичная violation с `criterionType = TTQL_ERROR`. Детерминированный `violationsHash` (R16, FR-31) — не меняется между тиками.
+
+UI показывает баннер ERROR с кнопкой «Открыть тип и исправить» — отводит к форме типа КТ (и при необходимости — в конвертер / Structured-режим).
+
+---
+
 ## Полезные ссылки
 
 - [API reference — /api/releases/:id/checkpoints](../../api/reference.md)
 - [Архитектура — backend/releases/checkpoints](../../architecture/backend-modules.md)
 - [Диаграмма сгорания](./release-burndown.md)
+- [TTS-QL reference](./jql.md) · [Страница Поиск задач](./search.md)
 - Техническое задание: [TTMP-160](../../tz/TTMP-160.md)

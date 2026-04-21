@@ -2,7 +2,85 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.47**
+**Last version: 2.49**
+
+---
+
+## [2.49] [2026-04-21] docs(ttsrh-1): PR-21 — Документация TTS-QL + feature flag cutover
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/docs-cutover`
+
+### Что было
+
+После PR-1..PR-20 эпика TTSRH-1 вся функциональность (TTS-QL поиск + сохранённые фильтры + экспорт + Value Suggesters + checkpoint TTQL) merged в main, но конечному пользователю негде прочитать, **как** этим пользоваться. Feature flag `FEATURES_ADVANCED_SEARCH` оставался `false` (ожидание UAT).
+
+### Что теперь
+
+- **`docs/user-manual/features/jql.md`** (новый, ~300L) — полный reference TTS-QL:
+  - Быстрый старт + грамматика EBNF + литералы + операторы.
+  - Реестр system-полей (Задача / Люди / Планирование / AI / КТ) с синонимами и операторами.
+  - Раздел про кастомные поля с маппингом типов → операторов.
+  - Все функции (User / Dates / Sprints / Releases / Issue-refs / Checkpoints).
+  - Секция `ORDER BY` + 20+ примеров (каждодневные / сложные / КТ / custom-fields).
+  - Ограничения MVP (WAS/CHANGED/FTS — Phase 2).
+- **`docs/user-manual/features/search.md`** (новый, ~200L) — руководство по странице «Поиск задач»:
+  - Схема 3-панельного layout'а + Basic vs Advanced сравнение.
+  - Shortcut'ы (Ctrl+Enter, Ctrl+S, `/`, Esc).
+  - Сохранённые фильтры: категории (Избранные / Общие / Поделены / Мои / Недавние), visibility levels, шаринг, права.
+  - Колонки: конфигуратор, сохранение (per-filter / default).
+  - Экспорт CSV/XLSX, bulk-actions (ADMIN/MANAGER).
+  - URL-sync + горячие сценарии (standup / планирование спринта / release review / КТ pre-flight).
+- **`docs/user-manual/features/checkpoints.md`** — добавлена секция «Режим условия: Structured / TTQL / Combined» (~70L):
+  - Matrix-таблица сравнения режимов.
+  - TTS-QL редактор в контексте КТ-variant (`releasePlannedDate()`, `checkpointDeadline()`, warning на `currentUser()`).
+  - Preview-панель.
+  - Структурный → TTQL конвертер (R21 manual-review).
+  - Feature flag `FEATURES_CHECKPOINT_TTQL`, ошибки эвалуации (`state=ERROR`, `TTQL_ERROR`).
+- **`docs/api/reference.md`** — добавлены разделы (~180L):
+  - `/api/search/{issues, validate, suggest, export, schema}` — полный контракт с примерами, timeout'ами, rate-limit, error codes.
+  - `/api/saved-filters/*` — CRUD + `/favorite`, `/share`, `/use`.
+  - `/api/admin/checkpoint-types/preview` — dry-run with meta.ttqlSkippedByFlag / ttqlError поведение под флагом.
+- **`docs/architecture/backend-modules.md`** — добавлены разделы (~60L):
+  - Модуль `search` — pipeline (tokenizer → parser → validator → compiler → executor), эндпоинты, suggesters, безопасность.
+  - Модуль `saved-filters` — модели, visibility, ключевые операции.
+  - Checkpoint TTQL integration — трёх-ветвочный evaluator, feature flag, error handling.
+
+### Изменения
+
+- `docs/user-manual/features/jql.md` — **новый**.
+- `docs/user-manual/features/search.md` — **новый**.
+- `docs/user-manual/features/checkpoints.md` — + ~70L (секция TTQL).
+- `docs/api/reference.md` — + ~180L (search + saved-filters + checkpoint preview).
+- `docs/architecture/backend-modules.md` — + ~60L (модули search / saved-filters / checkpoint TTQL).
+- `docs/tz/TTSRH-1.md` — §13.8 PR-20 → 🟢 Merged; PR-21 → 🚧 В работе.
+
+### Влияние на prod
+
+- **Документация** — zero runtime impact.
+- **Feature flag cutover** (в отдельном deployment-change, не в этом PR):
+  1. `FEATURES_ADVANCED_SEARCH=true` в **staging** → UAT run.
+  2. После UAT signoff → `true` в **production**.
+  3. `FEATURES_CHECKPOINT_TTQL=true` — отдельный UAT после стабилизации `FEATURES_ADVANCED_SEARCH`.
+
+### Проверки
+
+- Все ссылки между markdown-файлами проверены вручную.
+- `docs/tz/TTSRH-1.md` §13.9 (итоговая таблица) — PR-20 → 🟢, PR-21 → 🚧.
+
+### Что остаётся в follow-up
+
+- **Phase 2 / TTSRH-23** — `WAS` / `CHANGED` с моделью `FieldChangeLog`.
+- **Phase 2 / TTSRH-24** — `pg_trgm` + `unaccent` + PostgreSQL FTS.
+- **TTSRH-38** (опционально) — MCP-tool `search_issues` для Agent SDK.
+- **T-12** (shared-URL cross-user E2E) — wiring 2-го session-fixture.
+- **Full T-19** — data-testid'ы на форму AdminReleaseCheckpointTypesPage.
+
+---
+
+## [2.48] [2026-04-21] feat(e2e): TTSRH-1 PR-20 — E2E smoke/axe + perf-seed harness + Lighthouse budget
+
+*(entry из ветки `ttsrh-1/e2e-perf` — добавляется в main при merge PR #122)*
 
 ---
 

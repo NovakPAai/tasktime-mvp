@@ -1119,3 +1119,233 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 
 CSV экспорт матрицы и аудита использует UTF-8 BOM + CRLF — читается в Excel с кириллицей без мусора (FR-23 / FR-27 / SEC-9).
 
+---
+
+## TTS-QL Search (`/api/search`) — TTSRH-1
+
+> Поиск задач на языке TTS-QL (JIRA-compatible). Feature flag `FEATURES_ADVANCED_SEARCH`.
+> Язык: [docs/user-manual/features/jql.md](../user-manual/features/jql.md). Источник: [backend/src/modules/search/](../../backend/src/modules/search/).
+
+### `POST /api/search/issues`
+
+Выполнить TTS-QL запрос.
+
+**Body:**
+```json
+{
+  "jql": "assignee = currentUser() AND statusCategory != DONE ORDER BY priority DESC",
+  "startAt": 0,
+  "limit": 50,
+  "columns": ["key", "summary", "status", "priority", "assignee", "updated"]
+}
+```
+
+| Поле | Тип | Default | Max | Прим. |
+|------|-----|---------|-----|-------|
+| `jql` | string | — | — | TTS-QL выражение. Пустой JQL возвращает 0 задач. |
+| `startAt` | integer | 0 | — | offset пагинации |
+| `limit` | integer | 50 | 100 | размер страницы |
+| `columns` | string[] | системный дефолт | — | какие поля вернуть в `issues[].<col>` |
+
+**Response:**
+```json
+{
+  "total": 142,
+  "startAt": 0,
+  "limit": 50,
+  "issues": [{ "id": "...", "key": "TTMP-12", "summary": "...", "status": { ... }, ... }],
+  "warnings": ["currentUser() in CHECKPOINT context — not recommended"]
+}
+```
+
+**Rate-limit:** 30 req/min/user. **Timeout:** 10s (превышение → 504 с `{ error: "timeout" }`).
+
+**Scope (R3):** результаты автоматически ограничены `accessibleProjectIds` читающего — никакой пользователь не выйдет за пределы своих прав даже через PUBLIC-фильтр.
+
+**Коды ошибок:**
+
+| Код | Тело | Прим. |
+|-----|------|-------|
+| 400 | `{ error, details: [{ start, end, code, message }] }` | parse/validator ошибка |
+| 429 | `{ error: "rate-limit" }` | 30 req/min exceeded |
+| 504 | `{ error: "timeout" }` | > 10s |
+
+### `POST /api/search/validate`
+
+Проверить корректность JQL **без выполнения**. Используется JqlEditor для inline-ошибок.
+
+**Body:** `{ "jql": "…" }`
+**Response:**
+```json
+{
+  "valid": false,
+  "errors": [
+    { "start": 24, "end": 31, "code": "E_UNKNOWN_FIELD",
+      "message": "Unknown field 'unknwn'", "hint": "Did you mean 'unknown'?" }
+  ],
+  "ast": { ... }
+}
+```
+**Timeout:** 2s.
+
+### `GET /api/search/suggest`
+
+Автокомплит для JqlEditor и Basic-builder.
+
+**Query params:**
+- `jql=<text>&cursor=<int>` — полное выражение + позиция курсора (основной режим), или
+- `field=<name>&operator=<op>&prefix=<text>` — контекст из Basic popover.
+
+**Response:**
+```json
+{
+  "completions": [
+    {
+      "kind": "field",
+      "label": "assignee",
+      "insert": "assignee",
+      "detail": "User-ref",
+      "icon": { "kind": "svg", "value": "user" },
+      "score": 0.95
+    },
+    { "kind": "value", "label": "Иван Петров", "insert": "\"ivan@acme.ru\"",
+      "detail": "ivan@acme.ru", "icon": { "kind": "avatar", "value": "…" }, "score": 0.82 }
+  ],
+  "context": { "expectedField": "assignee", "expectedType": "USER" }
+}
+```
+**Timeout:** 1s. **Cache:** TTL 30s per-(field, operator, prefix, userId).
+
+### `POST /api/search/export`
+
+Стриминговый экспорт в CSV или XLSX. Не ограничен `limit` — гоняет весь результат через cursor-based Prisma query.
+
+**Body:**
+```json
+{
+  "jql": "…",
+  "format": "csv",
+  "columns": ["key", "summary", "status", "assignee", "due"]
+}
+```
+
+**Response:** `Content-Type: text/csv` или `…/spreadsheetml.sheet`, `Content-Disposition: attachment; filename="search-<timestamp>.csv"`.
+
+**CSV:** UTF-8 BOM, разделитель `;`, CRLF (Excel-ru совместимо).
+**Timeout:** 60s.
+
+### `GET /api/search/schema`
+
+Реестр полей и функций для UI-подсказок и Basic-builder.
+
+**Query params:** `?variant=default|checkpoint` (для UI контекста КТ — расширенный реестр с КТ-функциями).
+
+**Response:**
+```json
+{
+  "fields": [
+    { "name": "assignee", "synonyms": [], "type": "USER",
+      "operators": ["=", "!=", "IN", "NOT IN", "IS EMPTY", "IS NOT EMPTY"],
+      "sortable": true }
+  ],
+  "functions": [
+    { "name": "currentUser", "args": [], "returns": "User" },
+    { "name": "violatedCheckpoints", "args": [{ "name": "typeName", "optional": true }], "returns": "Issue[]" }
+  ]
+}
+```
+
+---
+
+## Saved Filters (`/api/saved-filters`) — TTSRH-1
+
+> CRUD для сохранённых TTS-QL фильтров + share + favorite. См. [docs/user-manual/features/search.md](../user-manual/features/search.md) § Сохранённые фильтры.
+
+### `GET /api/saved-filters`
+
+**Query:** `?scope=mine|shared|public|favorite|recent`
+
+**Response:** `SavedFilter[]`
+
+```ts
+type SavedFilter = {
+  id: string;
+  ownerId: string;
+  name: string;
+  description?: string;
+  jql: string;
+  columns?: string[];
+  visibility: 'PRIVATE' | 'SHARED' | 'PUBLIC';
+  favorite: boolean;
+  sharedWith?: Array<{ userId?: string; groupId?: string; permission: 'READ' | 'WRITE' }>;
+  useCount: number;
+  lastUsedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+### `POST /api/saved-filters`
+
+**Body:** `{ name, description?, jql, visibility, columns?, sharedWith? }` → `SavedFilter` (201).
+
+### `GET /api/saved-filters/:id`
+### `PATCH /api/saved-filters/:id`
+### `DELETE /api/saved-filters/:id`
+
+Write/delete: только owner или `SHARED` с permission=`WRITE`.
+
+### `POST /api/saved-filters/:id/favorite`
+
+**Body:** `{ value: boolean }` → `SavedFilter`.
+
+### `POST /api/saved-filters/:id/share`
+
+**Body:** `{ users?: [], groups?: [], permission: 'READ'|'WRITE' }` → `SavedFilter`.
+
+### `POST /api/saved-filters/:id/use`
+
+Инкремент `useCount` + обновление `lastUsedAt`. Fire-and-forget (UI не ждёт ответа).
+
+---
+
+## Checkpoint TTQL (`/api/admin/checkpoint-types/preview`) — TTSRH-1
+
+> Dry-run эвалуация TTS-QL-условия КТ для выбранного релиза. Feature flag `FEATURES_CHECKPOINT_TTQL`.
+> RBAC: `canManageCheckpoints` (R22).
+
+### `POST /api/admin/checkpoint-types/preview`
+
+**Body:**
+```json
+{
+  "releaseId": "...",
+  "conditionMode": "TTQL",
+  "ttqlCondition": "statusCategory = DONE AND assignee IS NOT EMPTY",
+  "criteria": [],
+  "offsetDays": 0,
+  "warningDays": 3
+}
+```
+
+**Response:**
+```json
+{
+  "applicable": [{ "id": "...", "key": "TTMP-12", ... }],
+  "passed":     [{ "id": "...", "key": "TTMP-12", ... }],
+  "violated":   [{ "id": "...", "key": "TTMP-42", ... }],
+  "state": "WARNING",
+  "meta": {
+    "releaseId": "...",
+    "conditionMode": "TTQL",
+    "totalIssuesInRelease": 24,
+    "ttqlSkippedByFlag": false,
+    "ttqlError": null
+  }
+}
+```
+
+**Поведение под feature flag:** если `FEATURES_CHECKPOINT_TTQL=false` и `conditionMode` ∈ `{ TTQL, COMBINED }`, сервер выполняет только structured-часть, возвращает `meta.ttqlSkippedByFlag=true` — UI показывает баннер.
+
+**Timeout:** 5s (hard, через Promise.race). Превышение → `state=ERROR` + `meta.ttqlError` с описанием.
+
