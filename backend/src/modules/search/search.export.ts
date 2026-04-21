@@ -68,8 +68,13 @@ export interface ExportPlan {
   kind: 'ok';
   where: Prisma.IssueWhereInput;
   orderBy: Prisma.IssueOrderByWithRelationInput[];
-  columns: ResolvedColumn[];
   customFieldMap: Map<string, { id: string; name: string; type: string }>;
+}
+
+// The concrete plan passed to iterateIssues — has resolved columns so the
+// generator can narrow `customFieldValues` include to just the requested CFs.
+interface ResolvedPlan extends ExportPlan {
+  columns: ResolvedColumn[];
 }
 
 export type ExportPrepareResult = ExportPlan | ExportPrepareError;
@@ -86,6 +91,7 @@ const STANDARD_COLUMNS = new Set([
   'description',
   'type',
   'status',
+  'statusName', // alias of `status` — §5.8 UI column name
   'priority',
   'assignee',
   'creator',
@@ -210,7 +216,6 @@ export async function prepareExport(input: ExportInput, ctx: ExportContext): Pro
     kind: 'ok',
     where: exec.where,
     orderBy: compiled.orderBy.length > 0 ? compiled.orderBy : [{ updatedAt: 'desc' }],
-    columns: resolveColumns(undefined, customFieldMap),
     customFieldMap,
   };
 }
@@ -255,6 +260,7 @@ function extractValue(issue: IssuePayload, col: ResolvedColumn): string | number
     case 'type':
       return issue.issueTypeConfig?.systemKey ?? issue.issueTypeConfig?.name ?? null;
     case 'status':
+    case 'statusName':
       return issue.workflowStatus?.name ?? null;
     case 'priority':
       return issue.priority ?? null;
@@ -297,8 +303,15 @@ function formatJsonValue(v: unknown): string | number | null {
 
 // ─── Batched issue iterator ─────────────────────────────────────────────────
 
+class ExportAbortError extends Error {
+  constructor() {
+    super('Export aborted');
+    this.name = 'ExportAbortError';
+  }
+}
+
 async function* iterateIssues(
-  plan: ExportPlan,
+  plan: ResolvedPlan,
   cap: number,
   signal: AbortSignal,
 ): AsyncGenerator<IssuePayload[], void, void> {
@@ -308,7 +321,16 @@ async function* iterateIssues(
   while (remaining > 0) {
     if (signal.aborted) return;
     const take = Math.min(BATCH_SIZE, remaining);
-    const batch: IssuePayload[] = (await prisma.issue.findMany({
+    // Promise.race with abort-signal so the caller's `finally` can close the
+    // HTTP connection the moment the timeout fires — the Prisma query still
+    // completes in the background, but the client isn't held hostage to it
+    // (Postgres `statement_timeout` is the ultimate backstop).
+    const abortPromise = new Promise<never>((_, reject) => {
+      const onAbort = () => reject(new ExportAbortError());
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    });
+    const findMany = prisma.issue.findMany({
       where: plan.where,
       orderBy: [...plan.orderBy, { id: 'asc' }],
       take,
@@ -328,7 +350,14 @@ async function* iterateIssues(
             }
           : { select: { customFieldId: true, value: true }, take: 0 },
       },
-    })) as unknown as IssuePayload[];
+    });
+    let batch: IssuePayload[];
+    try {
+      batch = (await Promise.race([findMany, abortPromise])) as unknown as IssuePayload[];
+    } catch (err) {
+      if (err instanceof ExportAbortError) return;
+      throw err;
+    }
     if (batch.length === 0) return;
     yield batch;
     remaining -= batch.length;
@@ -337,10 +366,15 @@ async function* iterateIssues(
   }
 }
 
+// CSV formula-injection (CWE-1236): Excel/LibreOffice treat cells starting with
+// `=`, `+`, `-`, `@`, `\t`, `\r` as formulas. Wrapping in double-quotes neutralises
+// the interpretation while staying RFC-4180 compliant.
+const FORMULA_INJECTION_RE = /^[=+\-@\t\r]/;
+
 function csvEscape(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '';
   const s = typeof value === 'string' ? value : String(value);
-  if (/[,"\n\r]/.test(s)) {
+  if (/[,"\n\r]/.test(s) || FORMULA_INJECTION_RE.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
@@ -367,7 +401,7 @@ export async function exportIssuesToCsv(
     res.status(400).json({ error: 'NO_VALID_COLUMNS', message: 'None of the requested columns are exportable.' });
     return;
   }
-  const plan: ExportPlan = { ...prepared, columns };
+  const plan: ResolvedPlan = { ...prepared, columns };
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="search-export.csv"');
@@ -418,7 +452,7 @@ export async function exportIssuesToXlsx(
     res.status(400).json({ error: 'NO_VALID_COLUMNS', message: 'None of the requested columns are exportable.' });
     return;
   }
-  const plan: ExportPlan = { ...prepared, columns };
+  const plan: ResolvedPlan = { ...prepared, columns };
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="search-export.xlsx"');
@@ -430,6 +464,7 @@ export async function exportIssuesToXlsx(
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), QUERY_TIMEOUT_MS);
   let rowCount = 0;
+  let committed = false;
   try {
     for await (const batch of iterateIssues(plan, MAX_ROWS, ctrl.signal)) {
       for (const issue of batch) {
@@ -443,10 +478,13 @@ export async function exportIssuesToXlsx(
       sheet.addRow({ [columns[0].name]: `WARNING: truncated at ${MAX_ROWS} rows` }).commit();
     }
     await workbook.commit();
+    committed = true;
   } catch (err) {
+    // Do NOT retry commit on error — ExcelJS writes an EOCD on first commit;
+    // a second call produces a corrupt ZIP that Excel cannot open.
     console.warn('xlsx export error', { userId: ctx.userId, rowCount, err: (err as Error).message });
-    try { await workbook.commit(); } catch { /* ignore */ }
   } finally {
     clearTimeout(timer);
+    if (!committed) res.end();
   }
 }

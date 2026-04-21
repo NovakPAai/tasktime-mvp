@@ -1500,7 +1500,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 | 🟢 Merged ([#103](https://github.com/NovakPAai/tasktime-mvp/pull/103)) |
 | 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 | 🟢 Merged ([#104](https://github.com/NovakPAai/tasktime-mvp/pull/104)) |
 | 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 | 🟢 Merged ([#106](https://github.com/NovakPAai/tasktime-mvp/pull/106)) |
-| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | ✅ Done (готов к push после merge PR-6) |
+| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 🟢 Merged ([#107](https://github.com/NovakPAai/tasktime-mvp/pull/107)) |
 | 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | ✅ Done (готов к push после merge PR-7) |
 | 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 📋 Планируется |
 | 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 📋 Планируется |
