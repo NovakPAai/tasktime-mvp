@@ -6,8 +6,13 @@ import { authenticate } from '../../../shared/middleware/auth.js';
 import { requireRole } from '../../../shared/middleware/rbac.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import { logAudit } from '../../../shared/middleware/audit.js';
-import { createCheckpointTypeDto, updateCheckpointTypeDto } from './checkpoint.dto.js';
+import {
+  createCheckpointTypeDto,
+  previewCheckpointConditionDto,
+  updateCheckpointTypeDto,
+} from './checkpoint.dto.js';
 import * as service from './checkpoint-types.service.js';
+import { previewCheckpointCondition } from './checkpoint-preview.service.js';
 import { asyncHandler, authHandler } from '../../../shared/utils/async-handler.js';
 
 const router = Router();
@@ -56,5 +61,16 @@ router.delete('/:id', authHandler(async (req, res) => {
   await logAudit(req, 'checkpoint_type.deleted', 'checkpoint_type', id);
   res.json({ ok: true });
 }));
+
+// TTSRH-1 PR-17: dry-run preview для проверки TTQL-condition на реальных
+// данных релиза перед сохранением. Не пишет в БД, не триггерит webhooks.
+router.post(
+  '/preview',
+  validate(previewCheckpointConditionDto),
+  asyncHandler(async (req, res) => {
+    const result = await previewCheckpointCondition(req.body);
+    res.json(result);
+  }),
+);
 
 export default router;

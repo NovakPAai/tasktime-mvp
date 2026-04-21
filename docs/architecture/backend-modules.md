@@ -337,3 +337,71 @@ Run `make docs` to check for staleness warnings.
 | Search | `/api` | `backend/src/modules/search/search.router.js.ts` |
 | Saved Filters | `/api` | `backend/src/modules/saved-filters/saved-filters.router.js.ts` |
 <!-- AUTO-GENERATED:END -->
+
+---
+
+### search — `/api/search` (TTSRH-1)
+
+Файлы: `backend/src/modules/search/`.
+
+**Pipeline:**
+```
+jql string
+  ↓ tokenizer   (search-tokenizer.ts)
+  ↓ parser      (search-parser.ts)      — recursive descent, AST с span-позициями
+  ↓ validator   (search-validator.ts)   — field registry + type-check
+  ↓ compiler    (search-compiler.ts)    — AST → Prisma where + raw SQL для custom fields
+  ↓ executor    (search.service.ts)     — prisma.issue.findMany + scope R3 + timeout
+```
+
+**Эндпоинты:**
+
+| Method | Path | Назначение | Timeout | Rate-limit |
+|--------|------|-----------|---------|------------|
+| POST | `/search/issues` | Выполнить TTS-QL | 10s | 30/min |
+| POST | `/search/validate` | Проверить без выполнения | 2s | — |
+| GET | `/search/suggest` | Автокомплит (JqlEditor, Basic popover) | 1s | — |
+| POST | `/search/export` | Стриминговый CSV/XLSX | 60s | — |
+| GET | `/search/schema` | Реестр полей и функций | — | — |
+
+**Value Suggesters** — per-field провайдеры (`search-suggesters/`) — возвращают значения с метаданными (avatar, цвет, email). Кеш TTL 30s.
+
+**Безопасность:**
+- Scope R3 (`accessibleProjectIds`) применяется в compiler'е на уровне верхнего AND.
+- Timeout через `Promise.race` — никогда не throws, всегда 504 с контролируемым body.
+- Custom-field raw SQL — только через Prisma typed SQL (no string concat).
+
+### saved-filters — `/api/saved-filters` (TTSRH-1)
+
+Файлы: `backend/src/modules/saved-filters/`.
+
+**Модели Prisma:** `SavedFilter`, `SavedFilterShare`.
+
+**Visibility:**
+- `PRIVATE` — только owner.
+- `SHARED` — owner + `SavedFilterShare[]` (per-user/group, permission `READ`/`WRITE`).
+- `PUBLIC` — все authenticated, но исполнение всё равно scope-filtered по читающему.
+
+**Ключевые операции:**
+- `POST /saved-filters/:id/use` — инкремент `useCount` + `lastUsedAt` (fire-and-forget).
+- `POST /saved-filters/:id/favorite` — toggle favorite.
+- `POST /saved-filters/:id/share` — меняет `visibility` + `sharedWith[]`.
+
+**Audit:** create/update/delete логируются в `AuditLog` через существующий `logAudit` middleware.
+
+### Checkpoint TTQL integration (TTSRH-1 PR-15..PR-19)
+
+Расширяет existing checkpoint engine (TTMP-160) тремя режимами:
+
+- `STRUCTURED` — старый criteria[]-based (backward-compat, default для существующих КТ).
+- `TTQL` — TTS-QL условие вместо criteria[].
+- `COMBINED` — structured AND TTQL.
+
+**Ключевые файлы:**
+- `backend/src/modules/releases/checkpoints/checkpoint-engine.service.ts` — трёх-ветвочный evaluator.
+- `backend/src/modules/releases/checkpoints/checkpoint-ttql-evaluator.service.ts` — async resolver TTQL matched IDs с 5s hard-timeout через `Promise.race`.
+- `backend/src/modules/releases/checkpoints/checkpoint-preview.service.ts` — dry-run preview эндпоинт (`POST /admin/checkpoint-types/preview`).
+
+**Feature flag `FEATURES_CHECKPOINT_TTQL`:** при `false` ветка TTQL не выполняется — TTQL/COMBINED эвалируются как STRUCTURED (state=OK) до включения флага. Позволяет merge security-review ДО UAT.
+
+**Ошибки эвалуации:** compile/runtime error / timeout → `CheckpointState=ERROR` + единичная `CheckpointViolationEvent` с `criterionType='TTQL_ERROR'` и детерминированным hash'ем (R16, FR-31).

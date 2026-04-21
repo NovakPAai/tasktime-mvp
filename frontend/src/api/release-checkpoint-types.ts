@@ -22,6 +22,10 @@ export type CheckpointCriterion =
 
 export type CheckpointCriterionType = CheckpointCriterion['type'];
 
+// TTSRH-1 PR-15: три режима оценки. STRUCTURED — existing (criteria[]),
+// TTQL — evaluate через compiled TTS-QL, COMBINED — оба одновременно.
+export type CheckpointConditionMode = 'STRUCTURED' | 'TTQL' | 'COMBINED';
+
 export interface CheckpointType {
   id: string;
   name: string;
@@ -31,6 +35,8 @@ export interface CheckpointType {
   offsetDays: number;
   warningDays: number;
   criteria: CheckpointCriterion[];
+  conditionMode?: CheckpointConditionMode;
+  ttqlCondition?: string | null;
   webhookUrl?: string | null;
   minStableSeconds: number;
   isActive: boolean;
@@ -47,6 +53,8 @@ export interface CreateCheckpointTypeBody {
   offsetDays: number;
   warningDays?: number;
   criteria: CheckpointCriterion[];
+  conditionMode?: CheckpointConditionMode;
+  ttqlCondition?: string | null;
   webhookUrl?: string | null;
   minStableSeconds?: number;
   isActive?: boolean;
@@ -105,6 +113,50 @@ export async function syncInstances(
   const { data } = await api.post<{ syncedCount: number }>(
     `/admin/checkpoint-types/${id}/sync-instances`,
     { releaseIds },
+  );
+  return data;
+}
+
+// TTSRH-1 PR-17/18: dry-run preview для TTQL/STRUCTURED/COMBINED condition.
+// Используется UI PR-18 в Preview-панели формы редактирования КТ.
+export interface CheckpointPreviewBody {
+  releaseId: string;
+  conditionMode: CheckpointConditionMode;
+  criteria?: CheckpointCriterion[];
+  ttqlCondition?: string | null;
+  offsetDays?: number;
+  warningDays?: number;
+}
+
+export interface CheckpointPreviewResponse {
+  state: 'PENDING' | 'OK' | 'VIOLATED' | 'ERROR';
+  isWarning: boolean;
+  applicableIssueIds: string[];
+  passedIssueIds: string[];
+  violations: Array<{
+    issueId: string;
+    issueKey: string;
+    issueTitle: string;
+    reason: string;
+    criterionType: string;
+  }>;
+  violationsHash: string;
+  breakdown: { applicable: number; passed: number; violated: number };
+  meta: {
+    releaseId: string;
+    conditionMode: CheckpointConditionMode;
+    totalIssuesInRelease: number;
+    ttqlSkippedByFlag: boolean;
+    ttqlError: string | null;
+  };
+}
+
+export async function previewCheckpointCondition(
+  body: CheckpointPreviewBody,
+): Promise<CheckpointPreviewResponse> {
+  const { data } = await api.post<CheckpointPreviewResponse>(
+    '/admin/checkpoint-types/preview',
+    body,
   );
   return data;
 }

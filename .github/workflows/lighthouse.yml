@@ -1,0 +1,48 @@
+name: Lighthouse
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/public/**'
+      - 'frontend/index.html'
+      - 'frontend/vite.config.ts'
+      - 'frontend/package-lock.json'
+      - 'frontend/.lighthouserc.json'
+  workflow_dispatch:
+
+# TTSRH-1 PR-20 (NFR-5): budget check for /search — bundle size, a11y score.
+# Runs on PRs that touch the frontend. Advisory-only for now; once thresholds
+# stabilize, flip `continue-on-error` to false to make it a required check.
+#
+# The companion Playwright specs (20-search, 21-checkpoints-ttql) live in
+# e2e-staging, not here. They self-skip when ADMIN_AUTH_FILE falls back to
+# the e2e-bot session (E2E_CLEANUP_PASSWORD unset) — that is expected in
+# shared CI. Admin-path coverage runs on staging with the full secret.
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_API_URL: /api
+      VITE_FEATURES_ADVANCED_SEARCH: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: cd frontend && npm ci --legacy-peer-deps
+      - run: cd frontend && npm run build
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.15.x
+      - name: Run Lighthouse CI
+        continue-on-error: true
+        working-directory: frontend
+        run: lhci autorun
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: frontend/.lighthouseci

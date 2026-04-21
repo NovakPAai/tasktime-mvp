@@ -21,9 +21,44 @@ import type {
   ReleaseRisk,
 } from './checkpoint.types.js';
 import { computeReleaseRisk, evaluateCheckpoint } from './checkpoint-engine.service.js';
+import { resolveTtqlMatchedIds } from './checkpoint-ttql-evaluator.service.js';
 import type { LoadedRelease } from './evaluation-loader.service.js';
 import { loadEvaluationIssuesForRelease } from './evaluation-loader.service.js';
 import { notifyViolation } from './webhook-notifier.service.js';
+import { features } from '../../../shared/features.js';
+
+// TTSRH-1 PR-16: system-level project list for the TTQL scope filter. Loader
+// caches nothing — caller (recomputeForRelease) memoizes per-invocation.
+async function loadAllProjectIds(): Promise<string[]> {
+  const rows = await prisma.project.findMany({ select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+// TTSRH-1 PR-16: TTQL evaluation runs behind a separate sub-flag so core-поиск
+// (advancedSearch) can ship без TTQL-engine в prod до security review. Default
+// false — до явного включения TTQL/COMBINED checkpoints эффективно работают
+// как STRUCTURED: ttqlMatchedIds=null, получают violations на TTQL_MISMATCH.
+// Чтобы избежать этого, когда флаг off мы применяем existing `criteriaSnapshot`
+// path без учёта conditionMode.
+async function maybeResolveTtqlIds(
+  ttqlSnapshot: string | null,
+  conditionMode: 'STRUCTURED' | 'TTQL' | 'COMBINED',
+  now: Date,
+  applicableIssueIds: string[],
+  accessibleProjectIds: string[],
+): Promise<{ matchedIds: Set<string> | null; error: string | null; skipped: boolean }> {
+  if (conditionMode === 'STRUCTURED') return { matchedIds: null, error: null, skipped: false };
+  if (!features.checkpointTtql) return { matchedIds: null, error: null, skipped: true };
+  if (!ttqlSnapshot || ttqlSnapshot.trim().length === 0) {
+    return { matchedIds: null, error: 'missing ttql snapshot', skipped: false };
+  }
+  const res = await resolveTtqlMatchedIds(ttqlSnapshot, {
+    now,
+    applicableIssueIds,
+    accessibleProjectIds,
+  });
+  return { matchedIds: res.matchedIds, error: res.error, skipped: false };
+}
 
 const CACHE_TTL_SECONDS = 60;
 const cacheKey = (releaseId: string) => `release:${releaseId}:checkpoints`;
@@ -264,9 +299,29 @@ export async function recomputeForRelease(
 
   let updatedCount = 0;
   let unchangedCount = 0;
+  // Lazily loaded once if any checkpoint actually fires the TTQL resolver —
+  // zero DB cost for STRUCTURED-only releases (which is every release in prod
+  // until FEATURES_CHECKPOINT_TTQL flips on).
+  let ttqlProjectIds: string[] | null = null;
+  // Hoist out of the loop: every checkpoint operates on the same issue set.
+  const releaseIssueIds = loaded.issues.map((i) => i.id);
 
   for (const rc of existing) {
     const criteria = rc.criteriaSnapshot as unknown as CheckpointCriterion[];
+    // TTSRH-1 PR-16: only fetch project-list when this checkpoint would actually
+    // run the TTQL resolver — STRUCTURED snapshot + flag-off short-circuit.
+    const needsProjects =
+      rc.conditionModeSnapshot !== 'STRUCTURED' && features.checkpointTtql;
+    const projectIdsForScope = needsProjects
+      ? (ttqlProjectIds ?? (ttqlProjectIds = await loadAllProjectIds()))
+      : [];
+    const ttqlOutcome = await maybeResolveTtqlIds(
+      rc.ttqlSnapshot,
+      rc.conditionModeSnapshot,
+      now,
+      releaseIssueIds,
+      projectIdsForScope,
+    );
     const result = evaluateCheckpoint(
       {
         criteria,
@@ -274,6 +329,12 @@ export async function recomputeForRelease(
         warningDays: rc.checkpointType.warningDays,
         issues: loaded.issues,
         context: loaded.context,
+        // If TTQL skipped (flag off), fall back to STRUCTURED semantics даже если
+        // snapshot = TTQL/COMBINED — чтобы prod-prod не ломать existing evaluate
+        // result до включения FEATURES_CHECKPOINT_TTQL + UAT (см. PR-16 в ТЗ).
+        conditionMode: ttqlOutcome.skipped ? 'STRUCTURED' : rc.conditionModeSnapshot,
+        ttqlMatchedIds: ttqlOutcome.matchedIds,
+        ttqlError: ttqlOutcome.error,
       },
       now,
     );
@@ -341,6 +402,10 @@ export async function syncInstances(
           data: {
             criteriaSnapshot: type.criteria as Prisma.InputJsonValue,
             offsetDaysSnapshot: type.offsetDays,
+            // TTSRH-1 PR-15: propagate TTQL snapshot fields at sync time.
+            // PR-16 evaluator reads these to decide STRUCTURED/TTQL/COMBINED path.
+            ttqlSnapshot: type.ttqlCondition ?? null,
+            conditionModeSnapshot: type.conditionMode,
             deadline: addDays(rc.release.plannedDate!, type.offsetDays),
           },
         }),
@@ -863,6 +928,11 @@ async function createCheckpointsFromTypes(
           checkpointTypeId: type.id,
           criteriaSnapshot: type.criteria as Prisma.InputJsonValue,
           offsetDaysSnapshot: type.offsetDays,
+          // TTSRH-1 PR-15: snapshot на момент создания — FR-25 backward-compat.
+          // Parent CheckpointType может быть изменён позже; evaluator (PR-16)
+          // читает snapshot поля чтобы путь evaluation не менялся.
+          ttqlSnapshot: type.ttqlCondition ?? null,
+          conditionModeSnapshot: type.conditionMode,
           deadline,
         },
         update: {
@@ -880,13 +950,19 @@ async function reconcileViolationEvents(
   currentViolations: CheckpointViolation[],
   now: Date,
 ): Promise<void> {
+  // TTSRH-1 PR-16: filter out TTQL_ERROR synthetic violations (issueId: '').
+  // Они не привязаны к реальной задаче и не должны попадать в
+  // CheckpointViolationEvent — timeline будет врать о нарушениях задач.
+  // `state=ERROR` на ReleaseCheckpoint сам по себе — достаточный signal.
+  const realViolations = currentViolations.filter((v) => v.issueId !== '');
+
   const openEvents = await tx.checkpointViolationEvent.findMany({
     where: { releaseCheckpointId, resolvedAt: null },
     select: { id: true, issueId: true },
   });
   const openByIssue = new Map(openEvents.map((e) => [e.issueId, e.id]));
 
-  const currentIssueIds = new Set(currentViolations.map((v) => v.issueId));
+  const currentIssueIds = new Set(realViolations.map((v) => v.issueId));
 
   // Resolve events whose issue is no longer violating.
   const toResolve = openEvents.filter((e) => !currentIssueIds.has(e.issueId)).map((e) => e.id);
@@ -898,7 +974,7 @@ async function reconcileViolationEvents(
   }
 
   // Open a new event for each newly-violating issue that has no open event yet.
-  const toOpen = currentViolations.filter((v) => !openByIssue.has(v.issueId));
+  const toOpen = realViolations.filter((v) => !openByIssue.has(v.issueId));
   if (toOpen.length > 0) {
     await tx.checkpointViolationEvent.createMany({
       data: toOpen.map((v) => ({

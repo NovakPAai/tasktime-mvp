@@ -2,7 +2,624 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.38**
+**Last version: 2.49**
+
+---
+
+## [2.49] [2026-04-21] docs(ttsrh-1): PR-21 — Документация TTS-QL + feature flag cutover
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/docs-cutover`
+
+### Что было
+
+После PR-1..PR-20 эпика TTSRH-1 вся функциональность (TTS-QL поиск + сохранённые фильтры + экспорт + Value Suggesters + checkpoint TTQL) merged в main, но конечному пользователю негде прочитать, **как** этим пользоваться. Feature flag `FEATURES_ADVANCED_SEARCH` оставался `false` (ожидание UAT).
+
+### Что теперь
+
+- **`docs/user-manual/features/jql.md`** (новый, ~300L) — полный reference TTS-QL:
+  - Быстрый старт + грамматика EBNF + литералы + операторы.
+  - Реестр system-полей (Задача / Люди / Планирование / AI / КТ) с синонимами и операторами.
+  - Раздел про кастомные поля с маппингом типов → операторов.
+  - Все функции (User / Dates / Sprints / Releases / Issue-refs / Checkpoints).
+  - Секция `ORDER BY` + 20+ примеров (каждодневные / сложные / КТ / custom-fields).
+  - Ограничения MVP (WAS/CHANGED/FTS — Phase 2).
+- **`docs/user-manual/features/search.md`** (новый, ~200L) — руководство по странице «Поиск задач»:
+  - Схема 3-панельного layout'а + Basic vs Advanced сравнение.
+  - Shortcut'ы (Ctrl+Enter, Ctrl+S, `/`, Esc).
+  - Сохранённые фильтры: категории (Избранные / Общие / Поделены / Мои / Недавние), visibility levels, шаринг, права.
+  - Колонки: конфигуратор, сохранение (per-filter / default).
+  - Экспорт CSV/XLSX, bulk-actions (ADMIN/MANAGER).
+  - URL-sync + горячие сценарии (standup / планирование спринта / release review / КТ pre-flight).
+- **`docs/user-manual/features/checkpoints.md`** — добавлена секция «Режим условия: Structured / TTQL / Combined» (~70L):
+  - Matrix-таблица сравнения режимов.
+  - TTS-QL редактор в контексте КТ-variant (`releasePlannedDate()`, `checkpointDeadline()`, warning на `currentUser()`).
+  - Preview-панель.
+  - Структурный → TTQL конвертер (R21 manual-review).
+  - Feature flag `FEATURES_CHECKPOINT_TTQL`, ошибки эвалуации (`state=ERROR`, `TTQL_ERROR`).
+- **`docs/api/reference.md`** — добавлены разделы (~180L):
+  - `/api/search/{issues, validate, suggest, export, schema}` — полный контракт с примерами, timeout'ами, rate-limit, error codes.
+  - `/api/saved-filters/*` — CRUD + `/favorite`, `/share`, `/use`.
+  - `/api/admin/checkpoint-types/preview` — dry-run with meta.ttqlSkippedByFlag / ttqlError поведение под флагом.
+- **`docs/architecture/backend-modules.md`** — добавлены разделы (~60L):
+  - Модуль `search` — pipeline (tokenizer → parser → validator → compiler → executor), эндпоинты, suggesters, безопасность.
+  - Модуль `saved-filters` — модели, visibility, ключевые операции.
+  - Checkpoint TTQL integration — трёх-ветвочный evaluator, feature flag, error handling.
+
+### Изменения
+
+- `docs/user-manual/features/jql.md` — **новый**.
+- `docs/user-manual/features/search.md` — **новый**.
+- `docs/user-manual/features/checkpoints.md` — + ~70L (секция TTQL).
+- `docs/api/reference.md` — + ~180L (search + saved-filters + checkpoint preview).
+- `docs/architecture/backend-modules.md` — + ~60L (модули search / saved-filters / checkpoint TTQL).
+- `docs/tz/TTSRH-1.md` — §13.8 PR-20 → 🟢 Merged; PR-21 → 🚧 В работе.
+
+### Влияние на prod
+
+- **Документация** — zero runtime impact.
+- **Feature flag cutover** (в отдельном deployment-change, не в этом PR):
+  1. `FEATURES_ADVANCED_SEARCH=true` в **staging** → UAT run.
+  2. После UAT signoff → `true` в **production**.
+  3. `FEATURES_CHECKPOINT_TTQL=true` — отдельный UAT после стабилизации `FEATURES_ADVANCED_SEARCH`.
+
+### Проверки
+
+- Все ссылки между markdown-файлами проверены вручную.
+- `docs/tz/TTSRH-1.md` §13.9 (итоговая таблица) — PR-20 → 🟢, PR-21 → 🚧.
+
+### Что остаётся в follow-up
+
+- **Phase 2 / TTSRH-23** — `WAS` / `CHANGED` с моделью `FieldChangeLog`.
+- **Phase 2 / TTSRH-24** — `pg_trgm` + `unaccent` + PostgreSQL FTS.
+- **TTSRH-38** (опционально) — MCP-tool `search_issues` для Agent SDK.
+- **T-12** (shared-URL cross-user E2E) — wiring 2-го session-fixture.
+- **Full T-19** — data-testid'ы на форму AdminReleaseCheckpointTypesPage.
+
+---
+
+## [2.48] [2026-04-21] feat(e2e): TTSRH-1 PR-20 — E2E smoke/axe + perf-seed harness + Lighthouse budget
+
+**PR:** [#122](https://github.com/NovakPAai/tasktime-mvp/pull/122)
+**Ветка:** `ttsrh-1/e2e-perf`
+
+### Что было
+
+После PR-19 весь бек/фронт `/search` и admin «КТ-TTQL» собран, но не покрыт end-to-end тестами. Нет инструментов для воспроизводимого perf-замера T-8 (p95 < 400ms на 100K) и нет бюджета bundle-size/a11y для `/search` (NFR-5 ≤ 160KB gzip initial).
+
+### Что теперь
+
+- **`frontend/e2e/specs/20-search.spec.ts`** — Playwright smoke + axe для `/search`:
+  - Shell renders (3-панельный layout, все testid видны).
+  - URL round-trip: ввод JQL через CM6 → Run → URL содержит `?jql=` → reload сохраняет state (**T-9**).
+  - Save-модалка открывается из sidebar-кнопки, кнопка disabled при пустом JQL, Escape закрывает.
+  - axe-core на wcag2a/aa — 0 critical/serious violations (A11Y-1..4).
+  - Graceful skip если `FEATURES_ADVANCED_SEARCH` off в env.
+- **`frontend/e2e/specs/21-checkpoints-ttql.spec.ts`** — Admin «Типы КТ» smoke + axe:
+  - Страница `/admin/release-checkpoint-types` рендерится для ADMIN.
+  - Create-type modal поднимает `checkpoint-condition-mode-control` + `condition-mode-segmented` (PR-18 wiring).
+  - axe-core — 0 critical/serious violations.
+  - **Полный T-19** (create TTQL → violations → COMBINED → regen → preview) отложен до wiring data-testid'ов на admin-form (next pass).
+- **`backend/tests/fixtures/search-seed-100k.ts`** — seed-хелпер:
+  - `seedSearchPerfFixture({ total, prisma, projectId, creatorId, seed })` — mulberry32-seeded детерминистичный генератор.
+  - chunked `createMany` по 5_000 rows, idempotent-префикс `TT_PERF_SEED_` (pre-run `deleteMany`).
+  - Auto-pick first Project + first non-bot User.
+  - `npm run db:seed:search-100k` — opt-in (не в CI, для ops benchmark VM).
+- **`.lighthouserc.json`** + **`.github/workflows/lighthouse.yml`**:
+  - desktop preset, 3 runs, target `/search`.
+  - assertions: performance ≥ 0.85 warn, accessibility ≥ 0.9 **error**, `resource-summary:script:size` ≤ 500KB error, uses-text-compression error.
+  - workflow запускается на PR touch'ing frontend, `continue-on-error: true` (advisory) до стабилизации thresholds.
+
+### Изменения
+
+- `frontend/e2e/specs/20-search.spec.ts` — новый (~145L).
+- `frontend/e2e/specs/21-checkpoints-ttql.spec.ts` — новый (~90L).
+- `backend/tests/fixtures/search-seed-100k.ts` — новый (~130L).
+- `backend/package.json` — + `db:seed:search-100k` script.
+- `frontend/.lighthouserc.json` — новый.
+- `.github/workflows/lighthouse.yml` — новый.
+- `docs/tz/TTSRH-1.md` §13.7 PR-19 / §13.8 PR-20 / §13.9 — статусы обновлены (PR-19 → 🟢 Merged, PR-20 → 🚧 В работе).
+
+### Влияние на prod
+
+Нулевое. Все изменения:
+- **Новые тестовые файлы** (не билдятся в prod-bundle).
+- **Новый seed-скрипт** — opt-in, не запускается в CI.
+- **Новый CI workflow** — advisory, `continue-on-error: true`, не блокирует merge.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend + backend) — 0 ошибок.
+- `npm run lint` — pre-existing warnings only (не от этого PR).
+- E2E локально не запускали (нужен запущенный frontend + API), гоняется в e2e-staging после merge.
+
+### Известные ограничения / follow-ups
+
+- **T-12** (shared-URL cross-user) — требует второго authenticated-session в `test.ts` fixtures. Follow-up.
+- **Full T-19** (TTQL → violations → COMBINED → regen) — требует data-testid на `AdminReleaseCheckpointTypesPage` форму. Wiring — follow-up 30 мин.
+- **Composite-индексы** по profiling (§3.3) — отдельная follow-up миграция, не в PR-20.
+
+---
+
+## [2.47] [2026-04-21] feat(checkpoint): TTSRH-1 PR-19 — Structured → TTQL one-way converter
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-converter`
+
+### Что было
+
+После PR-18 админы могли создавать TTQL/COMBINED checkpoints, но перевод старых STRUCTURED типов на TTQL приходилось делать вручную — читать criteria[] JSON и переписывать в TTS-QL с нуля.
+
+### Что теперь
+
+- **`convertCriteriaToTtql.ts`** — pure-function one-way конвертер всех 6 типов criterion (§5.12.9):
+  - `STATUS_IN` → `statusCategory IN (...)` (single → `=`).
+  - `DUE_BEFORE` → `due < checkpointDeadline() +/- Nd` (wire-up checkpointDeadline() в PR-17 follow-up).
+  - `ASSIGNEE_SET` → `assignee IS NOT EMPTY`.
+  - `CUSTOM_FIELD_VALUE` → `cf["id"] op value` (NOT_EMPTY/EQUALS/IN разные формы).
+  - `ALL_SUBTASKS_DONE` / `NO_BLOCKING_LINKS` → `-- TODO` placeholder comment (нет прямого выражения без recursion, требуется manual review per R21).
+  - `issueTypes` фильтр → префикс-clause `(type IN (...)) AND (body)`.
+- **UI кнопка** «Сконвертировать structured-критерии в TTS-QL (draft)» в форме `AdminReleaseCheckpointTypesPage`:
+  - Видна когда mode STRUCTURED или COMBINED.
+  - Click → генерирует draft, переключает режим в COMBINED, вставляет в TTQL-editor.
+  - `message.success` хинт «Проверьте и отредактируйте перед сохранением» — R21 requires manual review.
+  - НЕ автосохраняет — save остаётся за пользователем.
+
+### Изменения
+
+- `frontend/src/components/releases/convertCriteriaToTtql.ts` — новый (~90L).
+- `frontend/src/pages/admin/AdminReleaseCheckpointTypesPage.tsx` — + import + «Сконвертировать» button.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-19 → ✅ Done.
+
+### Влияние на prod
+
+Pure-function utility — zero runtime impact. UI button виден только в admin interface (required role SUPER_ADMIN/ADMIN/RELEASE_MANAGER). Никаких новых deps, bundle unchanged.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` — 0 errors
+- `npm run build` — чисто, 4.50s
+
+---
+
+## [2.46] [2026-04-21] feat(checkpoint): TTSRH-1 PR-18 — Checkpoint admin UI: mode-toggle + JqlEditor + preview panel
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-admin-ui`
+
+### Что было
+
+После PR-17 endpoint `/admin/checkpoint-types/preview` был готов backend-wise, но UI оставался чисто structured — пользователь не мог создать TTQL/COMBINED checkpoint type и не имел инструмента dry-run перед сохранением.
+
+### Что теперь
+
+- **`api/release-checkpoint-types.ts`** — + `CheckpointConditionMode` type, + optional `conditionMode`/`ttqlCondition` в `CheckpointType` / `CreateCheckpointTypeBody`, + `previewCheckpointCondition(body)` → `/admin/checkpoint-types/preview`.
+- **`components/releases/CheckpointConditionModeControl.tsx`** — AntD `Segmented` (STRUCTURED/TTQL/COMBINED) + условно lazy-loaded `JqlEditor` (PR-10) для TTQL/COMBINED. Переключение режима НЕ стирает criteria/ttqlCondition state (R20). `CheckpointConditionModeIcon` — inline S/Q/S+Q иконка для таблицы с tooltip.
+- **`components/releases/CheckpointPreviewPanel.tsx`** — AntD Card с Release-select + «Рассчитать». Breakdown (applicable/passed/violated) + state badge + top-10 violations. Alerts на `meta.ttqlSkippedByFlag` и `meta.ttqlError`.
+- **`AdminReleaseCheckpointTypesPage.tsx`** — integration: state conditionMode/ttqlValue вне Form (мгновенный re-render toggle); openCreate/openEdit + handleSave пропагируют новые fields; форма показывает mode-toggle всегда, criteria section conditional (STRUCTURED/COMBINED), TTQL-editor внутри control (TTQL/COMBINED), preview panel всегда. Releases preloaded через `listReleasesGlobal({limit:100})` silent-fail.
+- Иконка режима в таблице «Название» column.
+
+### Изменения
+
+- `frontend/src/api/release-checkpoint-types.ts` — + conditionMode/ttqlCondition + previewCheckpointCondition.
+- `frontend/src/components/releases/CheckpointConditionModeControl.tsx` — новый.
+- `frontend/src/components/releases/CheckpointPreviewPanel.tsx` — новый.
+- `frontend/src/pages/admin/AdminReleaseCheckpointTypesPage.tsx` — integration + mode-icon.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-18 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` JqlEditor chunk не грузится; mode-toggle виден, но TTQL-editor требует CodeMirror (lazy chunk), грузится by-demand. Backend gate `FEATURES_CHECKPOINT_TTQL=false` → preview ttqlSkippedByFlag=true, UI показывает баннер.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` (frontend) — 0 errors
+- `npm run build` — чисто, 4.54s; JqlEditor chunk без изменений.
+
+---
+
+## [2.45] [2026-04-21] feat(checkpoint): TTSRH-1 PR-17 — /admin/checkpoint-types/preview + suggesters sync
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-search-integration`
+
+### Что было
+
+После PR-16 engine TTQL-ветка была реализована, но admin UI (PR-18) нужен dry-run endpoint: «как этот TTQL поведёт себя на живых данных конкретного релиза» — без сохранения и без триггеринга webhooks. Без него UI не может показать preview в форме создания/редактирования КТ.
+
+### Что теперь
+
+- **`checkpoint-preview.service.previewCheckpointCondition`** — новый dry-run сервис:
+  - Переиспользует `evaluateCheckpoint` + `resolveTtqlMatchedIds` — zero drift между preview и production scheduler.
+  - Валидирует релиз (404 если не найден, 400 если нет plannedDate).
+  - Rate-limit + 5s timeout наследуются из `resolveTtqlMatchedIds` (R16).
+  - Возвращает полный `CheckpointEvaluationResult` + `meta` (`totalIssuesInRelease`, `ttqlSkippedByFlag`, `ttqlError`) — UI debug panel.
+  - Feature-flag gate: если `FEATURES_CHECKPOINT_TTQL=false` и caller запрашивает TTQL/COMBINED preview, meta.ttqlSkippedByFlag=true, эвалуация fall-back'ит к STRUCTURED.
+- **`POST /api/admin/checkpoint-types/preview`** — новый endpoint с Zod `previewCheckpointConditionDto` (releaseId UUID, conditionMode default STRUCTURED, optional criteria/ttqlCondition ≤10K/offsetDays/warningDays). RBAC наследуется от `checkpoint-types.router` — `SUPER_ADMIN | ADMIN | RELEASE_MANAGER`.
+- **Suggesters sync**: `CHECKPOINT_STATE_VALUES` в `search.suggest.static.ts` приведены в соответствие с Prisma enum `CheckpointState` = `PENDING | OK | VIOLATED | ERROR` (ERROR добавлен в PR-16). Раньше было placeholder'ом `['PENDING', 'ON_TRACK', 'WARNING', 'OVERDUE', 'ERROR', 'SATISFIED']` из design-doc.
+- **`checkpointsatrisk` description**: обновлена со ссылкой на VIOLATED/ERROR (не WARNING/OVERDUE).
+- **`search-suggest.unit.test.ts`**: test `by type: CHECKPOINT_STATE` обновлён — проверяет VIOLATED + ERROR, отрицательный ассерт на OVERDUE.
+- **`checkpoint-dto.unit.test.ts`**: +5 unit-кейсов для `previewCheckpointConditionDto` (STRUCTURED accept, TTQL accept, non-uuid reject, 10K+ reject, mode default).
+
+### Deferred в follow-up (не блокирует PR-18)
+
+- Function resolvers для `violatedcheckpoints` / `violatedcheckpointsof` / `checkpointsatrisk` / `checkpointsinstate` — требуют Prisma queries через ReleaseCheckpoint + JOIN ReleaseItem + профилировки индекса `@@index([resolvedAt, releaseCheckpointId])`. Currently: default-branch в `search.function-resolver.ts` возвращает `resolve-failed` → compiler → engine state=ERROR с явным reason (loud, not silent NULL).
+- Compiler-mapping для `hasCheckpointViolation` / `checkpointViolationType` / `checkpointViolationReason` system-fields — join-based query, требует отдельного raw SQL с Prisma.sql-guard.
+- Suggesters уже wired в PR-6 (`CheckpointTypeSuggester` через Prisma, `CheckpointStateSuggester` через enum literal).
+
+### Изменения
+
+- `backend/src/modules/releases/checkpoints/checkpoint-preview.service.ts` — новый.
+- `backend/src/modules/releases/checkpoints/checkpoint.dto.ts` — + `previewCheckpointConditionDto`.
+- `backend/src/modules/releases/checkpoints/checkpoint-types.router.ts` — + `POST /preview`.
+- `backend/src/modules/search/search.suggest.static.ts` — CHECKPOINT_STATE_VALUES sync.
+- `backend/src/modules/search/search.functions.ts` — checkpointsatrisk description fix.
+- `backend/tests/search-suggest.unit.test.ts` — CHECKPOINT_STATE test update.
+- `backend/tests/checkpoint-dto.unit.test.ts` — +5 preview DTO tests (22 total).
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-17 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_CHECKPOINT_TTQL=false` preview работает, но TTQL-часть evaluate'ится как STRUCTURED (meta.ttqlSkippedByFlag=true). UI получает warning-state и может показать баннер. При `=true` (UAT) — полноценный dry-run с TTQL pipeline.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors
+- `npm run test:parser` — **464/464 passing** (+5 preview DTO tests)
+
+---
+
+## [2.44] [2026-04-21] feat(checkpoint): TTSRH-1 PR-16 — Checkpoint engine TTQL branch + error handling
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-engine`
+
+### Что было
+
+После PR-15 foundation (схема + DTO + snapshot-пропагация) был готов, но evaluator игнорировал `conditionModeSnapshot`/`ttqlSnapshot` — работал только через structured path. TTQL/COMBINED чекпоинты создаваться могли, но оценивались как STRUCTURED. Валидация и снапшоты были inert до merge engine'а.
+
+### Что теперь
+
+`evaluateCheckpoint` теперь знает про три mode'а + обрабатывает TTQL compile/exec failure как ERROR-state:
+
+- **`checkpoint-engine.service.ts`** — `CheckpointEvaluationInput` расширен: `conditionMode?` (default STRUCTURED), `ttqlMatchedIds?: ReadonlySet<string> | null`, `ttqlError?: string | null`.
+  - Fast-path: `ttqlError != null` → state=`ERROR` + single synthetic `TTQL_ERROR` violation с стабильным hash (R16, FR-31).
+  - STRUCTURED: existing pure behavior unchanged (backward-compat — вызовы без conditionMode работают).
+  - TTQL: все issues applicable, passed iff `ttqlMatchedIds.has(id)`, violations с `criterionType='TTQL_MISMATCH'`.
+  - COMBINED: structured-first (failed → short-circuit); если structured passed, доп. TTQL check. Issue fails COMBINED если хотя бы один из двух путей failed, но violation пишется только один раз.
+- **`checkpoint-ttql-evaluator.service.ts`** (новый) — async Prisma-backed resolver:
+  - `resolveTtqlMatchedIds(ttql, {now, applicableIssueIds, accessibleProjectIds})` → `{matchedIds, error}`.
+  - Reuses полный pipeline: `parse` → `validate(variant='checkpoint')` → `resolveFunctions` → `compile` → `executeCustomFieldPredicates` → `prisma.issue.findMany({where: AND[compiled, {id: {in: applicableIds}}]})`.
+  - Hard timeout 5с через `Promise.race` vs `setTimeout` — любая фаза включена в бюджет (R16).
+  - Never throws: parse/validate/compile/exec errors + timeout → `{matchedIds: new Set(), error}` (caller → ERROR state).
+- **Prisma migration `20260424000001_ttsrh_checkpoint_state_error`**:
+  - `ALTER TYPE CheckpointState ADD VALUE IF NOT EXISTS 'ERROR'`.
+  - Existing rows unchanged — только new code emits ERROR.
+- **`release-checkpoints.service.recomputeForRelease`** — wire'нут TTQL path:
+  - `maybeResolveTtqlIds` — helper, проверяет `features.checkpointTtql` sub-flag. Если OFF → skipped=true → caller falls back к STRUCTURED path (TZ §13.7 PR-16: «Под флагом FEATURES_CHECKPOINT_TTQL=false ветка TTQL не выполняется, conditionMode=TTQL/COMBINED саммится как NOOP до включения флага»).
+  - Если ON → compiles TTQL через resolver, передаёт `{matchedIds, error}` в engine.
+  - `loadAllProjectIds()` lazy helper: system-level scheduler scope через `prisma.project.findMany`. Memoized per-recompute — не fetch'ится для releases с только STRUCTURED чекпоинтами (zero-cost для 100% existing prod).
+- **`checkpoint.types.ts`**: `CheckpointViolationType = CheckpointCriterionType | 'TTQL_MISMATCH' | 'TTQL_ERROR'`. `CheckpointViolation.criterionType` теперь union — hash payload остаётся uniform.
+- **Unit tests `checkpoint-engine-ttql.unit.test.ts`**: 9 pure-function кейсов:
+  - STRUCTURED (×2): default behavior backward-compat + ttqlMatchedIds ignored при conditionMode=STRUCTURED.
+  - TTQL (×5): все applicable with match, empty set → all fail, null matched → all fail, ttqlError → ERROR state, violationsHash stability.
+  - COMBINED (×2): BOTH required for pass + pending deadline override.
+- Добавлен в `test:parser` script.
+
+### Backward-compat (FR-25)
+
+1. **Existing callers без conditionMode**: `evaluateCheckpoint({criteria, deadline, …})` без новых полей — mode default'ом STRUCTURED, behavior идентичен pre-PR-16.
+2. **Existing rows в production**: `condition_mode_snapshot = 'STRUCTURED'`, `ttql_snapshot = NULL` (из PR-15 default). `maybeResolveTtqlIds` fast-path'ит как `{matchedIds: null, skipped: false}` → engine не дёргается TTQL logic, existing `violationsHash` стабилен.
+3. **Feature-flag off в prod**: даже если caller создал TTQL/COMBINED чекпоинт, `features.checkpointTtql=false` → skipped=true → engine fallback к STRUCTURED. Чекпоинт НЕ попадает в VIOLATED из-за TTQL — прозрачно до UAT.
+
+### Изменения
+
+- `backend/src/modules/releases/checkpoints/checkpoint.types.ts` — + `CheckpointViolationType` union.
+- `backend/src/modules/releases/checkpoints/checkpoint-engine.service.ts` — + conditionMode/ttqlMatchedIds/ttqlError branches + ERROR fast-path.
+- `backend/src/modules/releases/checkpoints/checkpoint-ttql-evaluator.service.ts` — новый (5s timeout, never-throws).
+- `backend/src/modules/releases/checkpoints/release-checkpoints.service.ts` — + maybeResolveTtqlIds + loadAllProjectIds + wiring в recomputeForRelease.
+- `backend/src/prisma/schema.prisma` — + `ERROR` в `CheckpointState`.
+- `backend/src/prisma/migrations/20260424000001_ttsrh_checkpoint_state_error/migration.sql` — новый.
+- `backend/tests/checkpoint-engine-ttql.unit.test.ts` — новый (9 unit-кейсов).
+- `backend/package.json` — `test:parser` включает новый тест.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-16 → ✅ Done.
+
+### Влияние на prod
+
+Feature-flag `FEATURES_CHECKPOINT_TTQL=false` в prod → schema + engine готовы, но не выполняются для TTQL/COMBINED чекпоинтов. Зелёные CI тесты проверяют backward-compat: все existing STRUCTURED тесты продолжают проходить.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npx prisma generate` — чисто
+- `npx vitest tests/checkpoint-engine-ttql.unit.test.ts` — **9/9 passing**
+
+---
+
+## [2.43] [2026-04-21] feat(checkpoint): TTSRH-1 PR-15 — Checkpoint TTQL foundation (schema + DTO superRefine)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-foundation`
+
+### Что было
+
+После PR-14 вся search-часть (§13.6) была closed, но CheckpointType продолжал evaluate'ить только через `criteria[]` (STRUCTURED mode). Бизнес-кейс §5.12.5 («КТ с гибридным условием — структурное + TTQL») был недоступен. UI (PR-18) и engine (PR-16) не могли начаться без foundation-миграции и DTO contract'а.
+
+### Что теперь
+
+Foundation для TTQL-ветки Checkpoint evaluator'а (engine в PR-16):
+
+- **Prisma migration `20260424000000_ttsrh_checkpoint_ttql`**:
+  - Новый enum `CheckpointConditionMode` (`STRUCTURED | TTQL | COMBINED`).
+  - `checkpoint_types`: `condition_mode` (NOT NULL DEFAULT `STRUCTURED`), `ttql_condition` (TEXT, nullable).
+  - `release_checkpoints`: `ttql_snapshot` (TEXT, nullable), `condition_mode_snapshot` (NOT NULL DEFAULT `STRUCTURED`). Immutable snapshot — evaluator'у нужен snapshot на момент создания ReleaseCheckpoint, потому что parent CheckpointType может быть изменён позже (FR-25 backward-compat, R21).
+  - Все existing rows получают `STRUCTURED` через PostgreSQL DEFAULT при `ADD COLUMN` — zero downtime, нет явного UPDATE.
+  - Миграция идемпотентна (создаёт enum + ADD COLUMN'ы, оба no-op при повторном `migrate deploy`).
+- **Prisma schema**: модели `CheckpointType` и `ReleaseCheckpoint` обновлены с `conditionMode`/`ttqlCondition` и `conditionModeSnapshot`/`ttqlSnapshot` полями. Комментарии поясняют FR-25 backward-compat.
+- **`checkpoint.dto.ts`** — расширен:
+  - `conditionModeEnum` (Zod `z.enum(['STRUCTURED','TTQL','COMBINED'])`).
+  - `ttqlConditionSchema` (`z.string().min(1).max(10_000).nullable().optional()`) — 10K лимит зеркалит `/search/issues`.
+  - `checkpointTypeBase` (общее тело) + `createCheckpointTypeDto` с `superRefine` cross-field check:
+    - STRUCTURED → criteria required (min 1), ttqlCondition запрещён.
+    - TTQL → ttqlCondition required (non-empty after trim), criteria любые (evaluator игнорирует).
+    - COMBINED → оба required.
+  - `updateCheckpointTypeDto` (partial) skip'ает cross-field check если `conditionMode` absent — plain PATCH работает. Если conditionMode присутствует — validate правило для нового mode'а.
+- **TTQL checkpoint-функции** — уже wired в PR-5 (`releasePlannedDate()`, `checkpointDeadline()` с `availableIn: ['checkpoint']`) и validator с `variant: 'checkpoint'` — в PR-3. Proven вместе с foundation'ом.
+- **`tests/checkpoint-dto.unit.test.ts`** — 15 unit-кейсов pure-function:
+  - STRUCTURED (×4): default accept, empty criteria reject, ttqlCondition reject, explicit null OK.
+  - TTQL (×4): TTQL-only accept (criteria [] OK), empty reject, whitespace reject, missing reject.
+  - COMBINED (×3): both required accept, empty criteria reject, empty ttqlCondition reject.
+  - PATCH (×4): без conditionMode → skip, TTQL→accept с ttql, TTQL→reject без ttql, STRUCTURED→reject с ttql.
+- **`backend/package.json`** — `test:parser` включает новый `checkpoint-dto.unit.test.ts`.
+
+### Backward-compat (FR-25, R21)
+
+- Все existing `CheckpointType` rows имеют `condition_mode = 'STRUCTURED'` и `ttql_condition = NULL` после миграции — evaluator'у в PR-16 достаточно проверить `condition_mode === 'STRUCTURED'` и fallback к existing path.
+- Existing `ReleaseCheckpoint` rows имеют `condition_mode_snapshot = 'STRUCTURED'` и `ttql_snapshot = NULL` — проверка `violationsHash` стабильна (reasons-порядок не меняется).
+
+### Изменения
+
+- `backend/src/prisma/schema.prisma` — + enum, + 4 fields.
+- `backend/src/prisma/migrations/20260424000000_ttsrh_checkpoint_ttql/migration.sql` — новый.
+- `backend/src/modules/releases/checkpoints/checkpoint.dto.ts` — + conditionMode/ttqlCondition + superRefine.
+- `backend/tests/checkpoint-dto.unit.test.ts` — новый (15 unit-кейсов).
+- `backend/package.json` — `test:parser` включает новый тест.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-15 → ✅ Done.
+
+### Влияние на prod
+
+Под feature-flag `FEATURES_CHECKPOINT_TTQL=false` (default) engine TTQL-ветки (PR-16) не будет выполняться — новые поля чисто data-only. Existing КТ evaluate через structured path unchanged. При `=true` (после merge PR-16 + UAT) TTQL/COMBINED КТ начнут evaluate'иться.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npx prisma generate` — чисто
+- `npx vitest run tests/checkpoint-dto.unit.test.ts` — **15 passing**
+
+---
+
+## [2.42] [2026-04-21] feat(frontend): TTSRH-1 PR-14 — ColumnConfigurator + ResultsTable + BulkActions + ExportMenu
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/results`
+
+### Что было
+
+После PR-13 SearchPage имел sidebar и модалки, но основная центральная панель показывала «preview до 20 строк». Не было: (a) настройки колонок, (b) сортировки, (c) bulk-операций, (d) экспорта текущего фильтра. Последний frontend-PR по §13.6 закрывает эти gaps.
+
+### Что теперь
+
+4 новых компонента + integration в SearchPage:
+
+- **`frontend/src/components/search/ColumnConfigurator.tsx`** (~170L) — native HTML5 drag-n-drop между списками Available/Selected. Reorder внутри Selected drag-over-drop'ом. Без react-dnd dependency (11h эстимат не позволяет). Кнопка-стрелка на item'е в Available — быстрое добавление. Duplicate-guard: drop того же имени дважды в Selected — ignore.
+- **`frontend/src/components/search/ResultsTable.tsx`** (~180L) — Ant Table:
+  - `rowKey="id"` — стабильные UUID (pre-push-reviewer pattern).
+  - `virtual={issues.length > 200}` + `scroll={y: 480}` для больших результатов.
+  - Renderer'ы per column: priority с цветной `<Tag>` (CRITICAL red → LOW default), key monospace + blue, status Tag, даты через `toLocaleDateString`. Custom-field fallback через `String(v)`.
+  - Click по sortable header → `rewriteOrderBy(jql, field, dir)` → `onJqlChange`. 3-way toggle: none → descend → ascend → none (AntD default).
+  - `rowSelection.onChange` → `onSelectionChange(ids)` для BulkActionsBar.
+  - Pagination через Ant Table controlled props.
+- **`frontend/src/components/search/BulkActionsBar.tsx`** (~140L) — появляется при `selectedIds.length > 0`:
+  - Delete через Popconfirm: `Promise.allSettled(ids.map(DELETE /issues/:id))` → aggregate `{succeeded, failed}` (R12).
+  - Export CSV/XLSX selected через ad-hoc JQL `issue IN (id1, id2, …)`.
+  - «Снять выделение» — очистить selectedIds.
+- **`frontend/src/components/search/ExportMenu.tsx`** (~70L) — Dropdown CSV/XLSX для текущего фильтра:
+  - `exportIssues(jql, format, columns)` → `Blob` → `saveAs` pattern (attach `<a>` to DOM, click, `setTimeout(0)`-revoke — PR-8 pre-push-reviewer anti-race Firefox/Safari).
+  - Disabled при пустом JQL / busy.
+- **`frontend/src/pages/SearchPage.tsx`** — integration:
+  - Preview-список удалён.
+  - `selectedRowIds` state, `displayedColumns = state.columns || DEFAULT_COLUMNS`, `AVAILABLE_COLUMNS` list.
+  - Popover с ColumnConfigurator + кнопка «Колонки» (SettingOutlined).
+  - ExportMenu в правой части header results.
+  - BulkActionsBar рендерится над таблицей при selection.
+  - `onJqlChange` от таблицы → `updateUrl({jql, page: 1}, {push: true})`.
+  - `onSaved` в ColumnConfigurator → `updateUrl({columns}, {push: false})` (replace, без истории на каждый drag).
+  - `state.columns` автоматически сохраняется в URL.
+
+### Изменения
+
+- `frontend/src/components/search/ColumnConfigurator.tsx` — новый.
+- `frontend/src/components/search/ResultsTable.tsx` — новый.
+- `frontend/src/components/search/BulkActionsBar.tsx` — новый.
+- `frontend/src/components/search/ExportMenu.tsx` — новый.
+- `frontend/src/pages/SearchPage.tsx` — integration, selectedIds state, column-config Popover.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-14 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений. При `=true`:
+- Полноценная таблица с сортировкой, пагинацией, выбором строк.
+- Колонки настраиваются через drag-n-drop и сохраняются в URL.
+- Bulk-delete + bulk-export для выделенных задач.
+- Общий export текущего фильтра через ExportMenu.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.45s. Main bundle +2.5KB gzip (AntD Table/Popover/Dropdown уже в main). JqlEditor chunk без изменений.
+
+---
+
+## [2.41] [2026-04-21] feat(frontend): TTSRH-1 PR-13 — SavedFiltersSidebar + Save/Share modals + Zustand store
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/saved-filters-ui`
+
+### Что было
+
+После PR-12 SearchPage уже имел JqlEditor + BasicFilterBuilder, но backend'овые фильтры (CRUD + share из PR-7) не имели UI. Левая колонка была placeholder'ом «Список появится в PR-13». Пользователи не могли сохранять, делить и переиспользовать запросы.
+
+### Что теперь
+
+Полноценный UI для SavedFilters c 5 списками + 2 модалками + Ctrl+S:
+
+- **`frontend/src/store/savedFilters.store.ts`** (~130L) — Zustand-стор:
+  - 5 scope'ов: `mine / favorite / public / shared / recent` (recent — client-side compute на mine sorted by lastUsedAt DESC, top 10).
+  - `load(scope)` / `loadAll()` (параллельный Promise.all).
+  - `create / update / remove / toggleFavorite / share` — тонкие обёртки над `api/savedFilters`, каждая завершается `loadAll()` для синхронизации между списками (filter может переехать из mine → shared → public после изменения visibility).
+  - Ошибки сохраняются в `error`, не throw'ятся — UI решает как показывать.
+- **`frontend/src/components/search/SaveFilterModal.tsx`** (~170L) — Ant Design Modal с Form-validation:
+  - Поля: name (required ≤200), description (≤2000), jql (readonly preview), visibility (Select PRIVATE/SHARED/PUBLIC), isFavorite (Switch).
+  - Обрабатывает create и update через `initial` prop.
+  - PUBLIC → Alert-warning (R11 из §5.9).
+  - Favorite toggling — отдельный endpoint, вызывается только если значение изменилось.
+  - `onClose` / `onCancel` / backdrop / Esc → все триггерят parent `load()` (CLAUDE.md).
+- **`frontend/src/components/search/FilterShareModal.tsx`** (~160L) — управление visibility + sharing:
+  - Visibility switch (PRIVATE/SHARED/PUBLIC).
+  - При SHARED — multi-select пользователей из `/api/users` + permission READ/WRITE.
+  - Copy-link кнопка: `${origin}/search/saved/:id` → `navigator.clipboard.writeText` + AntD `message.success`.
+  - Replace-semantics: visibility → update(), затем `share({users, permission})`.
+- **`frontend/src/components/search/SavedFiltersSidebar.tsx`** (~220L) — левая колонка:
+  - 5 collapsible sections через native `<details>`-style buttons с `aria-expanded`.
+  - Per-item actions: favorite toggle (⭐), share (если permission=WRITE), delete (Popconfirm, только для mine).
+  - Active highlight: `jql === currentJql` подсвечивает текущий фильтр.
+  - Tooltip на item — показывает description || jql.
+- **`frontend/src/pages/SearchPage.tsx`** — integration:
+  - Placeholder-секция заменена на `<SavedFiltersSidebar>` + кнопка «+ Сохранить».
+  - `saveModalOpen / shareModalFilter` — local state модалок.
+  - `Ctrl/Cmd+S` hotkey → openSaveModal (preventDefault на browser "Save Page"). Игнорируется на пустом JQL.
+  - Select-filter из sidebar → `updateUrl` + fire-and-forget `markSavedFilterUsed`.
+  - Все onClose/onSaved вызывают `loadAllSavedFilters()` — CLAUDE.md FR-18.
+
+### Изменения
+
+- `frontend/src/store/savedFilters.store.ts` — новый.
+- `frontend/src/components/search/SaveFilterModal.tsx` — новый.
+- `frontend/src/components/search/FilterShareModal.tsx` — новый.
+- `frontend/src/components/search/SavedFiltersSidebar.tsx` — новый.
+- `frontend/src/pages/SearchPage.tsx` — sidebar integration + modals + Ctrl+S hotkey.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-13 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений. При `=true`:
+- Sidebar подгружает 5 списков (4 backend + 1 client-compute) при mount.
+- Ctrl+S сохраняет текущий JQL.
+- Share-флоу даёт copy-link и управление визиблити/members.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.52s. Main bundle +3.9KB gzip (AntD Modal/Form/Select уже в bundle). JqlEditor chunk unchanged.
+
+---
+
+## [2.40] [2026-04-21] feat(frontend): TTSRH-1 PR-12 — BasicFilterBuilder + Basic↔Advanced toggle
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/basic-builder`
+
+### Что было
+
+После PR-11 `/search` имел только Advanced-режим (JQL-редактор). Пользователи, не знакомые с TTS-QL синтаксисом, упирались в пустой textarea без способа построить запрос визуально — большой барьер для adoption'а feature.
+
+### Что теперь
+
+Chip-based Basic-режим с переключателем:
+
+- **`frontend/src/components/search/basic-filter-model.ts`** (~150L) — чистая pure-function модель:
+  - `BasicChip = {id, field, op, values[]}`; op ∈ `=|!=|IN|NOT IN`.
+  - `canBasicize(jql)` → `{ok, reason?}` — детектит OR / NOT / WAS / CHANGED / `~` / ORDER BY / группировку (R9) и возвращает причину для tooltip.
+  - `chipsFromJql(jql)` — regex-парсер на flat AND-chain (`CLAUSE_RE`: field + op + rhs). `rhs` может быть bare-ident / number / quoted string / `(v1, v2, "v 3")`. `splitInList` корректно обрабатывает запятые внутри quoted строк и escape'ы.
+  - `jqlFromChips(chips)` — сериализация обратно. Values escape: bare-identifier / number остаются без кавычек, всё остальное → `"..."` с escape `\\`/`\"`.
+  - `CATEGORIES` — 5 групп полей для cascade-menu (Задача / Даты / Пользователи / Планирование / AI).
+- **`frontend/src/components/search/FilterModeToggle.tsx`** (~80L) — сегмент-кнопка Basic|Advanced. `aria-pressed` на каждом, `role="group"`, `disabled` + tooltip для Basic через `title`-attribute.
+- **`frontend/src/components/search/BasicFilterBuilder.tsx`** (~200L) — основной UI:
+  - Chips рендерятся inline с inline-edit (field-label + `<select>` op + `<input>` values + `×`-remove).
+  - Клик по chip → edit mode; blur → save; `setEditingId(null)`.
+  - "+ Добавить фильтр" раскрывает cascade-menu `role="menu"` с категориями из `CATEGORIES`.
+  - Sync с внешним `value` через `useEffect([value])` — меняет chips только если `jqlFromChips` отличается (избегает re-render cascade).
+  - Commit helper: setChips + onChange(jqlFromChips) атомарно.
+- **`frontend/src/pages/SearchPage.tsx`** — integration:
+  - `filterMode: 'basic' | 'advanced'` state (default 'advanced').
+  - `basicCheck = useMemo(canBasicize(jqlDraft))` — disabled state для toggle.
+  - Auto-fallback: при загрузке saved filter с OR/NOT → mode forced в 'advanced'.
+  - В Basic-mode рендерим `<BasicFilterBuilder>`, в Advanced — `<JqlEditor>`.
+  - `setJqlDraft` общий, переключение не теряет черновик.
+
+### Изменения
+
+- `frontend/src/components/search/basic-filter-model.ts` — новый.
+- `frontend/src/components/search/BasicFilterBuilder.tsx` — новый.
+- `frontend/src/components/search/FilterModeToggle.tsx` — новый.
+- `frontend/src/pages/SearchPage.tsx` — integration + mode-state.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-12 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений. При `=true`: по умолчанию режим Advanced (existing behavior). Toggle переключает на chip-builder. Full autocomplete значений в chip-popover'ах + кастомные поля — PR-13 (Save/Share modals + полноценные popover'ы на Ant Design).
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.49s. Main bundle вырос на ~7.5KB gzip (BasicFilterBuilder не lazy-загружается, чтобы переключение режима было мгновенным). JqlEditor chunk без изменений.
+
+---
+
+## [2.39] [2026-04-21] feat(frontend): TTSRH-1 PR-11 — ValueSuggester CM6 autocomplete + TTL cache
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/value-suggester`
+
+### Что было
+
+После PR-10 JqlEditor был статичным: user писал запрос вручную, без подсказок значений. Ключи проектов, имена статусов, email'ы assignee'ев нужно было копировать глазами из других страниц. Backend-endpoint `/search/suggest` был готов с PR-6 (13 value-providers), но frontend его не использовал.
+
+### Что теперь
+
+CM6 autocomplete подключён к `/search/suggest` со всеми 13 backend-провайдерами:
+
+- **`frontend/src/components/search/suggest-cache.ts`** (~60L) — lightweight TTL Map-cache. TTL per field: Project/IssueType/Status = 60s, Sprint/Release = 30s, default = 30s (§13.6 PR-11). GC когда `cache.size > 200`. Ключ — конкатенация `jql|cursor|field|operator|prefix|variant` (stable ordering).
+- **`frontend/src/components/search/ttql-completion.ts`** (~100L) — CM6 `CompletionSource` адаптер:
+  - `ttqlCompletionSource(triggerChars)` возвращает async source, который (a) находит word-boundary через `context.matchBefore(/[\w."-]*/)`, (b) проверяет trigger chars (`=`, `,`, `(`, ` `) если trigger не explicit, (c) вызывает `cachedSuggest({jql, cursor, prefix})`, (d) маппит `Completion.kind` → CM6 `type` (`variable`/`operator`/`function`/`constant`/`keyword`), (e) маппит `score` (0..1) → CM6 `boost` (-99..99), (f) лениво рендерит `info` из `icon + detail`.
+  - `context.aborted` guard — stale responses не попадают в UI.
+  - Never throws: network/5xx → `null` (CM6 скрывает popup).
+- **`frontend/src/components/search/JqlEditor.tsx`** — + `autocompletion({override: [ttqlCompletionSource(...)], activateOnTyping: true, closeOnBlur: true, maxRenderedOptions: 50, defaultKeymap: false})`. `completionKeymap` добавлен в общий keymap-merge для Ctrl+Space / Enter-to-accept / Escape-to-close.
+
+### Изменения
+
+- `frontend/src/components/search/suggest-cache.ts` — новый.
+- `frontend/src/components/search/ttql-completion.ts` — новый.
+- `frontend/src/components/search/JqlEditor.tsx` — + autocompletion extension + completionKeymap.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-11 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений (chunk не грузится). При включении: в JqlEditor появляется всплывающий popup с автокомплитом по мере ввода (и Ctrl+Space / после `=`/`,`/`(`). Каждая suggestion показывает type-badge (CM6 стандартный), опциональный icon + detail в info-panel.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.53s. Chunk `JqlEditor` = **113.62KB gzip** (71% от NFR-5 160KB budget, +12KB за `@codemirror/autocomplete`).
 
 ---
 
@@ -23,10 +640,6 @@
 - `backend/src/shared/utils/async-handler.ts`, `logger.ts`, `rate-limit.ts`, `issue-access.ts`
 - `backend/src/shared/middleware/error-handler.ts`, `backend/src/app.ts`
 - 39 роутеров — убраны try/catch блоки
-
----
-
-**Last version before this branch: 2.37**
 
 ---
 

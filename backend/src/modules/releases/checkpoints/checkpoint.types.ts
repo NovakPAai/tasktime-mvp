@@ -20,12 +20,18 @@ export type CheckpointCriterion =
 
 export type CheckpointCriterionType = CheckpointCriterion['type'];
 
+// TTSRH-1 PR-16: `TTQL_MISMATCH` — issue didn't pass the TTQL snapshot filter.
+// `TTQL_ERROR` — compile/exec failure (state=ERROR per R16, FR-31). These are
+// not real CheckpointCriterion types; including them in the union keeps the
+// violation payload uniform across structured and TTQL paths (хэш стабилен).
+export type CheckpointViolationType = CheckpointCriterionType | 'TTQL_MISMATCH' | 'TTQL_ERROR';
+
 export interface CheckpointViolation {
   issueId: string;
   issueKey: string;
   issueTitle: string;
   reason: string;
-  criterionType: CheckpointCriterionType;
+  criterionType: CheckpointViolationType;
 }
 
 export interface CheckpointBreakdown {

@@ -131,6 +131,11 @@ jobs:
           file: frontend/Dockerfile
           push: true
           tags: ${{ steps.vars.outputs.web_tags }}
+          # TODO(TTSRH-1): revert to default (off) after prod cutover signoff.
+          # During cutover window, prod builds also get the flag on — backend
+          # gate keeps /search API locked until ops flips FEATURES_ADVANCED_SEARCH.
+          build-args: |
+            VITE_FEATURES_ADVANCED_SEARCH=true
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 

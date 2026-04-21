@@ -5,7 +5,7 @@
 // See docs/tz/TTMP-160.md §12.4 for the state machine and risk formula.
 
 import { createHash } from 'node:crypto';
-import type { CheckpointState, CheckpointWeight } from '@prisma/client';
+import type { CheckpointConditionMode, CheckpointState, CheckpointWeight } from '@prisma/client';
 
 import type {
   CheckpointCriterion,
@@ -27,6 +27,18 @@ export interface CheckpointEvaluationInput {
   warningDays: number;
   issues: EvaluationIssue[];
   context: EvaluationContext;
+
+  // TTSRH-1 PR-16: TTQL branch inputs. `conditionMode` defaults to 'STRUCTURED'
+  // for backward-compat (FR-25) — older callers don't need to pass it.
+  conditionMode?: CheckpointConditionMode;
+  // Set of issue.id's that pass the TTQL snapshot query. Caller pre-computes
+  // this via checkpoint-ttql-evaluator.service.ts (Prisma + compiler). `null`
+  // means "TTQL not evaluated" — valid for STRUCTURED mode, unexpected for
+  // TTQL/COMBINED modes (treated as empty → all applicable issues fail).
+  ttqlMatchedIds?: ReadonlySet<string> | null;
+  // If non-null, engine emits state=ERROR + a single TTQL_ERROR violation and
+  // skips normal evaluation. Set by the resolver on compile/exec failure (R16).
+  ttqlError?: string | null;
 }
 
 export interface CheckpointEvaluationResult {
@@ -46,36 +58,95 @@ export function evaluateCheckpoint(
   input: CheckpointEvaluationInput,
   now: Date,
 ): CheckpointEvaluationResult {
+  const mode: CheckpointConditionMode = input.conditionMode ?? 'STRUCTURED';
+
+  // ─── TTQL error fast-path (FR-31) ─────────────────────────────────────────
+  // Compile/exec failure → state=ERROR + single synthetic TTQL_ERROR violation.
+  // Keeps violationsHash stable (one entry, deterministic).
+  if (input.ttqlError != null && input.ttqlError.length > 0) {
+    const errViolations: CheckpointViolation[] = [
+      {
+        issueId: '',
+        issueKey: '',
+        issueTitle: '',
+        reason: input.ttqlError,
+        criterionType: 'TTQL_ERROR',
+      },
+    ];
+    return {
+      state: 'ERROR' as CheckpointState,
+      isWarning: false,
+      applicableIssueIds: [],
+      passedIssueIds: [],
+      violations: errViolations,
+      violationsHash: computeViolationsHash(errViolations),
+      breakdown: { applicable: 0, passed: 0, violated: 1 },
+    };
+  }
+
   const applicableIssueIds: string[] = [];
   const passedIssueIds: string[] = [];
   const violations: CheckpointViolation[] = [];
+  const ttqlSet = input.ttqlMatchedIds ?? null;
 
   for (const issue of input.issues) {
-    const results = input.criteria.map((c) => evaluateCriterion(c, issue, input.context));
-    const applicableResults = results.filter((r) => r.applicable);
-    if (applicableResults.length === 0) continue;
-
-    applicableIssueIds.push(issue.id);
-
-    const failed = applicableResults.filter((r) => r.applicable && r.passed === false) as Array<
-      Extract<ReturnType<typeof evaluateCriterion>, { applicable: true; passed: false }>
-    >;
-
-    if (failed.length === 0) {
-      passedIssueIds.push(issue.id);
-      continue;
+    // ─── STRUCTURED & COMBINED: run structured criteria first ───────────────
+    let structuredPassed: boolean | 'not-applicable' = 'not-applicable';
+    if (mode === 'STRUCTURED' || mode === 'COMBINED') {
+      const results = input.criteria.map((c) => evaluateCriterion(c, issue, input.context));
+      const applicableResults = results.filter((r) => r.applicable);
+      if (applicableResults.length === 0) {
+        // Issue not subject to structured criteria; for STRUCTURED this skips it
+        // entirely. For COMBINED we still consider TTQL applicability below.
+        if (mode === 'STRUCTURED') continue;
+      } else {
+        const failed = applicableResults.filter((r) => r.applicable && r.passed === false) as Array<
+          Extract<ReturnType<typeof evaluateCriterion>, { applicable: true; passed: false }>
+        >;
+        structuredPassed = failed.length === 0;
+        if (failed.length > 0) {
+          // Structured criteria failed — record violation (reason preserves detail).
+          violations.push({
+            issueId: issue.id,
+            issueKey: issue.key,
+            issueTitle: issue.title,
+            reason: failed.map((f) => f.reason).join('; '),
+            criterionType: failed[0]!.criterionType,
+          });
+          applicableIssueIds.push(issue.id);
+          // For STRUCTURED short-circuit; for COMBINED skip TTQL check (already
+          // failed — structured result wins and we avoid duplicate violation).
+          continue;
+        }
+        applicableIssueIds.push(issue.id);
+      }
     }
 
-    violations.push({
-      issueId: issue.id,
-      issueKey: issue.key,
-      issueTitle: issue.title,
-      // Concatenate human reasons so the violation row carries the full "why" in one field.
-      // criterionType takes the first failing criterion — good enough for filtering/analytics;
-      // the joined reason preserves detail.
-      reason: failed.map((f) => f.reason).join('; '),
-      criterionType: failed[0]!.criterionType,
-    });
+    // ─── TTQL / COMBINED: check TTQL set ─────────────────────────────────────
+    if (mode === 'TTQL' || mode === 'COMBINED') {
+      // For TTQL mode every issue is applicable; for COMBINED we may not have
+      // recorded applicability if structured criteria were n/a — do it now.
+      if (mode === 'TTQL') applicableIssueIds.push(issue.id);
+      else if (mode === 'COMBINED' && structuredPassed === 'not-applicable') {
+        applicableIssueIds.push(issue.id);
+      }
+
+      const ttqlOk = ttqlSet !== null && ttqlSet.has(issue.id);
+      if (!ttqlOk) {
+        violations.push({
+          issueId: issue.id,
+          issueKey: issue.key,
+          issueTitle: issue.title,
+          reason: 'Issue does not match checkpoint TTQL condition',
+          criterionType: 'TTQL_MISMATCH',
+        });
+        continue;
+      }
+      passedIssueIds.push(issue.id);
+    } else {
+      // STRUCTURED-only path reaches here only for passed issues.
+      passedIssueIds.push(issue.id);
+    }
   }
 
   const state = computeState(violations.length, input.deadline, now);

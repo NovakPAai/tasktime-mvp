@@ -21,10 +21,23 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Button, Popover } from 'antd';
+import { SettingOutlined } from '@ant-design/icons';
 
 import { searchIssues, type IssueSearchRow } from '../api/search';
-import { getSavedFilter, markSavedFilterUsed } from '../api/savedFilters';
+import { getSavedFilter, markSavedFilterUsed, type SavedFilter } from '../api/savedFilters';
+import BasicFilterBuilder from '../components/search/BasicFilterBuilder';
+import { canBasicize } from '../components/search/basic-filter-model';
+import FilterModeToggle, { type FilterMode } from '../components/search/FilterModeToggle';
+import BulkActionsBar from '../components/search/BulkActionsBar';
+import ColumnConfigurator from '../components/search/ColumnConfigurator';
+import ExportMenu from '../components/search/ExportMenu';
+import FilterShareModal from '../components/search/FilterShareModal';
 import JqlEditor from '../components/search/JqlEditor.lazy';
+import ResultsTable from '../components/search/ResultsTable';
+import SaveFilterModal from '../components/search/SaveFilterModal';
+import SavedFiltersSidebar from '../components/search/SavedFiltersSidebar';
+import { useSavedFiltersStore } from '../store/savedFilters.store';
 import { useThemeStore } from '../store/theme.store';
 import { useSearchUrlState } from './search/useSearchUrlState';
 import { useJqlValidation } from './search/useJqlValidation';
@@ -41,6 +54,56 @@ export default function SearchPage() {
   const [jqlDraft, setJqlDraft] = useState(state.jql);
   const [load, setLoad] = useState<LoadState>({ status: 'idle' });
   const { errors: inlineErrors, isValidating } = useJqlValidation(jqlDraft);
+  const [filterMode, setFilterMode] = useState<FilterMode>('advanced');
+  const basicCheck = useMemo(() => canBasicize(jqlDraft), [jqlDraft]);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveModalInitial, setSaveModalInitial] = useState<SavedFilter | null>(null);
+  const [shareModalFilter, setShareModalFilter] = useState<SavedFilter | null>(null);
+  const loadAllSavedFilters = useSavedFiltersStore((s) => s.loadAll);
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [columnConfigOpen, setColumnConfigOpen] = useState(false);
+  const DEFAULT_COLUMNS = useMemo(
+    () => ['key', 'summary', 'type', 'status', 'priority', 'assignee', 'sprint', 'updated'],
+    [],
+  );
+  const AVAILABLE_COLUMNS = useMemo(
+    () => [
+      'key', 'summary', 'type', 'status', 'priority', 'assignee', 'creator',
+      'project', 'projectKey', 'sprint', 'release', 'due', 'created', 'updated',
+      'description',
+    ],
+    [],
+  );
+  const displayedColumns = state.columns.length > 0 ? state.columns : DEFAULT_COLUMNS;
+
+  const openSaveModal = useCallback(() => {
+    setSaveModalInitial(null);
+    setSaveModalOpen(true);
+  }, []);
+
+  // Ctrl/Cmd+S → Save. preventDefault чтобы не триггерить browser "Save Page".
+  // Skip when focus is inside another form control (AntD modal inputs etc.) —
+  // исключение: CM6 JqlEditor (`.cm-editor`), там Ctrl+S должен сохранять.
+  useEffect(() => {
+    function onKey(ev: KeyboardEvent) {
+      if (!(ev.ctrlKey || ev.metaKey) || ev.key.toLowerCase() !== 's') return;
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName?.toLowerCase();
+      const isEditable = el?.getAttribute('contenteditable') === 'true';
+      const isCmEditor = el?.closest('.cm-editor') != null;
+      if (!isCmEditor && (tag === 'input' || tag === 'textarea' || tag === 'select' || isEditable)) return;
+      ev.preventDefault();
+      if (!jqlDraft.trim()) return;
+      openSaveModal();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [jqlDraft, openSaveModal]);
+  // Auto-switch to Advanced if current JQL can't be basicized (e.g. user loaded a
+  // saved filter with OR/NOT). Reverse not enforced — user may manually switch.
+  useEffect(() => {
+    if (filterMode === 'basic' && !basicCheck.ok) setFilterMode('advanced');
+  }, [filterMode, basicCheck.ok]);
 
   // Sync draft when URL changes (browser back/forward).
   useEffect(() => {
@@ -132,22 +195,52 @@ export default function SearchPage() {
           alignItems: 'stretch',
         }}
       >
-        {/* Column 1 — Sidebar (PR-13: saved filters list) */}
+        {/* Column 1 — SavedFiltersSidebar */}
         <aside
           data-testid="search-sidebar"
           style={{
             background: c.panel,
             border: `1px solid ${c.border}`,
             borderRadius: 8,
-            padding: 16,
+            padding: 12,
             minHeight: 480,
-            color: c.t3,
+            color: c.t1,
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 120px)',
           }}
         >
-          <div style={{ fontWeight: 600, color: c.t1, marginBottom: 6, fontSize: 13 }}>Мои фильтры</div>
-          <div style={{ fontSize: 12 }}>
-            Список сохранённых фильтров появится в PR-13 (§13.6 ТЗ).
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 600, color: c.t1, fontSize: 13 }}>Фильтры</div>
+            <button
+              type="button"
+              onClick={openSaveModal}
+              disabled={!jqlDraft.trim()}
+              aria-label="Сохранить текущий фильтр"
+              title={jqlDraft.trim() ? 'Сохранить (Ctrl+S)' : 'Введите JQL для сохранения'}
+              data-testid="sidebar-save-filter"
+              style={{
+                background: jqlDraft.trim() ? c.acc : 'transparent',
+                color: jqlDraft.trim() ? '#fff' : c.t3,
+                border: `1px solid ${jqlDraft.trim() ? c.acc : c.border}`,
+                borderRadius: 5,
+                padding: '3px 10px',
+                fontSize: 11,
+                cursor: jqlDraft.trim() ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+              }}
+            >
+              + Сохранить
+            </button>
           </div>
+          <SavedFiltersSidebar
+            currentJql={state.jql}
+            isLight={isLight}
+            onSelectFilter={(f) => {
+              updateUrl({ jql: f.jql, columns: f.columns ?? [], page: 1 }, { push: true });
+              markSavedFilterUsed(f.id).catch(() => undefined);
+            }}
+            onOpenShare={(f) => setShareModalFilter(f)}
+          />
         </aside>
 
         {/* Column 2 — Main (editor + results) */}
@@ -164,20 +257,35 @@ export default function SearchPage() {
           }}
         >
           <div>
-            {/* CM6 editor provides its own aria-label on the contenteditable node;
-                this visual label is purely decorative (aria-hidden) to avoid a
-                dangling htmlFor association. */}
-            <div aria-hidden="true" style={{ fontSize: 12, color: c.t3, marginBottom: 6 }}>
-              JQL / TTS-QL <span style={{ color: c.t3, fontSize: 11 }}>(/ — фокус, Ctrl/Cmd+Enter — выполнить)</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+              {/* CM6 editor provides its own aria-label on the contenteditable node;
+                  this visual label is purely decorative (aria-hidden) to avoid a
+                  dangling htmlFor association. */}
+              <div aria-hidden="true" style={{ fontSize: 12, color: c.t3 }}>
+                {filterMode === 'advanced'
+                  ? <>JQL / TTS-QL <span style={{ color: c.t3, fontSize: 11 }}>(/ — фокус, Ctrl/Cmd+Enter — выполнить)</span></>
+                  : 'Basic-фильтры'}
+              </div>
+              <FilterModeToggle
+                mode={filterMode}
+                onChange={setFilterMode}
+                basicDisabled={!basicCheck.ok}
+                basicDisabledReason={basicCheck.reason}
+                isLight={isLight}
+              />
             </div>
-            <JqlEditor
-              value={jqlDraft}
-              onChange={setJqlDraft}
-              onSubmit={(v) => updateUrl({ jql: v.trim(), page: 1 }, { push: true })}
-              errors={inlineErrors}
-              isLight={isLight}
-              ariaDescribedBy="jql-status-line"
-            />
+            {filterMode === 'basic' ? (
+              <BasicFilterBuilder value={jqlDraft} onChange={setJqlDraft} isLight={isLight} />
+            ) : (
+              <JqlEditor
+                value={jqlDraft}
+                onChange={setJqlDraft}
+                onSubmit={(v) => updateUrl({ jql: v.trim(), page: 1 }, { push: true })}
+                errors={inlineErrors}
+                isLight={isLight}
+                ariaDescribedBy="jql-status-line"
+              />
+            )}
             {inlineErrors.length > 0 && (
               <ul
                 data-testid="jql-error-banner"
@@ -243,11 +351,67 @@ export default function SearchPage() {
               minHeight: 240,
             }}
           >
-            {load.status === 'ok' ? (
-              <SearchResultsPreview issues={load.issues} color={c} />
-            ) : (
+            {load.status === 'ok' && (
+              <>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: c.t3 }}>Всего: {load.total}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Popover
+                      open={columnConfigOpen}
+                      onOpenChange={setColumnConfigOpen}
+                      trigger="click"
+                      placement="bottomRight"
+                      content={
+                        <ColumnConfigurator
+                          available={AVAILABLE_COLUMNS}
+                          selected={displayedColumns}
+                          onChange={(next) => updateUrl({ columns: next }, { push: false })}
+                          onClose={() => setColumnConfigOpen(false)}
+                          isLight={isLight}
+                        />
+                      }
+                    >
+                      <Button size="small" icon={<SettingOutlined />}>Колонки</Button>
+                    </Popover>
+                    <ExportMenu jql={state.jql} columns={displayedColumns} />
+                  </div>
+                </div>
+                {selectedRowIds.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <BulkActionsBar
+                      selectedIds={selectedRowIds}
+                      onCleared={() => {
+                        setSelectedRowIds([]);
+                        void runQuery(state.jql, state.page);
+                      }}
+                      isLight={isLight}
+                    />
+                  </div>
+                )}
+                <ResultsTable
+                  issues={load.issues}
+                  columns={displayedColumns}
+                  total={load.total}
+                  page={state.page}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={(p) => {
+                    setSelectedRowIds([]);
+                    updateUrl({ page: p }, { push: true });
+                  }}
+                  currentJql={state.jql}
+                  onJqlChange={(jql) => {
+                    setSelectedRowIds([]);
+                    updateUrl({ jql, page: 1 }, { push: true });
+                  }}
+                  onSelectionChange={setSelectedRowIds}
+                  selectedIds={selectedRowIds}
+                  isLight={isLight}
+                />
+              </>
+            )}
+            {load.status !== 'ok' && (
               <div style={{ color: c.t3, fontSize: 12 }}>
-                Результаты появятся здесь. Полноценная таблица (сортировка, bulk-actions, экспорт) — в PR-14.
+                Введите JQL и нажмите Ctrl+Enter или выберите сохранённый фильтр слева.
               </div>
             )}
           </div>
@@ -266,47 +430,37 @@ export default function SearchPage() {
             fontSize: 12,
           }}
         >
-          Preview задачи появится в PR-14.
+          Выберите задачу в таблице для preview (полный drawer — вне scope §13.6, Phase 2).
         </aside>
       </div>
+
+      <SaveFilterModal
+        open={saveModalOpen}
+        onClose={() => {
+          setSaveModalOpen(false);
+          void loadAllSavedFilters(); // CLAUDE.md rule: onClose → reload parent data
+        }}
+        onSaved={(f) => {
+          setSaveModalOpen(false);
+          updateUrl({ jql: f.jql, columns: f.columns ?? [], page: 1 }, { push: false });
+          void loadAllSavedFilters();
+        }}
+        initial={saveModalInitial}
+        currentJql={jqlDraft}
+      />
+      <FilterShareModal
+        open={shareModalFilter !== null}
+        filter={shareModalFilter}
+        onClose={() => {
+          setShareModalFilter(null);
+          void loadAllSavedFilters();
+        }}
+        onSaved={() => {
+          setShareModalFilter(null);
+          void loadAllSavedFilters();
+        }}
+      />
     </div>
   );
 }
 
-function SearchResultsPreview({
-  issues,
-  color,
-}: {
-  issues: IssueSearchRow[];
-  color: { panel: string; border: string; t1: string; t2: string; t3: string; acc: string };
-}) {
-  if (issues.length === 0) {
-    return <div style={{ color: color.t3, fontSize: 12 }}>Нет задач, удовлетворяющих запросу.</div>;
-  }
-  return (
-    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {issues.slice(0, 20).map((issue) => {
-        const keyLabel = `${issue.project.key}-${issue.number}`;
-        return (
-          <li
-            key={issue.id}
-            style={{
-              display: 'flex',
-              gap: 10,
-              padding: '6px 8px',
-              border: `1px solid ${color.border}`,
-              borderRadius: 6,
-              fontSize: 13,
-              color: color.t1,
-            }}
-          >
-            <span style={{ fontFamily: '"JetBrains Mono", monospace', color: color.acc, minWidth: 80 }}>{keyLabel}</span>
-            <span style={{ flex: 1 }}>{issue.title}</span>
-            <span style={{ color: color.t3, fontSize: 11 }}>{issue.workflowStatus?.name ?? issue.priority ?? ''}</span>
-          </li>
-        );
-      })}
-      {issues.length > 20 && <li style={{ color: color.t3, fontSize: 12 }}>…и ещё {issues.length - 20}. Полная таблица — PR-14.</li>}
-    </ul>
-  );
-}

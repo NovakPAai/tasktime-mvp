@@ -1098,6 +1098,8 @@ Run `make docs` to check for staleness warnings.
 | `offsetDays` | `Int` | нет |  |
 | `warningDays` | `Int` | нет | default: 3 |
 | `criteria` | `Json` | нет |  |
+| `conditionMode` | `CheckpointConditionMode` | нет | default: STRUCTURED |
+| `ttqlCondition` | `String` | да |  |
 | `webhookUrl` | `String` | да |  |
 | `minStableSeconds` | `Int` | нет | default: 300 |
 | `isActive` | `Boolean` | нет | default: true |
@@ -1139,6 +1141,8 @@ Run `make docs` to check for staleness warnings.
 | `checkpointTypeId` | `String` | нет |  |
 | `criteriaSnapshot` | `Json` | нет |  |
 | `offsetDaysSnapshot` | `Int` | нет |  |
+| `ttqlSnapshot` | `String` | да |  |
+| `conditionModeSnapshot` | `CheckpointConditionMode` | нет | default: STRUCTURED |
 | `deadline` | `DateTime` | нет |  |
 | `state` | `CheckpointState` | нет | default: PENDING |
 | `lastEvaluatedAt` | `DateTime` | да |  |
@@ -1219,7 +1223,7 @@ Run `make docs` to check for staleness warnings.
 | `user` | `User` | да |  |
 | `group` | `UserGroup` | да |  |
 
-## Перечисления (22)
+## Перечисления (23)
 
 ### SystemRoleType
 
@@ -1385,6 +1389,13 @@ Run `make docs` to check for staleness warnings.
 - `PENDING`
 - `OK`
 - `VIOLATED`
+- `ERROR`
+
+### CheckpointConditionMode
+
+- `STRUCTURED`
+- `TTQL`
+- `COMBINED`
 
 ### FilterVisibility
 

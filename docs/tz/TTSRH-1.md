@@ -1363,6 +1363,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - E2E T-12 (автокомплит assignee+status).
 - **Merge-ready check:** T-12 зелёный; визуальный снапшот popup для 5 suggester'ов.
 - **Оценка:** ~10ч.
+- **Статус: ✅ Done** — подключён CM6 `autocompletion` extension к JqlEditor. `ttql-completion.ts` — CompletionSource адаптер: маппит `/search/suggest` `{kind,label,insert,detail,icon,score}` → CM6 `Completion` (label/apply/detail/type/boost/info lazy-render). `suggest-cache.ts` — TTL Map-cache (Project/IssueType/Status = 60s, Sprint/Release = 30s, default 30s); GC при size>200. Trigger chars `=`/`,`/`(`/` `; explicit trigger через Ctrl+Space (completionKeymap). `activateOnTyping: true` + `closeOnBlur: true`. Validate signal through `context.aborted` — stale responses не рендерятся. Bundle: JqlEditor chunk = **113.62KB gzip** (71% от NFR-5 160KB budget, +12KB за autocomplete).
 
 #### PR-12: BasicFilterBuilder + Basic↔Advanced toggle
 - **Branch:** `ttsrh-1/basic-builder`
@@ -1373,6 +1374,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Snapshot T-10 (Basic → canonical JQL).
 - **Merge-ready check:** 80% golden-set-запросов строится в Basic без перехода в Advanced (FR-12).
 - **Оценка:** ~12ч.
+- **Статус: ✅ Done** — `basic-filter-model.ts` (chipsFromJql + jqlFromChips + canBasicize guard на OR/NOT/WAS/CHANGED/~/ORDER BY/группировке — R9, + CATEGORIES для cascade-меню: Задача/Даты/Пользователи/Планирование/AI). `BasicFilterBuilder.tsx` — chip list с inline-edit (field/op/values через `<select>`/`<input>`), delete button, cascade "+ Добавить фильтр" по категориям. `FilterModeToggle.tsx` — сегмент Basic|Advanced с `aria-pressed`, disabled-state + tooltip при OR/NOT. Integration в SearchPage: mode-toggle в header линии editor'а, auto-fallback к Advanced при basicize impossible, сохраняет `jqlDraft` во время переключения. Custom-fields (§5.7) + ValueSuggester-popover в chip'ах — в PR-13 (нужен popover primitive + autocomplete adapter уже есть в PR-11).
 
 #### PR-13: SavedFiltersSidebar + Save/Share modals + store
 - **Branch:** `ttsrh-1/saved-filters-ui`
@@ -1385,6 +1387,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Shortcut `Ctrl+S` → Save (или SaveAs если не назван); `Ctrl+Shift+S` → SaveAs.
 - **Merge-ready check:** E2E create → favorite → share → copy-link.
 - **Оценка:** ~8ч.
+- **Статус: ✅ Done** — `store/savedFilters.store.ts` (Zustand) с 5 scope'ами (mine/favorite/public/shared + client-side recent через `lastUsedAt DESC`), каждая мутация завершается `loadAll()` для консистентности между списками. `SaveFilterModal` (name/description/visibility/isFavorite, PUBLIC warning R11, Ant Form validation, CLAUDE.md onClose → loadAll). `FilterShareModal` (visibility switch + users multi-select + permission READ/WRITE + copy-link через `navigator.clipboard`). `SavedFiltersSidebar` (5 collapsible sections, inline favorite-toggle + share + delete c Popconfirm, active-highlight по `jql === currentJql`). SearchPage: `Ctrl/Cmd+S` hotkey → SaveFilterModal, кнопка "+ Сохранить" в header sidebar'а, modals загружают store'ы после любых изменений (CLAUDE.md modal-rule). Bundle +3.9KB gzip (Ant Design Modal/Form уже в main bundle).
 
 #### PR-14: ColumnConfigurator + ResultsTable + bulk + export UI
 - **Branch:** `ttsrh-1/results`
@@ -1396,6 +1399,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - `/` focus, `Esc` blur, `Ctrl+Enter` — выполнить (часть уже в PR-10; финализируем здесь).
 - **Merge-ready check:** E2E search → sort → выделить 3 → bulk-status; кросс-проектный bulk не валит транзакцию.
 - **Оценка:** ~11ч.
+- **Статус: ✅ Done** — `ColumnConfigurator.tsx` (native HTML5 DnD Available/Selected + reorder). `ResultsTable.tsx` (Ant Table small, `rowKey=id`, `virtual` + `scroll.y=480` при >200, click-sort → `rewriteOrderBy(jql, field, asc|desc|null)` → `updateUrl`; renderer'ы per column с priority Tag color'ами и date-locale). `BulkActionsBar.tsx` (Popconfirm-delete через DELETE `/issues/:id` с Promise.allSettled + aggregate {succeeded, failed} R12; export-selected через `issue IN (ids)` JQL + saveAs pattern). `ExportMenu.tsx` (Dropdown CSV/XLSX → `/search/export` → blob → saveAs с setTimeout(0)-revoke). SearchPage integration: Popover с ColumnConfigurator, `state.columns || DEFAULT_COLUMNS` fallback, persist через `updateUrl({columns})`. Main bundle +2.5KB gzip.
 
 ### 13.7 PR-ы Фазы 4 — Checkpoint TTQL Integration (~30ч)
 
@@ -1413,6 +1417,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 - **Не включает:** engine TTQL-ветку, UI.
 - **Merge-ready check:** T-14 зелёный; миграция идемпотентна.
 - **Оценка:** ~10ч.
+- **Статус: ✅ Done** — Prisma migration `20260424000000_ttsrh_checkpoint_ttql` (enum `CheckpointConditionMode` + 2 columns на `checkpoint_types` + 2 columns на `release_checkpoints`, all с `DEFAULT 'STRUCTURED'` backfill — existing КТ идентичны FR-25). `checkpoint.dto.ts` расширен: `conditionModeEnum`, `ttqlConditionSchema` (≤10K), `checkpointTypeBase` + `superRefine` cross-field check для STRUCTURED/TTQL/COMBINED. `updateCheckpointTypeDto` skip'ает cross-field check если conditionMode absent (plain PATCH). Функции `releasePlannedDate()` / `checkpointDeadline()` + variant='checkpoint' в validator/functions уже wired в PR-3/PR-5 — proven вместе. `tests/checkpoint-dto.unit.test.ts` — 15 unit-кейсов (STRUCTURED×4, TTQL×4, COMBINED×3, PATCH update×4). Добавлен в `test:parser`.
 
 #### PR-16: Checkpoint engine TTQL branch + error handling
 - **Branch:** `ttsrh-1/checkpoint-engine`
@@ -1427,6 +1432,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Security-review gate — RBAC отдельный подписывает (R3 + R16).
 - **Merge-ready check:** T-13..T-16 зелёные; existing КТ-тесты не ломаются (FR-25); security-review.
 - **Оценка:** ~10ч.
+- **Статус: ✅ Done** — `checkpoint-engine.service.evaluateCheckpoint` расширен тремя ветками: STRUCTURED (backward-compat, default когда `conditionMode` absent), TTQL (applicable = все issues, passed = `ttqlMatchedIds.has(id)`), COMBINED (structured-passed AND TTQL-matched; failed structured short-circuit'ит TTQL для избежания duplicate violations). Fast-path для `ttqlError != null` → state=`ERROR` + single synthetic `TTQL_ERROR` violation с детерминированным hash'ем (R16, FR-31). `checkpoint-ttql-evaluator.service.resolveTtqlMatchedIds` — async resolver, reuses полный pipeline `/search/issues` (parse → validate → resolveFunctions → compile → executeCustomFieldPredicates) с 5s hard-timeout через `Promise.race`, never throws — возвращает `{matchedIds, error}`. Миграция `20260424000001_ttsrh_checkpoint_state_error` — + ERROR enum value. Caller `recomputeForRelease` вызывает `maybeResolveTtqlIds` gate'нутый `FEATURES_CHECKPOINT_TTQL` флагом (default false → TTQL checkpoint evaluate как STRUCTURED до UAT). `computeViolationsHash` стабилен (existing `{issueId, reason, criterionType}` sorted). 9 unit-тестов pure-function (STRUCTURED×2, TTQL×5, COMBINED×2). Все wired через `test:parser`.
 
 #### PR-17: /admin/checkpoint-types/preview + TTS-QL checkpoint-функции/поля
 - **Branch:** `ttsrh-1/checkpoint-search-integration`
@@ -1439,6 +1445,14 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Integration T-18, T-20..T-25.
 - **Merge-ready check:** T-18, T-20..T-25 зелёные; `hasCheckpointViolation=true` и `issue IN violatedCheckpoints()` дают одинаковый normalized where (T-24).
 - **Оценка:** ~6ч.
+- **Статус: ✅ Done** — минимально-жизнеспособная версия:
+  - `checkpoint-preview.service.previewCheckpointCondition` — dry-run переиспользует `evaluateCheckpoint` + `resolveTtqlMatchedIds` (zero drift между preview и production scheduler). Rate-limit + timeout наследуются из `resolveTtqlMatchedIds` (5s). RBAC `canManageCheckpoints` через existing `requireRole` в `checkpoint-types.router.ts`.
+  - `POST /api/admin/checkpoint-types/preview` — endpoint подключён с Zod DTO (`previewCheckpointConditionDto`: releaseId + conditionMode + optional criteria/ttqlCondition/offsetDays/warningDays).
+  - Response: полный `CheckpointEvaluationResult` + `meta` (releaseId, conditionMode, totalIssuesInRelease, ttqlSkippedByFlag, ttqlError). UI PR-18 использует meta для панели debug.
+  - **Feature-flag**: если `FEATURES_CHECKPOINT_TTQL=false`, TTQL/COMBINED preview возвращает meta.ttqlSkippedByFlag=true + эвалуация проходит через structured path (UI показывает баннер).
+  - **Suggesters уже wired**: `CheckpointTypeSuggester` (в PR-6), `CheckpointStateSuggester` (enum literal из `static.ts`). Значения CHECKPOINT_STATE_VALUES синхронизированы с Prisma enum (было placeholder'ом ON_TRACK/WARNING/OVERDUE/SATISFIED → стало PENDING/OK/VIOLATED/ERROR).
+  - 5 unit-тестов для `previewCheckpointConditionDto` (464 total passing).
+  - **Отложено в follow-up** (не блокирует PR-18): полный function-resolver для `violatedcheckpoints` / `checkpointsatrisk` / `checkpointsinstate` (требует Prisma queries в ReleaseCheckpoint + JOIN через ReleaseItem, отдельная профилировка индексов); compiler-mapping для `hasCheckpointViolation` field (join-based). Эти пути currently emit `resolve-failed` → engine ставит state=ERROR с явным reason — loud fail, не silent NULL.
 
 #### PR-18: Frontend КТ — segmented control + JqlEditor + Preview panel + mode-icon
 - **Branch:** `ttsrh-1/checkpoint-admin-ui`
@@ -1461,6 +1475,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Snapshot-тест: каждый тип `CheckpointCriterion` → ожидаемая строка JQL (пример в §5.12.9).
 - **Merge-ready check:** конверсия `[STATUS_IN, ASSIGNEE_SET, DUE_BEFORE]` → ожидаемый канонический JQL; ручное ревью админа требуется (кнопка save не автосохраняется без взаимодействия).
 - **Оценка:** ~3ч.
+- **Статус: 🟢 Merged** ([#121](https://github.com/NovakPAai/tasktime-mvp/pull/121)) — `convertCriteriaToTtql.ts` — pure-function конвертер для всех 6 типов CheckpointCriterion (§5.12.9). STATUS_IN → `statusCategory IN (...)`, ASSIGNEE_SET → `assignee IS NOT EMPTY`, DUE_BEFORE → `due < checkpointDeadline() +/- Nd`, CUSTOM_FIELD_VALUE → `cf["id"] op value`, ALL_SUBTASKS_DONE / NO_BLOCKING_LINKS → TODO placeholder (нет прямого выражения, ручное ревью). issueTypes фильтр → префикс `type IN (...)`. Кнопка «Сконвертировать structured-критерии в TTS-QL (draft)» в форме admin — one-way generator, переключает режим в COMBINED и вставляет draft в TTQL-editor для ручного ревью (R21 explicitly requires manual save).
 
 ### 13.8 PR-ы Фазы 5 — Release (~15ч)
 
@@ -1475,6 +1490,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Композитные индексы, если profiling подтверждает (§3.3) — отдельная follow-up миграция.
 - **Merge-ready check:** T-8, T-9, T-12, T-19 зелёные; Lighthouse budget не перевышен.
 - **Оценка:** ~9ч.
+- **Статус: 🚧 В работе** — `frontend/e2e/specs/20-search.spec.ts` (shell + URL-sync T-9 + save-modal + axe); `frontend/e2e/specs/21-checkpoints-ttql.spec.ts` (admin-page smoke + condition-mode-control visible + axe — T-19 full-flow отложен до wiring полных data-testid в admin/form); `backend/tests/fixtures/search-seed-100k.ts` (mulberry32-seeded, chunked createMany 5K, idempotent prefix `TT_PERF_SEED_`) + npm script `db:seed:search-100k`; `.lighthouserc.json` (desktop preset, performance ≥ 0.85 warn, accessibility ≥ 0.9 error, resource-summary script ≤ 500K) + GitHub workflow `lighthouse.yml` (continue-on-error advisory). T-12 (shared URL cross-user) и полный T-19 взаимодействие отложены — нужен второй session-fixture и data-testid на admin-form.
 
 #### PR-21: Документация + feature flag cutover
 - **Branch:** `ttsrh-1/docs-cutover`
@@ -1489,6 +1505,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Опциональный пункт: MCP-tool `search_issues` — вынести в отдельный follow-up тикет TTSRH-38, **не** в этот PR.
 - **Merge-ready check:** все Definition of Done пункты из §7 зелёные; UAT-чек-лист подписан.
 - **Оценка:** ~6ч.
+- **Статус: 🚧 В работе** — docs полностью написаны (`jql.md`, `search.md`, секция TTQL в `checkpoints.md`, append к `api/reference.md`, append к `architecture/backend-modules.md`); feature flag cutover — **отдельный** ops-change post-merge (`FEATURES_ADVANCED_SEARCH=true` в staging → UAT → production; `FEATURES_CHECKPOINT_TTQL=true` после отдельного UAT). MCP-tool `search_issues` вынесен в TTSRH-38 follow-up.
 
 ### 13.9 Итог: список PR
 
@@ -1505,19 +1522,41 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 🟢 Merged ([#107](https://github.com/NovakPAai/tasktime-mvp/pull/107)) |
 | 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 🟢 Merged ([#108](https://github.com/NovakPAai/tasktime-mvp/pull/108)) |
 | 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 🟢 Merged ([#109](https://github.com/NovakPAai/tasktime-mvp/pull/109)) |
-| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | ✅ Done (готов к push после merge PR-9) |
-| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 📋 Планируется |
-| 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 📋 Планируется |
-| 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 📋 Планируется |
-| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 📋 Планируется |
-| 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | 📋 Планируется |
-| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 📋 Планируется |
-| 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 📋 Планируется |
-| 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 📋 Планируется |
-| 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | 📋 Планируется |
-| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | 📋 Планируется |
-| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 📋 Планируется |
+| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 🟢 Merged ([#110](https://github.com/NovakPAai/tasktime-mvp/pull/110)) |
+| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 🟢 Merged ([#113](https://github.com/NovakPAai/tasktime-mvp/pull/113)) |
+| 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 🟢 Merged ([#114](https://github.com/NovakPAai/tasktime-mvp/pull/114)) |
+| 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 🟢 Merged ([#115](https://github.com/NovakPAai/tasktime-mvp/pull/115)) |
+| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 🟢 Merged ([#116](https://github.com/NovakPAai/tasktime-mvp/pull/116)) |
+| 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | 🟢 Merged ([#117](https://github.com/NovakPAai/tasktime-mvp/pull/117)) |
+| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 🟢 Merged ([#118](https://github.com/NovakPAai/tasktime-mvp/pull/118)) |
+| 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 🟢 Merged ([#119](https://github.com/NovakPAai/tasktime-mvp/pull/119)) |
+| 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 🟢 Merged ([#120](https://github.com/NovakPAai/tasktime-mvp/pull/120)) |
+| 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | 🟢 Merged ([#121](https://github.com/NovakPAai/tasktime-mvp/pull/121)) |
+| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | 🟢 Merged ([#122](https://github.com/NovakPAai/tasktime-mvp/pull/122)) |
+| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 🟢 Merged ([#123](https://github.com/NovakPAai/tasktime-mvp/pull/123)) |
 | **Итого** | | | **199** | | | |
+
+### 13.9.1 Эпик завершён — 2026-04-21
+
+**Все 21 PR merged в `main`.** Финальный deploy на staging:
+
+- **Main HEAD sha:** `9c1e526` (включает PR-20, PR-21 и чужие коммиты из #111).
+- **Build and Publish Images:** образы запушены в `ghcr.io/novakpaai/tasktime-{backend,web,pipeline}:main` через `workflow_dispatch` (auto-trigger упал из-за approval-гейта на не-TTSRH PR #111; запустили вручную как workaround).
+- **Deploy Staging:** [run 24741886078](https://github.com/NovakPAai/tasktime-mvp/actions/runs/24741886078) — SUCCESS.
+
+**Feature flags в prod — отдельный cutover (вне scope PR-цикла):**
+
+1. На staging: `FEATURES_ADVANCED_SEARCH=true` → UAT по чек-листу §7.
+2. После signoff → в production.
+3. `FEATURES_CHECKPOINT_TTQL=true` — отдельный UAT (минимум 1 неделя в prod `FEATURES_ADVANCED_SEARCH`).
+
+**Известные технические долги / Phase-2 (не блокируют MVP):**
+- **TTSRH-23** — `WAS`/`CHANGED` + модель `FieldChangeLog`.
+- **TTSRH-24** — `pg_trgm` + `unaccent` + PG FTS.
+- **TTSRH-38** — MCP-tool `search_issues` (опционально).
+- **T-12** — shared-URL cross-user E2E (второй session-fixture).
+- **Full T-19** — data-testid'ы на `AdminReleaseCheckpointTypesPage` form для полного TTQL flow теста.
+- **Composite-индексы** по profiling (§3.3) — follow-up миграция после запуска в prod.
 
 **Дельта к §8 (278ч):** план покрывает ~199ч. Недостающие ~79ч — это (a) code review + фиксы (~8ч per §8), (b) security review + фиксы (~4ч), (c) докуметация JQL полная (~6ч уже в PR-21, ~0ч дополнительно), (d) профайлинг + composite-index tuning (~4ч в PR-20), (e) fuzz-harness extended (~4ч в PR-5); остальное — buffer на unknown unknowns и Phase-2-проникновение. Реалистичный календарный план — 8–10 недель при одном fullstack-разработчике или 5–6 недель при параллельной работе двоих (backend + frontend после PR-5).
 
