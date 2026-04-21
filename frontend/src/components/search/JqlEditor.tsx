@@ -35,6 +35,18 @@ import { searchKeymap } from '@codemirror/search';
 import { ttqlLanguage } from './ttql-language';
 import { DEFAULT_TRIGGER_CHARS, ttqlCompletionSource } from './ttql-completion';
 
+// Module-level autocompletion extension — recreating this inside useMemo produces
+// a new object identity each render, and CM6 diffs extensions by identity. The
+// result was a full editor remount (undo/cursor/in-flight suggestions lost) on
+// every theme toggle. The source closes over no component state, so this is safe.
+const AUTOCOMPLETE_EXT = autocompletion({
+  override: [ttqlCompletionSource(DEFAULT_TRIGGER_CHARS)],
+  activateOnTyping: true,
+  closeOnBlur: true,
+  maxRenderedOptions: 50,
+  defaultKeymap: false,
+});
+
 export interface InlineError {
   start: number;
   end: number;
@@ -137,13 +149,7 @@ export default function JqlEditor({
       buildTheme(isLight),
       ttqlLanguage(),
       cmPlaceholder(placeholder),
-      autocompletion({
-        override: [ttqlCompletionSource(DEFAULT_TRIGGER_CHARS)],
-        activateOnTyping: true,
-        closeOnBlur: true,
-        maxRenderedOptions: 50,
-        defaultKeymap: false, // we merge completionKeymap manually below
-      }),
+      AUTOCOMPLETE_EXT,
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({
         'aria-label': 'JQL / TTS-QL query editor',

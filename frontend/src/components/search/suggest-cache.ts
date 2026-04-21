@@ -35,6 +35,8 @@ const cache = new Map<string, CacheEntry>();
 
 function keyOf(req: SuggestRequest): string {
   // Stable ordering so `{jql:'x', prefix:'y'}` ≡ `{prefix:'y', jql:'x'}`.
+  // Delimiter `\x1f` (ASCII unit separator) can never appear in JQL input,
+  // a CSS-safe pipe `|` could collide: `jql = "a|b"` vs `jql = "a", field = "b"`.
   return [
     req.jql ?? '',
     req.cursor ?? '',
@@ -42,7 +44,7 @@ function keyOf(req: SuggestRequest): string {
     req.operator ?? '',
     req.prefix ?? '',
     req.variant ?? 'default',
-  ].join('|');
+  ].join('\x1f');
 }
 
 function ttlFor(field: string | undefined): number {
@@ -63,13 +65,27 @@ export async function cachedSuggest(req: SuggestRequest): Promise<SuggestRespons
     expiresAt: now + ttlFor(req.field),
   });
   // Opportunistic GC — keep cache size bounded.
-  if (cache.size > 200) {
+  if (cache.size > MAX_ENTRIES) {
+    // Pass 1: evict expired entries.
     for (const [k, v] of cache) {
       if (v.expiresAt <= now) cache.delete(k);
+    }
+    // Pass 2: if still above watermark (200 fresh entries under heavy typing),
+    // LRU-evict oldest (Map iterates in insertion order).
+    if (cache.size > HIGH_WATER_MARK) {
+      const excess = cache.size - HIGH_WATER_MARK;
+      let i = 0;
+      for (const k of cache.keys()) {
+        if (i++ >= excess) break;
+        cache.delete(k);
+      }
     }
   }
   return res;
 }
+
+const MAX_ENTRIES = 200;
+const HIGH_WATER_MARK = 150;
 
 export function clearSuggestCache(): void {
   cache.clear();

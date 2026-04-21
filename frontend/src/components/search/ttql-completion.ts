@@ -29,7 +29,10 @@ import { cachedSuggest } from './suggest-cache';
 function kindToCmType(kind: TtqlCompletion['kind']): string {
   switch (kind) {
     case 'field': return 'variable';
-    case 'operator': return 'operator';
+    // `operator` is not in the default CM6 icon set — fallback to `keyword` so
+    // `.cm-completionIcon-keyword` renders; otherwise operator suggestions get
+    // no icon.
+    case 'operator': return 'keyword';
     case 'function': return 'function';
     case 'value': return 'constant';
     case 'keyword': return 'keyword';
@@ -64,8 +67,9 @@ function toCmCompletion(item: TtqlCompletion): CmCompletion {
     apply: item.insert,
     detail: item.detail,
     type: kindToCmType(item.kind),
-    // CM6 sorts by `boost` descending — map backend score (0..1) to range [-99,99].
-    boost: Math.round((item.score - 0.5) * 198),
+    // CM6 sorts by `boost` descending. Valid range is [-99, 99] — we clamp
+    // defensively in case backend ever emits score outside [0, 1].
+    boost: Math.max(-99, Math.min(99, Math.round((item.score - 0.5) * 198))),
     info: () => renderInfo(item),
   };
 }
