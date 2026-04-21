@@ -205,7 +205,7 @@ Rules:
 - Skip trivial style issues unless they're systematic.
 - For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
 - Verdict: "approve" if no critical/high issues; "request_changes" if critical/high exist; "comment" otherwise.
-- If version_history.md was not updated in this PR, mention it ONCE as a single brief info-level issue (one sentence). Do not elaborate.`;
+- If version_history.md was not updated in this PR, mention it ONCE as a single brief info-level issue (one sentence, severity: "info"). NEVER raise it as high/medium. Do not elaborate.`;
 
   const previousReviewSection = isFollowUp
     ? `\n\nPREVIOUS REVIEW JSON (structured — use this to track what was flagged and what is now resolved):\n${JSON.stringify(previousReview, null, 2)}\n\n---\n`
