@@ -125,6 +125,21 @@ describe('updateCheckpointTypeDto — PATCH without conditionMode', () => {
     expect(res.success).toBe(true);
   });
 
+  it('accepts {ttqlCondition} without conditionMode — cross-field skipped (service enforces)', () => {
+    // DTO-level passes because we don't know effective mode here. The service
+    // layer re-checks against existing row (see checkpoint-types.service.ts
+    // updateCheckpointType — effective-mode guard).
+    const res = updateCheckpointTypeDto.safeParse({ ttqlCondition: 'status = DONE' });
+    expect(res.success).toBe(true);
+  });
+
+  it('accepts {criteria} without conditionMode — same rationale', () => {
+    const res = updateCheckpointTypeDto.safeParse({
+      criteria: [{ type: 'ASSIGNEE_SET' as const }],
+    });
+    expect(res.success).toBe(true);
+  });
+
   it('accepts TTQL mode-change with required ttqlCondition', () => {
     const res = updateCheckpointTypeDto.safeParse({
       conditionMode: 'TTQL',
