@@ -72,9 +72,13 @@ export const FUNCTION_REGISTRY: readonly FunctionDef[] = [
   { name: 'violatedcheckpointsof', args: [{ name: 'releaseKeyOrId', type: 'RELEASE', optional: false }, { name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Нарушения КТ в конкретном релизе.' },
   { name: 'checkpointsatrisk', args: [{ name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Задачи релизов с КТ в состоянии WARNING/OVERDUE/ERROR.' },
   { name: 'checkpointsinstate', args: [{ name: 'state', type: 'CHECKPOINT_STATE', optional: false }, { name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Задачи, где КТ находится в заданном состоянии.' },
-  // Checkpoint-context-only (§5.12.4) — wiring in PR-15
-  { name: 'releaseplanneddate', args: [], returnType: { kind: 'scalar', type: 'DATETIME' }, phase: 'MVP', availableIn: ['checkpoint'], description: 'Дата плановой сдачи релиза (только для КТ-условий).' },
-  { name: 'checkpointdeadline', args: [], returnType: { kind: 'scalar', type: 'DATETIME' }, phase: 'MVP', availableIn: ['checkpoint'], description: 'Дедлайн КТ = releasePlannedDate + offsetDays (только для КТ-условий).' },
+  // Checkpoint-context-only (§5.12.4). Declared here so parser+validator accept
+  // them in a checkpoint TTQL snapshot. Resolver branches land in PR-17 — до
+  // тех пор function-resolver default-case возвращает `resolve-failed`, что
+  // компилятор переводит в compile-error → engine ставит state=ERROR с явным
+  // reason (LOUD fail, not silent NULL). Поэтому безопасно держать phase=MVP.
+  { name: 'releaseplanneddate', args: [], returnType: { kind: 'scalar', type: 'DATETIME' }, phase: 'MVP', availableIn: ['checkpoint'], description: 'Дата плановой сдачи релиза. Resolver wire-up в PR-17 (до того — state=ERROR с reason).' },
+  { name: 'checkpointdeadline', args: [], returnType: { kind: 'scalar', type: 'DATETIME' }, phase: 'MVP', availableIn: ['checkpoint'], description: 'Дедлайн КТ = releasePlannedDate + offsetDays. Resolver wire-up в PR-17.' },
   // Phase 2 — parser accepts, validator rejects
   { name: 'watchedissues', args: [], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'PHASE_2', availableIn: ['default'], description: 'Задачи, на которые я подписан (Phase 2).' },
   { name: 'votedissues', args: [], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'PHASE_2', availableIn: ['default'], description: 'Голоса (Phase 2).' },

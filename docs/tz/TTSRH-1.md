@@ -1432,6 +1432,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Security-review gate — RBAC отдельный подписывает (R3 + R16).
 - **Merge-ready check:** T-13..T-16 зелёные; existing КТ-тесты не ломаются (FR-25); security-review.
 - **Оценка:** ~10ч.
+- **Статус: ✅ Done** — `checkpoint-engine.service.evaluateCheckpoint` расширен тремя ветками: STRUCTURED (backward-compat, default когда `conditionMode` absent), TTQL (applicable = все issues, passed = `ttqlMatchedIds.has(id)`), COMBINED (structured-passed AND TTQL-matched; failed structured short-circuit'ит TTQL для избежания duplicate violations). Fast-path для `ttqlError != null` → state=`ERROR` + single synthetic `TTQL_ERROR` violation с детерминированным hash'ем (R16, FR-31). `checkpoint-ttql-evaluator.service.resolveTtqlMatchedIds` — async resolver, reuses полный pipeline `/search/issues` (parse → validate → resolveFunctions → compile → executeCustomFieldPredicates) с 5s hard-timeout через `Promise.race`, never throws — возвращает `{matchedIds, error}`. Миграция `20260424000001_ttsrh_checkpoint_state_error` — + ERROR enum value. Caller `recomputeForRelease` вызывает `maybeResolveTtqlIds` gate'нутый `FEATURES_CHECKPOINT_TTQL` флагом (default false → TTQL checkpoint evaluate как STRUCTURED до UAT). `computeViolationsHash` стабилен (existing `{issueId, reason, criterionType}` sorted). 9 unit-тестов pure-function (STRUCTURED×2, TTQL×5, COMBINED×2). Все wired через `test:parser`.
 
 #### PR-17: /admin/checkpoint-types/preview + TTS-QL checkpoint-функции/поля
 - **Branch:** `ttsrh-1/checkpoint-search-integration`
@@ -1515,8 +1516,8 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 🟢 Merged ([#114](https://github.com/NovakPAai/tasktime-mvp/pull/114)) |
 | 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 🟢 Merged ([#115](https://github.com/NovakPAai/tasktime-mvp/pull/115)) |
 | 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 🟢 Merged ([#116](https://github.com/NovakPAai/tasktime-mvp/pull/116)) |
-| 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | ✅ Done (готов к push после merge PR-14) |
-| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 📋 Планируется |
+| 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | 🟢 Merged ([#117](https://github.com/NovakPAai/tasktime-mvp/pull/117)) |
+| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | ✅ Done (готов к push после merge PR-15) |
 | 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 📋 Планируется |
 | 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 📋 Планируется |
 | 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | 📋 Планируется |

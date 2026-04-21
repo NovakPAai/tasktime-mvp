@@ -2,7 +2,75 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.43**
+**Last version: 2.44**
+
+---
+
+## [2.44] [2026-04-21] feat(checkpoint): TTSRH-1 PR-16 — Checkpoint engine TTQL branch + error handling
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-engine`
+
+### Что было
+
+После PR-15 foundation (схема + DTO + snapshot-пропагация) был готов, но evaluator игнорировал `conditionModeSnapshot`/`ttqlSnapshot` — работал только через structured path. TTQL/COMBINED чекпоинты создаваться могли, но оценивались как STRUCTURED. Валидация и снапшоты были inert до merge engine'а.
+
+### Что теперь
+
+`evaluateCheckpoint` теперь знает про три mode'а + обрабатывает TTQL compile/exec failure как ERROR-state:
+
+- **`checkpoint-engine.service.ts`** — `CheckpointEvaluationInput` расширен: `conditionMode?` (default STRUCTURED), `ttqlMatchedIds?: ReadonlySet<string> | null`, `ttqlError?: string | null`.
+  - Fast-path: `ttqlError != null` → state=`ERROR` + single synthetic `TTQL_ERROR` violation с стабильным hash (R16, FR-31).
+  - STRUCTURED: existing pure behavior unchanged (backward-compat — вызовы без conditionMode работают).
+  - TTQL: все issues applicable, passed iff `ttqlMatchedIds.has(id)`, violations с `criterionType='TTQL_MISMATCH'`.
+  - COMBINED: structured-first (failed → short-circuit); если structured passed, доп. TTQL check. Issue fails COMBINED если хотя бы один из двух путей failed, но violation пишется только один раз.
+- **`checkpoint-ttql-evaluator.service.ts`** (новый) — async Prisma-backed resolver:
+  - `resolveTtqlMatchedIds(ttql, {now, applicableIssueIds, accessibleProjectIds})` → `{matchedIds, error}`.
+  - Reuses полный pipeline: `parse` → `validate(variant='checkpoint')` → `resolveFunctions` → `compile` → `executeCustomFieldPredicates` → `prisma.issue.findMany({where: AND[compiled, {id: {in: applicableIds}}]})`.
+  - Hard timeout 5с через `Promise.race` vs `setTimeout` — любая фаза включена в бюджет (R16).
+  - Never throws: parse/validate/compile/exec errors + timeout → `{matchedIds: new Set(), error}` (caller → ERROR state).
+- **Prisma migration `20260424000001_ttsrh_checkpoint_state_error`**:
+  - `ALTER TYPE CheckpointState ADD VALUE IF NOT EXISTS 'ERROR'`.
+  - Existing rows unchanged — только new code emits ERROR.
+- **`release-checkpoints.service.recomputeForRelease`** — wire'нут TTQL path:
+  - `maybeResolveTtqlIds` — helper, проверяет `features.checkpointTtql` sub-flag. Если OFF → skipped=true → caller falls back к STRUCTURED path (TZ §13.7 PR-16: «Под флагом FEATURES_CHECKPOINT_TTQL=false ветка TTQL не выполняется, conditionMode=TTQL/COMBINED саммится как NOOP до включения флага»).
+  - Если ON → compiles TTQL через resolver, передаёт `{matchedIds, error}` в engine.
+  - `loadAllProjectIds()` lazy helper: system-level scheduler scope через `prisma.project.findMany`. Memoized per-recompute — не fetch'ится для releases с только STRUCTURED чекпоинтами (zero-cost для 100% existing prod).
+- **`checkpoint.types.ts`**: `CheckpointViolationType = CheckpointCriterionType | 'TTQL_MISMATCH' | 'TTQL_ERROR'`. `CheckpointViolation.criterionType` теперь union — hash payload остаётся uniform.
+- **Unit tests `checkpoint-engine-ttql.unit.test.ts`**: 9 pure-function кейсов:
+  - STRUCTURED (×2): default behavior backward-compat + ttqlMatchedIds ignored при conditionMode=STRUCTURED.
+  - TTQL (×5): все applicable with match, empty set → all fail, null matched → all fail, ttqlError → ERROR state, violationsHash stability.
+  - COMBINED (×2): BOTH required for pass + pending deadline override.
+- Добавлен в `test:parser` script.
+
+### Backward-compat (FR-25)
+
+1. **Existing callers без conditionMode**: `evaluateCheckpoint({criteria, deadline, …})` без новых полей — mode default'ом STRUCTURED, behavior идентичен pre-PR-16.
+2. **Existing rows в production**: `condition_mode_snapshot = 'STRUCTURED'`, `ttql_snapshot = NULL` (из PR-15 default). `maybeResolveTtqlIds` fast-path'ит как `{matchedIds: null, skipped: false}` → engine не дёргается TTQL logic, existing `violationsHash` стабилен.
+3. **Feature-flag off в prod**: даже если caller создал TTQL/COMBINED чекпоинт, `features.checkpointTtql=false` → skipped=true → engine fallback к STRUCTURED. Чекпоинт НЕ попадает в VIOLATED из-за TTQL — прозрачно до UAT.
+
+### Изменения
+
+- `backend/src/modules/releases/checkpoints/checkpoint.types.ts` — + `CheckpointViolationType` union.
+- `backend/src/modules/releases/checkpoints/checkpoint-engine.service.ts` — + conditionMode/ttqlMatchedIds/ttqlError branches + ERROR fast-path.
+- `backend/src/modules/releases/checkpoints/checkpoint-ttql-evaluator.service.ts` — новый (5s timeout, never-throws).
+- `backend/src/modules/releases/checkpoints/release-checkpoints.service.ts` — + maybeResolveTtqlIds + loadAllProjectIds + wiring в recomputeForRelease.
+- `backend/src/prisma/schema.prisma` — + `ERROR` в `CheckpointState`.
+- `backend/src/prisma/migrations/20260424000001_ttsrh_checkpoint_state_error/migration.sql` — новый.
+- `backend/tests/checkpoint-engine-ttql.unit.test.ts` — новый (9 unit-кейсов).
+- `backend/package.json` — `test:parser` включает новый тест.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-16 → ✅ Done.
+
+### Влияние на prod
+
+Feature-flag `FEATURES_CHECKPOINT_TTQL=false` в prod → schema + engine готовы, но не выполняются для TTQL/COMBINED чекпоинтов. Зелёные CI тесты проверяют backward-compat: все existing STRUCTURED тесты продолжают проходить.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npx prisma generate` — чисто
+- `npx vitest tests/checkpoint-engine-ttql.unit.test.ts` — **9/9 passing**
 
 ---
 
