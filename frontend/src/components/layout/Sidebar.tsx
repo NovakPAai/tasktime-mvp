@@ -106,13 +106,13 @@ export default function Sidebar({
 
   // TTSRH-1 PR-9: top-5 favorite saved filters, fetched lazily when /search is active.
   // Failures are swallowed — sidebar never surfaces errors to the user (the main
-  // SearchPage does, which avoids double-reporting). `user` toggles as a dep so the
-  // list refreshes on login/logout. Backend handles the empty case gracefully (flag
-  // off → 404 → silently [] here).
+  // SearchPage does, which avoids double-reporting). Dep narrowed to a boolean so
+  // intra-search URL changes (?jql=&page=) don't re-trigger a fetch on every keystroke.
+  const isSearchActive = path.startsWith('/search');
   const [searchFavorites, setSearchFavorites] = useState<SavedFilter[]>([]);
   useEffect(() => {
     if (!frontendFeatures.advancedSearch) return;
-    if (!path.startsWith('/search')) return;
+    if (!isSearchActive) return;
     if (!user) return;
     let cancelled = false;
     (async () => {
@@ -126,7 +126,7 @@ export default function Sidebar({
     return () => {
       cancelled = true;
     };
-  }, [path, user]);
+  }, [isSearchActive, user]);
 
   const isPlanningOpen = openKeys.includes('planning-submenu');
   const isAdminOpen = openKeys.includes('admin-submenu');

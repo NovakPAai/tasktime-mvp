@@ -103,9 +103,11 @@ export async function markSavedFilterUsed(id: string): Promise<void> {
 
 // ─── User preferences ──────────────────────────────────────────────────────
 
+// Concrete shape matches backend updatePreferencesDto. Future sections (like
+// `checkpointDefaults`) should be added here explicitly as they land, rather
+// than relying on an `[key: string]: unknown` escape hatch.
 export interface UserPreferences {
   searchDefaults?: { columns?: string[]; pageSize?: number };
-  [key: string]: unknown;
 }
 
 export async function getMyPreferences(): Promise<UserPreferences> {

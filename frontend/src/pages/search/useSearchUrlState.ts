@@ -14,7 +14,7 @@
  *   • `page` — positive int, по умолчанию 1. Невалидные значения игнорируются.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export type SearchView = 'table';
@@ -65,9 +65,18 @@ export function useSearchUrlState(): {
     [params],
   );
 
+  // `state` goes into a ref so `updateUrl` keeps a stable identity across renders.
+  // Without this, any consumer effect that lists `updateUrl` in its dep array
+  // would re-fire after every URL mutation and cascade into an infinite loop
+  // (e.g. the `/search/saved/:filterId` fetch that calls `updateUrl` itself).
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   const updateUrl = useCallback(
     (next: Partial<SearchUrlState>, opts?: { push?: boolean }) => {
-      const merged: SearchUrlState = { ...state, ...next };
+      const merged: SearchUrlState = { ...stateRef.current, ...next };
       const qs = new URLSearchParams();
       if (merged.jql) qs.set('jql', merged.jql);
       if (merged.view !== DEFAULT_VIEW) qs.set('view', merged.view);
@@ -77,8 +86,21 @@ export function useSearchUrlState(): {
       const url = search ? `/search?${search}` : '/search';
       navigate(url, { replace: !opts?.push });
     },
-    [state, navigate],
+    [navigate],
   );
+
+  // One-time self-heal: if URL has a malformed `page` value (e.g. `page=0`),
+  // `parsePage` silently falls back to 1 but the URL still reads wrong. Correct
+  // it on mount so the URL and the rendered state don't drift.
+  useEffect(() => {
+    const raw = params.get('page');
+    if (raw !== null && parsePage(raw) !== Number(raw)) {
+      updateUrl({ page: DEFAULT_PAGE }, { push: false });
+    }
+    // Only run once per mount; dep-less effects like this are intentional —
+    // any subsequent URL mutation goes through our own updateUrl and is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return { state, updateUrl };
 }

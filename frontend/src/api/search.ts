@@ -15,6 +15,10 @@
 
 import api from './client';
 
+// Named fields preserve intellisense/type-checking. Custom-field columns are
+// returned by the API under arbitrary string keys — an intersection with a
+// Record keeps them accessible (as `unknown`) without suppressing typos on the
+// named fields (a bare `[key: string]: unknown` index signature would).
 export type IssueSearchRow = {
   id: string;
   projectId: string;
@@ -26,8 +30,7 @@ export type IssueSearchRow = {
   project: { id: string; key: string; name: string };
   assignee: { id: string; name: string; email: string } | null;
   workflowStatus: { id: string; name: string; category: string; color: string | null; systemKey: string | null } | null;
-  [key: string]: unknown;
-};
+} & Record<string, unknown>;
 
 export interface SearchIssuesResponse {
   total: number;

@@ -170,7 +170,9 @@ export default function SearchPage() {
               value={jqlDraft}
               onChange={(e) => setJqlDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || !e.shiftKey)) {
+                // Ctrl/Cmd+Enter submits. Plain Enter must insert a newline so
+                // multi-line JQL stays editable.
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
                   submit();
                 }
