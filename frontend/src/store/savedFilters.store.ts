@@ -65,7 +65,7 @@ function computeRecent(mine: SavedFilter[]): SavedFilter[] {
     .slice(0, 10);
 }
 
-export const useSavedFiltersStore = create<SavedFiltersState>((set, get) => ({
+export const useSavedFiltersStore = create<SavedFiltersState>((set) => ({
   mine: [],
   favorite: [],
   public: [],
@@ -106,34 +106,32 @@ export const useSavedFiltersStore = create<SavedFiltersState>((set, get) => ({
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ошибка загрузки';
-      set({ loading: false, error: msg });
+      // Clear lists on failure so stale data isn't shown next to the error banner.
+      set({ loading: false, error: msg, mine: [], favorite: [], public: [], shared: [], recent: [] });
     }
   },
 
+  // Mutations return the API response but DO NOT call loadAll — the caller
+  // (modal's onSaved / onClose) is the single refresh trigger per CLAUDE.md
+  // modal-refresh rule. This eliminates double-fetch (8 parallel HTTP roundtrips
+  // per save action).
   create: async (input) => {
-    const created = await createSavedFilter(input);
-    await get().loadAll();
-    return created;
+    return await createSavedFilter(input);
   },
 
   update: async (id, input) => {
-    const updated = await updateSavedFilter(id, input);
-    await get().loadAll();
-    return updated;
+    return await updateSavedFilter(id, input);
   },
 
   remove: async (id) => {
     await deleteSavedFilter(id);
-    await get().loadAll();
   },
 
   toggleFavorite: async (id, value) => {
     await setSavedFilterFavorite(id, value);
-    await get().loadAll();
   },
 
   share: async (id, input) => {
     await shareSavedFilter(id, input);
-    await get().loadAll();
   },
 }));

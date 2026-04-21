@@ -61,13 +61,19 @@ export default function SearchPage() {
   }, []);
 
   // Ctrl/Cmd+S → Save. preventDefault чтобы не триггерить browser "Save Page".
+  // Skip when focus is inside another form control (AntD modal inputs etc.) —
+  // исключение: CM6 JqlEditor (`.cm-editor`), там Ctrl+S должен сохранять.
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') {
-        ev.preventDefault();
-        if (!jqlDraft.trim()) return;
-        openSaveModal();
-      }
+      if (!(ev.ctrlKey || ev.metaKey) || ev.key.toLowerCase() !== 's') return;
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName?.toLowerCase();
+      const isEditable = el?.getAttribute('contenteditable') === 'true';
+      const isCmEditor = el?.closest('.cm-editor') != null;
+      if (!isCmEditor && (tag === 'input' || tag === 'textarea' || tag === 'select' || isEditable)) return;
+      ev.preventDefault();
+      if (!jqlDraft.trim()) return;
+      openSaveModal();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -188,6 +194,7 @@ export default function SearchPage() {
               type="button"
               onClick={openSaveModal}
               disabled={!jqlDraft.trim()}
+              aria-label="Сохранить текущий фильтр"
               title={jqlDraft.trim() ? 'Сохранить (Ctrl+S)' : 'Введите JQL для сохранения'}
               data-testid="sidebar-save-filter"
               style={{

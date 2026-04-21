@@ -62,6 +62,9 @@ export default function SaveFilterModal({
     initial?.visibility ?? 'PRIVATE',
   );
 
+  // Key on `initial?.id` rather than the full `initial` object identity —
+  // parent `loadAll` re-allocates a structurally-equal `SavedFilter` object and
+  // would nuke mid-edit form state if we depended on reference equality.
   useEffect(() => {
     if (!open) return;
     form.setFieldsValue({
@@ -71,7 +74,8 @@ export default function SaveFilterModal({
       isFavorite: initial?.isFavorite ?? false,
     });
     setVisibility(initial?.visibility ?? 'PRIVATE');
-  }, [open, initial, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id, form]);
 
   const handleOk = async () => {
     try {

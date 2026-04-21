@@ -44,6 +44,7 @@ export default function FilterShareModal({ open, onClose, onSaved, filter }: Fil
   const [form] = Form.useForm<FormValues>();
   const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [visibility, setVisibility] = useState<FilterVisibility>('PRIVATE');
   const update = useSavedFiltersStore((s) => s.update);
   const share = useSavedFiltersStore((s) => s.share);
@@ -51,7 +52,11 @@ export default function FilterShareModal({ open, onClose, onSaved, filter }: Fil
   // Fetch user directory on open for the multi-select.
   useEffect(() => {
     if (!open) return;
-    listUsers().then(setUsers).catch(() => setUsers([]));
+    setUsersLoading(true);
+    listUsers()
+      .then(setUsers)
+      .catch(() => setUsers([]))
+      .finally(() => setUsersLoading(false));
   }, [open]);
 
   useEffect(() => {
@@ -145,7 +150,8 @@ export default function FilterShareModal({ open, onClose, onSaved, filter }: Fil
             <Form.Item label="Поделиться с пользователями" name="users">
               <Select
                 mode="multiple"
-                placeholder="Выберите пользователей"
+                placeholder={usersLoading ? 'Загрузка пользователей…' : 'Выберите пользователей'}
+                loading={usersLoading}
                 data-testid="share-filter-users"
                 showSearch
                 optionFilterProp="label"

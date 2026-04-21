@@ -85,6 +85,7 @@ export default function SavedFiltersSidebar({
     try {
       await remove(filter.id);
       message.success(`Фильтр «${filter.name}» удалён`);
+      await loadAll();
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Ошибка удаления');
     }
@@ -93,6 +94,7 @@ export default function SavedFiltersSidebar({
   const handleToggleFav = async (filter: SavedFilter) => {
     try {
       await toggleFavorite(filter.id, !filter.isFavorite);
+      await loadAll();
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Ошибка');
     }
@@ -195,7 +197,7 @@ export default function SavedFiltersSidebar({
                       {f.isFavorite ? <StarFilled /> : <StarOutlined />}
                     </button>
                   </Tooltip>
-                  {f.permission === 'WRITE' && (
+                  {section.scopeKey === 'mine' && (
                     <Tooltip title="Поделиться">
                       <button
                         type="button"
@@ -214,7 +216,7 @@ export default function SavedFiltersSidebar({
                       </button>
                     </Tooltip>
                   )}
-                  {f.permission === 'WRITE' && section.scopeKey === 'mine' && (
+                  {section.scopeKey === 'mine' && (
                     <Popconfirm
                       title="Удалить фильтр?"
                       onConfirm={() => handleDelete(f)}
