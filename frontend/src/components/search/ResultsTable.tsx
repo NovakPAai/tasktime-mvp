@@ -33,6 +33,8 @@ export interface ResultsTableProps {
   currentJql: string;
   onJqlChange: (jql: string) => void;
   onSelectionChange?: (ids: string[]) => void;
+  /** Controlled selection — parent resets on JQL/page change so the bulk bar doesn't lie. */
+  selectedIds?: string[];
   isLight?: boolean;
 }
 
@@ -53,6 +55,7 @@ const COLUMN_LABELS: Record<string, string> = {
   release: 'Релиз',
 };
 
+// Must mirror backend SYSTEM_FIELDS `sortable: true` flags (search.schema.ts).
 const SORTABLE = new Set([
   'key',
   'summary',
@@ -60,10 +63,12 @@ const SORTABLE = new Set([
   'priority',
   'assignee',
   'type',
+  'project',
   'due',
   'created',
   'updated',
   'sprint',
+  'release',
 ]);
 
 type SortState = 'ascend' | 'descend' | null;
@@ -71,7 +76,11 @@ type SortState = 'ascend' | 'descend' | null;
 function parseOrderBy(jql: string): { field: string; dir: SortState } | null {
   const m = /\border\s+by\s+([A-Za-z_][A-Za-z0-9_]*)\s*(asc|desc)?/i.exec(jql);
   if (!m) return null;
-  const dir: SortState = m[2]?.toLowerCase() === 'asc' ? 'ascend' : 'descend';
+  // Missing direction keyword → SQL default (ascending in most dialects). Return
+  // `null` so the header indicator doesn't lie about descending. If the user
+  // clicks again, the 3-way toggle promotes to `descend`.
+  const raw = m[2]?.toLowerCase();
+  const dir: SortState = raw === 'asc' ? 'ascend' : raw === 'desc' ? 'descend' : null;
   return { field: m[1]!.toLowerCase(), dir };
 }
 
@@ -147,6 +156,7 @@ export default function ResultsTable({
   currentJql,
   onJqlChange,
   onSelectionChange,
+  selectedIds,
 }: ResultsTableProps) {
   const currentSort = useMemo(() => parseOrderBy(currentJql), [currentJql]);
 
@@ -158,7 +168,10 @@ export default function ResultsTable({
       key: col,
       title: COLUMN_LABELS[col] ?? col,
       dataIndex: col,
-      sorter: isSortable ? true : false,
+      // `compare: false` suppresses Ant Table client-side sort — we rewrite
+      // JQL's ORDER BY on onChange and let the backend re-order. Without this,
+      // Ant does a visual client-sort flicker before the server response lands.
+      sorter: isSortable ? { compare: () => 0, multiple: 0 } : false,
       sortOrder,
       showSorterTooltip: isSortable ? undefined : false,
       render: (_: unknown, issue: IssueSearchRow) => renderCell(col, issue),
@@ -192,6 +205,7 @@ export default function ResultsTable({
       rowSelection={
         onSelectionChange
           ? {
+              selectedRowKeys: selectedIds,
               onChange: (keys) => onSelectionChange(keys.map(String)),
             }
           : undefined

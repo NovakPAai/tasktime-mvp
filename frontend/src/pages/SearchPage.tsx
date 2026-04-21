@@ -394,10 +394,17 @@ export default function SearchPage() {
                   total={load.total}
                   page={state.page}
                   pageSize={PAGE_SIZE}
-                  onPageChange={(p) => updateUrl({ page: p }, { push: true })}
+                  onPageChange={(p) => {
+                    setSelectedRowIds([]);
+                    updateUrl({ page: p }, { push: true });
+                  }}
                   currentJql={state.jql}
-                  onJqlChange={(jql) => updateUrl({ jql, page: 1 }, { push: true })}
+                  onJqlChange={(jql) => {
+                    setSelectedRowIds([]);
+                    updateUrl({ jql, page: 1 }, { push: true });
+                  }}
                   onSelectionChange={setSelectedRowIds}
+                  selectedIds={selectedRowIds}
                   isLight={isLight}
                 />
               </>
@@ -423,7 +430,7 @@ export default function SearchPage() {
             fontSize: 12,
           }}
         >
-          Preview задачи появится в PR-14.
+          Выберите задачу в таблице для preview (полный drawer — вне scope §13.6, Phase 2).
         </aside>
       </div>
 

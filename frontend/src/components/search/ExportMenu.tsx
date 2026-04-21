@@ -15,24 +15,12 @@ import { Button, Dropdown, message, type MenuProps } from 'antd';
 import { DownOutlined, DownloadOutlined } from '@ant-design/icons';
 
 import { exportIssues } from '../../api/search';
+import { saveBlob } from '../../utils/saveBlob';
 
 export interface ExportMenuProps {
   jql: string;
   columns: string[];
   disabled?: boolean;
-}
-
-function saveBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 0);
 }
 
 export default function ExportMenu({ jql, columns, disabled = false }: ExportMenuProps) {

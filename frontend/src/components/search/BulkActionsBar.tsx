@@ -18,8 +18,10 @@ import { DownOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icon
 
 import api from '../../api/client';
 import { exportIssues } from '../../api/search';
+import { saveBlob } from '../../utils/saveBlob';
 
 export interface BulkActionsBarProps {
+  /** UUID strings — come from `issue.id` via ResultsTable rowKey. */
   selectedIds: string[];
   onCleared: () => void;
   isLight?: boolean;
@@ -34,21 +36,6 @@ async function bulkDelete(ids: string[]): Promise<{ succeeded: number; failed: n
     else failed += 1;
   }
   return { succeeded, failed };
-}
-
-function saveBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  // Attach to DOM — Firefox/Safari race: object URL must not be revoked
-  // synchronously before the download starts.
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 0);
 }
 
 export default function BulkActionsBar({ selectedIds, onCleared, isLight = false }: BulkActionsBarProps) {

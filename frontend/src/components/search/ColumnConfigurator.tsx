@@ -63,8 +63,10 @@ export default function ColumnConfigurator({
       const srcIdx = from.index;
       if (srcIdx < 0 || srcIdx >= next.length) return;
       const [item] = next.splice(srcIdx, 1);
+      // After splice(-1), indices above srcIdx shift left by 1. Compensate so
+      // a drag from index 1 to drop-at-4 actually lands at index 4 (not 5).
       let insertAt = dropIndex ?? next.length;
-      if (insertAt > srcIdx) insertAt -= 0; // after removal indices shift left — but we already removed
+      if (insertAt > srcIdx) insertAt -= 1;
       next.splice(insertAt, 0, item!);
     }
     onChange(next);
