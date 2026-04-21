@@ -18,7 +18,7 @@
  *     commit chips → jqlFromChips → onChange).
  *   • aria-labels на всех интерактивных узлах (A11Y-1).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   BasicChip,
@@ -40,6 +40,17 @@ export default function BasicFilterBuilder({ value, onChange, isLight = false }:
   const [chips, setChips] = useState<BasicChip[]>(() => chipsFromJql(value).chips);
   const [addingOpen, setAddingOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const addMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Outside-click handler: close cascade menu when user clicks anywhere else.
+  useEffect(() => {
+    if (!addingOpen) return;
+    function onDocMouseDown(ev: MouseEvent) {
+      if (!addMenuRef.current?.contains(ev.target as Node)) setAddingOpen(false);
+    }
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [addingOpen]);
 
   // Sync chips from external value changes (e.g. saved-filter load).
   useEffect(() => {
@@ -70,8 +81,11 @@ export default function BasicFilterBuilder({ value, onChange, isLight = false }:
 
   const addChip = (field: string) => {
     const id = `c${Date.now()}`;
-    const next = [...chips, { id, field, op: '=' as BasicOp, values: [''] }];
-    commit(next);
+    // Add to local state only; `jqlFromChips` filters empty-value chips so
+    // parent `onChange` would receive the same JQL as before. Calling commit()
+    // here would emit a spurious `field = ""` for the untouched placeholder
+    // — wait until the user types a value (via updateChip).
+    setChips((prev) => [...prev, { id, field, op: '=' as BasicOp, values: [''] }]);
     setAddingOpen(false);
     setEditingId(id);
   };
@@ -157,12 +171,13 @@ export default function BasicFilterBuilder({ value, onChange, isLight = false }:
         );
       })}
 
-      <div style={{ position: 'relative' }}>
+      <div ref={addMenuRef} style={{ position: 'relative' }}>
         <button
           type="button"
           data-testid="basic-add-chip"
           onClick={() => setAddingOpen((v) => !v)}
           aria-expanded={addingOpen}
+          aria-haspopup="menu"
           aria-label="Добавить фильтр"
           style={{
             background: 'transparent',

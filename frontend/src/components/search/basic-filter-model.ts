@@ -95,8 +95,15 @@ export function canBasicize(jql: string): CanBasicizeResult {
   if (ADVANCED_RE.test(q)) {
     return { ok: false, reason: 'Запрос содержит OR / NOT / WAS / CHANGED / ~ или ORDER BY — недоступно в Basic.' };
   }
-  if (q.includes('(') && !/\bIN\s*\(/i.test(q)) {
-    return { ok: false, reason: 'Запрос содержит группировку в скобках — недоступно в Basic.' };
+  // Strip `IN (...)` / `NOT IN (...)` groups (valid in Basic), then any residual
+  // `(` means explicit grouping — disallowed. Without this strip, a query like
+  // `type IN (Bug) AND (status = Done)` would pass the old short-circuit and
+  // `chipsFromJql` would silently drop the grouped clause.
+  const stripped = q
+    .replace(/\bNOT\s+IN\s*\([^)]*\)/gi, '')
+    .replace(/\bIN\s*\([^)]*\)/gi, '');
+  if (stripped.includes('(')) {
+    return { ok: false, reason: 'Запрос содержит группировку в скобках или вызов функции — недоступно в Basic.' };
   }
   return { ok: true };
 }
@@ -156,6 +163,7 @@ function serializeValue(v: string): string {
 
 export function jqlFromChips(chips: BasicChip[]): string {
   return chips
+    .map((c) => ({ ...c, values: c.values.filter((v) => v.trim().length > 0) }))
     .filter((c) => c.field && c.values.length > 0)
     .map((c) => {
       if (c.op === 'IN' || c.op === 'NOT IN') {
