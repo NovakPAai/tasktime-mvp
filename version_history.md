@@ -2,7 +2,48 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.45**
+**Last version: 2.46**
+
+---
+
+## [2.46] [2026-04-21] feat(checkpoint): TTSRH-1 PR-18 — Checkpoint admin UI: mode-toggle + JqlEditor + preview panel
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-admin-ui`
+
+### Что было
+
+После PR-17 endpoint `/admin/checkpoint-types/preview` был готов backend-wise, но UI оставался чисто structured — пользователь не мог создать TTQL/COMBINED checkpoint type и не имел инструмента dry-run перед сохранением.
+
+### Что теперь
+
+- **`api/release-checkpoint-types.ts`** — + `CheckpointConditionMode` type, + optional `conditionMode`/`ttqlCondition` в `CheckpointType` / `CreateCheckpointTypeBody`, + `previewCheckpointCondition(body)` → `/admin/checkpoint-types/preview`.
+- **`components/releases/CheckpointConditionModeControl.tsx`** — AntD `Segmented` (STRUCTURED/TTQL/COMBINED) + условно lazy-loaded `JqlEditor` (PR-10) для TTQL/COMBINED. Переключение режима НЕ стирает criteria/ttqlCondition state (R20). `CheckpointConditionModeIcon` — inline S/Q/S+Q иконка для таблицы с tooltip.
+- **`components/releases/CheckpointPreviewPanel.tsx`** — AntD Card с Release-select + «Рассчитать». Breakdown (applicable/passed/violated) + state badge + top-10 violations. Alerts на `meta.ttqlSkippedByFlag` и `meta.ttqlError`.
+- **`AdminReleaseCheckpointTypesPage.tsx`** — integration: state conditionMode/ttqlValue вне Form (мгновенный re-render toggle); openCreate/openEdit + handleSave пропагируют новые fields; форма показывает mode-toggle всегда, criteria section conditional (STRUCTURED/COMBINED), TTQL-editor внутри control (TTQL/COMBINED), preview panel всегда. Releases preloaded через `listReleasesGlobal({limit:100})` silent-fail.
+- Иконка режима в таблице «Название» column.
+
+### Изменения
+
+- `frontend/src/api/release-checkpoint-types.ts` — + conditionMode/ttqlCondition + previewCheckpointCondition.
+- `frontend/src/components/releases/CheckpointConditionModeControl.tsx` — новый.
+- `frontend/src/components/releases/CheckpointPreviewPanel.tsx` — новый.
+- `frontend/src/pages/admin/AdminReleaseCheckpointTypesPage.tsx` — integration + mode-icon.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-18 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` JqlEditor chunk не грузится; mode-toggle виден, но TTQL-editor требует CodeMirror (lazy chunk), грузится by-demand. Backend gate `FEATURES_CHECKPOINT_TTQL=false` → preview ttqlSkippedByFlag=true, UI показывает баннер.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` (frontend) — 0 errors
+- `npm run build` — чисто, 4.54s; JqlEditor chunk без изменений.
+
+---
+
+## [2.45] [2026-04-21] feat(checkpoint): TTSRH-1 PR-17 — /admin/checkpoint-types/preview + suggesters sync
 
 ---
 
