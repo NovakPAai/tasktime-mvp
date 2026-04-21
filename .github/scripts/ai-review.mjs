@@ -149,6 +149,13 @@ Severity guide:
   low      — style, naming, minor improvement
   info     — optional suggestion, best practice
 
+Shell/CI error handling — WHAT COUNTS AS PROPER (do NOT flag these as "missing error handling"):
+- A run: block that starts with "set -euo pipefail" — this enables strict mode, any command failure exits immediately
+- A command followed by "|| { ...; exit 1; }" or "|| exit 1" — explicit failure handling
+- An ssh heredoc that starts with "set -euo pipefail" inside the heredoc body — the remote shell runs in strict mode
+- GitHub Actions steps fail automatically on non-zero exit codes by default
+Only flag "missing error handling" if NONE of these patterns are present AND the code ignores errors in a risky way (e.g., "|| true" on a critical step, no set -e anywhere in the block).
+
 CRITICAL rules to prevent review loops:
 - DO NOT re-raise issues from the previous review that are now fixed or reasonably addressed.
 - DO NOT raise new medium/low/info issues about code introduced specifically to fix a previous issue — if the fix is reasonable, accept it.
@@ -185,13 +192,20 @@ Severity guide:
   low      — style, naming, minor improvement
   info     — optional suggestion, best practice
 
+Shell/CI error handling — WHAT COUNTS AS PROPER (do NOT flag these as "missing error handling"):
+- A run: block that starts with "set -euo pipefail" — this enables strict mode, any command failure exits immediately
+- A command followed by "|| { ...; exit 1; }" or "|| exit 1" — explicit failure handling
+- An ssh heredoc that starts with "set -euo pipefail" inside the heredoc body — the remote shell runs in strict mode
+- GitHub Actions steps fail automatically on non-zero exit codes by default
+Only flag "missing error handling" if NONE of these patterns are present AND the code ignores errors in a risky way (e.g., "|| true" on a critical step, no set -e anywhere in the block).
+
 Rules:
 - Write ALL text fields in ${REVIEW_LANGUAGE}.
 - Return ONLY valid JSON, no markdown code fences.
 - Skip trivial style issues unless they're systematic.
 - For "line", use the NEW file line number from the diff (+lines). Use null if not applicable.
 - Verdict: "approve" if no critical/high issues; "request_changes" if critical/high exist; "comment" otherwise.
-- If version_history.md was not updated in this PR, mention it ONCE as a single brief info-level issue (one sentence). Do not elaborate.`;
+- If version_history.md was not updated in this PR, mention it ONCE as a single brief info-level issue (one sentence, severity: "info"). NEVER raise it as high/medium. Do not elaborate.`;
 
   const previousReviewSection = isFollowUp
     ? `\n\nPREVIOUS REVIEW JSON (structured — use this to track what was flagged and what is now resolved):\n${JSON.stringify(previousReview, null, 2)}\n\n---\n`
