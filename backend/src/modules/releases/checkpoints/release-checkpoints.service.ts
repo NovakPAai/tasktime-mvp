@@ -341,6 +341,10 @@ export async function syncInstances(
           data: {
             criteriaSnapshot: type.criteria as Prisma.InputJsonValue,
             offsetDaysSnapshot: type.offsetDays,
+            // TTSRH-1 PR-15: propagate TTQL snapshot fields at sync time.
+            // PR-16 evaluator reads these to decide STRUCTURED/TTQL/COMBINED path.
+            ttqlSnapshot: type.ttqlCondition ?? null,
+            conditionModeSnapshot: type.conditionMode,
             deadline: addDays(rc.release.plannedDate!, type.offsetDays),
           },
         }),
@@ -863,6 +867,11 @@ async function createCheckpointsFromTypes(
           checkpointTypeId: type.id,
           criteriaSnapshot: type.criteria as Prisma.InputJsonValue,
           offsetDaysSnapshot: type.offsetDays,
+          // TTSRH-1 PR-15: snapshot на момент создания — FR-25 backward-compat.
+          // Parent CheckpointType может быть изменён позже; evaluator (PR-16)
+          // читает snapshot поля чтобы путь evaluation не менялся.
+          ttqlSnapshot: type.ttqlCondition ?? null,
+          conditionModeSnapshot: type.conditionMode,
           deadline,
         },
         update: {

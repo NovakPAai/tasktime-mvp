@@ -84,6 +84,11 @@ export async function createCheckpointType(dto: CreateCheckpointTypeDto) {
         offsetDays: dto.offsetDays,
         warningDays: dto.warningDays,
         criteria: dto.criteria as unknown as Prisma.InputJsonValue,
+        // TTSRH-1 PR-15: conditionMode + ttqlCondition должны быть persist'нуты
+        // из DTO, иначе row сохраняется с default'ом STRUCTURED независимо от
+        // того, что клиент валидировал через superRefine — schema-change inert.
+        conditionMode: dto.conditionMode,
+        ttqlCondition: dto.ttqlCondition ?? null,
         webhookUrl: dto.webhookUrl ?? null,
         minStableSeconds: dto.minStableSeconds,
         isActive: dto.isActive,
@@ -110,9 +115,26 @@ export async function updateCheckpointType(id: string, dto: UpdateCheckpointType
   if (dto.offsetDays !== undefined) data.offsetDays = dto.offsetDays;
   if (dto.warningDays !== undefined) data.warningDays = dto.warningDays;
   if (dto.criteria !== undefined) data.criteria = dto.criteria as unknown as Prisma.InputJsonValue;
+  if (dto.conditionMode !== undefined) data.conditionMode = dto.conditionMode;
+  if (dto.ttqlCondition !== undefined) data.ttqlCondition = dto.ttqlCondition ?? null;
   if (dto.webhookUrl !== undefined) data.webhookUrl = dto.webhookUrl ?? null;
   if (dto.minStableSeconds !== undefined) data.minStableSeconds = dto.minStableSeconds;
   if (dto.isActive !== undefined) data.isActive = dto.isActive;
+
+  // TTSRH-1 PR-15: cross-field guard против PATCH-bypass. DTO superRefine
+  // skip'ается если conditionMode absent в payload — но effective mode может
+  // быть STRUCTURED из существующей row, а caller прислал только ttqlCondition.
+  // Проверяем на effective-mode чтобы не оставлять contradictory row.
+  const effectiveMode = dto.conditionMode ?? existing.conditionMode;
+  const effectiveTtql =
+    dto.ttqlCondition !== undefined ? dto.ttqlCondition : existing.ttqlCondition;
+  if (effectiveMode === 'STRUCTURED' && effectiveTtql != null && effectiveTtql.length > 0) {
+    throw new AppError(400, 'ttqlCondition must be empty in STRUCTURED mode');
+  }
+  if ((effectiveMode === 'TTQL' || effectiveMode === 'COMBINED') &&
+      (effectiveTtql == null || effectiveTtql.trim().length === 0)) {
+    throw new AppError(400, `${effectiveMode} mode requires a non-empty ttqlCondition`);
+  }
 
   try {
     return await prisma.checkpointType.update({

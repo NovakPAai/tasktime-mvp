@@ -2,7 +2,70 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.42**
+**Last version: 2.43**
+
+---
+
+## [2.43] [2026-04-21] feat(checkpoint): TTSRH-1 PR-15 — Checkpoint TTQL foundation (schema + DTO superRefine)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-foundation`
+
+### Что было
+
+После PR-14 вся search-часть (§13.6) была closed, но CheckpointType продолжал evaluate'ить только через `criteria[]` (STRUCTURED mode). Бизнес-кейс §5.12.5 («КТ с гибридным условием — структурное + TTQL») был недоступен. UI (PR-18) и engine (PR-16) не могли начаться без foundation-миграции и DTO contract'а.
+
+### Что теперь
+
+Foundation для TTQL-ветки Checkpoint evaluator'а (engine в PR-16):
+
+- **Prisma migration `20260424000000_ttsrh_checkpoint_ttql`**:
+  - Новый enum `CheckpointConditionMode` (`STRUCTURED | TTQL | COMBINED`).
+  - `checkpoint_types`: `condition_mode` (NOT NULL DEFAULT `STRUCTURED`), `ttql_condition` (TEXT, nullable).
+  - `release_checkpoints`: `ttql_snapshot` (TEXT, nullable), `condition_mode_snapshot` (NOT NULL DEFAULT `STRUCTURED`). Immutable snapshot — evaluator'у нужен snapshot на момент создания ReleaseCheckpoint, потому что parent CheckpointType может быть изменён позже (FR-25 backward-compat, R21).
+  - Все existing rows получают `STRUCTURED` через PostgreSQL DEFAULT при `ADD COLUMN` — zero downtime, нет явного UPDATE.
+  - Миграция идемпотентна (создаёт enum + ADD COLUMN'ы, оба no-op при повторном `migrate deploy`).
+- **Prisma schema**: модели `CheckpointType` и `ReleaseCheckpoint` обновлены с `conditionMode`/`ttqlCondition` и `conditionModeSnapshot`/`ttqlSnapshot` полями. Комментарии поясняют FR-25 backward-compat.
+- **`checkpoint.dto.ts`** — расширен:
+  - `conditionModeEnum` (Zod `z.enum(['STRUCTURED','TTQL','COMBINED'])`).
+  - `ttqlConditionSchema` (`z.string().min(1).max(10_000).nullable().optional()`) — 10K лимит зеркалит `/search/issues`.
+  - `checkpointTypeBase` (общее тело) + `createCheckpointTypeDto` с `superRefine` cross-field check:
+    - STRUCTURED → criteria required (min 1), ttqlCondition запрещён.
+    - TTQL → ttqlCondition required (non-empty after trim), criteria любые (evaluator игнорирует).
+    - COMBINED → оба required.
+  - `updateCheckpointTypeDto` (partial) skip'ает cross-field check если `conditionMode` absent — plain PATCH работает. Если conditionMode присутствует — validate правило для нового mode'а.
+- **TTQL checkpoint-функции** — уже wired в PR-5 (`releasePlannedDate()`, `checkpointDeadline()` с `availableIn: ['checkpoint']`) и validator с `variant: 'checkpoint'` — в PR-3. Proven вместе с foundation'ом.
+- **`tests/checkpoint-dto.unit.test.ts`** — 15 unit-кейсов pure-function:
+  - STRUCTURED (×4): default accept, empty criteria reject, ttqlCondition reject, explicit null OK.
+  - TTQL (×4): TTQL-only accept (criteria [] OK), empty reject, whitespace reject, missing reject.
+  - COMBINED (×3): both required accept, empty criteria reject, empty ttqlCondition reject.
+  - PATCH (×4): без conditionMode → skip, TTQL→accept с ttql, TTQL→reject без ttql, STRUCTURED→reject с ttql.
+- **`backend/package.json`** — `test:parser` включает новый `checkpoint-dto.unit.test.ts`.
+
+### Backward-compat (FR-25, R21)
+
+- Все existing `CheckpointType` rows имеют `condition_mode = 'STRUCTURED'` и `ttql_condition = NULL` после миграции — evaluator'у в PR-16 достаточно проверить `condition_mode === 'STRUCTURED'` и fallback к existing path.
+- Existing `ReleaseCheckpoint` rows имеют `condition_mode_snapshot = 'STRUCTURED'` и `ttql_snapshot = NULL` — проверка `violationsHash` стабильна (reasons-порядок не меняется).
+
+### Изменения
+
+- `backend/src/prisma/schema.prisma` — + enum, + 4 fields.
+- `backend/src/prisma/migrations/20260424000000_ttsrh_checkpoint_ttql/migration.sql` — новый.
+- `backend/src/modules/releases/checkpoints/checkpoint.dto.ts` — + conditionMode/ttqlCondition + superRefine.
+- `backend/tests/checkpoint-dto.unit.test.ts` — новый (15 unit-кейсов).
+- `backend/package.json` — `test:parser` включает новый тест.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-15 → ✅ Done.
+
+### Влияние на prod
+
+Под feature-flag `FEATURES_CHECKPOINT_TTQL=false` (default) engine TTQL-ветки (PR-16) не будет выполняться — новые поля чисто data-only. Existing КТ evaluate через structured path unchanged. При `=true` (после merge PR-16 + UAT) TTQL/COMBINED КТ начнут evaluate'иться.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npx prisma generate` — чисто
+- `npx vitest run tests/checkpoint-dto.unit.test.ts` — **15 passing**
 
 ---
 
