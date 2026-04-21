@@ -1135,17 +1135,17 @@ CSV экспорт матрицы и аудита использует UTF-8 BOM
 {
   "jql": "assignee = currentUser() AND statusCategory != DONE ORDER BY priority DESC",
   "startAt": 0,
-  "limit": 50,
-  "columns": ["key", "summary", "status", "priority", "assignee", "updated"]
+  "limit": 50
 }
 ```
 
 | Поле | Тип | Default | Max | Прим. |
 |------|-----|---------|-----|-------|
-| `jql` | string | — | — | TTS-QL выражение. Пустой JQL возвращает 0 задач. |
-| `startAt` | integer | 0 | — | offset пагинации |
+| `jql` | string | — | 10_000 chars | TTS-QL выражение. Пустой JQL возвращает 0 задач. |
+| `startAt` | integer | 0 | 10_000 | offset пагинации |
 | `limit` | integer | 50 | 100 | размер страницы |
-| `columns` | string[] | системный дефолт | — | какие поля вернуть в `issues[].<col>` |
+
+> Выбор полей для response'а — серверный (базовый набор + scope-фильтры). Кастомный набор колонок поддерживается **только** в `POST /search/export`.
 
 **Response:**
 ```json
@@ -1174,7 +1174,8 @@ CSV экспорт матрицы и аудита использует UTF-8 BOM
 
 Проверить корректность JQL **без выполнения**. Используется JqlEditor для inline-ошибок.
 
-**Body:** `{ "jql": "…" }`
+**Body:** `{ "jql": "…", "variant"?: "default" | "checkpoint" }` — `variant=checkpoint` расширяет реестр КТ-функциями (`releasePlannedDate()`, `checkpointDeadline()`).
+
 **Response:**
 ```json
 {
@@ -1183,10 +1184,14 @@ CSV экспорт матрицы и аудита использует UTF-8 BOM
     { "start": 24, "end": 31, "code": "E_UNKNOWN_FIELD",
       "message": "Unknown field 'unknwn'", "hint": "Did you mean 'unknown'?" }
   ],
+  "warnings": [
+    { "start": 10, "end": 22, "code": "W_CURRENT_USER_IN_CHECKPOINT",
+      "message": "currentUser() в CHECKPOINT-контексте редко бывает корректным" }
+  ],
   "ast": { ... }
 }
 ```
-**Timeout:** 2s.
+**Timeout:** 2s. **Rate-limit:** нет.
 
 ### `GET /api/search/suggest`
 
@@ -1195,6 +1200,8 @@ CSV экспорт матрицы и аудита использует UTF-8 BOM
 **Query params:**
 - `jql=<text>&cursor=<int>` — полное выражение + позиция курсора (основной режим), или
 - `field=<name>&operator=<op>&prefix=<text>` — контекст из Basic popover.
+
+Также принимает `&variant=checkpoint` для CHECKPOINT-контекста.
 
 **Response:**
 ```json
@@ -1214,7 +1221,7 @@ CSV экспорт матрицы и аудита использует UTF-8 BOM
   "context": { "expectedField": "assignee", "expectedType": "USER" }
 }
 ```
-**Timeout:** 1s. **Cache:** TTL 30s per-(field, operator, prefix, userId).
+**Timeout:** 1s. **Rate-limit:** 30 req/min/user (общий limiter с `/search/issues`). **Cache:** TTL 30s per-(field, operator, prefix, userId).
 
 ### `POST /api/search/export`
 

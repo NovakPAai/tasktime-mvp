@@ -318,5 +318,5 @@ violatedCheckpointsOf("TTMP-5.0") OR checkpointsAtRisk()
 
 - **Использование страницы поиска** — [search.md](./search.md).
 - **API эндпоинты** — [docs/api/reference.md § TTS-QL Search](../../api/reference.md).
-- **TTS-QL в контрольных точках** — [checkpoints.md § Режим «TTS-QL условие»](./checkpoints.md#режим-условия-структурный--ttql--combined).
+- **TTS-QL в контрольных точках** — [checkpoints.md § Режим условия: Structured / TTQL / Combined](./checkpoints.md#режим-условия-structured--ttql--combined).
 - **Граничные случаи и error codes** — [docs/tz/TTSRH-1.md §5.1-5.9](../../tz/TTSRH-1.md).
