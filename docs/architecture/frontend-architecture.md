@@ -198,6 +198,7 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/time` | `TimePage` | `frontend/src/pages/TimePage` | — |
 | `/teams` | `TeamsPage` | `frontend/src/pages/TeamsPage` | — |
 | `/search` | `SearchPage` | `frontend/src/pages/SearchPage` | — |
+| `/search/saved/:filterId` | `SearchPage` | `frontend/src/pages/SearchPage` | — |
 | `/uat` | `UatTestsPage` | `frontend/src/pages/UatTestsPage` | — |
 | `/admin` | `Navigate` | `frontend/src/pages/Navigate` | — |
 | `/admin/dashboard` | `AdminDashboardPage` | `frontend/src/pages/admin/AdminDashboardPage` | — |
