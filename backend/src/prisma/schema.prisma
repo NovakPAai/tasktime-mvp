@@ -1136,6 +1136,10 @@ enum CheckpointState {
   PENDING
   OK
   VIOLATED
+  // TTSRH-1 PR-16: TTQL compile/runtime failure → checkpoint в ERROR вместо
+  // VIOLATED. Отдельное состояние нужно UI (иконка warning vs error) и чтобы
+  // ReleaseRisk не включал TTQL-ошибки в violated weight (см. computeReleaseRisk).
+  ERROR
 }
 
 // TTSRH-1 §5.12: mode for evaluating КТ conditions.

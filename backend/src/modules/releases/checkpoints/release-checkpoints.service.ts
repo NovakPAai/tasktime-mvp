@@ -21,9 +21,44 @@ import type {
   ReleaseRisk,
 } from './checkpoint.types.js';
 import { computeReleaseRisk, evaluateCheckpoint } from './checkpoint-engine.service.js';
+import { resolveTtqlMatchedIds } from './checkpoint-ttql-evaluator.service.js';
 import type { LoadedRelease } from './evaluation-loader.service.js';
 import { loadEvaluationIssuesForRelease } from './evaluation-loader.service.js';
 import { notifyViolation } from './webhook-notifier.service.js';
+import { features } from '../../../shared/features.js';
+
+// TTSRH-1 PR-16: system-level project list for the TTQL scope filter. Loader
+// caches nothing — caller (recomputeForRelease) memoizes per-invocation.
+async function loadAllProjectIds(): Promise<string[]> {
+  const rows = await prisma.project.findMany({ select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+// TTSRH-1 PR-16: TTQL evaluation runs behind a separate sub-flag so core-поиск
+// (advancedSearch) can ship без TTQL-engine в prod до security review. Default
+// false — до явного включения TTQL/COMBINED checkpoints эффективно работают
+// как STRUCTURED: ttqlMatchedIds=null, получают violations на TTQL_MISMATCH.
+// Чтобы избежать этого, когда флаг off мы применяем existing `criteriaSnapshot`
+// path без учёта conditionMode.
+async function maybeResolveTtqlIds(
+  ttqlSnapshot: string | null,
+  conditionMode: 'STRUCTURED' | 'TTQL' | 'COMBINED',
+  now: Date,
+  applicableIssueIds: string[],
+  accessibleProjectIds: string[],
+): Promise<{ matchedIds: Set<string> | null; error: string | null; skipped: boolean }> {
+  if (conditionMode === 'STRUCTURED') return { matchedIds: null, error: null, skipped: false };
+  if (!features.checkpointTtql) return { matchedIds: null, error: null, skipped: true };
+  if (!ttqlSnapshot || ttqlSnapshot.trim().length === 0) {
+    return { matchedIds: null, error: 'missing ttql snapshot', skipped: false };
+  }
+  const res = await resolveTtqlMatchedIds(ttqlSnapshot, {
+    now,
+    applicableIssueIds,
+    accessibleProjectIds,
+  });
+  return { matchedIds: res.matchedIds, error: res.error, skipped: false };
+}
 
 const CACHE_TTL_SECONDS = 60;
 const cacheKey = (releaseId: string) => `release:${releaseId}:checkpoints`;
@@ -264,9 +299,27 @@ export async function recomputeForRelease(
 
   let updatedCount = 0;
   let unchangedCount = 0;
+  // Lazily loaded once if any checkpoint uses TTQL path — no cost for STRUCTURED-only releases.
+  let ttqlProjectIds: string[] | null = null;
 
   for (const rc of existing) {
     const criteria = rc.criteriaSnapshot as unknown as CheckpointCriterion[];
+    // TTSRH-1 PR-16: resolve TTQL matches per-checkpoint if snapshot mode
+    // requires it. STRUCTURED fast-path returns {null, null, false} — original
+    // behavior preserved.
+    // Scheduler runs system-level — R3 scope is bypassed by the `id IN
+    // (applicableIssueIds)` narrowing the resolver applies (see
+    // checkpoint-ttql-evaluator.service.ts). We still need to feed the compiler
+    // a non-empty `accessibleProjectIds` list or the baseline scope becomes
+    // `projectId: {in: []}` (matches nothing). Fetch all project-ids lazily.
+    const projectIdsForScope = ttqlProjectIds ?? (ttqlProjectIds = await loadAllProjectIds());
+    const ttqlOutcome = await maybeResolveTtqlIds(
+      rc.ttqlSnapshot,
+      rc.conditionModeSnapshot,
+      now,
+      loaded.issues.map((i) => i.id),
+      projectIdsForScope,
+    );
     const result = evaluateCheckpoint(
       {
         criteria,
@@ -274,6 +327,12 @@ export async function recomputeForRelease(
         warningDays: rc.checkpointType.warningDays,
         issues: loaded.issues,
         context: loaded.context,
+        // If TTQL skipped (flag off), fall back to STRUCTURED semantics даже если
+        // snapshot = TTQL/COMBINED — чтобы prod-prod не ломать existing evaluate
+        // result до включения FEATURES_CHECKPOINT_TTQL + UAT (см. PR-16 в ТЗ).
+        conditionMode: ttqlOutcome.skipped ? 'STRUCTURED' : rc.conditionModeSnapshot,
+        ttqlMatchedIds: ttqlOutcome.matchedIds,
+        ttqlError: ttqlOutcome.error,
       },
       now,
     );
