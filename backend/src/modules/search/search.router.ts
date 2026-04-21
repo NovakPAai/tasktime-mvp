@@ -13,6 +13,7 @@ import { functionsForVariant } from './search.functions.js';
 import { searchIssues } from './search.service.js';
 import { searchRateLimit } from './search.rate-limit.js';
 import { suggest } from './search.suggest.js';
+import { exportIssuesToCsv, exportIssuesToXlsx } from './search.export.js';
 import type { QueryVariant } from './search.types.js';
 
 /**
@@ -27,17 +28,6 @@ import type { QueryVariant } from './search.types.js';
 
 const router = Router();
 router.use(authenticate);
-
-function notImplemented(endpoint: string) {
-  return (_req: Request, res: Response): void => {
-    res.status(501).json({
-      error: 'NOT_IMPLEMENTED',
-      endpoint,
-      message:
-        'TTS-QL endpoint is under development. See docs/tz/TTSRH-1.md — delivered in PR-5..PR-8.',
-    });
-  };
-}
 
 // ─── POST /search/validate ──────────────────────────────────────────────────
 
@@ -286,8 +276,46 @@ router.get(
   },
 );
 
-// ─── Still-stubbed endpoints ────────────────────────────────────────────────
+// ─── POST /search/export ────────────────────────────────────────────────────
 
-router.post('/search/export', notImplemented('POST /search/export'));
+const exportDtoSchema = z.object({
+  jql: z.string().max(10_000),
+  format: z.enum(['csv', 'xlsx']),
+  // Column allow-list upper bound — guard against XLSX with 10K sparse columns.
+  columns: z.array(z.string().min(1).max(100)).max(50).optional(),
+});
+
+router.post(
+  '/search/export',
+  searchRateLimit,
+  validateDto(exportDtoSchema),
+  async (req: Request, res: Response, next): Promise<void> => {
+    try {
+      const auth = req as AuthRequest;
+      if (!auth.user) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const { projectIds } = await resolveAccessibleProjectIds(auth);
+      const { jql, format, columns } = req.body as z.infer<typeof exportDtoSchema>;
+      const ctx = { userId: auth.user.userId, accessibleProjectIds: projectIds };
+      if (format === 'csv') {
+        await exportIssuesToCsv({ jql, columns }, ctx, res);
+      } else {
+        await exportIssuesToXlsx({ jql, columns }, ctx, res);
+      }
+    } catch (err) {
+      // If we already started streaming, we can't send a JSON error — just drop
+      // the connection and let the global error handler log it. If headers
+      // haven't been sent yet, next(err) produces the standard 500 JSON.
+      if (res.headersSent) {
+        console.error('export stream error after headers', err);
+        res.end();
+        return;
+      }
+      next(err);
+    }
+  },
+);
 
 export default router;
