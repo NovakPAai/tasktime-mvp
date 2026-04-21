@@ -7,6 +7,11 @@ loadEnv({ path: '.env.test', override: true });
 
 process.env.NODE_ENV = 'test';
 
+// TTSRH-1 PR-7: saved-filter + search tests exercise the feature-flagged mount.
+// Default OFF in prod, but tests always expect the routes to be live unless a
+// specific test explicitly overrides it.
+process.env.FEATURES_ADVANCED_SEARCH ??= 'true';
+
 if (process.env.DATABASE_URL) {
   const sourceUrl = new URL(process.env.DATABASE_URL);
   const databaseName = sourceUrl.pathname.split('/').filter(Boolean).at(-1) ?? 'tasktime';

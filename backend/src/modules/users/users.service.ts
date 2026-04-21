@@ -2,7 +2,7 @@ import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { isSuperAdmin } from '../../shared/auth/roles.js';
 import type { SystemRoleType } from '@prisma/client';
-import type { UpdateUserDto } from './users.dto.js';
+import type { UpdatePreferencesDto, UpdateUserDto } from './users.dto.js';
 
 const userSelect = {
   id: true,
@@ -229,6 +229,29 @@ export async function getSystemRoles(userId: string): Promise<SystemRoleType[]> 
 
 const NA_SUFFIX = ' (N/A)';
 const MAX_NAME_LEN = 255;
+
+// TTSRH-1 PR-7: per-user preferences — read/merge semantics.
+// Merge is shallow over top-level keys (`searchDefaults`, …) and replace within; this matches
+// TTUI-90 §5.4. PATCH with partial payload only overwrites the keys provided.
+export async function getPreferences(userId: string): Promise<Record<string, unknown>> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { preferences: true } });
+  if (!user) throw new AppError(404, 'User not found');
+  return (user.preferences as Record<string, unknown> | null) ?? {};
+}
+
+export async function updatePreferences(userId: string, dto: UpdatePreferencesDto): Promise<Record<string, unknown>> {
+  const existing = await getPreferences(userId);
+  const merged: Record<string, unknown> = { ...existing };
+  for (const [key, value] of Object.entries(dto)) {
+    if (value === undefined) continue;
+    merged[key] = value;
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { preferences: merged as never },
+  });
+  return merged;
+}
 
 export async function deactivateUser(id: string) {
   const user = await prisma.user.findUnique({ where: { id } });

@@ -1313,6 +1313,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Integration T-6 (CRUD + sharing + RBAC negative).
 - **Merge-ready check:** T-6 зелёные; SavedFilter PUBLIC + невидимые проекты → 0 задач (SEC-8).
 - **Оценка:** ~8ч.
+- **Статус: ✅ Done** — 24 integration-теста (CRUD × 10, Sharing × 6, Favorite/use × 4, Audit × 1, Preferences × 5) + shallow-merge preferences + owner-only favorite + group-share через `UserGroupMember`. Добавлен `POST /:id/use` для incrementUseStats (инкремент `useCount` + `lastUsedAt`). В §13.9 — 🟢 Merged после слияния PR.
 
 #### PR-8: Export CSV/XLSX
 - **Branch:** `ttsrh-1/export`
@@ -1498,7 +1499,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 | 🟢 Merged ([#103](https://github.com/NovakPAai/tasktime-mvp/pull/103)) |
 | 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 | 🟢 Merged ([#104](https://github.com/NovakPAai/tasktime-mvp/pull/104)) |
 | 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 | ✅ Done (готов к push после merge PR-5) |
-| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 📋 Планируется |
+| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | ✅ Done (готов к push после merge PR-6) |
 | 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 📋 Планируется |
 | 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 📋 Планируется |
 | 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 📋 Планируется |
