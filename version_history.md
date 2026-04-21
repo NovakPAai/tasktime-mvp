@@ -2,7 +2,57 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.34**
+**Last version: 2.35**
+
+---
+
+## [2.35] [2026-04-21] feat(search): TTSRH-1 PR-8 — POST /search/export CSV/XLSX streaming
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/export`
+
+### Что было
+
+После PR-7 `/api/search/export` возвращал 501. Из UI нельзя было выгрузить результаты search'а — ни для оффлайн-отчёта, ни для шеринга вне системы (FR-19, §5.6).
+
+### Что теперь
+
+`POST /api/search/export` — live с двумя форматами + streaming writers, reuse всего pipeline PR-2..PR-5.
+
+- **`search.export.ts`** — новый модуль, publico `exportIssuesToCsv` / `exportIssuesToXlsx`:
+  - **`prepareExport`** — reuses parse → validate → resolveFunctions → compile → executeCustomFieldPredicates (тот же path, что у `POST /search/issues`), гарантирует идентичную R3-семантику (`accessibleProjectIds` → AND[0]).
+  - **`iterateIssues`** — async generator с cursor-based pagination (batches × 500). Избегает O(n²) на больших offset'ах (skip/take → P.K).
+  - **Limits**: `MAX_ROWS=50_000` (безопасность от memory-blow), `QUERY_TIMEOUT_MS=60_000` (§5.6 NFR-8) через `AbortController`. Truncate-маркер в последней строке если hit cap.
+  - **Column allow-list**: `STANDARD_COLUMNS` (19 проекций — key/summary/priority/status/assignee и т.д.) ∪ `SYSTEM_FIELDS` (канонические имена) ∪ custom-field names из `loadCustomFields()`. Unknown columns silently dropped, не раскрывают произвольные Prisma-поля. 400 если ВСЕ columns неизвестны (`NO_VALID_COLUMNS`).
+  - **CSV**: inline writer (~30 LoC) с UTF-8 BOM (Excel-RU compat), escape для `,"\n\r`, null → пустая строка. `Content-Type: text/csv; charset=utf-8`.
+  - **XLSX**: `exceljs.stream.xlsx.WorkbookWriter` — коммит per-row через `addRow(...).commit()` (streaming, не держит всё в памяти). `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+- **`search.router.ts`** — `POST /search/export` подключён (Zod body `{jql, format:csv|xlsx, columns?: string[]}`; columns.max=50). Авторизация + rate-limit + accessibleProjectIds. Стрим-safe error-handler: если headers уже отправлены, `res.end()` + log; иначе `next(err)` → 500 JSON.
+- **`backend/package.json`** — добавлен `exceljs@^4.4.0` (~300KB node_modules, единственный new dep).
+
+### Тесты (интеграционные, требуют Postgres)
+
+**`tests/search-export.test.ts`** — 11 кейсов:
+
+- **CSV** (9): default columns, subset+order columns, unknown column dropped, all-unknown → 400, CSV escape special chars (`,"\n`), parse error → 400, validation error → 400, no auth → 401, invalid format → 400.
+- **XLSX** (1): content-type spreadsheetml.sheet + ZIP-signature `PK\x03\x04` в начале бинарника (буферизованный stream чтение через supertest .parse()).
+- **RBAC** (1): неавторизованный на проект user → 0 data rows (только header). Scope R3 наследуется из `/search/issues` path.
+
+### Изменения
+
+- `backend/src/modules/search/search.export.ts` — новый.
+- `backend/src/modules/search/search.router.ts` — + POST /search/export, удалён unused `notImplemented` helper (все endpoints теперь live).
+- `backend/package.json` — + `exceljs@^4.4.0`.
+- `backend/tests/search-export.test.ts` — новый, 11 integration-кейсов.
+- `docs/tz/TTSRH-1.md` §13.5/§13.9 — статус PR-8 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_ADVANCED_SEARCH=false` эндпоинт недоступен (mount условный). При включении: XLSX-файл стримится, frontend потребляет как blob для `saveAs` (PR-14 добавит UI). Никаких изменений на read-path'е `/search/issues`.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings (2 pre-existing)
 
 ---
 
