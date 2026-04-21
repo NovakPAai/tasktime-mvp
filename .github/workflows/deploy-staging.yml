@@ -65,6 +65,27 @@ jobs:
             mv -f "$TMP_FILE" "$ENV_FILE"
           SSHEOF
 
+      # TTSRH-1: feature flags are enabled on staging for UAT. Idempotent —
+      # removes any prior FEATURES_* lines and re-appends the desired values,
+      # so re-runs produce the same result.
+      - name: Inject feature flags into backend env (staging)
+        run: |
+          ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
+            bash -s -- "${{ secrets.STAGING_DEPLOY_PATH }}" \
+            <<'SSHEOF'
+            set -euo pipefail
+            ENV_FILE="$1/deploy/env/backend.staging.env"
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "::error::$ENV_FILE not found on staging host"; exit 1
+            fi
+            TMP_FILE=$(mktemp "${ENV_FILE}.XXXXXX")
+            grep -v '^FEATURES_ADVANCED_SEARCH=\|^FEATURES_CHECKPOINT_TTQL=' \
+              "$ENV_FILE" > "$TMP_FILE" || true
+            printf 'FEATURES_ADVANCED_SEARCH=true\nFEATURES_CHECKPOINT_TTQL=true\n' \
+              >> "$TMP_FILE"
+            mv -f "$TMP_FILE" "$ENV_FILE"
+          SSHEOF
+
       - name: Run remote deploy
         id: remote_deploy
         run: |
