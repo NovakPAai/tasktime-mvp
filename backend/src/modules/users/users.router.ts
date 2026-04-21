@@ -19,7 +19,7 @@ router.get('/', asyncHandler(async (_req, res) => {
 // TTSRH-1 PR-7 — per-user UI preferences (search columns, page size). Must be
 // declared before `/:id` so Express doesn't greedy-match `me` as an id.
 router.get('/me/preferences', authHandler(async (req, res) => {
-  const prefs = await usersService.getPreferences(req.user.userId);
+  const prefs = await usersService.getPreferences(req.user!.userId);
   res.json(prefs);
 }));
 
@@ -27,7 +27,7 @@ router.patch(
   '/me/preferences',
   validate(updatePreferencesDto),
   authHandler(async (req, res) => {
-    const prefs = await usersService.updatePreferences(req.user.userId, req.body);
+    const prefs = await usersService.updatePreferences(req.user!.userId, req.body);
     res.json(prefs);
   }),
 );
