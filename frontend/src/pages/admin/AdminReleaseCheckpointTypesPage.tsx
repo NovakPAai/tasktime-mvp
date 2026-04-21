@@ -40,6 +40,7 @@ import {
 import { listReleasesGlobal } from '../../api/releases';
 import CheckpointConditionModeControl, { CheckpointConditionModeIcon } from '../../components/releases/CheckpointConditionModeControl';
 import CheckpointPreviewPanel from '../../components/releases/CheckpointPreviewPanel';
+import { convertCriteriaToTtql } from '../../components/releases/convertCriteriaToTtql';
 import SyncInstancesModal from './SyncInstancesModal';
 
 const COLOR_PALETTE = [
@@ -442,6 +443,33 @@ export default function AdminReleaseCheckpointTypesPage() {
             onTtqlChange={setTtqlValue}
             disabled={saving}
           />
+
+          {/* TTSRH-1 PR-19: one-way structured → TTQL converter. Не автосохраняет
+              режим (R21) — только генерирует draft в TTQL-редактор. Кнопка показывается
+              когда есть хотя бы 1 structured criterion. */}
+          {(conditionMode === 'STRUCTURED' || conditionMode === 'COMBINED') && (
+            <div style={{ marginTop: 6, fontSize: 12, color: '#6B7280' }}>
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0 }}
+                onClick={() => {
+                  const values = form.getFieldsValue() as Partial<TypeFormValues>;
+                  const criteria = values.criteria ?? [];
+                  if (criteria.length === 0) {
+                    message.info('Нет критериев для конвертации');
+                    return;
+                  }
+                  const generated = convertCriteriaToTtql(criteria);
+                  setTtqlValue(generated);
+                  setConditionMode('COMBINED');
+                  message.success('TTS-QL сгенерирован. Проверьте и отредактируйте перед сохранением.');
+                }}
+              >
+                Сконвертировать structured-критерии в TTS-QL (draft)
+              </Button>
+            </div>
+          )}
 
           {(conditionMode === 'STRUCTURED' || conditionMode === 'COMBINED') && (
             <>

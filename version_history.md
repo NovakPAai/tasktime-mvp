@@ -2,7 +2,49 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.46**
+**Last version: 2.47**
+
+---
+
+## [2.47] [2026-04-21] feat(checkpoint): TTSRH-1 PR-19 — Structured → TTQL one-way converter
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-converter`
+
+### Что было
+
+После PR-18 админы могли создавать TTQL/COMBINED checkpoints, но перевод старых STRUCTURED типов на TTQL приходилось делать вручную — читать criteria[] JSON и переписывать в TTS-QL с нуля.
+
+### Что теперь
+
+- **`convertCriteriaToTtql.ts`** — pure-function one-way конвертер всех 6 типов criterion (§5.12.9):
+  - `STATUS_IN` → `statusCategory IN (...)` (single → `=`).
+  - `DUE_BEFORE` → `due < checkpointDeadline() +/- Nd` (wire-up checkpointDeadline() в PR-17 follow-up).
+  - `ASSIGNEE_SET` → `assignee IS NOT EMPTY`.
+  - `CUSTOM_FIELD_VALUE` → `cf["id"] op value` (NOT_EMPTY/EQUALS/IN разные формы).
+  - `ALL_SUBTASKS_DONE` / `NO_BLOCKING_LINKS` → `-- TODO` placeholder comment (нет прямого выражения без recursion, требуется manual review per R21).
+  - `issueTypes` фильтр → префикс-clause `(type IN (...)) AND (body)`.
+- **UI кнопка** «Сконвертировать structured-критерии в TTS-QL (draft)» в форме `AdminReleaseCheckpointTypesPage`:
+  - Видна когда mode STRUCTURED или COMBINED.
+  - Click → генерирует draft, переключает режим в COMBINED, вставляет в TTQL-editor.
+  - `message.success` хинт «Проверьте и отредактируйте перед сохранением» — R21 requires manual review.
+  - НЕ автосохраняет — save остаётся за пользователем.
+
+### Изменения
+
+- `frontend/src/components/releases/convertCriteriaToTtql.ts` — новый (~90L).
+- `frontend/src/pages/admin/AdminReleaseCheckpointTypesPage.tsx` — + import + «Сконвертировать» button.
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-19 → ✅ Done.
+
+### Влияние на prod
+
+Pure-function utility — zero runtime impact. UI button виден только в admin interface (required role SUPER_ADMIN/ADMIN/RELEASE_MANAGER). Никаких новых deps, bundle unchanged.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` — 0 errors
+- `npm run build` — чисто, 4.50s
 
 ---
 
@@ -40,10 +82,6 @@
 - `npx tsc --noEmit` (frontend) — чисто
 - `npm run lint` (frontend) — 0 errors
 - `npm run build` — чисто, 4.54s; JqlEditor chunk без изменений.
-
----
-
-## [2.45] [2026-04-21] feat(checkpoint): TTSRH-1 PR-17 — /admin/checkpoint-types/preview + suggesters sync
 
 ---
 
