@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, theme as antdTheme } from 'antd';
+import { App as AntApp, ConfigProvider, theme as antdTheme } from 'antd';
 import { useAuthStore } from './store/auth.store';
 import { useThemeStore } from './store/theme.store';
 import * as tokens from './design-tokens';
@@ -166,7 +166,8 @@ export default function App() {
 
   return (
     <ConfigProvider theme={antTheme}>
-      <BrowserRouter>
+      <AntApp>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
@@ -251,6 +252,7 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      </AntApp>
     </ConfigProvider>
   );
 }

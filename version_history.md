@@ -2,7 +2,72 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.40**
+**Last version: 2.41**
+
+---
+
+## [2.41] [2026-04-21] feat(frontend): TTSRH-1 PR-13 — SavedFiltersSidebar + Save/Share modals + Zustand store
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/saved-filters-ui`
+
+### Что было
+
+После PR-12 SearchPage уже имел JqlEditor + BasicFilterBuilder, но backend'овые фильтры (CRUD + share из PR-7) не имели UI. Левая колонка была placeholder'ом «Список появится в PR-13». Пользователи не могли сохранять, делить и переиспользовать запросы.
+
+### Что теперь
+
+Полноценный UI для SavedFilters c 5 списками + 2 модалками + Ctrl+S:
+
+- **`frontend/src/store/savedFilters.store.ts`** (~130L) — Zustand-стор:
+  - 5 scope'ов: `mine / favorite / public / shared / recent` (recent — client-side compute на mine sorted by lastUsedAt DESC, top 10).
+  - `load(scope)` / `loadAll()` (параллельный Promise.all).
+  - `create / update / remove / toggleFavorite / share` — тонкие обёртки над `api/savedFilters`, каждая завершается `loadAll()` для синхронизации между списками (filter может переехать из mine → shared → public после изменения visibility).
+  - Ошибки сохраняются в `error`, не throw'ятся — UI решает как показывать.
+- **`frontend/src/components/search/SaveFilterModal.tsx`** (~170L) — Ant Design Modal с Form-validation:
+  - Поля: name (required ≤200), description (≤2000), jql (readonly preview), visibility (Select PRIVATE/SHARED/PUBLIC), isFavorite (Switch).
+  - Обрабатывает create и update через `initial` prop.
+  - PUBLIC → Alert-warning (R11 из §5.9).
+  - Favorite toggling — отдельный endpoint, вызывается только если значение изменилось.
+  - `onClose` / `onCancel` / backdrop / Esc → все триггерят parent `load()` (CLAUDE.md).
+- **`frontend/src/components/search/FilterShareModal.tsx`** (~160L) — управление visibility + sharing:
+  - Visibility switch (PRIVATE/SHARED/PUBLIC).
+  - При SHARED — multi-select пользователей из `/api/users` + permission READ/WRITE.
+  - Copy-link кнопка: `${origin}/search/saved/:id` → `navigator.clipboard.writeText` + AntD `message.success`.
+  - Replace-semantics: visibility → update(), затем `share({users, permission})`.
+- **`frontend/src/components/search/SavedFiltersSidebar.tsx`** (~220L) — левая колонка:
+  - 5 collapsible sections через native `<details>`-style buttons с `aria-expanded`.
+  - Per-item actions: favorite toggle (⭐), share (если permission=WRITE), delete (Popconfirm, только для mine).
+  - Active highlight: `jql === currentJql` подсвечивает текущий фильтр.
+  - Tooltip на item — показывает description || jql.
+- **`frontend/src/pages/SearchPage.tsx`** — integration:
+  - Placeholder-секция заменена на `<SavedFiltersSidebar>` + кнопка «+ Сохранить».
+  - `saveModalOpen / shareModalFilter` — local state модалок.
+  - `Ctrl/Cmd+S` hotkey → openSaveModal (preventDefault на browser "Save Page"). Игнорируется на пустом JQL.
+  - Select-filter из sidebar → `updateUrl` + fire-and-forget `markSavedFilterUsed`.
+  - Все onClose/onSaved вызывают `loadAllSavedFilters()` — CLAUDE.md FR-18.
+
+### Изменения
+
+- `frontend/src/store/savedFilters.store.ts` — новый.
+- `frontend/src/components/search/SaveFilterModal.tsx` — новый.
+- `frontend/src/components/search/FilterShareModal.tsx` — новый.
+- `frontend/src/components/search/SavedFiltersSidebar.tsx` — новый.
+- `frontend/src/pages/SearchPage.tsx` — sidebar integration + modals + Ctrl+S hotkey.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-13 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений. При `=true`:
+- Sidebar подгружает 5 списков (4 backend + 1 client-compute) при mount.
+- Ctrl+S сохраняет текущий JQL.
+- Share-флоу даёт copy-link и управление визиблити/members.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.52s. Main bundle +3.9KB gzip (AntD Modal/Form/Select уже в bundle). JqlEditor chunk unchanged.
 
 ---
 
