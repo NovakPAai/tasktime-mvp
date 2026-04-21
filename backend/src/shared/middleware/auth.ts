@@ -35,8 +35,7 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
   if (session !== null) {
     // Redis is available and session exists — check inactivity
     if (!session.userId) {
-      // Corrupted session data — allow through
-      return next();
+      return next(new AppError(401, 'Session invalid', { code: 'SESSION_INVALID' }));
     }
 
     const lifetimeMinutes = await getSessionLifetimeMinutes();

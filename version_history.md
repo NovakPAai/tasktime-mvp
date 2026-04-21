@@ -2,7 +2,31 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.37**
+**Last version: 2.38**
+
+---
+
+## [2.38] [2026-04-21] feat: паттерны из Pulsar — asyncHandler, logger, rate-limit, security
+
+**PR:** [#112](https://github.com/NovakPAai/tasktime-mvp/pull/112)
+**Ветка:** `claude/jack-pulsar-patterns`
+
+### Что изменилось
+
+- **`asyncHandler` / `authHandler`** — убраны `try/catch` из 39 роутеров, ошибки проксируются в `next()` автоматически
+- **`logger`** — структурированный логгер: prod → JSON, dev → pretty; `captureError` с redact секретов
+- **`rate-limit`** — scoped in-memory лимитер; `authRead` (30/мин) / `authWrite` (10/мин); size cap 100k
+- **`issue-access`** — централизованный Prisma WHERE для ACL: `accessibleIssueWhere(userId, systemRoles)`
+- **Security**: `trust proxy = 1`, `safeClientMeta` denylist (не обрезает validatorType и др.), corrupted Redis session → 401, `console` → logger
+
+### Файлы
+- `backend/src/shared/utils/async-handler.ts`, `logger.ts`, `rate-limit.ts`, `issue-access.ts`
+- `backend/src/shared/middleware/error-handler.ts`, `backend/src/app.ts`
+- 39 роутеров — убраны try/catch блоки
+
+---
+
+**Last version before this branch: 2.37**
 
 ---
 

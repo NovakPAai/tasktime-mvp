@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient, type RedisClientType } from 'redis';
 import { config } from '../config.js';
+import { captureError } from './utils/logger.js';
 
 type RedisClient = RedisClientType;
 
@@ -27,7 +28,7 @@ async function getRedisClientInternal(): Promise<RedisClient | null> {
     const instance = createClient({ url: config.REDIS_URL }) as RedisClient;
 
     instance.on('error', (err) => {
-      console.error('Redis client error:', err);
+      captureError(err, { fn: 'getRedisClientInternal', event: 'redis-error' });
     });
 
     connecting = instance
@@ -37,7 +38,7 @@ async function getRedisClientInternal(): Promise<RedisClient | null> {
         return instance;
       })
       .catch((err) => {
-        console.error('Failed to connect to Redis, caching disabled:', err);
+        captureError(err, { fn: 'getRedisClientInternal', event: 'connect-failed' });
         client = null;
         return null;
       });
@@ -55,7 +56,7 @@ export async function getCachedJson<T>(key: string): Promise<T | null> {
     if (!raw) return null;
     return JSON.parse(raw) as T;
   } catch (err) {
-    console.error('Failed to read from Redis cache:', err);
+    captureError(err, { fn: 'getCachedJson', key });
     return null;
   }
 }
@@ -67,7 +68,7 @@ export async function setCachedJson<T>(key: string, value: T, ttlSeconds = confi
   try {
     await redis.set(key, JSON.stringify(value), { EX: ttlSeconds });
   } catch (err) {
-    console.error('Failed to write to Redis cache:', err);
+    captureError(err, { fn: 'setCachedJson', key });
   }
 }
 
@@ -79,7 +80,7 @@ export async function delCachedJson(key: string): Promise<void> {
   try {
     await redis.del(key);
   } catch (err) {
-    console.error('Failed to delete from Redis cache:', err);
+    captureError(err, { fn: 'delCachedJson', key });
   }
 }
 
@@ -105,7 +106,7 @@ export async function incrWithTtl(key: string, ttlSeconds: number): Promise<numb
       .exec();
     return Number(replies[0]);
   } catch (err) {
-    console.error('Redis INCR failed:', err);
+    captureError(err, { fn: 'incrWithTtl', key });
     return null;
   }
 }
@@ -128,7 +129,7 @@ export async function delCacheByPrefix(prefix: string): Promise<void> {
       }
     } while (cursor !== '0');
   } catch (err) {
-    console.error('Failed to delete cache by prefix:', err);
+    captureError(err, { fn: 'delCacheByPrefix', prefix });
   }
 }
 
@@ -168,7 +169,7 @@ export async function setUserSession(
   try {
     await redis.set(buildSessionKey(userId), JSON.stringify(fullSession), { EX: ttlSeconds });
   } catch (err) {
-    console.error('Failed to write user session to Redis:', err);
+    captureError(err, { fn: 'setUserSession', userId });
   }
 }
 
@@ -181,7 +182,7 @@ export async function getUserSession(userId: string): Promise<UserSession | null
     if (!raw) return null;
     return JSON.parse(raw) as UserSession;
   } catch (err) {
-    console.error('Failed to read user session from Redis:', err);
+    captureError(err, { fn: 'getUserSession', userId });
     return null;
   }
 }
@@ -193,7 +194,7 @@ export async function deleteUserSession(userId: string): Promise<void> {
   try {
     await redis.del(buildSessionKey(userId));
   } catch (err) {
-    console.error('Failed to delete user session from Redis:', err);
+    captureError(err, { fn: 'deleteUserSession', userId });
   }
 }
 
@@ -214,7 +215,7 @@ export async function touchUserSession(userId: string, ttlSeconds: number): Prom
     await redis.set(buildSessionKey(userId), JSON.stringify(session), { EX: ttlSeconds });
     return true;
   } catch (err) {
-    console.error('Failed to touch user session in Redis:', err);
+    captureError(err, { fn: 'touchUserSession', userId });
     return true; // Redis error — allow request, degrade gracefully
   }
 }
@@ -227,7 +228,7 @@ export async function deleteCachedByPattern(pattern: string): Promise<void> {
     const keys = await redis.keys(pattern);
     if (keys.length > 0) await redis.del(keys);
   } catch (err) {
-    console.error('Failed to delete cached keys by pattern:', err);
+    captureError(err, { fn: 'deleteCachedByPattern', pattern });
   }
 }
 
@@ -251,7 +252,7 @@ export async function acquireLock(key: string, ttlSeconds = 60): Promise<string 
     const result = await redis.set(key, token, { NX: true, EX: ttlSeconds });
     return result === 'OK' ? token : null;
   } catch (err) {
-    console.error('acquireLock Redis error:', err);
+    captureError(err, { fn: 'acquireLock', key });
     return process.env.NODE_ENV === 'test' ? 'test-token' : null;
   }
 }
@@ -267,7 +268,7 @@ export async function releaseLock(key: string, token: string): Promise<void> {
   try {
     await redis.eval(RELEASE_LOCK_SCRIPT, { keys: [key], arguments: [token] });
   } catch (err) {
-    console.error('releaseLock Redis error:', err);
+    captureError(err, { fn: 'releaseLock', key });
   }
 }
 

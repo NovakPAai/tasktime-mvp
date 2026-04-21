@@ -30,6 +30,7 @@ import {
   syncInstancesDto,
 } from './release-checkpoint.dto.js';
 import * as service from './release-checkpoints.service.js';
+import { authHandler } from '../../../shared/utils/async-handler.js';
 
 const router = Router();
 router.use(authenticate);
@@ -94,189 +95,141 @@ async function assertReleasePermission(
 
 // ─── Read ────────────────────────────────────────────────────────────────────
 
-router.get('/releases/:releaseId/checkpoints', async (req: AuthRequest, res, next) => {
-  try {
-    const releaseId = req.params.releaseId as string;
-    await assertReleaseRead(req, releaseId);
-    res.json(await service.listForRelease(releaseId));
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/releases/:releaseId/checkpoints', authHandler(async (req, res) => {
+  const releaseId = req.params.releaseId as string;
+  await assertReleaseRead(req, releaseId);
+  res.json(await service.listForRelease(releaseId));
+}));
 
 // FR-26: Matrix view of Issues × Checkpoints for a release. `?format=csv` returns the
 // same data as an attachment (UTF-8 BOM + CRLF for Excel). Anyone who can read the
 // release reads the matrix.
-router.get('/releases/:releaseId/checkpoints/matrix', async (req: AuthRequest, res, next) => {
-  try {
-    const releaseId = req.params.releaseId as string;
-    await assertReleaseRead(req, releaseId);
-    const matrix = await service.buildCheckpointsMatrix(releaseId);
-    if (req.query.format === 'csv') {
-      const csv = service.checkpointsMatrixToCsv(matrix);
-      const filename = `checkpoints-matrix-${releaseId.slice(0, 8)}-${new Date()
-        .toISOString()
-        .slice(0, 10)}.csv`;
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(csv);
-      return;
-    }
-    res.json(matrix);
-  } catch (err) {
-    next(err);
+router.get('/releases/:releaseId/checkpoints/matrix', authHandler(async (req, res) => {
+  const releaseId = req.params.releaseId as string;
+  await assertReleaseRead(req, releaseId);
+  const matrix = await service.buildCheckpointsMatrix(releaseId);
+  if (req.query.format === 'csv') {
+    const csv = service.checkpointsMatrixToCsv(matrix);
+    const filename = `checkpoints-matrix-${releaseId.slice(0, 8)}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+    return;
   }
-});
+  res.json(matrix);
+}));
 
-router.get('/issues/:issueId/checkpoints', async (req: AuthRequest, res, next) => {
-  try {
-    const issueId = req.params.issueId as string;
-    await assertIssueRead(req, issueId);
-    res.json(await service.listForIssue(issueId));
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/issues/:issueId/checkpoints', authHandler(async (req, res) => {
+  const issueId = req.params.issueId as string;
+  await assertIssueRead(req, issueId);
+  res.json(await service.listForIssue(issueId));
+}));
 
 // FR-22: issue's checkpoint-violation history.
-router.get('/issues/:issueId/checkpoint-events', async (req: AuthRequest, res, next) => {
-  try {
-    const issueId = req.params.issueId as string;
-    await assertIssueRead(req, issueId);
-    res.json(await service.listEventsForIssue(issueId));
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/issues/:issueId/checkpoint-events', authHandler(async (req, res) => {
+  const issueId = req.params.issueId as string;
+  await assertIssueRead(req, issueId);
+  res.json(await service.listEventsForIssue(issueId));
+}));
 
 // FR-11: issues in a project that currently violate at least one VIOLATED checkpoint.
 // Powers the board / project-list red-stripe indicator. Anyone with read access to the
 // project can see the aggregate (same gate as listing project issues).
-router.get('/projects/:projectId/checkpoint-violating-issues', async (req: AuthRequest, res, next) => {
-  try {
-    const projectId = req.params.projectId as string;
-    const hasGlobalRole = hasAnySystemRole(req.user!.systemRoles, [
-      'ADMIN',
-      'RELEASE_MANAGER',
-      'SUPER_ADMIN',
-      'AUDITOR',
-    ]);
-    if (!hasGlobalRole) {
-      await assertProjectPermission(req.user!, projectId, ['ISSUES_VIEW']);
-    }
-    res.json(await service.listViolatingIssuesForProject(projectId));
-  } catch (err) {
-    next(err);
+router.get('/projects/:projectId/checkpoint-violating-issues', authHandler(async (req, res) => {
+  const projectId = req.params.projectId as string;
+  const hasGlobalRole = hasAnySystemRole(req.user!.systemRoles, [
+    'ADMIN',
+    'RELEASE_MANAGER',
+    'SUPER_ADMIN',
+    'AUDITOR',
+  ]);
+  if (!hasGlobalRole) {
+    await assertProjectPermission(req.user!, projectId, ['ISSUES_VIEW']);
   }
-});
+  res.json(await service.listViolatingIssuesForProject(projectId));
+}));
 
 // FR-12 / SEC-7: authenticated user's own issues currently violating a VIOLATED checkpoint.
 // The user id + systemRoles come from the JWT; service layer applies project-membership
 // scoping (users without global read roles cannot see violations from projects they aren't
 // members of).
-router.get('/my-checkpoint-violations', async (req: AuthRequest, res, next) => {
-  try {
-    res.json(await service.listMyViolations(req.user!.userId, req.user!.systemRoles));
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/my-checkpoint-violations', authHandler(async (req, res) => {
+  res.json(await service.listMyViolations(req.user!.userId, req.user!.systemRoles));
+}));
 
 // FR-12 badge poll endpoint — lightweight `{ count }` shape so the TopBar can poll every
 // 60 s without dragging the full list.
-router.get('/my-checkpoint-violations/count', async (req: AuthRequest, res, next) => {
-  try {
-    const count = await service.countMyViolations(req.user!.userId);
-    res.json({ count });
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/my-checkpoint-violations/count', authHandler(async (req, res) => {
+  const count = await service.countMyViolations(req.user!.userId);
+  res.json({ count });
+}));
 
 // ─── Write ───────────────────────────────────────────────────────────────────
 
 router.post(
   '/releases/:releaseId/checkpoints',
   validate(addCheckpointsDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const releaseId = req.params.releaseId as string;
-      await assertReleaseMutate(req, releaseId);
-      const result = await service.addCheckpoints(releaseId, req.body.checkpointTypeIds);
-      await logAudit(req, 'release_checkpoint.added', 'release', releaseId, {
-        checkpointTypeIds: req.body.checkpointTypeIds,
-      });
-      res.status(201).json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const releaseId = req.params.releaseId as string;
+    await assertReleaseMutate(req, releaseId);
+    const result = await service.addCheckpoints(releaseId, req.body.checkpointTypeIds);
+    await logAudit(req, 'release_checkpoint.added', 'release', releaseId, {
+      checkpointTypeIds: req.body.checkpointTypeIds,
+    });
+    res.status(201).json(result);
+  }),
 );
 
 router.post(
   '/releases/:releaseId/checkpoints/apply-template',
   validate(applyTemplateDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const releaseId = req.params.releaseId as string;
-      await assertReleaseMutate(req, releaseId);
-      const result = await service.applyTemplate(releaseId, req.body.templateId);
-      await logAudit(req, 'checkpoint_template.applied', 'release', releaseId, {
-        templateId: req.body.templateId,
-        createdCheckpointIds: result.checkpoints.map((c) => c.id),
-      });
-      res.status(201).json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const releaseId = req.params.releaseId as string;
+    await assertReleaseMutate(req, releaseId);
+    const result = await service.applyTemplate(releaseId, req.body.templateId);
+    await logAudit(req, 'checkpoint_template.applied', 'release', releaseId, {
+      templateId: req.body.templateId,
+      createdCheckpointIds: result.checkpoints.map((c) => c.id),
+    });
+    res.status(201).json(result);
+  }),
 );
 
 router.post(
   '/releases/:releaseId/checkpoints/preview-template',
   validate(previewTemplateDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const releaseId = req.params.releaseId as string;
-      // FR-14: dry-run, no writes — read-level gate is enough. A VIEWER on the project can
-      // preview what would happen if a template were applied.
-      await assertReleaseRead(req, releaseId);
-      res.json(await service.previewTemplate(releaseId, req.body.templateId));
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const releaseId = req.params.releaseId as string;
+    // FR-14: dry-run, no writes — read-level gate is enough. A VIEWER on the project can
+    // preview what would happen if a template were applied.
+    await assertReleaseRead(req, releaseId);
+    res.json(await service.previewTemplate(releaseId, req.body.templateId));
+  }),
 );
 
-router.post('/releases/:releaseId/checkpoints/recompute', async (req: AuthRequest, res, next) => {
-  try {
-    const releaseId = req.params.releaseId as string;
-    await assertReleaseMutate(req, releaseId);
-    const stats = await service.recomputeForRelease(releaseId);
-    await logAudit(req, 'release_checkpoint.recomputed', 'release', releaseId, {
-      trigger: 'manual',
-      ...stats,
-    });
-    res.json(stats);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post('/releases/:releaseId/checkpoints/recompute', authHandler(async (req, res) => {
+  const releaseId = req.params.releaseId as string;
+  await assertReleaseMutate(req, releaseId);
+  const stats = await service.recomputeForRelease(releaseId);
+  await logAudit(req, 'release_checkpoint.recomputed', 'release', releaseId, {
+    trigger: 'manual',
+    ...stats,
+  });
+  res.json(stats);
+}));
 
 router.delete(
   '/releases/:releaseId/checkpoints/:checkpointId',
-  async (req: AuthRequest, res, next) => {
-    try {
-      const releaseId = req.params.releaseId as string;
-      const checkpointId = req.params.checkpointId as string;
-      await assertReleaseMutate(req, releaseId);
-      await service.removeCheckpoint(releaseId, checkpointId);
-      await logAudit(req, 'release_checkpoint.removed', 'release', releaseId, { checkpointId });
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const releaseId = req.params.releaseId as string;
+    const checkpointId = req.params.checkpointId as string;
+    await assertReleaseMutate(req, releaseId);
+    await service.removeCheckpoint(releaseId, checkpointId);
+    await logAudit(req, 'release_checkpoint.removed', 'release', releaseId, { checkpointId });
+    res.json({ ok: true });
+  }),
 );
 
 // ─── Sync-instances (FR-15): SUPER_ADMIN / ADMIN / RELEASE_MANAGER ───────────
@@ -288,19 +241,15 @@ syncRouter.use(requireRole('SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER'));
 syncRouter.post(
   '/:id/sync-instances',
   validate(syncInstancesDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const typeId = req.params.id as string;
-      const result = await service.syncInstances(typeId, req.body.releaseIds);
-      await logAudit(req, 'checkpoint_type.instances_synced', 'checkpoint_type', typeId, {
-        releaseIds: req.body.releaseIds,
-        syncedCount: result.syncedCount,
-      });
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const typeId = req.params.id as string;
+    const result = await service.syncInstances(typeId, req.body.releaseIds);
+    await logAudit(req, 'checkpoint_type.instances_synced', 'checkpoint_type', typeId, {
+      releaseIds: req.body.releaseIds,
+      syncedCount: result.syncedCount,
+    });
+    res.json(result);
+  }),
 );
 
 export default router;

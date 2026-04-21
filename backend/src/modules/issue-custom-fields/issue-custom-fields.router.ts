@@ -5,7 +5,7 @@ import { validate } from '../../shared/middleware/validate.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import { upsertCustomFieldValuesDto } from './issue-custom-fields.dto.js';
 import * as service from './issue-custom-fields.service.js';
-import type { AuthRequest } from '../../shared/types/index.js';
+import { asyncHandler, authHandler } from '../../shared/utils/async-handler.js';
 
 const router = Router();
 
@@ -13,17 +13,13 @@ router.use(authenticate);
 
 // GET /api/issues/:id/custom-fields — applicable fields + current values
 // Optional query param: ?issueTypeConfigId=<uuid> to override the issue type (used by edit modal on type change)
-router.get('/issues/:id/custom-fields', async (req, res, next) => {
-  try {
-    const overrideTypeId = typeof req.query.issueTypeConfigId === 'string'
-      ? req.query.issueTypeConfigId
-      : undefined;
-    const result = await service.getIssueCustomFields(req.params.id as string, overrideTypeId);
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/issues/:id/custom-fields', asyncHandler(async (req, res) => {
+  const overrideTypeId = typeof req.query.issueTypeConfigId === 'string'
+    ? req.query.issueTypeConfigId
+    : undefined;
+  const result = await service.getIssueCustomFields(req.params.id as string, overrideTypeId);
+  res.json(result);
+}));
 
 // PUT /api/issues/:id/custom-fields — batch upsert values
 // VIEWER cannot write; USER and above can
@@ -31,19 +27,15 @@ router.put(
   '/issues/:id/custom-fields',
   requireRole('USER'),
   validate(upsertCustomFieldValuesDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const result = await service.upsertIssueCustomFields(
-        req.params.id as string,
-        req.body,
-        req.user!.userId,
-      );
-      await logAudit(req, 'issue.custom_fields_updated', 'issue', req.params.id as string, req.body);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const result = await service.upsertIssueCustomFields(
+      req.params.id as string,
+      req.body,
+      req.user!.userId,
+    );
+    await logAudit(req, 'issue.custom_fields_updated', 'issue', req.params.id as string, req.body);
+    res.json(result);
+  }),
 );
 
 export default router;
