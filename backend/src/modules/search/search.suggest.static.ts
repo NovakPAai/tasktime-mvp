@@ -72,7 +72,10 @@ const PRIORITY_VALUES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const STATUS_CATEGORY_VALUES = ['TODO', 'IN_PROGRESS', 'DONE'];
 const AI_STATUS_VALUES = ['NOT_STARTED', 'IN_PROGRESS', 'DONE', 'FAILED'];
 const AI_ASSIGNEE_TYPE_VALUES = ['HUMAN', 'AGENT', 'MIXED'];
-const CHECKPOINT_STATE_VALUES = ['PENDING', 'ON_TRACK', 'WARNING', 'OVERDUE', 'ERROR', 'SATISFIED'];
+// Must mirror Prisma enum `CheckpointState` (schema.prisma). ERROR добавлен в
+// PR-16 для TTQL compile/runtime failure. Предыдущий placeholder со значениями
+// ON_TRACK/WARNING/OVERDUE/SATISFIED был design-doc artifact.
+const CHECKPOINT_STATE_VALUES = ['PENDING', 'OK', 'VIOLATED', 'ERROR'];
 const BOOL_VALUES = ['true', 'false'];
 
 const ENUM_BY_FIELD: Record<string, readonly string[]> = {

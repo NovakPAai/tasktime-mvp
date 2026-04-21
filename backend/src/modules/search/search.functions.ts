@@ -70,7 +70,7 @@ export const FUNCTION_REGISTRY: readonly FunctionDef[] = [
   // Checkpoint-scoped functions (§5.4 extensions, TTSRH-37). Wire-up in PR-17.
   { name: 'violatedcheckpoints', args: [{ name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Задачи с активными нарушениями КТ.' },
   { name: 'violatedcheckpointsof', args: [{ name: 'releaseKeyOrId', type: 'RELEASE', optional: false }, { name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Нарушения КТ в конкретном релизе.' },
-  { name: 'checkpointsatrisk', args: [{ name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Задачи релизов с КТ в состоянии WARNING/OVERDUE/ERROR.' },
+  { name: 'checkpointsatrisk', args: [{ name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Задачи релизов с КТ в состоянии VIOLATED или ERROR (resolver wire-up в PR-17+).' },
   { name: 'checkpointsinstate', args: [{ name: 'state', type: 'CHECKPOINT_STATE', optional: false }, { name: 'typeName', type: 'TEXT', optional: true }], returnType: { kind: 'list', type: 'ISSUE' }, phase: 'MVP', availableIn: ['default', 'checkpoint'], description: 'Задачи, где КТ находится в заданном состоянии.' },
   // Checkpoint-context-only (§5.12.4). Declared here so parser+validator accept
   // them in a checkpoint TTQL snapshot. Resolver branches land in PR-17 — до

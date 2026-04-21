@@ -2,7 +2,59 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.44**
+**Last version: 2.45**
+
+---
+
+## [2.45] [2026-04-21] feat(checkpoint): TTSRH-1 PR-17 — /admin/checkpoint-types/preview + suggesters sync
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/checkpoint-search-integration`
+
+### Что было
+
+После PR-16 engine TTQL-ветка была реализована, но admin UI (PR-18) нужен dry-run endpoint: «как этот TTQL поведёт себя на живых данных конкретного релиза» — без сохранения и без триггеринга webhooks. Без него UI не может показать preview в форме создания/редактирования КТ.
+
+### Что теперь
+
+- **`checkpoint-preview.service.previewCheckpointCondition`** — новый dry-run сервис:
+  - Переиспользует `evaluateCheckpoint` + `resolveTtqlMatchedIds` — zero drift между preview и production scheduler.
+  - Валидирует релиз (404 если не найден, 400 если нет plannedDate).
+  - Rate-limit + 5s timeout наследуются из `resolveTtqlMatchedIds` (R16).
+  - Возвращает полный `CheckpointEvaluationResult` + `meta` (`totalIssuesInRelease`, `ttqlSkippedByFlag`, `ttqlError`) — UI debug panel.
+  - Feature-flag gate: если `FEATURES_CHECKPOINT_TTQL=false` и caller запрашивает TTQL/COMBINED preview, meta.ttqlSkippedByFlag=true, эвалуация fall-back'ит к STRUCTURED.
+- **`POST /api/admin/checkpoint-types/preview`** — новый endpoint с Zod `previewCheckpointConditionDto` (releaseId UUID, conditionMode default STRUCTURED, optional criteria/ttqlCondition ≤10K/offsetDays/warningDays). RBAC наследуется от `checkpoint-types.router` — `SUPER_ADMIN | ADMIN | RELEASE_MANAGER`.
+- **Suggesters sync**: `CHECKPOINT_STATE_VALUES` в `search.suggest.static.ts` приведены в соответствие с Prisma enum `CheckpointState` = `PENDING | OK | VIOLATED | ERROR` (ERROR добавлен в PR-16). Раньше было placeholder'ом `['PENDING', 'ON_TRACK', 'WARNING', 'OVERDUE', 'ERROR', 'SATISFIED']` из design-doc.
+- **`checkpointsatrisk` description**: обновлена со ссылкой на VIOLATED/ERROR (не WARNING/OVERDUE).
+- **`search-suggest.unit.test.ts`**: test `by type: CHECKPOINT_STATE` обновлён — проверяет VIOLATED + ERROR, отрицательный ассерт на OVERDUE.
+- **`checkpoint-dto.unit.test.ts`**: +5 unit-кейсов для `previewCheckpointConditionDto` (STRUCTURED accept, TTQL accept, non-uuid reject, 10K+ reject, mode default).
+
+### Deferred в follow-up (не блокирует PR-18)
+
+- Function resolvers для `violatedcheckpoints` / `violatedcheckpointsof` / `checkpointsatrisk` / `checkpointsinstate` — требуют Prisma queries через ReleaseCheckpoint + JOIN ReleaseItem + профилировки индекса `@@index([resolvedAt, releaseCheckpointId])`. Currently: default-branch в `search.function-resolver.ts` возвращает `resolve-failed` → compiler → engine state=ERROR с явным reason (loud, not silent NULL).
+- Compiler-mapping для `hasCheckpointViolation` / `checkpointViolationType` / `checkpointViolationReason` system-fields — join-based query, требует отдельного raw SQL с Prisma.sql-guard.
+- Suggesters уже wired в PR-6 (`CheckpointTypeSuggester` через Prisma, `CheckpointStateSuggester` через enum literal).
+
+### Изменения
+
+- `backend/src/modules/releases/checkpoints/checkpoint-preview.service.ts` — новый.
+- `backend/src/modules/releases/checkpoints/checkpoint.dto.ts` — + `previewCheckpointConditionDto`.
+- `backend/src/modules/releases/checkpoints/checkpoint-types.router.ts` — + `POST /preview`.
+- `backend/src/modules/search/search.suggest.static.ts` — CHECKPOINT_STATE_VALUES sync.
+- `backend/src/modules/search/search.functions.ts` — checkpointsatrisk description fix.
+- `backend/tests/search-suggest.unit.test.ts` — CHECKPOINT_STATE test update.
+- `backend/tests/checkpoint-dto.unit.test.ts` — +5 preview DTO tests (22 total).
+- `docs/tz/TTSRH-1.md` §13.7/§13.9 — статус PR-17 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_CHECKPOINT_TTQL=false` preview работает, но TTQL-часть evaluate'ится как STRUCTURED (meta.ttqlSkippedByFlag=true). UI получает warning-state и может показать баннер. При `=true` (UAT) — полноценный dry-run с TTQL pipeline.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors
+- `npm run test:parser` — **464/464 passing** (+5 preview DTO tests)
 
 ---
 

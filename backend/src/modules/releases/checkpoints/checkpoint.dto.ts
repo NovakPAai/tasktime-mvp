@@ -160,6 +160,19 @@ export const cloneCheckpointTemplateDto = z.object({
   name: z.string().min(1).max(100).optional(),
 });
 
+// TTSRH-1 PR-17: dry-run preview для TTQL/STRUCTURED/COMBINED condition.
+// Caller передаёт either `criteria` либо `ttqlCondition` (или оба для COMBINED).
+// Валидация соответствия mode ↔ payload — в сервисе (чтобы не дублировать
+// superRefine правила из createCheckpointTypeDto).
+export const previewCheckpointConditionDto = z.object({
+  releaseId: z.string().uuid(),
+  conditionMode: conditionModeEnum.default('STRUCTURED'),
+  criteria: z.array(criterionSchema).max(10).optional(),
+  ttqlCondition: z.string().min(1).max(10_000).nullable().optional(),
+  offsetDays: z.number().int().min(-365).max(365).optional(),
+  warningDays: z.number().int().min(0).max(30).optional(),
+});
+
 // ─── Inferred TS types ───────────────────────────────────────────────────────
 
 export type CreateCheckpointTypeDto = z.infer<typeof createCheckpointTypeDto>;
@@ -167,3 +180,4 @@ export type UpdateCheckpointTypeDto = z.infer<typeof updateCheckpointTypeDto>;
 export type CreateCheckpointTemplateDto = z.infer<typeof createCheckpointTemplateDto>;
 export type UpdateCheckpointTemplateDto = z.infer<typeof updateCheckpointTemplateDto>;
 export type CloneCheckpointTemplateDto = z.infer<typeof cloneCheckpointTemplateDto>;
+export type PreviewCheckpointConditionDto = z.infer<typeof previewCheckpointConditionDto>;

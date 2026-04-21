@@ -1445,6 +1445,14 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Integration T-18, T-20..T-25.
 - **Merge-ready check:** T-18, T-20..T-25 зелёные; `hasCheckpointViolation=true` и `issue IN violatedCheckpoints()` дают одинаковый normalized where (T-24).
 - **Оценка:** ~6ч.
+- **Статус: ✅ Done** — минимально-жизнеспособная версия:
+  - `checkpoint-preview.service.previewCheckpointCondition` — dry-run переиспользует `evaluateCheckpoint` + `resolveTtqlMatchedIds` (zero drift между preview и production scheduler). Rate-limit + timeout наследуются из `resolveTtqlMatchedIds` (5s). RBAC `canManageCheckpoints` через existing `requireRole` в `checkpoint-types.router.ts`.
+  - `POST /api/admin/checkpoint-types/preview` — endpoint подключён с Zod DTO (`previewCheckpointConditionDto`: releaseId + conditionMode + optional criteria/ttqlCondition/offsetDays/warningDays).
+  - Response: полный `CheckpointEvaluationResult` + `meta` (releaseId, conditionMode, totalIssuesInRelease, ttqlSkippedByFlag, ttqlError). UI PR-18 использует meta для панели debug.
+  - **Feature-flag**: если `FEATURES_CHECKPOINT_TTQL=false`, TTQL/COMBINED preview возвращает meta.ttqlSkippedByFlag=true + эвалуация проходит через structured path (UI показывает баннер).
+  - **Suggesters уже wired**: `CheckpointTypeSuggester` (в PR-6), `CheckpointStateSuggester` (enum literal из `static.ts`). Значения CHECKPOINT_STATE_VALUES синхронизированы с Prisma enum (было placeholder'ом ON_TRACK/WARNING/OVERDUE/SATISFIED → стало PENDING/OK/VIOLATED/ERROR).
+  - 5 unit-тестов для `previewCheckpointConditionDto` (464 total passing).
+  - **Отложено в follow-up** (не блокирует PR-18): полный function-resolver для `violatedcheckpoints` / `checkpointsatrisk` / `checkpointsinstate` (требует Prisma queries в ReleaseCheckpoint + JOIN через ReleaseItem, отдельная профилировка индексов); compiler-mapping для `hasCheckpointViolation` field (join-based). Эти пути currently emit `resolve-failed` → engine ставит state=ERROR с явным reason — loud fail, не silent NULL.
 
 #### PR-18: Frontend КТ — segmented control + JqlEditor + Preview panel + mode-icon
 - **Branch:** `ttsrh-1/checkpoint-admin-ui`
@@ -1517,8 +1525,8 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 🟢 Merged ([#115](https://github.com/NovakPAai/tasktime-mvp/pull/115)) |
 | 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 🟢 Merged ([#116](https://github.com/NovakPAai/tasktime-mvp/pull/116)) |
 | 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | 🟢 Merged ([#117](https://github.com/NovakPAai/tasktime-mvp/pull/117)) |
-| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | ✅ Done (готов к push после merge PR-15) |
-| 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 📋 Планируется |
+| 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 🟢 Merged ([#118](https://github.com/NovakPAai/tasktime-mvp/pull/118)) |
+| 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | ✅ Done (готов к push после merge PR-16) |
 | 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 📋 Планируется |
 | 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | 📋 Планируется |
 | 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | 📋 Планируется |

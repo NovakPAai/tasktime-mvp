@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createCheckpointTypeDto,
+  previewCheckpointConditionDto,
   updateCheckpointTypeDto,
 } from '../src/modules/releases/checkpoints/checkpoint.dto.js';
 
@@ -159,5 +160,52 @@ describe('updateCheckpointTypeDto — PATCH without conditionMode', () => {
       ttqlCondition: 'status = OPEN',
     });
     expect(res.success).toBe(false);
+  });
+});
+
+describe('previewCheckpointConditionDto — PR-17', () => {
+  it('accepts minimal STRUCTURED payload', () => {
+    const res = previewCheckpointConditionDto.safeParse({
+      releaseId: '00000000-0000-0000-0000-000000000001',
+      conditionMode: 'STRUCTURED',
+      criteria: [{ type: 'ASSIGNEE_SET' as const }],
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('accepts TTQL payload without criteria', () => {
+    const res = previewCheckpointConditionDto.safeParse({
+      releaseId: '00000000-0000-0000-0000-000000000001',
+      conditionMode: 'TTQL',
+      ttqlCondition: 'status = DONE',
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('rejects non-uuid releaseId', () => {
+    const res = previewCheckpointConditionDto.safeParse({
+      releaseId: 'not-a-uuid',
+      conditionMode: 'STRUCTURED',
+      criteria: [{ type: 'ASSIGNEE_SET' as const }],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('rejects ttqlCondition over 10K chars', () => {
+    const res = previewCheckpointConditionDto.safeParse({
+      releaseId: '00000000-0000-0000-0000-000000000001',
+      conditionMode: 'TTQL',
+      ttqlCondition: 'x'.repeat(10_001),
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('conditionMode defaults to STRUCTURED when absent', () => {
+    const res = previewCheckpointConditionDto.safeParse({
+      releaseId: '00000000-0000-0000-0000-000000000001',
+      criteria: [{ type: 'ASSIGNEE_SET' as const }],
+    });
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data.conditionMode).toBe('STRUCTURED');
   });
 });
