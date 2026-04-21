@@ -1374,6 +1374,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Snapshot T-10 (Basic → canonical JQL).
 - **Merge-ready check:** 80% golden-set-запросов строится в Basic без перехода в Advanced (FR-12).
 - **Оценка:** ~12ч.
+- **Статус: ✅ Done** — `basic-filter-model.ts` (chipsFromJql + jqlFromChips + canBasicize guard на OR/NOT/WAS/CHANGED/~/ORDER BY/группировке — R9, + CATEGORIES для cascade-меню: Задача/Даты/Пользователи/Планирование/AI). `BasicFilterBuilder.tsx` — chip list с inline-edit (field/op/values через `<select>`/`<input>`), delete button, cascade "+ Добавить фильтр" по категориям. `FilterModeToggle.tsx` — сегмент Basic|Advanced с `aria-pressed`, disabled-state + tooltip при OR/NOT. Integration в SearchPage: mode-toggle в header линии editor'а, auto-fallback к Advanced при basicize impossible, сохраняет `jqlDraft` во время переключения. Custom-fields (§5.7) + ValueSuggester-popover в chip'ах — в PR-13 (нужен popover primitive + autocomplete adapter уже есть в PR-11).
 
 #### PR-13: SavedFiltersSidebar + Save/Share modals + store
 - **Branch:** `ttsrh-1/saved-filters-ui`
@@ -1507,8 +1508,8 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 🟢 Merged ([#108](https://github.com/NovakPAai/tasktime-mvp/pull/108)) |
 | 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 🟢 Merged ([#109](https://github.com/NovakPAai/tasktime-mvp/pull/109)) |
 | 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 🟢 Merged ([#110](https://github.com/NovakPAai/tasktime-mvp/pull/110)) |
-| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | ✅ Done (готов к push после merge PR-10) |
-| 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 📋 Планируется |
+| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 🟢 Merged ([#113](https://github.com/NovakPAai/tasktime-mvp/pull/113)) |
+| 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | ✅ Done (готов к push после merge PR-11) |
 | 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 📋 Планируется |
 | 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 📋 Планируется |
 | 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | 📋 Планируется |
