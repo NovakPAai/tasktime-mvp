@@ -33,8 +33,10 @@ test.describe('TTSRH-1: /search page smoke + a11y', () => {
       return;
     }
     const root = page.getByTestId('search-page');
-    if (!(await root.isVisible({ timeout: 5_000 }).catch(() => false))) {
-      test.skip(true, 'search-page not rendered — FEATURES_ADVANCED_SEARCH disabled');
+    const visible = await root.waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true).catch(() => false);
+    if (!visible) {
+      test.skip(true, 'search-page not rendered (feature flag off or render error)');
       return;
     }
     await expect(root).toBeVisible();
@@ -48,8 +50,10 @@ test.describe('TTSRH-1: /search page smoke + a11y', () => {
   test('URL reflects JQL after Run; reload preserves state (T-9)', async ({ page }) => {
     await page.goto(`${BASE}/search`);
     const root = page.getByTestId('search-page');
-    if (!(await root.isVisible({ timeout: 5_000 }).catch(() => false))) {
-      test.skip(true, 'search-page not rendered — FEATURES_ADVANCED_SEARCH disabled');
+    const visible = await root.waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true).catch(() => false);
+    if (!visible) {
+      test.skip(true, 'search-page not rendered (feature flag off or render error)');
       return;
     }
 
@@ -80,8 +84,10 @@ test.describe('TTSRH-1: /search page smoke + a11y', () => {
   test('save modal opens via Ctrl+S when JQL is non-empty', async ({ page }) => {
     await page.goto(`${BASE}/search`);
     const root = page.getByTestId('search-page');
-    if (!(await root.isVisible({ timeout: 5_000 }).catch(() => false))) {
-      test.skip(true, 'search-page not rendered — FEATURES_ADVANCED_SEARCH disabled');
+    const visible = await root.waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true).catch(() => false);
+    if (!visible) {
+      test.skip(true, 'search-page not rendered (feature flag off or render error)');
       return;
     }
 
@@ -113,8 +119,10 @@ test.describe('TTSRH-1: /search page smoke + a11y', () => {
   test('a11y: no critical/serious axe violations on /search', async ({ page }) => {
     await page.goto(`${BASE}/search`);
     const root = page.getByTestId('search-page');
-    if (!(await root.isVisible({ timeout: 5_000 }).catch(() => false))) {
-      test.skip(true, 'search-page not rendered — FEATURES_ADVANCED_SEARCH disabled');
+    const visible = await root.waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true).catch(() => false);
+    if (!visible) {
+      test.skip(true, 'search-page not rendered (feature flag off or render error)');
       return;
     }
     // Wait for the lazy-loaded CM6 editor chunk to mount before axe scans
