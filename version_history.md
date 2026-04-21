@@ -2,7 +2,70 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.41**
+**Last version: 2.42**
+
+---
+
+## [2.42] [2026-04-21] feat(frontend): TTSRH-1 PR-14 — ColumnConfigurator + ResultsTable + BulkActions + ExportMenu
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/results`
+
+### Что было
+
+После PR-13 SearchPage имел sidebar и модалки, но основная центральная панель показывала «preview до 20 строк». Не было: (a) настройки колонок, (b) сортировки, (c) bulk-операций, (d) экспорта текущего фильтра. Последний frontend-PR по §13.6 закрывает эти gaps.
+
+### Что теперь
+
+4 новых компонента + integration в SearchPage:
+
+- **`frontend/src/components/search/ColumnConfigurator.tsx`** (~170L) — native HTML5 drag-n-drop между списками Available/Selected. Reorder внутри Selected drag-over-drop'ом. Без react-dnd dependency (11h эстимат не позволяет). Кнопка-стрелка на item'е в Available — быстрое добавление. Duplicate-guard: drop того же имени дважды в Selected — ignore.
+- **`frontend/src/components/search/ResultsTable.tsx`** (~180L) — Ant Table:
+  - `rowKey="id"` — стабильные UUID (pre-push-reviewer pattern).
+  - `virtual={issues.length > 200}` + `scroll={y: 480}` для больших результатов.
+  - Renderer'ы per column: priority с цветной `<Tag>` (CRITICAL red → LOW default), key monospace + blue, status Tag, даты через `toLocaleDateString`. Custom-field fallback через `String(v)`.
+  - Click по sortable header → `rewriteOrderBy(jql, field, dir)` → `onJqlChange`. 3-way toggle: none → descend → ascend → none (AntD default).
+  - `rowSelection.onChange` → `onSelectionChange(ids)` для BulkActionsBar.
+  - Pagination через Ant Table controlled props.
+- **`frontend/src/components/search/BulkActionsBar.tsx`** (~140L) — появляется при `selectedIds.length > 0`:
+  - Delete через Popconfirm: `Promise.allSettled(ids.map(DELETE /issues/:id))` → aggregate `{succeeded, failed}` (R12).
+  - Export CSV/XLSX selected через ad-hoc JQL `issue IN (id1, id2, …)`.
+  - «Снять выделение» — очистить selectedIds.
+- **`frontend/src/components/search/ExportMenu.tsx`** (~70L) — Dropdown CSV/XLSX для текущего фильтра:
+  - `exportIssues(jql, format, columns)` → `Blob` → `saveAs` pattern (attach `<a>` to DOM, click, `setTimeout(0)`-revoke — PR-8 pre-push-reviewer anti-race Firefox/Safari).
+  - Disabled при пустом JQL / busy.
+- **`frontend/src/pages/SearchPage.tsx`** — integration:
+  - Preview-список удалён.
+  - `selectedRowIds` state, `displayedColumns = state.columns || DEFAULT_COLUMNS`, `AVAILABLE_COLUMNS` list.
+  - Popover с ColumnConfigurator + кнопка «Колонки» (SettingOutlined).
+  - ExportMenu в правой части header results.
+  - BulkActionsBar рендерится над таблицей при selection.
+  - `onJqlChange` от таблицы → `updateUrl({jql, page: 1}, {push: true})`.
+  - `onSaved` в ColumnConfigurator → `updateUrl({columns}, {push: false})` (replace, без истории на каждый drag).
+  - `state.columns` автоматически сохраняется в URL.
+
+### Изменения
+
+- `frontend/src/components/search/ColumnConfigurator.tsx` — новый.
+- `frontend/src/components/search/ResultsTable.tsx` — новый.
+- `frontend/src/components/search/BulkActionsBar.tsx` — новый.
+- `frontend/src/components/search/ExportMenu.tsx` — новый.
+- `frontend/src/pages/SearchPage.tsx` — integration, selectedIds state, column-config Popover.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-14 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений. При `=true`:
+- Полноценная таблица с сортировкой, пагинацией, выбором строк.
+- Колонки настраиваются через drag-n-drop и сохраняются в URL.
+- Bulk-delete + bulk-export для выделенных задач.
+- Общий export текущего фильтра через ExportMenu.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.45s. Main bundle +2.5KB gzip (AntD Table/Popover/Dropdown уже в main). JqlEditor chunk без изменений.
 
 ---
 

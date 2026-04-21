@@ -21,14 +21,20 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Button, Popover } from 'antd';
+import { SettingOutlined } from '@ant-design/icons';
 
 import { searchIssues, type IssueSearchRow } from '../api/search';
 import { getSavedFilter, markSavedFilterUsed, type SavedFilter } from '../api/savedFilters';
 import BasicFilterBuilder from '../components/search/BasicFilterBuilder';
 import { canBasicize } from '../components/search/basic-filter-model';
 import FilterModeToggle, { type FilterMode } from '../components/search/FilterModeToggle';
+import BulkActionsBar from '../components/search/BulkActionsBar';
+import ColumnConfigurator from '../components/search/ColumnConfigurator';
+import ExportMenu from '../components/search/ExportMenu';
 import FilterShareModal from '../components/search/FilterShareModal';
 import JqlEditor from '../components/search/JqlEditor.lazy';
+import ResultsTable from '../components/search/ResultsTable';
 import SaveFilterModal from '../components/search/SaveFilterModal';
 import SavedFiltersSidebar from '../components/search/SavedFiltersSidebar';
 import { useSavedFiltersStore } from '../store/savedFilters.store';
@@ -54,6 +60,21 @@ export default function SearchPage() {
   const [saveModalInitial, setSaveModalInitial] = useState<SavedFilter | null>(null);
   const [shareModalFilter, setShareModalFilter] = useState<SavedFilter | null>(null);
   const loadAllSavedFilters = useSavedFiltersStore((s) => s.loadAll);
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [columnConfigOpen, setColumnConfigOpen] = useState(false);
+  const DEFAULT_COLUMNS = useMemo(
+    () => ['key', 'summary', 'type', 'status', 'priority', 'assignee', 'sprint', 'updated'],
+    [],
+  );
+  const AVAILABLE_COLUMNS = useMemo(
+    () => [
+      'key', 'summary', 'type', 'status', 'priority', 'assignee', 'creator',
+      'project', 'projectKey', 'sprint', 'release', 'due', 'created', 'updated',
+      'description',
+    ],
+    [],
+  );
+  const displayedColumns = state.columns.length > 0 ? state.columns : DEFAULT_COLUMNS;
 
   const openSaveModal = useCallback(() => {
     setSaveModalInitial(null);
@@ -330,11 +351,67 @@ export default function SearchPage() {
               minHeight: 240,
             }}
           >
-            {load.status === 'ok' ? (
-              <SearchResultsPreview issues={load.issues} color={c} />
-            ) : (
+            {load.status === 'ok' && (
+              <>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: c.t3 }}>Всего: {load.total}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Popover
+                      open={columnConfigOpen}
+                      onOpenChange={setColumnConfigOpen}
+                      trigger="click"
+                      placement="bottomRight"
+                      content={
+                        <ColumnConfigurator
+                          available={AVAILABLE_COLUMNS}
+                          selected={displayedColumns}
+                          onChange={(next) => updateUrl({ columns: next }, { push: false })}
+                          onClose={() => setColumnConfigOpen(false)}
+                          isLight={isLight}
+                        />
+                      }
+                    >
+                      <Button size="small" icon={<SettingOutlined />}>Колонки</Button>
+                    </Popover>
+                    <ExportMenu jql={state.jql} columns={displayedColumns} />
+                  </div>
+                </div>
+                {selectedRowIds.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <BulkActionsBar
+                      selectedIds={selectedRowIds}
+                      onCleared={() => {
+                        setSelectedRowIds([]);
+                        void runQuery(state.jql, state.page);
+                      }}
+                      isLight={isLight}
+                    />
+                  </div>
+                )}
+                <ResultsTable
+                  issues={load.issues}
+                  columns={displayedColumns}
+                  total={load.total}
+                  page={state.page}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={(p) => {
+                    setSelectedRowIds([]);
+                    updateUrl({ page: p }, { push: true });
+                  }}
+                  currentJql={state.jql}
+                  onJqlChange={(jql) => {
+                    setSelectedRowIds([]);
+                    updateUrl({ jql, page: 1 }, { push: true });
+                  }}
+                  onSelectionChange={setSelectedRowIds}
+                  selectedIds={selectedRowIds}
+                  isLight={isLight}
+                />
+              </>
+            )}
+            {load.status !== 'ok' && (
               <div style={{ color: c.t3, fontSize: 12 }}>
-                Результаты появятся здесь. Полноценная таблица (сортировка, bulk-actions, экспорт) — в PR-14.
+                Введите JQL и нажмите Ctrl+Enter или выберите сохранённый фильтр слева.
               </div>
             )}
           </div>
@@ -353,7 +430,7 @@ export default function SearchPage() {
             fontSize: 12,
           }}
         >
-          Preview задачи появится в PR-14.
+          Выберите задачу в таблице для preview (полный drawer — вне scope §13.6, Phase 2).
         </aside>
       </div>
 
@@ -387,40 +464,3 @@ export default function SearchPage() {
   );
 }
 
-function SearchResultsPreview({
-  issues,
-  color,
-}: {
-  issues: IssueSearchRow[];
-  color: { panel: string; border: string; t1: string; t2: string; t3: string; acc: string };
-}) {
-  if (issues.length === 0) {
-    return <div style={{ color: color.t3, fontSize: 12 }}>Нет задач, удовлетворяющих запросу.</div>;
-  }
-  return (
-    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {issues.slice(0, 20).map((issue) => {
-        const keyLabel = `${issue.project.key}-${issue.number}`;
-        return (
-          <li
-            key={issue.id}
-            style={{
-              display: 'flex',
-              gap: 10,
-              padding: '6px 8px',
-              border: `1px solid ${color.border}`,
-              borderRadius: 6,
-              fontSize: 13,
-              color: color.t1,
-            }}
-          >
-            <span style={{ fontFamily: '"JetBrains Mono", monospace', color: color.acc, minWidth: 80 }}>{keyLabel}</span>
-            <span style={{ flex: 1 }}>{issue.title}</span>
-            <span style={{ color: color.t3, fontSize: 11 }}>{issue.workflowStatus?.name ?? issue.priority ?? ''}</span>
-          </li>
-        );
-      })}
-      {issues.length > 20 && <li style={{ color: color.t3, fontSize: 12 }}>…и ещё {issues.length - 20}. Полная таблица — PR-14.</li>}
-    </ul>
-  );
-}
