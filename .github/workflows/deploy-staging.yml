@@ -39,9 +39,11 @@ jobs:
 
       - name: Docker login on server
         run: |
+          set -euo pipefail
           printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
             ssh "${{ secrets.STAGING_DEPLOY_USER }}@${{ secrets.STAGING_DEPLOY_HOST }}" \
-              "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+              "docker login ghcr.io -u ${{ github.actor }} --password-stdin" \
+            || { echo "::error::Docker login failed"; exit 1; }
 
       - name: Inject secrets into backend env
         run: |
