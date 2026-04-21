@@ -11,6 +11,10 @@
  *     the script picks the first Project and first non-BOT User it finds.
  *   - Uses chunked createMany (5_000 rows per call) to stay within
  *     Postgres / Prisma query size limits.
+ *   - NOT safe for concurrent invocations — the delete+findFirst+insert
+ *     sequence is not wrapped in a transaction, so parallel runs can collide
+ *     on `issue.number` uniqueness and silently under-insert via
+ *     `skipDuplicates: true`. This is an opt-in ops script; serialise runs.
  *   - Title distribution is seeded (mulberry32) so T-8 latency profile is
  *     reproducible across runs.
  *
@@ -43,7 +47,7 @@ const STATUSES: IssueStatus[] = [
   IssueStatus.IN_PROGRESS,
   IssueStatus.REVIEW,
   IssueStatus.DONE,
-  IssueStatus.BLOCKED,
+  IssueStatus.CANCELLED,
 ];
 
 const PRIORITIES: IssuePriority[] = [

@@ -68,7 +68,9 @@ test.describe('TTSRH-1: checkpoint types admin + TTQL mode', () => {
     await page.waitForFunction(() => document.body.innerText.trim().length > 30, {
       timeout: 15_000,
     });
-    await page.waitForTimeout(500);
+    // Wait for main content region to mount so axe sees the real DOM tree.
+    await page.locator('main, [role="main"], .ant-table-wrapper').first()
+      .waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])

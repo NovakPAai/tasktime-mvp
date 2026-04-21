@@ -4,7 +4,7 @@
       "numberOfRuns": 3,
       "url": ["http://localhost:4173/search"],
       "startServerCommand": "npm run preview -- --host 127.0.0.1 --port 4173",
-      "startServerReadyPattern": "Local:",
+      "startServerReadyPattern": "localhost",
       "settings": {
         "preset": "desktop",
         "onlyCategories": ["performance", "accessibility"]

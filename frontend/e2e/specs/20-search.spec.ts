@@ -117,8 +117,10 @@ test.describe('TTSRH-1: /search page smoke + a11y', () => {
       test.skip(true, 'search-page not rendered — FEATURES_ADVANCED_SEARCH disabled');
       return;
     }
-    // Let lazy chunks settle (JqlEditor is code-split per NFR-5).
-    await page.waitForTimeout(600);
+    // Wait for the lazy-loaded CM6 editor chunk to mount before axe scans
+    // the DOM — JqlEditor is code-split per NFR-5. Deterministic locator
+    // wait beats a fixed timeout for flake resistance.
+    await page.locator('.cm-editor').first().waitFor({ state: 'visible', timeout: 15_000 });
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])

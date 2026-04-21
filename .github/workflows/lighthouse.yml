@@ -14,6 +14,11 @@ on:
 # TTSRH-1 PR-20 (NFR-5): budget check for /search — bundle size, a11y score.
 # Runs on PRs that touch the frontend. Advisory-only for now; once thresholds
 # stabilize, flip `continue-on-error` to false to make it a required check.
+#
+# The companion Playwright specs (20-search, 21-checkpoints-ttql) live in
+# e2e-staging, not here. They self-skip when ADMIN_AUTH_FILE falls back to
+# the e2e-bot session (E2E_CLEANUP_PASSWORD unset) — that is expected in
+# shared CI. Admin-path coverage runs on staging with the full secret.
 jobs:
   lighthouse:
     runs-on: ubuntu-latest
