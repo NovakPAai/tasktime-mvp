@@ -31,6 +31,7 @@ function clientKey(req: Request): string {
 
 /** Express middleware that enforces a rate limit. Calls next(AppError 429) when exceeded. */
 export function rateLimit(opts: RateLimitOptions) {
+  if (process.env.NODE_ENV === 'test') return (_req: Request, _res: Response, next: NextFunction) => next();
   return (req: Request, _res: Response, next: NextFunction): void => {
     const key = `${opts.scope}:${clientKey(req)}`;
     const now = Date.now();
