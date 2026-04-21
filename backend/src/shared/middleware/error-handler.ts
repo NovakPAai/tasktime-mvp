@@ -14,12 +14,14 @@ export class AppError extends Error {
   }
 }
 
-const SAFE_CLIENT_META_KEYS = new Set(['retryAfter', 'code', 'field', 'details']);
+// Keys that must never reach the client (internal implementation details).
+// AppError.meta is client-visible by design — add truly internal keys here, not allowlist client keys.
+const BLOCKED_META_KEYS = new Set(['scope', 'stack', 'sql', 'query', 'internalId']);
 
 function safeClientMeta(meta?: Record<string, unknown>) {
   if (!meta) return {};
   return Object.fromEntries(
-    Object.entries(meta).filter(([k]) => SAFE_CLIENT_META_KEYS.has(k)),
+    Object.entries(meta).filter(([k]) => !BLOCKED_META_KEYS.has(k)),
   );
 }
 
