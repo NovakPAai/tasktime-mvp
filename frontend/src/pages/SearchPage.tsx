@@ -23,11 +23,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { searchIssues, type IssueSearchRow } from '../api/search';
-import { getSavedFilter, markSavedFilterUsed } from '../api/savedFilters';
+import { getSavedFilter, markSavedFilterUsed, type SavedFilter } from '../api/savedFilters';
 import BasicFilterBuilder from '../components/search/BasicFilterBuilder';
 import { canBasicize } from '../components/search/basic-filter-model';
 import FilterModeToggle, { type FilterMode } from '../components/search/FilterModeToggle';
+import FilterShareModal from '../components/search/FilterShareModal';
 import JqlEditor from '../components/search/JqlEditor.lazy';
+import SaveFilterModal from '../components/search/SaveFilterModal';
+import SavedFiltersSidebar from '../components/search/SavedFiltersSidebar';
+import { useSavedFiltersStore } from '../store/savedFilters.store';
 import { useThemeStore } from '../store/theme.store';
 import { useSearchUrlState } from './search/useSearchUrlState';
 import { useJqlValidation } from './search/useJqlValidation';
@@ -46,6 +50,28 @@ export default function SearchPage() {
   const { errors: inlineErrors, isValidating } = useJqlValidation(jqlDraft);
   const [filterMode, setFilterMode] = useState<FilterMode>('advanced');
   const basicCheck = useMemo(() => canBasicize(jqlDraft), [jqlDraft]);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveModalInitial, setSaveModalInitial] = useState<SavedFilter | null>(null);
+  const [shareModalFilter, setShareModalFilter] = useState<SavedFilter | null>(null);
+  const loadAllSavedFilters = useSavedFiltersStore((s) => s.loadAll);
+
+  const openSaveModal = useCallback(() => {
+    setSaveModalInitial(null);
+    setSaveModalOpen(true);
+  }, []);
+
+  // Ctrl/Cmd+S → Save. preventDefault чтобы не триггерить browser "Save Page".
+  useEffect(() => {
+    function onKey(ev: KeyboardEvent) {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') {
+        ev.preventDefault();
+        if (!jqlDraft.trim()) return;
+        openSaveModal();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [jqlDraft, openSaveModal]);
   // Auto-switch to Advanced if current JQL can't be basicized (e.g. user loaded a
   // saved filter with OR/NOT). Reverse not enforced — user may manually switch.
   useEffect(() => {
@@ -142,22 +168,51 @@ export default function SearchPage() {
           alignItems: 'stretch',
         }}
       >
-        {/* Column 1 — Sidebar (PR-13: saved filters list) */}
+        {/* Column 1 — SavedFiltersSidebar */}
         <aside
           data-testid="search-sidebar"
           style={{
             background: c.panel,
             border: `1px solid ${c.border}`,
             borderRadius: 8,
-            padding: 16,
+            padding: 12,
             minHeight: 480,
-            color: c.t3,
+            color: c.t1,
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 120px)',
           }}
         >
-          <div style={{ fontWeight: 600, color: c.t1, marginBottom: 6, fontSize: 13 }}>Мои фильтры</div>
-          <div style={{ fontSize: 12 }}>
-            Список сохранённых фильтров появится в PR-13 (§13.6 ТЗ).
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 600, color: c.t1, fontSize: 13 }}>Фильтры</div>
+            <button
+              type="button"
+              onClick={openSaveModal}
+              disabled={!jqlDraft.trim()}
+              title={jqlDraft.trim() ? 'Сохранить (Ctrl+S)' : 'Введите JQL для сохранения'}
+              data-testid="sidebar-save-filter"
+              style={{
+                background: jqlDraft.trim() ? c.acc : 'transparent',
+                color: jqlDraft.trim() ? '#fff' : c.t3,
+                border: `1px solid ${jqlDraft.trim() ? c.acc : c.border}`,
+                borderRadius: 5,
+                padding: '3px 10px',
+                fontSize: 11,
+                cursor: jqlDraft.trim() ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+              }}
+            >
+              + Сохранить
+            </button>
           </div>
+          <SavedFiltersSidebar
+            currentJql={state.jql}
+            isLight={isLight}
+            onSelectFilter={(f) => {
+              updateUrl({ jql: f.jql, columns: f.columns ?? [], page: 1 }, { push: true });
+              markSavedFilterUsed(f.id).catch(() => undefined);
+            }}
+            onOpenShare={(f) => setShareModalFilter(f)}
+          />
         </aside>
 
         {/* Column 2 — Main (editor + results) */}
@@ -294,6 +349,33 @@ export default function SearchPage() {
           Preview задачи появится в PR-14.
         </aside>
       </div>
+
+      <SaveFilterModal
+        open={saveModalOpen}
+        onClose={() => {
+          setSaveModalOpen(false);
+          void loadAllSavedFilters(); // CLAUDE.md rule: onClose → reload parent data
+        }}
+        onSaved={(f) => {
+          setSaveModalOpen(false);
+          updateUrl({ jql: f.jql, columns: f.columns ?? [], page: 1 }, { push: false });
+          void loadAllSavedFilters();
+        }}
+        initial={saveModalInitial}
+        currentJql={jqlDraft}
+      />
+      <FilterShareModal
+        open={shareModalFilter !== null}
+        filter={shareModalFilter}
+        onClose={() => {
+          setShareModalFilter(null);
+          void loadAllSavedFilters();
+        }}
+        onSaved={() => {
+          setShareModalFilter(null);
+          void loadAllSavedFilters();
+        }}
+      />
     </div>
   );
 }
