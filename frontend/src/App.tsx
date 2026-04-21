@@ -194,6 +194,7 @@ export default function App() {
             {/* TTSRH-1 PR-1: /search mounted only when advanced-search flag is on.
                 When disabled, the <Route path="*"> catch-all below redirects to "/". */}
             {frontendFeatures.advancedSearch && <Route path="search" element={<SearchPage />} />}
+            {frontendFeatures.advancedSearch && <Route path="search/saved/:filterId" element={<SearchPage />} />}
             <Route path="uat" element={<UatTestsPage />} />
             {/*
               TTSEC-2 round 16 — partial revert of round 15's global AdminGate.

@@ -2,7 +2,55 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.35**
+**Last version: 2.36**
+
+---
+
+## [2.36] [2026-04-21] feat(frontend): TTSRH-1 PR-9 — SearchPage shell + /search route + sidebar submenu + URL sync
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/frontend-shell`
+
+### Что было
+
+После PR-8 вся backend-поверхность TTS-QL была live (`/search/{issues,validate,schema,suggest,export}` + `/saved-filters/*` + `/users/me/preferences`), но frontend не имел страницы `/search` — только placeholder-stub из PR-1. Пользователь не мог протестировать запросы даже с `FEATURES_ADVANCED_SEARCH=true`.
+
+### Что теперь
+
+Полноценная страница `/search` + оболочка будущих PR-10..PR-14 + тонкие API-клиенты:
+
+- **`frontend/src/api/search.ts`** — `searchIssues / validateJql / getSearchSchema / suggestCompletions / exportIssues` (blob для saveAs). Типизированные ответы: `SearchIssuesResponse`, `ValidationResponse`, `SearchSchemaResponse`, `SuggestResponse`.
+- **`frontend/src/api/savedFilters.ts`** — CRUD + share + favorite + markUsed + `getMyPreferences / updateMyPreferences`. `SavedFilter` интерфейс с `permission: 'READ'|'WRITE'` и nested `shares[]`.
+- **`frontend/src/pages/SearchPage.tsx`** — переписан со stub'а. 3-column CSS grid (`320px | minmax(0,1fr) | 360px`): `SidebarFilters` | `JqlEditor + ResultsArea` | `DetailPreview`. Левая/правая колонки сейчас — placeholder'ы с refs на будущие PR (13/14). Средняя колонка работает:
+  - `<textarea>` с `Ctrl/Cmd+Enter` → submit (plain Enter вставляет newline для мульти-строк).
+  - Run-button + `role="status" aria-live="polite"` status-line (idle/loading/ok/error — A11Y-1).
+  - При `status=ok` рендерится preview-список (до 20 результатов, ключ + title + status) — PR-14 заменит полной `ResultsTable`.
+- **`frontend/src/pages/search/useSearchUrlState.ts`** — bridge между URL `?jql=&view=&columns=&page=` и локальным state. `updateUrl` имеет стабильную identity (via stateRef) — без этого `/search/saved/:filterId` попадал в infinite loop. Default dropping: `view=table` и `page=1` не записываются в URL. Mount-time self-heal для invalid `page=N`.
+- **`frontend/src/App.tsx`** — добавлен route `/search/saved/:filterId` под тем же gate'ом `features.advancedSearch`. Обе ветки используют `<SearchPage />` — он сам fetch'ит фильтр по `useParams().filterId` → `getSavedFilter` → replace URL state + fire-and-forget `markSavedFilterUsed`.
+- **`frontend/src/components/layout/Sidebar.tsx`** — при `isActive('/search')` под пунктом разворачивается submenu «Избранные фильтры»: до 5 item'ов, fetch `listSavedFilters('favorite')`. Dep-массив сужен до boolean `isSearchActive` — intra-search URL changes не триггерят redundant fetch.
+
+### Изменения
+
+- `frontend/src/api/search.ts` — новый (~100L).
+- `frontend/src/api/savedFilters.ts` — новый (~80L).
+- `frontend/src/pages/search/useSearchUrlState.ts` — новый (~90L).
+- `frontend/src/pages/SearchPage.tsx` — переписан (placeholder → 3-column shell, ~250L).
+- `frontend/src/App.tsx` — + `/search/saved/:filterId` route.
+- `frontend/src/components/layout/Sidebar.tsx` — + submenu fetch + render.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-9 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` страница и submenu не рендерятся (App.tsx catch-all → `/`). При `=true`:
+- `/search` открывается, URL-sync работает на пустом JQL.
+- Sub-menu «Избранные фильтры» подгружается из `/api/saved-filters?scope=favorite`.
+- Реальный JQL-editor (CodeMirror 6), Basic-builder, Save/Share-модалки, full-table — в PR-10..PR-14.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` (frontend) — 0 errors, 0 new warnings
+- `npm run build` (Vite) — чисто, 4.5s
 
 ---
 
