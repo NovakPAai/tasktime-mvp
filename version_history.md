@@ -2,7 +2,46 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.38**
+**Last version: 2.39**
+
+---
+
+## [2.39] [2026-04-21] feat(frontend): TTSRH-1 PR-11 — ValueSuggester CM6 autocomplete + TTL cache
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/value-suggester`
+
+### Что было
+
+После PR-10 JqlEditor был статичным: user писал запрос вручную, без подсказок значений. Ключи проектов, имена статусов, email'ы assignee'ев нужно было копировать глазами из других страниц. Backend-endpoint `/search/suggest` был готов с PR-6 (13 value-providers), но frontend его не использовал.
+
+### Что теперь
+
+CM6 autocomplete подключён к `/search/suggest` со всеми 13 backend-провайдерами:
+
+- **`frontend/src/components/search/suggest-cache.ts`** (~60L) — lightweight TTL Map-cache. TTL per field: Project/IssueType/Status = 60s, Sprint/Release = 30s, default = 30s (§13.6 PR-11). GC когда `cache.size > 200`. Ключ — конкатенация `jql|cursor|field|operator|prefix|variant` (stable ordering).
+- **`frontend/src/components/search/ttql-completion.ts`** (~100L) — CM6 `CompletionSource` адаптер:
+  - `ttqlCompletionSource(triggerChars)` возвращает async source, который (a) находит word-boundary через `context.matchBefore(/[\w."-]*/)`, (b) проверяет trigger chars (`=`, `,`, `(`, ` `) если trigger не explicit, (c) вызывает `cachedSuggest({jql, cursor, prefix})`, (d) маппит `Completion.kind` → CM6 `type` (`variable`/`operator`/`function`/`constant`/`keyword`), (e) маппит `score` (0..1) → CM6 `boost` (-99..99), (f) лениво рендерит `info` из `icon + detail`.
+  - `context.aborted` guard — stale responses не попадают в UI.
+  - Never throws: network/5xx → `null` (CM6 скрывает popup).
+- **`frontend/src/components/search/JqlEditor.tsx`** — + `autocompletion({override: [ttqlCompletionSource(...)], activateOnTyping: true, closeOnBlur: true, maxRenderedOptions: 50, defaultKeymap: false})`. `completionKeymap` добавлен в общий keymap-merge для Ctrl+Space / Enter-to-accept / Escape-to-close.
+
+### Изменения
+
+- `frontend/src/components/search/suggest-cache.ts` — новый.
+- `frontend/src/components/search/ttql-completion.ts` — новый.
+- `frontend/src/components/search/JqlEditor.tsx` — + autocompletion extension + completionKeymap.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-11 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений (chunk не грузится). При включении: в JqlEditor появляется всплывающий popup с автокомплитом по мере ввода (и Ctrl+Space / после `=`/`,`/`(`). Каждая suggestion показывает type-badge (CM6 стандартный), опциональный icon + detail в info-panel.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.53s. Chunk `JqlEditor` = **113.62KB gzip** (71% от NFR-5 160KB budget, +12KB за `@codemirror/autocomplete`).
 
 ---
 
@@ -23,10 +62,6 @@
 - `backend/src/shared/utils/async-handler.ts`, `logger.ts`, `rate-limit.ts`, `issue-access.ts`
 - `backend/src/shared/middleware/error-handler.ts`, `backend/src/app.ts`
 - 39 роутеров — убраны try/catch блоки
-
----
-
-**Last version before this branch: 2.37**
 
 ---
 

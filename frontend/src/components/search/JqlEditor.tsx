@@ -24,10 +24,16 @@ import { EditorView, keymap, Decoration, placeholder as cmPlaceholder, type Deco
 import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { bracketMatching, indentOnInput } from '@codemirror/language';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from '@codemirror/autocomplete';
 import { searchKeymap } from '@codemirror/search';
 
 import { ttqlLanguage } from './ttql-language';
+import { DEFAULT_TRIGGER_CHARS, ttqlCompletionSource } from './ttql-completion';
 
 export interface InlineError {
   start: number;
@@ -131,6 +137,13 @@ export default function JqlEditor({
       buildTheme(isLight),
       ttqlLanguage(),
       cmPlaceholder(placeholder),
+      autocompletion({
+        override: [ttqlCompletionSource(DEFAULT_TRIGGER_CHARS)],
+        activateOnTyping: true,
+        closeOnBlur: true,
+        maxRenderedOptions: 50,
+        defaultKeymap: false, // we merge completionKeymap manually below
+      }),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({
         'aria-label': 'JQL / TTS-QL query editor',
@@ -146,6 +159,7 @@ export default function JqlEditor({
             return true;
           },
         },
+        ...completionKeymap,
         ...closeBracketsKeymap,
         ...defaultKeymap,
         ...historyKeymap,

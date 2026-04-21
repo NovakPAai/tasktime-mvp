@@ -1363,6 +1363,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - E2E T-12 (автокомплит assignee+status).
 - **Merge-ready check:** T-12 зелёный; визуальный снапшот popup для 5 suggester'ов.
 - **Оценка:** ~10ч.
+- **Статус: ✅ Done** — подключён CM6 `autocompletion` extension к JqlEditor. `ttql-completion.ts` — CompletionSource адаптер: маппит `/search/suggest` `{kind,label,insert,detail,icon,score}` → CM6 `Completion` (label/apply/detail/type/boost/info lazy-render). `suggest-cache.ts` — TTL Map-cache (Project/IssueType/Status = 60s, Sprint/Release = 30s, default 30s); GC при size>200. Trigger chars `=`/`,`/`(`/` `; explicit trigger через Ctrl+Space (completionKeymap). `activateOnTyping: true` + `closeOnBlur: true`. Validate signal through `context.aborted` — stale responses не рендерятся. Bundle: JqlEditor chunk = **113.62KB gzip** (71% от NFR-5 160KB budget, +12KB за autocomplete).
 
 #### PR-12: BasicFilterBuilder + Basic↔Advanced toggle
 - **Branch:** `ttsrh-1/basic-builder`
@@ -1505,8 +1506,8 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 🟢 Merged ([#107](https://github.com/NovakPAai/tasktime-mvp/pull/107)) |
 | 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 🟢 Merged ([#108](https://github.com/NovakPAai/tasktime-mvp/pull/108)) |
 | 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 🟢 Merged ([#109](https://github.com/NovakPAai/tasktime-mvp/pull/109)) |
-| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | ✅ Done (готов к push после merge PR-9) |
-| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 📋 Планируется |
+| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 🟢 Merged ([#110](https://github.com/NovakPAai/tasktime-mvp/pull/110)) |
+| 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | ✅ Done (готов к push после merge PR-10) |
 | 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 📋 Планируется |
 | 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 📋 Планируется |
 | 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 📋 Планируется |
