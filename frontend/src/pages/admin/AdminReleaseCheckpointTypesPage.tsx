@@ -25,6 +25,7 @@ import type { Color } from 'antd/es/color-picker';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  type CheckpointConditionMode,
   type CheckpointCriterion,
   type CheckpointCriterionType,
   type CheckpointType,
@@ -36,6 +37,9 @@ import {
   listCheckpointTypes,
   updateCheckpointType,
 } from '../../api/release-checkpoint-types';
+import { listReleasesGlobal } from '../../api/releases';
+import CheckpointConditionModeControl, { CheckpointConditionModeIcon } from '../../components/releases/CheckpointConditionModeControl';
+import CheckpointPreviewPanel from '../../components/releases/CheckpointPreviewPanel';
 import SyncInstancesModal from './SyncInstancesModal';
 
 const COLOR_PALETTE = [
@@ -93,6 +97,8 @@ type TypeFormValues = {
   minStableSeconds: number;
   isActive: boolean;
   criteria: CheckpointCriterion[];
+  conditionMode?: CheckpointConditionMode;
+  ttqlCondition?: string | null;
 };
 
 export default function AdminReleaseCheckpointTypesPage() {
@@ -103,6 +109,27 @@ export default function AdminReleaseCheckpointTypesPage() {
   const [saving, setSaving] = useState(false);
   const [syncTarget, setSyncTarget] = useState<CheckpointType | null>(null);
   const [form] = Form.useForm();
+  // TTSRH-1 PR-18: mode state mirrors form.conditionMode but lives outside
+  // so mode-toggle + preview panel re-render instantly without waiting for
+  // Form.useWatch propagation.
+  const [conditionMode, setConditionMode] = useState<CheckpointConditionMode>('STRUCTURED');
+  const [ttqlValue, setTtqlValue] = useState<string>('');
+  const [releaseOptions, setReleaseOptions] = useState<Array<{ id: string; name: string; projectKey?: string }>>([]);
+
+  useEffect(() => {
+    // Preload releases for the preview panel. Silent-fail: panel is optional UX.
+    listReleasesGlobal({ limit: 100 })
+      .then((res) => {
+        setReleaseOptions(
+          res.data.map((r) => ({
+            id: r.id,
+            name: r.name,
+            projectKey: (r as unknown as { project?: { key?: string } }).project?.key,
+          })),
+        );
+      })
+      .catch(() => setReleaseOptions([]));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,12 +157,18 @@ export default function AdminReleaseCheckpointTypesPage() {
       minStableSeconds: 300,
       isActive: true,
       criteria: [{ type: 'STATUS_IN', categories: ['DONE'] }],
+      conditionMode: 'STRUCTURED',
+      ttqlCondition: '',
     });
+    setConditionMode('STRUCTURED');
+    setTtqlValue('');
     setModalOpen(true);
   };
 
   const openEdit = (t: CheckpointType) => {
     setEditing(t);
+    const mode = t.conditionMode ?? 'STRUCTURED';
+    const ttql = t.ttqlCondition ?? '';
     form.setFieldsValue({
       name: t.name,
       description: t.description ?? '',
@@ -147,7 +180,11 @@ export default function AdminReleaseCheckpointTypesPage() {
       minStableSeconds: t.minStableSeconds,
       isActive: t.isActive,
       criteria: t.criteria,
+      conditionMode: mode,
+      ttqlCondition: ttql,
     });
+    setConditionMode(mode);
+    setTtqlValue(ttql);
     setModalOpen(true);
   };
 
@@ -162,6 +199,13 @@ export default function AdminReleaseCheckpointTypesPage() {
         offsetDays: values.offsetDays,
         warningDays: values.warningDays,
         criteria: values.criteria,
+        // TTSRH-1 PR-18: propagate new fields. Backend superRefine validates
+        // mode ↔ payload consistency (см. checkpoint.dto.ts).
+        conditionMode: conditionMode,
+        ttqlCondition:
+          conditionMode === 'TTQL' || conditionMode === 'COMBINED'
+            ? ttqlValue.trim() || null
+            : null,
         webhookUrl: values.webhookUrl ? values.webhookUrl : null,
         minStableSeconds: values.minStableSeconds,
         isActive: values.isActive,
@@ -227,6 +271,7 @@ export default function AdminReleaseCheckpointTypesPage() {
             }}
           />
           {name}
+          <CheckpointConditionModeIcon mode={t.conditionMode ?? 'STRUCTURED'} />
         </Space>
       ),
     },
@@ -389,8 +434,40 @@ export default function AdminReleaseCheckpointTypesPage() {
             </Form.Item>
           </Space>
 
-          <Divider orientation="left">Критерии (AND)</Divider>
-          <CriteriaListField />
+          <Divider orientation="left">Режим оценки</Divider>
+          <CheckpointConditionModeControl
+            value={conditionMode}
+            onChange={setConditionMode}
+            ttqlValue={ttqlValue}
+            onTtqlChange={setTtqlValue}
+            disabled={saving}
+          />
+
+          {(conditionMode === 'STRUCTURED' || conditionMode === 'COMBINED') && (
+            <>
+              <Divider orientation="left">Критерии (AND)</Divider>
+              <CriteriaListField />
+            </>
+          )}
+
+          <CheckpointPreviewPanel
+            releaseOptions={releaseOptions}
+            disabled={saving}
+            body={() => {
+              const values = form.getFieldsValue() as Partial<TypeFormValues>;
+              return {
+                releaseId: '', // filled inside the panel from its own select
+                conditionMode,
+                criteria: conditionMode === 'TTQL' ? [] : (values.criteria ?? []),
+                ttqlCondition:
+                  conditionMode === 'TTQL' || conditionMode === 'COMBINED'
+                    ? ttqlValue.trim() || null
+                    : null,
+                offsetDays: values.offsetDays,
+                warningDays: values.warningDays,
+              };
+            }}
+          />
         </Form>
       </Modal>
 
