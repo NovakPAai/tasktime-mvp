@@ -200,9 +200,12 @@ describe('suggestEnum', () => {
     expect(suggestEnum('bogusField', '')).toBeNull();
   });
 
-  it('by type: CHECKPOINT_STATE', () => {
+  it('by type: CHECKPOINT_STATE mirrors Prisma enum', () => {
     const completions = suggestEnumByType('CHECKPOINT_STATE', '') ?? [];
-    expect(completions.some((c) => c.insert === 'OVERDUE')).toBe(true);
+    // Prisma enum: PENDING | OK | VIOLATED | ERROR (ERROR added in PR-16).
+    expect(completions.some((c) => c.insert === 'VIOLATED')).toBe(true);
+    expect(completions.some((c) => c.insert === 'ERROR')).toBe(true);
+    expect(completions.some((c) => c.insert === 'OVERDUE')).toBe(false);
   });
 });
 
