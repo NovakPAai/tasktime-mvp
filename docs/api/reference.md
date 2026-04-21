@@ -885,6 +885,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `DELETE` | `/api/saved-filters/:id` | 🔒 |
 | `POST` | `/api/saved-filters/:id/favorite` | 🔒 |
 | `POST` | `/api/saved-filters/:id/share` | 🔒 |
+| `POST` | `/api/saved-filters/:id/use` | 🔒 |
 
 ### search
 
@@ -974,6 +975,8 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | Метод | Путь | Доступ |
 |-------|------|--------|
 | `GET` | `/api/users/` | 🔒 |
+| `GET` | `/api/users/me/preferences` | 🔒 |
+| `PATCH` | `/api/users/me/preferences` | 🔒 |
 | `GET` | `/api/users/:id` | 🔒 |
 | `PATCH` | `/api/users/:id` | 🔒 |
 | `PATCH` | `/api/users/:id/role` | 🔒 |

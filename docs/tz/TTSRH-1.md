@@ -1313,6 +1313,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Integration T-6 (CRUD + sharing + RBAC negative).
 - **Merge-ready check:** T-6 зелёные; SavedFilter PUBLIC + невидимые проекты → 0 задач (SEC-8).
 - **Оценка:** ~8ч.
+- **Статус: ✅ Done** — 24 integration-теста (CRUD × 10, Sharing × 6, Favorite/use × 4, Audit × 1, Preferences × 5) + shallow-merge preferences + owner-only favorite + group-share через `UserGroupMember`. Добавлен `POST /:id/use` для incrementUseStats (инкремент `useCount` + `lastUsedAt`). В §13.9 — 🟢 Merged после слияния PR.
 
 #### PR-8: Export CSV/XLSX
 - **Branch:** `ttsrh-1/export`
@@ -1323,6 +1324,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Integration: negative-test на закрытый проект — строки не попадают в экспорт (SEC-1).
 - **Merge-ready check:** /export для 10K задач укладывается в 60с, респонс 200 OK.
 - **Оценка:** ~4ч.
+- **Статус: ✅ Done** — `search.export.ts` реализует CSV (inline writer с UTF-8 BOM) + XLSX (exceljs streaming writer). Cursor-based findMany batches × 500, cap 50K, hard-timeout 60s. Column allow-list (SYSTEM_FIELDS ∪ STANDARD_COLUMNS ∪ custom-field names) + 8 integration-тестов (CSV columns/escape/RBAC/errors + XLSX binary ZIP signature).
 
 ### 13.6 PR-ы Фазы 3 — Frontend Search Page (~50ч)
 
@@ -1337,6 +1339,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - `frontend/src/api/search.ts`, `frontend/src/api/savedFilters.ts` (тонкие клиенты для PR-5, PR-6, PR-7).
 - **Merge-ready check:** страница открывается, URL-sync работает на пустом JQL, снэпшот-тест layout.
 - **Оценка:** ~6ч.
+- **Статус: ✅ Done** — API-клиенты `api/search.ts` (searchIssues/validate/schema/suggest/export) + `api/savedFilters.ts` (CRUD/share/favorite/markUsed + preferences). `pages/SearchPage.tsx` переписан: 3-column grid (320px | fr | 360px), JQL-textarea + Ctrl/Cmd+Enter submit + status-line (`role=status aria-live`), results preview (PR-14 заменит полной таблицей). `useSearchUrlState` hook синхронизирует `?jql=&view=&columns=&page=`. Route `/search/saved/:filterId` — fetch SavedFilter → replace URL state + markSavedFilterUsed. Sidebar: «Избранные фильтры» submenu (до 5, fetch `listSavedFilters('favorite')` при `isActive('/search')`). Frontend CI = lint+typecheck+build (без unit-тестов); E2E идут в PR-20.
 
 #### PR-10: JqlEditor (CodeMirror 6) + inline errors
 - **Branch:** `ttsrh-1/jql-editor`
@@ -1349,6 +1352,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Бандл-аудит в CI: `npx source-map-explorer` на chunk `/search` или Lighthouse budget (NFR-5).
 - **Merge-ready check:** NFR-5 не превышен; a11y A11Y-1 (ARIA-live для ошибок) покрыт.
 - **Оценка:** ~13ч.
+- **Статус: ✅ Done** — `ttql-language.ts` (StreamLanguage с keywords/strings/numbers/functions/operators/comments + HighlightStyle), `JqlEditor.tsx` (CM6 view + history + bracketMatching + closeBrackets + lineWrapping + keymap Mod-Enter submit + StateField для inline-error-decoration), `JqlEditor.lazy.tsx` (React.lazy + Suspense placeholder), `useJqlValidation.ts` (debounce 300ms + reqId cancel + merge errors+warnings). Integration в SearchPage: textarea заменён на JqlEditor, добавлен error-banner (role=alert, aria-live) с первыми 5 ошибками + статус "Проверка запроса…" пока валидация идёт. `/` focus + `Ctrl/Cmd+Enter` submit. **Bundle**: `JqlEditor-*.js` = 309KB raw / **101KB gzip** (под NFR-5 ≤ 160KB budget). CodeMirror не попадает в main bundle — грузится только на `/search`.
 
 #### PR-11: ValueSuggesterPopup + CM6 autocomplete adapter
 - **Branch:** `ttsrh-1/value-suggester`
@@ -1496,12 +1500,12 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 2 | `ttsrh-1/parser` | Tokenizer + Parser + AST + golden-set | 14 | PR-1 | TTSRH-2 | 🟢 Merged ([#101](https://github.com/NovakPAai/tasktime-mvp/pull/101)) |
 | 3 | `ttsrh-1/validator` | Field registry + Validator + functions + `/search/schema`, `/validate` | 14 | PR-2 | TTSRH-3, TTSRH-6 | 🟢 Merged ([#102](https://github.com/NovakPAai/tasktime-mvp/pull/102)) |
 | 4 | `ttsrh-1/compiler` | Compiler system + custom fields + scope-фильтр R3 | 18 | PR-3 | TTSRH-4, TTSRH-5 | 🟢 Merged ([#103](https://github.com/NovakPAai/tasktime-mvp/pull/103)) |
-| 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 | ✅ Done (готов к push после merge PR-4) |
-| 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 | 📋 Планируется |
-| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 📋 Планируется |
-| 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 📋 Планируется |
-| 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 📋 Планируется |
-| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 📋 Планируется |
+| 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 | 🟢 Merged ([#104](https://github.com/NovakPAai/tasktime-mvp/pull/104)) |
+| 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 | 🟢 Merged ([#106](https://github.com/NovakPAai/tasktime-mvp/pull/106)) |
+| 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 🟢 Merged ([#107](https://github.com/NovakPAai/tasktime-mvp/pull/107)) |
+| 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 🟢 Merged ([#108](https://github.com/NovakPAai/tasktime-mvp/pull/108)) |
+| 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 🟢 Merged ([#109](https://github.com/NovakPAai/tasktime-mvp/pull/109)) |
+| 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | ✅ Done (готов к push после merge PR-9) |
 | 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 📋 Планируется |
 | 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 📋 Планируется |
 | 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 📋 Планируется |

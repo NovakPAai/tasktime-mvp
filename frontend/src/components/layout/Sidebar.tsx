@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { canViewCheckpointAudit, hasRequiredRole } from '../../lib/roles';
 import { features as frontendFeatures } from '../../lib/features';
+import { listSavedFilters, type SavedFilter } from '../../api/savedFilters';
 import type { SystemRoleType, User } from '../../types';
 
 // ─── Design tokens (Paper 1KR-0 dark + computed light) ───────────────────────
@@ -102,6 +103,30 @@ export default function Sidebar({
   const isMobile = useIsMobile();
   const tokens = isLight ? T.light : T.dark;
   const path = location.pathname;
+
+  // TTSRH-1 PR-9: top-5 favorite saved filters, fetched lazily when /search is active.
+  // Failures are swallowed — sidebar never surfaces errors to the user (the main
+  // SearchPage does, which avoids double-reporting). Dep narrowed to a boolean so
+  // intra-search URL changes (?jql=&page=) don't re-trigger a fetch on every keystroke.
+  const isSearchActive = path.startsWith('/search');
+  const [searchFavorites, setSearchFavorites] = useState<SavedFilter[]>([]);
+  useEffect(() => {
+    if (!frontendFeatures.advancedSearch) return;
+    if (!isSearchActive) return;
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const filters = await listSavedFilters('favorite');
+        if (!cancelled) setSearchFavorites(filters);
+      } catch {
+        if (!cancelled) setSearchFavorites([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSearchActive, user]);
 
   const isPlanningOpen = openKeys.includes('planning-submenu');
   const isAdminOpen = openKeys.includes('admin-submenu');
@@ -350,16 +375,42 @@ export default function Sidebar({
             <span style={textStyle('/flow-teams')}>Потоковые команды</span>
           </div>
 
-          {/* TTSRH-1 PR-1: «Поиск задач» (/search). Стоит перед Planning-submenu — см. §5.7 ТЗ.
-              Полный sidebar-item с submenu «Избранные фильтры» будет в PR-9. */}
+          {/* TTSRH-1 PR-9: «Поиск задач» (/search) между Flow Teams и Planning (§5.7 ТЗ).
+              Sub-menu «Избранные фильтры» раскрывается при активной странице: до 5
+              фильтров, сорт `useCount DESC, lastUsedAt DESC`. Клик → /search/saved/:id. */}
           {frontendFeatures.advancedSearch && (
-            <div data-testid="nav-search" style={itemStyle('/search')} onClick={() => onNavigate('/search')} onMouseEnter={() => setHovered('/search')} onMouseLeave={() => setHovered(null)}>
-              <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
-                <circle cx="7" cy="7" r="4.5" stroke={itemColor('/search')} strokeWidth="1.5" />
-                <path d="M10.5 10.5l3 3" stroke={itemColor('/search')} strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <span style={textStyle('/search')}>Поиск задач</span>
-            </div>
+            <>
+              <div data-testid="nav-search" style={itemStyle('/search')} onClick={() => onNavigate('/search')} onMouseEnter={() => setHovered('/search')} onMouseLeave={() => setHovered(null)}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+                  <circle cx="7" cy="7" r="4.5" stroke={itemColor('/search')} strokeWidth="1.5" />
+                  <path d="M10.5 10.5l3 3" stroke={itemColor('/search')} strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <span style={textStyle('/search')}>Поиск задач</span>
+              </div>
+              {isActive('/search') && !collapsed && searchFavorites.length > 0 && (
+                <div data-testid="nav-search-favorites">
+                  {searchFavorites.slice(0, 5).map((f) => {
+                    const href = `/search/saved/${f.id}`;
+                    return (
+                      <div
+                        key={f.id}
+                        data-testid={`nav-search-favorite-${f.id}`}
+                        style={subItemStyle(href)}
+                        onClick={() => onNavigate(href)}
+                        onMouseEnter={() => setHovered(href)}
+                        onMouseLeave={() => setHovered(null)}
+                        title={f.description ?? f.jql}
+                      >
+                        <svg width="12" height="12" fill="none" viewBox="0 0 12 12" style={{ flexShrink: 0 }}>
+                          <path d="M6 1l1.5 3.2 3.5.4-2.6 2.4.7 3.4L6 8.7l-3.1 1.7.7-3.4L1 4.6l3.5-.4L6 1z" fill={isActive(href) ? tokens.acc : tokens.inactive} />
+                        </svg>
+                        <span style={{ ...subTextStyle(href), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           {/* Planning submenu */}

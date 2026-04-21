@@ -2,7 +2,313 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.32**
+**Last version: 2.38**
+
+---
+
+## [2.38] [2026-04-21] feat: паттерны из Pulsar — asyncHandler, logger, rate-limit, security
+
+**PR:** [#112](https://github.com/NovakPAai/tasktime-mvp/pull/112)
+**Ветка:** `claude/jack-pulsar-patterns`
+
+### Что изменилось
+
+- **`asyncHandler` / `authHandler`** — убраны `try/catch` из 39 роутеров, ошибки проксируются в `next()` автоматически
+- **`logger`** — структурированный логгер: prod → JSON, dev → pretty; `captureError` с redact секретов
+- **`rate-limit`** — scoped in-memory лимитер; `authRead` (30/мин) / `authWrite` (10/мин); size cap 100k
+- **`issue-access`** — централизованный Prisma WHERE для ACL: `accessibleIssueWhere(userId, systemRoles)`
+- **Security**: `trust proxy = 1`, `safeClientMeta` allowlist, corrupted Redis session → 401, `console` → logger
+
+### Файлы
+- `backend/src/shared/utils/async-handler.ts`, `logger.ts`, `rate-limit.ts`, `issue-access.ts`
+- `backend/src/shared/middleware/error-handler.ts`, `backend/src/app.ts`
+- 39 роутеров — убраны try/catch блоки
+
+---
+
+**Last version before this branch: 2.37**
+
+---
+
+## [2.37] [2026-04-21] feat(frontend): TTSRH-1 PR-10 — JqlEditor (CodeMirror 6) + inline errors + lazy-load
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/jql-editor`
+
+### Что было
+
+После PR-9 SearchPage использовал plain `<textarea>` для JQL — без подсветки, без автокомплита, без inline-diagnostics. Редактор из §5.7 ТЗ не существовал, а без него feature flag не мог быть включён для UAT.
+
+### Что теперь
+
+Полноценный CodeMirror 6 редактор TTS-QL с lazy-load'ом, подсветкой и подключенным `/search/validate`:
+
+- **`frontend/src/components/search/ttql-language.ts`** (~100L) — `StreamLanguage` адаптер для TTS-QL. Классификатор токенов зеркалит backend `search.tokenizer.ts`: keywords (`AND/OR/NOT/IN/IS/EMPTY/NULL/ORDER/BY/ASC/DESC/TRUE/FALSE` + history-keywords), strings (с backslash-escape), numbers (int + decimal + relative-date `-7d`/`+1w`/`-1M`), operators (`!=/<=/>=/!~/=/</>/~`), custom-field prefix (`cf[`), comments (`-- …`). Function detection через lookahead на `(`. `HighlightStyle.define` — цвета в стиле One-Dark (keywords/functions/strings/numbers различимы, operators/punctuation — muted).
+- **`frontend/src/components/search/JqlEditor.tsx`** (~200L) — главный компонент:
+  - Extensions: `history()` (undo/redo), `bracketMatching()`, `closeBrackets()`, `indentOnInput()`, `lineWrapping`, наш `ttqlLanguage()`, error `StateField`/theme.
+  - Keymap: `Mod-Enter` → submit (preventDefault), + defaultKeymap/historyKeymap/closeBracketsKeymap/searchKeymap.
+  - Inline errors: `Decoration.mark({class: 'ttql-error', attributes: {title}})` через `StateField<DecorationSet>` + `StateEffect<InlineError[]>`. Squiggle = `text-decoration: underline wavy #e5484d`. `title`-attribute показывает сообщение ошибки на hover.
+  - Theme: dynamic (light/dark) через `EditorView.theme` + `buildTheme(isLight)`.
+  - a11y: `aria-label="JQL / TTS-QL query editor"`, `aria-describedby` к status-line в SearchPage (A11Y-1).
+  - `onChange/onSubmit` через refs — стабильная идентичность extensions, ре-mount только при смене theme/a11y.
+  - Sync external `value` (URL-driven) через `view.dispatch({ changes })` только если отличается (избегаем лишних ре-parse'ов).
+  - Global `/` hotkey → focus editor. Respect input/textarea/contenteditable focus (чтобы слэш оставался символом).
+- **`frontend/src/components/search/JqlEditor.lazy.tsx`** (~40L) — `React.lazy(() => import('./JqlEditor'))` + Suspense fallback с placeholder-высотой, чтобы избежать layout shift при подгрузке.
+- **`frontend/src/pages/search/useJqlValidation.ts`** (~70L) — debounced `POST /search/validate`:
+  - 300ms debounce.
+  - `reqIdRef` увеличивается на каждый новый запрос; stale responses игнорируются.
+  - Network errors сбрасывают `errors` в []. Пустой JQL → не триггерит запрос.
+  - Cleanup корректно отменяет timer + bumps reqId.
+  - Возвращает `{errors, isValidating}` для UI-banner'а.
+- **`frontend/src/pages/SearchPage.tsx`** — `textarea` заменён на `<JqlEditor>` (lazy-wrapped). Добавлены:
+  - Error-banner (`role="alert" aria-live="polite"`) с первыми 5 ошибками формата `[start:end] message`, остаток в виде «…ещё N ошибок».
+  - Status-line обновлён: `'Проверка запроса…'` пока debounced-валидация в полёте, `'Введите запрос и нажмите Ctrl+Enter'` когда idle.
+- **Новые deps**: `@codemirror/state`, `@codemirror/view`, `@codemirror/language`, `@codemirror/autocomplete`, `@codemirror/search`, `@codemirror/commands`, `@lezer/highlight`. В production bundle'е выделен отдельный chunk `JqlEditor-*.js` (309KB raw / **101KB gzip**) — грузится только при первом входе на `/search`.
+
+### Изменения
+
+- `frontend/src/components/search/ttql-language.ts` — новый.
+- `frontend/src/components/search/JqlEditor.tsx` — новый.
+- `frontend/src/components/search/JqlEditor.lazy.tsx` — новый.
+- `frontend/src/pages/search/useJqlValidation.ts` — новый.
+- `frontend/src/pages/SearchPage.tsx` — textarea → JqlEditor, + error-banner, + isValidating status.
+- `frontend/package.json` / `package-lock.json` — + 7 CM6 deps.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-10 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` CodeMirror не грузится вообще (route не смонтирован, chunk не реквестится). При включении: editor ленится, подхватывается за ~100ms после mount'а страницы. Main bundle unchanged по размеру (lazy-split'ин).
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` (frontend) — 0 errors, 0 new warnings
+- `npm run build` (Vite) — чисто, 4.57s. Chunk `JqlEditor` = **101KB gzip** (60% бюджета NFR-5 ≤ 160KB gzip).
+
+---
+
+## [2.36] [2026-04-21] feat(frontend): TTSRH-1 PR-9 — SearchPage shell + /search route + sidebar submenu + URL sync
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/frontend-shell`
+
+### Что было
+
+После PR-8 вся backend-поверхность TTS-QL была live (`/search/{issues,validate,schema,suggest,export}` + `/saved-filters/*` + `/users/me/preferences`), но frontend не имел страницы `/search` — только placeholder-stub из PR-1. Пользователь не мог протестировать запросы даже с `FEATURES_ADVANCED_SEARCH=true`.
+
+### Что теперь
+
+Полноценная страница `/search` + оболочка будущих PR-10..PR-14 + тонкие API-клиенты:
+
+- **`frontend/src/api/search.ts`** — `searchIssues / validateJql / getSearchSchema / suggestCompletions / exportIssues` (blob для saveAs). Типизированные ответы: `SearchIssuesResponse`, `ValidationResponse`, `SearchSchemaResponse`, `SuggestResponse`.
+- **`frontend/src/api/savedFilters.ts`** — CRUD + share + favorite + markUsed + `getMyPreferences / updateMyPreferences`. `SavedFilter` интерфейс с `permission: 'READ'|'WRITE'` и nested `shares[]`.
+- **`frontend/src/pages/SearchPage.tsx`** — переписан со stub'а. 3-column CSS grid (`320px | minmax(0,1fr) | 360px`): `SidebarFilters` | `JqlEditor + ResultsArea` | `DetailPreview`. Левая/правая колонки сейчас — placeholder'ы с refs на будущие PR (13/14). Средняя колонка работает:
+  - `<textarea>` с `Ctrl/Cmd+Enter` → submit (plain Enter вставляет newline для мульти-строк).
+  - Run-button + `role="status" aria-live="polite"` status-line (idle/loading/ok/error — A11Y-1).
+  - При `status=ok` рендерится preview-список (до 20 результатов, ключ + title + status) — PR-14 заменит полной `ResultsTable`.
+- **`frontend/src/pages/search/useSearchUrlState.ts`** — bridge между URL `?jql=&view=&columns=&page=` и локальным state. `updateUrl` имеет стабильную identity (via stateRef) — без этого `/search/saved/:filterId` попадал в infinite loop. Default dropping: `view=table` и `page=1` не записываются в URL. Mount-time self-heal для invalid `page=N`.
+- **`frontend/src/App.tsx`** — добавлен route `/search/saved/:filterId` под тем же gate'ом `features.advancedSearch`. Обе ветки используют `<SearchPage />` — он сам fetch'ит фильтр по `useParams().filterId` → `getSavedFilter` → replace URL state + fire-and-forget `markSavedFilterUsed`.
+- **`frontend/src/components/layout/Sidebar.tsx`** — при `isActive('/search')` под пунктом разворачивается submenu «Избранные фильтры»: до 5 item'ов, fetch `listSavedFilters('favorite')`. Dep-массив сужен до boolean `isSearchActive` — intra-search URL changes не триггерят redundant fetch.
+
+### Изменения
+
+- `frontend/src/api/search.ts` — новый (~100L).
+- `frontend/src/api/savedFilters.ts` — новый (~80L).
+- `frontend/src/pages/search/useSearchUrlState.ts` — новый (~90L).
+- `frontend/src/pages/SearchPage.tsx` — переписан (placeholder → 3-column shell, ~250L).
+- `frontend/src/App.tsx` — + `/search/saved/:filterId` route.
+- `frontend/src/components/layout/Sidebar.tsx` — + submenu fetch + render.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-9 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` страница и submenu не рендерятся (App.tsx catch-all → `/`). При `=true`:
+- `/search` открывается, URL-sync работает на пустом JQL.
+- Sub-menu «Избранные фильтры» подгружается из `/api/saved-filters?scope=favorite`.
+- Реальный JQL-editor (CodeMirror 6), Basic-builder, Save/Share-модалки, full-table — в PR-10..PR-14.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` (frontend) — 0 errors, 0 new warnings
+- `npm run build` (Vite) — чисто, 4.5s
+
+---
+
+## [2.35] [2026-04-21] feat(search): TTSRH-1 PR-8 — POST /search/export CSV/XLSX streaming
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/export`
+
+### Что было
+
+После PR-7 `/api/search/export` возвращал 501. Из UI нельзя было выгрузить результаты search'а — ни для оффлайн-отчёта, ни для шеринга вне системы (FR-19, §5.6).
+
+### Что теперь
+
+`POST /api/search/export` — live с двумя форматами + streaming writers, reuse всего pipeline PR-2..PR-5.
+
+- **`search.export.ts`** — новый модуль, publico `exportIssuesToCsv` / `exportIssuesToXlsx`:
+  - **`prepareExport`** — reuses parse → validate → resolveFunctions → compile → executeCustomFieldPredicates (тот же path, что у `POST /search/issues`), гарантирует идентичную R3-семантику (`accessibleProjectIds` → AND[0]).
+  - **`iterateIssues`** — async generator с cursor-based pagination (batches × 500). Избегает O(n²) на больших offset'ах (skip/take → P.K).
+  - **Limits**: `MAX_ROWS=50_000` (безопасность от memory-blow), `QUERY_TIMEOUT_MS=60_000` (§5.6 NFR-8) через `AbortController`. Truncate-маркер в последней строке если hit cap.
+  - **Column allow-list**: `STANDARD_COLUMNS` (19 проекций — key/summary/priority/status/assignee и т.д.) ∪ `SYSTEM_FIELDS` (канонические имена) ∪ custom-field names из `loadCustomFields()`. Unknown columns silently dropped, не раскрывают произвольные Prisma-поля. 400 если ВСЕ columns неизвестны (`NO_VALID_COLUMNS`).
+  - **CSV**: inline writer (~30 LoC) с UTF-8 BOM (Excel-RU compat), escape для `,"\n\r`, null → пустая строка. `Content-Type: text/csv; charset=utf-8`.
+  - **XLSX**: `exceljs.stream.xlsx.WorkbookWriter` — коммит per-row через `addRow(...).commit()` (streaming, не держит всё в памяти). `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+- **`search.router.ts`** — `POST /search/export` подключён (Zod body `{jql, format:csv|xlsx, columns?: string[]}`; columns.max=50). Авторизация + rate-limit + accessibleProjectIds. Стрим-safe error-handler: если headers уже отправлены, `res.end()` + log; иначе `next(err)` → 500 JSON.
+- **`backend/package.json`** — добавлен `exceljs@^4.4.0` (~300KB node_modules, единственный new dep).
+
+### Тесты (интеграционные, требуют Postgres)
+
+**`tests/search-export.test.ts`** — 11 кейсов:
+
+- **CSV** (9): default columns, subset+order columns, unknown column dropped, all-unknown → 400, CSV escape special chars (`,"\n`), parse error → 400, validation error → 400, no auth → 401, invalid format → 400.
+- **XLSX** (1): content-type spreadsheetml.sheet + ZIP-signature `PK\x03\x04` в начале бинарника (буферизованный stream чтение через supertest .parse()).
+- **RBAC** (1): неавторизованный на проект user → 0 data rows (только header). Scope R3 наследуется из `/search/issues` path.
+
+### Изменения
+
+- `backend/src/modules/search/search.export.ts` — новый.
+- `backend/src/modules/search/search.router.ts` — + POST /search/export, удалён unused `notImplemented` helper (все endpoints теперь live).
+- `backend/package.json` — + `exceljs@^4.4.0`.
+- `backend/tests/search-export.test.ts` — новый, 11 integration-кейсов.
+- `docs/tz/TTSRH-1.md` §13.5/§13.9 — статус PR-8 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_ADVANCED_SEARCH=false` эндпоинт недоступен (mount условный). При включении: XLSX-файл стримится, frontend потребляет как blob для `saveAs` (PR-14 добавит UI). Никаких изменений на read-path'е `/search/issues`.
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings (2 pre-existing)
+
+---
+
+## [2.34] [2026-04-21] feat(saved-filters): TTSRH-1 PR-7 — SavedFilter CRUD + share + favorite + User preferences
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/saved-filters`
+
+### Что было
+
+После PR-6 `/api/saved-filters/*` возвращали 501; `/api/users/me/preferences` не существовало. Пользователь не мог сохранить JQL-запрос, передать его коллеге, отметить избранным или зафиксировать набор колонок как дефолт — ни один flow §5.6 ТЗ не работал.
+
+### Что теперь
+
+Полный CRUD `/api/saved-filters` с RBAC, sharing'ом через пользователей и группы, а также Zod-DTO `PATCH /api/users/me/preferences`:
+
+- **`saved-filters.dto.ts`** — Zod схемы `listQueryDto`, `createDto`, `updateDto`, `favoriteDto`, `shareDto`, `preferencesDto`. Инварианты: `name` ≤ 200 символов, `jql` ≤ 10K (как на `/search/issues`), `columns` ≤ 50 строк, `sharedWith.users` ≤ 500 UUID, `sharedWith.groups` ≤ 100 UUID — чтобы не пропустить DoS через очень большие JSON-массивы в `User.preferences`.
+- **`saved-filters.service.ts`** — весь бизнес-слой:
+  - `listFilters(userId, scope)` — 4 scope'а: `mine` (owner), `favorite` (owner + isFavorite, сорт `useCount DESC, lastUsedAt DESC` — под сайдбарное submenu §5.7), `public` (все аутентифицированные), `shared` (SHARED-фильтры через прямые shares или группы пользователя, `ownerId: { not: userId }`).
+  - `getFilter`, `updateFilter`, `deleteFilter` — с RBAC-проверкой (R-SF-1 read, R-SF-2 write).
+  - `createFilter` — транзакционно создаёт `SavedFilter` + `SavedFilterShare[]` (если visibility=SHARED), валидирует существование shared-users/groups (400 при unknown UUID). `sharedWith` игнорируется для PRIVATE/PUBLIC, чтобы не плодить зомби-строки.
+  - `shareFilter` — replace-семантика: старые shares удаляются в той же транзакции, новые создаются. При первом share auto-promote PRIVATE → SHARED. Owner-only.
+  - `setFavorite` — только для owner'а (per-user favorites over shared/public filters — future).
+  - `incrementUseStats` — атомарный `{ increment: 1 }` + `lastUsedAt=now()` (race-safe на конкурентных запросах).
+  - `getUserFavorites(userId, limit=5)` — готовый хелпер для будущего `SavedFiltersSidebar`.
+  - RBAC: `resolveAccess(userId, filterId)` единственная точка правды, читает `SavedFilter` + `shares` + `userGroupMember` и возвращает `{canRead, canWrite}`.
+  - AuditLog: `savedFilter.created|updated|deleted|shared` — через `prisma.auditLog.create` с `userId/entityType/entityId/details`.
+- **`saved-filters.router.ts`** — live (раньше был stub-501):
+  - `GET /saved-filters?scope=` (Zod query), `POST /saved-filters` (201), `GET/PATCH/DELETE /:id` (403 на чужое, 404 на несуществующее).
+  - `POST /:id/favorite {value:bool}`, `POST /:id/share {users?,groups?,permission?}`, `POST /:id/use` (204, инкремент).
+  - Всё под `authenticate` middleware; 401 при `!req.user`. Gate по `features.advancedSearch` — в app.ts (без изменений).
+- **`users.router.ts` + `users.service.ts`** — `GET/PATCH /api/users/me/preferences`:
+  - `getPreferences` — читает `User.preferences`, возвращает `{}` если `null` (новый пользователь).
+  - `updatePreferences` — shallow-merge сверху (PATCH семантика): `{searchDefaults: {columns}}` не перетирает другие top-level ключи (`checkpointDefaults`, и т.д. — паттерн TTUI-90 §5.4).
+  - `me/preferences` регистрируется ПЕРЕД `/:id`, чтобы Express не greedy-match'ил `me` как UUID.
+- **`tests/env.ts`** — `process.env.FEATURES_ADVANCED_SEARCH ??= 'true'` (setup-файл vitest). Без этого `createApp()` не монтирует `/api/saved-filters/*` и все integration-тесты сразу падают 404.
+
+### Тесты (интеграционные, требуют Postgres — прогонит CI)
+
+**`tests/saved-filters.test.ts`** — 24 кейса:
+
+- **CRUD (10)**: create PRIVATE default, 400 на missing name, 401 без auth, list `scope=mine` фильтрует чужие, `scope=public` включает PUBLIC со всех, 403 на чужой PRIVATE, 200 для owner, PATCH owner-ok, PATCH non-owner 403, DELETE owner 204 + follow-up GET 404, DELETE non-owner 403 даже при SHARED-WRITE.
+- **Sharing (6)**: share users READ по умолчанию, READ → GET ok + PATCH 403, WRITE → PATCH ok, share через группу + non-member 403, replace-семантика (старые shares заменяются), 403 для не-owner'а, 400 на nonexistent UUID.
+- **Favorite + use (4)**: owner toggle favorite, non-owner PUBLIC → 400, `/use` инкрементирует useCount+lastUsedAt, `scope=favorite` сортирует по useCount.
+- **Audit (1)**: create/update/share/delete пишет 4 строки в AuditLog с правильным entityType + action.
+- **Preferences (5)**: GET empty object для нового user'а, PATCH searchDefaults, 400 на columns>50, 400 на empty body, 401 без auth.
+
+### Изменения
+
+- `backend/src/modules/saved-filters/saved-filters.dto.ts` — новый.
+- `backend/src/modules/saved-filters/saved-filters.service.ts` — новый.
+- `backend/src/modules/saved-filters/saved-filters.router.ts` — live (был stub).
+- `backend/src/modules/users/users.dto.ts` — + `updatePreferencesDto`.
+- `backend/src/modules/users/users.service.ts` — + `getPreferences`, `updatePreferences`.
+- `backend/src/modules/users/users.router.ts` — + `GET/PATCH /me/preferences` (перед `/:id`).
+- `backend/tests/env.ts` — `FEATURES_ADVANCED_SEARCH ??= 'true'` default в тестах.
+- `backend/tests/saved-filters.test.ts` — новый, 24 integration-кейса.
+- `docs/tz/TTSRH-1.md` §13.5/§13.9 — статус PR-7 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_ADVANCED_SEARCH=false` эндпоинты недоступны (ассоциированный mount не монтируется — см. app.ts:176). При включении: фронт может создавать/редактировать/делить фильтры, хранить UI-колонки в `User.preferences`, сайдбар готов к списку избранных (getUserFavorites).
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+
+---
+
+## [2.33] [2026-04-21] feat(search): TTSRH-1 PR-6 — Value Suggesters backend + GET /search/suggest + /implement-tz playbook
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/suggesters`
+
+### Что было
+
+После PR-5 `GET /search/suggest` возвращал 501. Редактор TTS-QL не мог предлагать значения — пользователь писал всё руками.
+
+### Что теперь
+
+`GET /api/search/suggest` live. 13 провайдеров значений из §5.11 ТЗ:
+
+- **`search.suggest.types.ts`** — `Completion { kind, label, insert, detail?, icon?, score }`, `PositionContext`, `SuggestContext`, `SuggestResponse`.
+- **`search.suggest.position.ts`** — позиционный анализатор. Tokenize'ит source до cursor, применяет heuristic rules: после `AND`/`OR`/`NOT`/пусто → field; после field → operator; после op/`IN (` → value; после `ORDER BY` → field; fails open на tokenizer-ошибках. Корректно обрабатывает editing-in-progress (только для Ident/String/Number/RelativeDate/CustomField, не для delimiters).
+- **`search.suggest.rank.ts`** — fuzzy-ranking: exact (1.0) → startsWith (0.75) → contains (0.5) → subsequence (0.25). Case-insensitive. Пустой prefix возвращает input-order.
+- **`search.suggest.static.ts`** — static suggesters без DB: `suggestFields` (system + custom), `suggestFunctions` (filter by variant, MVP-only), `suggestEnum` (priority/statusCategory/aiStatus/aiAssigneeType/checkpointState), `suggestBool`, `suggestDateShortcuts` (now/today/startOfX/-7d), `suggestOperators` (TtqlOpKind → display label).
+- **`search.suggest.providers.ts`** — 9 DB-backed провайдеров: Users (scoped по UserProjectRole), Projects, Statuses (system-keys + WorkflowStatus с color-dot), IssueTypes, Sprints (+ 3 function-shortcuts первыми), Releases (+ 4 function-shortcuts), Issues (key-based или title-substring, scoped), Labels (raw-SQL `jsonb_array_elements_text` на LABEL-type CFs), Groups, CheckpointTypes. Все scope'ятся по `accessibleProjectIds` (R3).
+- **`search.suggest.ts`** — orchestrator. Два пути: Basic-builder (explicit field/op/prefix) и text-editor (analyse position). Routing по type с fallbacks: unknown field → functions, unknown type → empty.
+- **`search.router.ts`** — `GET /search/suggest?jql=&cursor=&field=&operator=&prefix=&variant=` подключён. Authenticate + Zod query params + accessibleProjectIds.
+- **`.claude/commands/implement-tz.md`** — новый **/implement-tz playbook**: декомпозиция ТЗ → план PR'ов → цикл (branch → implement → test → docs → commit → pre-push-reviewer → fix → check prev CI → merge → rebase → push → schedule auto-check). Пользователь пишет `Реализуй ТЗ X` — цикл запускается автоматически.
+
+### Тесты (433 passing, +36 к PR-5)
+
+- **`tests/search-suggest.unit.test.ts`** (36 кейсов):
+  - Position analyser: 8 сценариев (пустой, after AND/NOT/(, after field, after op, IN (, dedupe picked, unterminated string, ORDER BY).
+  - rankByPrefix: 7 кейсов (пустой prefix, exact/startsWith/contains/subsequence tiers, case-insensitive, no-match).
+  - suggestFields: 3 (system + custom + quoted wrap).
+  - suggestFunctions: 4 (variant filter, Phase-2 exclude).
+  - suggestEnum: 5 (per-field mapping, dedupe picked, case-insensitive, unknown field, by type).
+  - suggestBool/DateShortcuts/Operators: 3.
+
+DB-backed провайдеры тестируются в integration layer (требуют Postgres).
+
+### Изменения
+
+- `backend/src/modules/search/search.suggest.types.ts` — новый.
+- `backend/src/modules/search/search.suggest.position.ts` — новый.
+- `backend/src/modules/search/search.suggest.rank.ts` — новый.
+- `backend/src/modules/search/search.suggest.static.ts` — новый.
+- `backend/src/modules/search/search.suggest.providers.ts` — новый.
+- `backend/src/modules/search/search.suggest.ts` — новый (orchestrator).
+- `backend/src/modules/search/search.router.ts` — `GET /search/suggest` подключён.
+- `backend/tests/search-suggest.unit.test.ts` — новый.
+- `backend/package.json` — `test:parser` включает suggest-тест.
+- `.claude/commands/implement-tz.md` — playbook для запуска циклов.
+- `docs/tz/TTSRH-1.md` §13.9 — статус PR-6 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_ADVANCED_SEARCH=false` — эндпоинт недоступен. При включении: auto-complete в редакторе + в Basic-chip popover работают одинаково (single source of truth).
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run test:parser` — **433 passing**
 
 ---
 

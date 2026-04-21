@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
-import { updateUserDto } from './users.dto.js';
+import { updatePreferencesDto, updateUserDto } from './users.dto.js';
 import * as usersService from './users.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import { asyncHandler, authHandler } from '../../shared/utils/async-handler.js';
@@ -15,6 +15,22 @@ router.get('/', asyncHandler(async (_req, res) => {
   const users = await usersService.listUsers();
   res.json(users);
 }));
+
+// TTSRH-1 PR-7 — per-user UI preferences (search columns, page size). Must be
+// declared before `/:id` so Express doesn't greedy-match `me` as an id.
+router.get('/me/preferences', authHandler(async (req, res) => {
+  const prefs = await usersService.getPreferences(req.user.userId);
+  res.json(prefs);
+}));
+
+router.patch(
+  '/me/preferences',
+  validate(updatePreferencesDto),
+  authHandler(async (req, res) => {
+    const prefs = await usersService.updatePreferences(req.user.userId, req.body);
+    res.json(prefs);
+  }),
+);
 
 router.get('/:id', asyncHandler(async (req, res) => {
   const user = await usersService.getUser(req.params.id as string);
