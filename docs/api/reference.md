@@ -904,6 +904,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `GET` | `/api/sprints` | 🔒 |
 | `GET` | `/api/projects/:projectId/sprints` | 🔒 |
 | `GET` | `/api/sprints/:id/issues` | 🔒 |
+| `GET` | `/api/sprints/:id/burndown` | 🔒 |
 | `GET` | `/api/projects/:projectId/backlog` | 🔒 |
 | `POST` | `/api/projects/:projectId/sprints` | 🔒 |
 | `PATCH` | `/api/sprints/:id` | 🔒 |
