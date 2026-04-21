@@ -252,6 +252,72 @@ describe('SavedFilter sharing', () => {
       .send({ users: ['00000000-0000-0000-0000-000000000000'] });
     expect(res.status).toBe(400);
   });
+
+  it('POST /share with empty list downgrades SHARED → PRIVATE (PUBLIC untouched)', async () => {
+    const shared = await createFilter(ownerToken, { name: 'S', jql: 'x = 1' });
+    await request
+      .post(`/api/saved-filters/${shared.body.id}/share`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ users: [otherId] });
+
+    const emptied = await request
+      .post(`/api/saved-filters/${shared.body.id}/share`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({});
+    expect(emptied.status).toBe(200);
+    expect(emptied.body.visibility).toBe('PRIVATE');
+    expect(emptied.body.shares).toHaveLength(0);
+
+    const pub = await createFilter(ownerToken, { name: 'P', jql: 'x = 1', visibility: 'PUBLIC' });
+    const emptyOnPublic = await request
+      .post(`/api/saved-filters/${pub.body.id}/share`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({});
+    expect(emptyOnPublic.body.visibility).toBe('PUBLIC');
+  });
+
+  it('GET /?scope=shared - returns filters shared with me, not mine, and not visible to non-recipient', async () => {
+    const created = await createFilter(ownerToken, { name: 'S', jql: 'x = 1' });
+    await request
+      .post(`/api/saved-filters/${created.body.id}/share`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ users: [otherId] });
+
+    const recipient = await request
+      .get('/api/saved-filters?scope=shared')
+      .set('Authorization', `Bearer ${otherToken}`);
+    expect(recipient.status).toBe(200);
+    expect(recipient.body.filters).toHaveLength(1);
+    expect(recipient.body.filters[0].id).toBe(created.body.id);
+
+    // Owner's own SHARED filter must not appear in their own shared scope.
+    const owner = await request
+      .get('/api/saved-filters?scope=shared')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    expect(owner.body.filters).toHaveLength(0);
+
+    // A third party not in shares sees nothing.
+    const third = await request
+      .get('/api/saved-filters?scope=shared')
+      .set('Authorization', `Bearer ${thirdToken}`);
+    expect(third.body.filters).toHaveLength(0);
+  });
+
+  it('GET /?scope=shared - finds filter shared via group membership', async () => {
+    const group = await prisma.userGroup.create({ data: { name: 'QA' } });
+    await prisma.userGroupMember.create({ data: { groupId: group.id, userId: thirdId } });
+    const created = await createFilter(ownerToken, { name: 'Grp', jql: 'x = 1' });
+    await request
+      .post(`/api/saved-filters/${created.body.id}/share`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ groups: [group.id] });
+
+    const res = await request
+      .get('/api/saved-filters?scope=shared')
+      .set('Authorization', `Bearer ${thirdToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.filters.map((f: { id: string }) => f.id)).toEqual([created.body.id]);
+  });
 });
 
 describe('SavedFilter favorite + use tracking', () => {
@@ -361,6 +427,21 @@ describe('User preferences', () => {
     expect(res.status).toBe(200);
     expect(res.body.searchDefaults.columns).toEqual(['key', 'summary']);
     expect(res.body.searchDefaults.pageSize).toBe(50);
+  });
+
+  it('PATCH /api/users/me/preferences - partial update preserves sibling keys', async () => {
+    await request
+      .patch('/api/users/me/preferences')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ searchDefaults: { columns: ['key', 'summary'], pageSize: 50 } });
+    const res = await request
+      .patch('/api/users/me/preferences')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ searchDefaults: { pageSize: 25 } });
+    expect(res.status).toBe(200);
+    // Sibling key `columns` must survive a partial PATCH over its parent section.
+    expect(res.body.searchDefaults.columns).toEqual(['key', 'summary']);
+    expect(res.body.searchDefaults.pageSize).toBe(25);
   });
 
   it('PATCH /api/users/me/preferences - 400 on columns above max (51)', async () => {

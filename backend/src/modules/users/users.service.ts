@@ -242,9 +242,24 @@ export async function getPreferences(userId: string): Promise<Record<string, unk
 export async function updatePreferences(userId: string, dto: UpdatePreferencesDto): Promise<Record<string, unknown>> {
   const existing = await getPreferences(userId);
   const merged: Record<string, unknown> = { ...existing };
+  // Two-level merge: partial PATCH like `{searchDefaults: {pageSize: 50}}` must not wipe
+  // sibling keys (`columns`) already stored under `searchDefaults`. We only deep-merge one
+  // level because section values are plain objects with scalar/array fields.
   for (const [key, value] of Object.entries(dto)) {
     if (value === undefined) continue;
-    merged[key] = value;
+    const prev = merged[key];
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      prev !== null &&
+      typeof prev === 'object' &&
+      !Array.isArray(prev)
+    ) {
+      merged[key] = { ...(prev as Record<string, unknown>), ...(value as Record<string, unknown>) };
+    } else {
+      merged[key] = value;
+    }
   }
   await prisma.user.update({
     where: { id: userId },

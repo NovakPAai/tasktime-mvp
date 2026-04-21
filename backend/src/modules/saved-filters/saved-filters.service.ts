@@ -27,7 +27,7 @@
  * Не бросает на DB-ошибках — пробрасывает AppError с http-status.
  */
 
-import type { FilterPermission, FilterVisibility, Prisma, SavedFilter } from '@prisma/client';
+import { Prisma, type FilterPermission, type FilterVisibility, type SavedFilter } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import type { CreateDto, UpdateDto, ShareDto } from './saved-filters.dto.js';
@@ -277,19 +277,34 @@ export async function updateFilter(userId: string, filterId: string, dto: Update
   if (!canWrite) throw new AppError(403, 'Forbidden');
 
   const data: Prisma.SavedFilterUpdateInput = {};
-  if (dto.name !== undefined) data.name = dto.name;
-  if (dto.description !== undefined) data.description = dto.description;
-  if (dto.jql !== undefined) data.jql = dto.jql;
-  if (dto.visibility !== undefined && filter.ownerId === userId) data.visibility = dto.visibility;
+  const changedKeys: string[] = [];
+  if (dto.name !== undefined) { data.name = dto.name; changedKeys.push('name'); }
+  if (dto.description !== undefined) { data.description = dto.description; changedKeys.push('description'); }
+  if (dto.jql !== undefined) { data.jql = dto.jql; changedKeys.push('jql'); }
+  // Visibility change is owner-only — SHARED-WRITE must NOT escalate to PUBLIC.
+  if (dto.visibility !== undefined && filter.ownerId === userId) {
+    data.visibility = dto.visibility;
+    changedKeys.push('visibility');
+  }
   if (dto.columns !== undefined) {
     data.columns = dto.columns as Prisma.InputJsonValue;
+    changedKeys.push('columns');
   }
 
-  const updated = await prisma.savedFilter.update({
-    where: { id: filterId },
-    data,
-    include: { shares: true },
-  });
+  let updated;
+  try {
+    updated = await prisma.savedFilter.update({
+      where: { id: filterId },
+      data,
+      include: { shares: true },
+    });
+  } catch (err) {
+    // Filter deleted between resolveAccess and update — surface as 404, not 500.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'SavedFilter not found');
+    }
+    throw err;
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -297,13 +312,11 @@ export async function updateFilter(userId: string, filterId: string, dto: Update
       entityType: 'savedFilter',
       entityId: filterId,
       userId,
-      details: {
-        changedKeys: Object.keys(data),
-      },
+      details: { changedKeys },
     },
   });
 
-  return toView(updated, userId, true);
+  return toView(updated, userId, canWrite);
 }
 
 export async function deleteFilter(userId: string, filterId: string): Promise<void> {
@@ -334,11 +347,19 @@ export async function setFavorite(userId: string, filterId: string, value: boole
     throw new AppError(400, 'Favoriting shared/public filters is not supported yet');
   }
 
-  const updated = await prisma.savedFilter.update({
-    where: { id: filterId },
-    data: { isFavorite: value },
-    include: { shares: true },
-  });
+  let updated;
+  try {
+    updated = await prisma.savedFilter.update({
+      where: { id: filterId },
+      data: { isFavorite: value },
+      include: { shares: true },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'SavedFilter not found');
+    }
+    throw err;
+  }
   return toView(updated, userId, true);
 }
 
@@ -363,6 +384,10 @@ export async function shareFilter(userId: string, filterId: string, dto: ShareDt
       if (existing.visibility === 'PRIVATE') {
         await tx.savedFilter.update({ where: { id: filterId }, data: { visibility: 'SHARED' } });
       }
+    } else if (existing.visibility === 'SHARED') {
+      // Owner emptied the share list on a SHARED filter — demote back to PRIVATE so the
+      // `visibility` field doesn't lie. PUBLIC is left alone (owner's explicit choice).
+      await tx.savedFilter.update({ where: { id: filterId }, data: { visibility: 'PRIVATE' } });
     }
     return tx.savedFilter.findUniqueOrThrow({
       where: { id: filterId },
@@ -390,10 +415,17 @@ export async function shareFilter(userId: string, filterId: string, dto: ShareDt
 export async function incrementUseStats(userId: string, filterId: string): Promise<void> {
   const { canRead } = await resolveAccess(userId, filterId);
   if (!canRead) throw new AppError(403, 'Forbidden');
-  await prisma.savedFilter.update({
-    where: { id: filterId },
-    data: { useCount: { increment: 1 }, lastUsedAt: new Date() },
-  });
+  try {
+    await prisma.savedFilter.update({
+      where: { id: filterId },
+      data: { useCount: { increment: 1 }, lastUsedAt: new Date() },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'SavedFilter not found');
+    }
+    throw err;
+  }
 }
 
 export async function getUserFavorites(userId: string, limit = 5): Promise<SavedFilterView[]> {

@@ -33,6 +33,10 @@ const columnsSchema = z
   .max(50)
   .optional();
 
+// Note: `permission` is a single value applied to ALL users+groups in one create/share call.
+// Per-share granular permissions (e.g. user X = WRITE, group Y = READ) are not supported in
+// this PR — callers who need them should issue separate `POST /:id/share` calls (replace-
+// semantics) or wait for a future per-share endpoint. This matches the §5.6 HTTP API shape.
 const sharedWithSchema = z
   .object({
     users: z.array(z.string().uuid()).max(500).optional(),
@@ -70,18 +74,11 @@ export const shareDto = z.object({
   permission: z.enum(permissionValues).optional(),
 });
 
-export const preferencesDto = z.object({
-  searchDefaults: z
-    .object({
-      columns: z.array(z.string().min(1).max(100)).max(50).optional(),
-      pageSize: z.number().int().min(10).max(100).optional(),
-    })
-    .optional(),
-});
+// Note: `preferencesDto` lives in `users/users.dto.ts` as `updatePreferencesDto` (it's
+// attached to the users module because the route is `/api/users/me/preferences`).
 
 export type ListQueryDto = z.infer<typeof listQueryDto>;
 export type CreateDto = z.infer<typeof createDto>;
 export type UpdateDto = z.infer<typeof updateDto>;
 export type FavoriteDto = z.infer<typeof favoriteDto>;
 export type ShareDto = z.infer<typeof shareDto>;
-export type PreferencesDto = z.infer<typeof preferencesDto>;
