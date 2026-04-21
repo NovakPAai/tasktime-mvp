@@ -1399,6 +1399,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - `/` focus, `Esc` blur, `Ctrl+Enter` — выполнить (часть уже в PR-10; финализируем здесь).
 - **Merge-ready check:** E2E search → sort → выделить 3 → bulk-status; кросс-проектный bulk не валит транзакцию.
 - **Оценка:** ~11ч.
+- **Статус: ✅ Done** — `ColumnConfigurator.tsx` (native HTML5 DnD Available/Selected + reorder). `ResultsTable.tsx` (Ant Table small, `rowKey=id`, `virtual` + `scroll.y=480` при >200, click-sort → `rewriteOrderBy(jql, field, asc|desc|null)` → `updateUrl`; renderer'ы per column с priority Tag color'ами и date-locale). `BulkActionsBar.tsx` (Popconfirm-delete через DELETE `/issues/:id` с Promise.allSettled + aggregate {succeeded, failed} R12; export-selected через `issue IN (ids)` JQL + saveAs pattern). `ExportMenu.tsx` (Dropdown CSV/XLSX → `/search/export` → blob → saveAs с setTimeout(0)-revoke). SearchPage integration: Popover с ColumnConfigurator, `state.columns || DEFAULT_COLUMNS` fallback, persist через `updateUrl({columns})`. Main bundle +2.5KB gzip.
 
 ### 13.7 PR-ы Фазы 4 — Checkpoint TTQL Integration (~30ч)
 
@@ -1512,7 +1513,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 🟢 Merged ([#113](https://github.com/NovakPAai/tasktime-mvp/pull/113)) |
 | 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 🟢 Merged ([#114](https://github.com/NovakPAai/tasktime-mvp/pull/114)) |
 | 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | ✅ Done (готов к push после merge PR-12) |
-| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 📋 Планируется |
+| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | ✅ Done (готов к push после merge PR-13) |
 | 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | 📋 Планируется |
 | 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 📋 Планируется |
 | 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 📋 Планируется |
