@@ -1138,20 +1138,33 @@ enum CheckpointState {
   VIOLATED
 }
 
+// TTSRH-1 §5.12: mode for evaluating КТ conditions.
+// STRUCTURED — существующий мир (criteria[] JSON, AND-combined). Все старые
+// CheckpointType получают STRUCTURED backfill'ом (FR-25, R21).
+// TTQL — evaluate через compiled TTQL-query (ttqlCondition).
+// COMBINED — structured AND TTQL (оба должны пройти) — для гибридов §5.12.5.
+enum CheckpointConditionMode {
+  STRUCTURED
+  TTQL
+  COMBINED
+}
+
 model CheckpointType {
-  id               String           @id @default(uuid())
-  name             String           @unique
+  id               String                  @id @default(uuid())
+  name             String                  @unique
   description      String?
-  color            String           @default("#888888")
-  weight           CheckpointWeight @default(MEDIUM)
-  offsetDays       Int              @map("offset_days")
-  warningDays      Int              @default(3) @map("warning_days")
-  criteria         Json // CheckpointCriterion[], AND-combined
-  webhookUrl       String?          @map("webhook_url")
-  minStableSeconds Int              @default(300) @map("min_stable_seconds")
-  isActive         Boolean          @default(true) @map("is_active")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  color            String                  @default("#888888")
+  weight           CheckpointWeight        @default(MEDIUM)
+  offsetDays       Int                     @map("offset_days")
+  warningDays      Int                     @default(3) @map("warning_days")
+  criteria         Json // CheckpointCriterion[], AND-combined (STRUCTURED mode)
+  conditionMode    CheckpointConditionMode @default(STRUCTURED) @map("condition_mode")
+  ttqlCondition    String?                 @map("ttql_condition") @db.Text
+  webhookUrl       String?                 @map("webhook_url")
+  minStableSeconds Int                     @default(300) @map("min_stable_seconds")
+  isActive         Boolean                 @default(true) @map("is_active")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
 
   templateItems      CheckpointTemplateItem[]
   releaseCheckpoints ReleaseCheckpoint[]
@@ -1189,21 +1202,26 @@ model CheckpointTemplateItem {
 }
 
 model ReleaseCheckpoint {
-  id                 String          @id @default(uuid())
-  releaseId          String          @map("release_id")
-  checkpointTypeId   String          @map("checkpoint_type_id")
-  criteriaSnapshot   Json            @map("criteria_snapshot")
-  offsetDaysSnapshot Int             @map("offset_days_snapshot")
-  deadline           DateTime        @db.Date
-  state              CheckpointState @default(PENDING)
-  lastEvaluatedAt    DateTime?       @map("last_evaluated_at")
-  applicableIssueIds Json            @default("[]") @map("applicable_issue_ids")
-  passedIssueIds     Json            @default("[]") @map("passed_issue_ids")
-  violations         Json            @default("[]")
-  violationsHash     String          @default("") @map("violations_hash")
-  lastWebhookSentAt  DateTime?       @map("last_webhook_sent_at")
-  createdAt          DateTime        @default(now()) @map("created_at")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
+  id                      String                  @id @default(uuid())
+  releaseId               String                  @map("release_id")
+  checkpointTypeId        String                  @map("checkpoint_type_id")
+  criteriaSnapshot        Json                    @map("criteria_snapshot")
+  offsetDaysSnapshot      Int                     @map("offset_days_snapshot")
+  // TTSRH-1 §5.12: immutable snapshot TTQL + mode at checkpoint creation time.
+  // Even если parent CheckpointType редактируется позже, already-created
+  // ReleaseCheckpoint evaluate'ится по snapshot'у (FR-25 backward-compat).
+  ttqlSnapshot            String?                 @map("ttql_snapshot") @db.Text
+  conditionModeSnapshot   CheckpointConditionMode @default(STRUCTURED) @map("condition_mode_snapshot")
+  deadline                DateTime                @db.Date
+  state                   CheckpointState         @default(PENDING)
+  lastEvaluatedAt         DateTime?               @map("last_evaluated_at")
+  applicableIssueIds      Json                    @default("[]") @map("applicable_issue_ids")
+  passedIssueIds          Json                    @default("[]") @map("passed_issue_ids")
+  violations              Json                    @default("[]")
+  violationsHash          String                  @default("") @map("violations_hash")
+  lastWebhookSentAt       DateTime?               @map("last_webhook_sent_at")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
 
   release         Release                    @relation(fields: [releaseId], references: [id], onDelete: Cascade)
   checkpointType  CheckpointType             @relation(fields: [checkpointTypeId], references: [id], onDelete: Restrict)
