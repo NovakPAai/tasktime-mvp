@@ -24,6 +24,9 @@ import { useParams } from 'react-router-dom';
 
 import { searchIssues, type IssueSearchRow } from '../api/search';
 import { getSavedFilter, markSavedFilterUsed } from '../api/savedFilters';
+import BasicFilterBuilder from '../components/search/BasicFilterBuilder';
+import { canBasicize } from '../components/search/basic-filter-model';
+import FilterModeToggle, { type FilterMode } from '../components/search/FilterModeToggle';
 import JqlEditor from '../components/search/JqlEditor.lazy';
 import { useThemeStore } from '../store/theme.store';
 import { useSearchUrlState } from './search/useSearchUrlState';
@@ -41,6 +44,13 @@ export default function SearchPage() {
   const [jqlDraft, setJqlDraft] = useState(state.jql);
   const [load, setLoad] = useState<LoadState>({ status: 'idle' });
   const { errors: inlineErrors, isValidating } = useJqlValidation(jqlDraft);
+  const [filterMode, setFilterMode] = useState<FilterMode>('advanced');
+  const basicCheck = useMemo(() => canBasicize(jqlDraft), [jqlDraft]);
+  // Auto-switch to Advanced if current JQL can't be basicized (e.g. user loaded a
+  // saved filter with OR/NOT). Reverse not enforced — user may manually switch.
+  useEffect(() => {
+    if (filterMode === 'basic' && !basicCheck.ok) setFilterMode('advanced');
+  }, [filterMode, basicCheck.ok]);
 
   // Sync draft when URL changes (browser back/forward).
   useEffect(() => {
@@ -164,20 +174,35 @@ export default function SearchPage() {
           }}
         >
           <div>
-            {/* CM6 editor provides its own aria-label on the contenteditable node;
-                this visual label is purely decorative (aria-hidden) to avoid a
-                dangling htmlFor association. */}
-            <div aria-hidden="true" style={{ fontSize: 12, color: c.t3, marginBottom: 6 }}>
-              JQL / TTS-QL <span style={{ color: c.t3, fontSize: 11 }}>(/ — фокус, Ctrl/Cmd+Enter — выполнить)</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+              {/* CM6 editor provides its own aria-label on the contenteditable node;
+                  this visual label is purely decorative (aria-hidden) to avoid a
+                  dangling htmlFor association. */}
+              <div aria-hidden="true" style={{ fontSize: 12, color: c.t3 }}>
+                {filterMode === 'advanced'
+                  ? <>JQL / TTS-QL <span style={{ color: c.t3, fontSize: 11 }}>(/ — фокус, Ctrl/Cmd+Enter — выполнить)</span></>
+                  : 'Basic-фильтры'}
+              </div>
+              <FilterModeToggle
+                mode={filterMode}
+                onChange={setFilterMode}
+                basicDisabled={!basicCheck.ok}
+                basicDisabledReason={basicCheck.reason}
+                isLight={isLight}
+              />
             </div>
-            <JqlEditor
-              value={jqlDraft}
-              onChange={setJqlDraft}
-              onSubmit={(v) => updateUrl({ jql: v.trim(), page: 1 }, { push: true })}
-              errors={inlineErrors}
-              isLight={isLight}
-              ariaDescribedBy="jql-status-line"
-            />
+            {filterMode === 'basic' ? (
+              <BasicFilterBuilder value={jqlDraft} onChange={setJqlDraft} isLight={isLight} />
+            ) : (
+              <JqlEditor
+                value={jqlDraft}
+                onChange={setJqlDraft}
+                onSubmit={(v) => updateUrl({ jql: v.trim(), page: 1 }, { push: true })}
+                errors={inlineErrors}
+                isLight={isLight}
+                ariaDescribedBy="jql-status-line"
+              />
+            )}
             {inlineErrors.length > 0 && (
               <ul
                 data-testid="jql-error-banner"

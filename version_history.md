@@ -2,7 +2,60 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.39**
+**Last version: 2.40**
+
+---
+
+## [2.40] [2026-04-21] feat(frontend): TTSRH-1 PR-12 — BasicFilterBuilder + Basic↔Advanced toggle
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/basic-builder`
+
+### Что было
+
+После PR-11 `/search` имел только Advanced-режим (JQL-редактор). Пользователи, не знакомые с TTS-QL синтаксисом, упирались в пустой textarea без способа построить запрос визуально — большой барьер для adoption'а feature.
+
+### Что теперь
+
+Chip-based Basic-режим с переключателем:
+
+- **`frontend/src/components/search/basic-filter-model.ts`** (~150L) — чистая pure-function модель:
+  - `BasicChip = {id, field, op, values[]}`; op ∈ `=|!=|IN|NOT IN`.
+  - `canBasicize(jql)` → `{ok, reason?}` — детектит OR / NOT / WAS / CHANGED / `~` / ORDER BY / группировку (R9) и возвращает причину для tooltip.
+  - `chipsFromJql(jql)` — regex-парсер на flat AND-chain (`CLAUSE_RE`: field + op + rhs). `rhs` может быть bare-ident / number / quoted string / `(v1, v2, "v 3")`. `splitInList` корректно обрабатывает запятые внутри quoted строк и escape'ы.
+  - `jqlFromChips(chips)` — сериализация обратно. Values escape: bare-identifier / number остаются без кавычек, всё остальное → `"..."` с escape `\\`/`\"`.
+  - `CATEGORIES` — 5 групп полей для cascade-menu (Задача / Даты / Пользователи / Планирование / AI).
+- **`frontend/src/components/search/FilterModeToggle.tsx`** (~80L) — сегмент-кнопка Basic|Advanced. `aria-pressed` на каждом, `role="group"`, `disabled` + tooltip для Basic через `title`-attribute.
+- **`frontend/src/components/search/BasicFilterBuilder.tsx`** (~200L) — основной UI:
+  - Chips рендерятся inline с inline-edit (field-label + `<select>` op + `<input>` values + `×`-remove).
+  - Клик по chip → edit mode; blur → save; `setEditingId(null)`.
+  - "+ Добавить фильтр" раскрывает cascade-menu `role="menu"` с категориями из `CATEGORIES`.
+  - Sync с внешним `value` через `useEffect([value])` — меняет chips только если `jqlFromChips` отличается (избегает re-render cascade).
+  - Commit helper: setChips + onChange(jqlFromChips) атомарно.
+- **`frontend/src/pages/SearchPage.tsx`** — integration:
+  - `filterMode: 'basic' | 'advanced'` state (default 'advanced').
+  - `basicCheck = useMemo(canBasicize(jqlDraft))` — disabled state для toggle.
+  - Auto-fallback: при загрузке saved filter с OR/NOT → mode forced в 'advanced'.
+  - В Basic-mode рендерим `<BasicFilterBuilder>`, в Advanced — `<JqlEditor>`.
+  - `setJqlDraft` общий, переключение не теряет черновик.
+
+### Изменения
+
+- `frontend/src/components/search/basic-filter-model.ts` — новый.
+- `frontend/src/components/search/BasicFilterBuilder.tsx` — новый.
+- `frontend/src/components/search/FilterModeToggle.tsx` — новый.
+- `frontend/src/pages/SearchPage.tsx` — integration + mode-state.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-12 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` — без изменений. При `=true`: по умолчанию режим Advanced (existing behavior). Toggle переключает на chip-builder. Full autocomplete значений в chip-popover'ах + кастомные поля — PR-13 (Save/Share modals + полноценные popover'ы на Ant Design).
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run build` — чисто, 4.49s. Main bundle вырос на ~7.5KB gzip (BasicFilterBuilder не lazy-загружается, чтобы переключение режима было мгновенным). JqlEditor chunk без изменений.
 
 ---
 
