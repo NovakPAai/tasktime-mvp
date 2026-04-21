@@ -1389,6 +1389,7 @@ Run `make docs` to check for staleness warnings.
 - `PENDING`
 - `OK`
 - `VIOLATED`
+- `ERROR`
 
 ### CheckpointConditionMode
 
