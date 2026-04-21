@@ -17,7 +17,7 @@
 - **`logger`** — структурированный логгер: prod → JSON, dev → pretty; `captureError` с redact секретов
 - **`rate-limit`** — scoped in-memory лимитер; `authRead` (30/мин) / `authWrite` (10/мин); size cap 100k
 - **`issue-access`** — централизованный Prisma WHERE для ACL: `accessibleIssueWhere(userId, systemRoles)`
-- **Security**: `trust proxy = 1`, `safeClientMeta` allowlist, corrupted Redis session → 401, `console` → logger
+- **Security**: `trust proxy = 1`, `safeClientMeta` denylist (не обрезает validatorType и др.), corrupted Redis session → 401, `console` → logger
 
 ### Файлы
 - `backend/src/shared/utils/async-handler.ts`, `logger.ts`, `rate-limit.ts`, `issue-access.ts`
