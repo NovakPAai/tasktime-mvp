@@ -281,6 +281,27 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `loading` | `boolean` | состояние |
 | `fetchProjects` | `() => Promise<void>` | экшен |
 
+### `savedFilters.store`
+
+Файл: `frontend/src/store/savedFilters.store.ts` · 7 полей состояния · 7 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `mine` | `SavedFilter[]` | состояние |
+| `favorite` | `SavedFilter[]` | состояние |
+| `public` | `SavedFilter[]` | состояние |
+| `shared` | `SavedFilter[]` | состояние |
+| `recent` | `SavedFilter[]` | состояние |
+| `loading` | `boolean` | состояние |
+| `error` | `string | null` | состояние |
+| `load` | `(scope: SavedFilterScope) => Promise<void>` | экшен |
+| `loadAll` | `() => Promise<void>` | экшен |
+| `create` | `(input: CreateSavedFilterInput) => Promise<SavedFilter>` | экшен |
+| `update` | `(id: string, input: UpdateSavedFilterInput) => Promise<Sa...` | экшен |
+| `remove` | `(id: string) => Promise<void>` | экшен |
+| `toggleFavorite` | `(id: string, value: boolean) => Promise<void>` | экшен |
+| `share` | `(id: string, input: ShareSavedFilterInput) => Promise<void>` | экшен |
+
 ### `theme.store`
 
 Файл: `frontend/src/store/theme.store.ts` · 1 полей состояния · 2 экшенов
