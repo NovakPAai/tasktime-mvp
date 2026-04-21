@@ -1514,7 +1514,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 🟢 Merged ([#113](https://github.com/NovakPAai/tasktime-mvp/pull/113)) |
 | 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 🟢 Merged ([#114](https://github.com/NovakPAai/tasktime-mvp/pull/114)) |
 | 13 | `ttsrh-1/saved-filters-ui` | SavedFiltersSidebar + Save/Share modals + store | 8 | PR-7, PR-9 | TTSRH-16 | 🟢 Merged ([#115](https://github.com/NovakPAai/tasktime-mvp/pull/115)) |
-| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | ✅ Done (готов к push после merge PR-13) |
+| 14 | `ttsrh-1/results` | ColumnConfigurator + ResultsTable + bulk + ExportMenu + shortcuts | 11 | PR-8, PR-10 | TTSRH-17, TTSRH-18, остаток TTSRH-19 | 🟢 Merged ([#116](https://github.com/NovakPAai/tasktime-mvp/pull/116)) |
 | 15 | `ttsrh-1/checkpoint-foundation` | Checkpoint Prisma + DTO + КТ-функции + variant=CHECKPOINT | 10 | PR-1, PR-3 | TTSRH-27, TTSRH-28, TTSRH-29 | ✅ Done (готов к push после merge PR-14) |
 | 16 | `ttsrh-1/checkpoint-engine` | Engine TTQL-ветка + COMBINED + error handling | 10 | PR-4, PR-15 | TTSRH-30, TTSRH-31 | 📋 Планируется |
 | 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 📋 Планируется |
