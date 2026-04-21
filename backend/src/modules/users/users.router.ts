@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
-import { updateUserDto } from './users.dto.js';
+import { updatePreferencesDto, updateUserDto } from './users.dto.js';
 import * as usersService from './users.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import type { AuthRequest } from '../../shared/types/index.js';
@@ -19,6 +19,38 @@ router.get('/', async (_req, res, next) => {
     next(err);
   }
 });
+
+// TTSRH-1 PR-7 — per-user UI preferences (search columns, page size). Must be
+// declared before `/:id` so Express doesn't greedy-match `me` as an id.
+router.get('/me/preferences', async (req: AuthRequest, res, next) => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const prefs = await usersService.getPreferences(req.user.userId);
+    res.json(prefs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch(
+  '/me/preferences',
+  validate(updatePreferencesDto),
+  async (req: AuthRequest, res, next) => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const prefs = await usersService.updatePreferences(req.user.userId, req.body);
+      res.json(prefs);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.get('/:id', async (req, res, next) => {
   try {

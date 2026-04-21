@@ -2,7 +2,74 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.33**
+**Last version: 2.34**
+
+---
+
+## [2.34] [2026-04-21] feat(saved-filters): TTSRH-1 PR-7 — SavedFilter CRUD + share + favorite + User preferences
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/saved-filters`
+
+### Что было
+
+После PR-6 `/api/saved-filters/*` возвращали 501; `/api/users/me/preferences` не существовало. Пользователь не мог сохранить JQL-запрос, передать его коллеге, отметить избранным или зафиксировать набор колонок как дефолт — ни один flow §5.6 ТЗ не работал.
+
+### Что теперь
+
+Полный CRUD `/api/saved-filters` с RBAC, sharing'ом через пользователей и группы, а также Zod-DTO `PATCH /api/users/me/preferences`:
+
+- **`saved-filters.dto.ts`** — Zod схемы `listQueryDto`, `createDto`, `updateDto`, `favoriteDto`, `shareDto`, `preferencesDto`. Инварианты: `name` ≤ 200 символов, `jql` ≤ 10K (как на `/search/issues`), `columns` ≤ 50 строк, `sharedWith.users` ≤ 500 UUID, `sharedWith.groups` ≤ 100 UUID — чтобы не пропустить DoS через очень большие JSON-массивы в `User.preferences`.
+- **`saved-filters.service.ts`** — весь бизнес-слой:
+  - `listFilters(userId, scope)` — 4 scope'а: `mine` (owner), `favorite` (owner + isFavorite, сорт `useCount DESC, lastUsedAt DESC` — под сайдбарное submenu §5.7), `public` (все аутентифицированные), `shared` (SHARED-фильтры через прямые shares или группы пользователя, `ownerId: { not: userId }`).
+  - `getFilter`, `updateFilter`, `deleteFilter` — с RBAC-проверкой (R-SF-1 read, R-SF-2 write).
+  - `createFilter` — транзакционно создаёт `SavedFilter` + `SavedFilterShare[]` (если visibility=SHARED), валидирует существование shared-users/groups (400 при unknown UUID). `sharedWith` игнорируется для PRIVATE/PUBLIC, чтобы не плодить зомби-строки.
+  - `shareFilter` — replace-семантика: старые shares удаляются в той же транзакции, новые создаются. При первом share auto-promote PRIVATE → SHARED. Owner-only.
+  - `setFavorite` — только для owner'а (per-user favorites over shared/public filters — future).
+  - `incrementUseStats` — атомарный `{ increment: 1 }` + `lastUsedAt=now()` (race-safe на конкурентных запросах).
+  - `getUserFavorites(userId, limit=5)` — готовый хелпер для будущего `SavedFiltersSidebar`.
+  - RBAC: `resolveAccess(userId, filterId)` единственная точка правды, читает `SavedFilter` + `shares` + `userGroupMember` и возвращает `{canRead, canWrite}`.
+  - AuditLog: `savedFilter.created|updated|deleted|shared` — через `prisma.auditLog.create` с `userId/entityType/entityId/details`.
+- **`saved-filters.router.ts`** — live (раньше был stub-501):
+  - `GET /saved-filters?scope=` (Zod query), `POST /saved-filters` (201), `GET/PATCH/DELETE /:id` (403 на чужое, 404 на несуществующее).
+  - `POST /:id/favorite {value:bool}`, `POST /:id/share {users?,groups?,permission?}`, `POST /:id/use` (204, инкремент).
+  - Всё под `authenticate` middleware; 401 при `!req.user`. Gate по `features.advancedSearch` — в app.ts (без изменений).
+- **`users.router.ts` + `users.service.ts`** — `GET/PATCH /api/users/me/preferences`:
+  - `getPreferences` — читает `User.preferences`, возвращает `{}` если `null` (новый пользователь).
+  - `updatePreferences` — shallow-merge сверху (PATCH семантика): `{searchDefaults: {columns}}` не перетирает другие top-level ключи (`checkpointDefaults`, и т.д. — паттерн TTUI-90 §5.4).
+  - `me/preferences` регистрируется ПЕРЕД `/:id`, чтобы Express не greedy-match'ил `me` как UUID.
+- **`tests/env.ts`** — `process.env.FEATURES_ADVANCED_SEARCH ??= 'true'` (setup-файл vitest). Без этого `createApp()` не монтирует `/api/saved-filters/*` и все integration-тесты сразу падают 404.
+
+### Тесты (интеграционные, требуют Postgres — прогонит CI)
+
+**`tests/saved-filters.test.ts`** — 24 кейса:
+
+- **CRUD (10)**: create PRIVATE default, 400 на missing name, 401 без auth, list `scope=mine` фильтрует чужие, `scope=public` включает PUBLIC со всех, 403 на чужой PRIVATE, 200 для owner, PATCH owner-ok, PATCH non-owner 403, DELETE owner 204 + follow-up GET 404, DELETE non-owner 403 даже при SHARED-WRITE.
+- **Sharing (6)**: share users READ по умолчанию, READ → GET ok + PATCH 403, WRITE → PATCH ok, share через группу + non-member 403, replace-семантика (старые shares заменяются), 403 для не-owner'а, 400 на nonexistent UUID.
+- **Favorite + use (4)**: owner toggle favorite, non-owner PUBLIC → 400, `/use` инкрементирует useCount+lastUsedAt, `scope=favorite` сортирует по useCount.
+- **Audit (1)**: create/update/share/delete пишет 4 строки в AuditLog с правильным entityType + action.
+- **Preferences (5)**: GET empty object для нового user'а, PATCH searchDefaults, 400 на columns>50, 400 на empty body, 401 без auth.
+
+### Изменения
+
+- `backend/src/modules/saved-filters/saved-filters.dto.ts` — новый.
+- `backend/src/modules/saved-filters/saved-filters.service.ts` — новый.
+- `backend/src/modules/saved-filters/saved-filters.router.ts` — live (был stub).
+- `backend/src/modules/users/users.dto.ts` — + `updatePreferencesDto`.
+- `backend/src/modules/users/users.service.ts` — + `getPreferences`, `updatePreferences`.
+- `backend/src/modules/users/users.router.ts` — + `GET/PATCH /me/preferences` (перед `/:id`).
+- `backend/tests/env.ts` — `FEATURES_ADVANCED_SEARCH ??= 'true'` default в тестах.
+- `backend/tests/saved-filters.test.ts` — новый, 24 integration-кейса.
+- `docs/tz/TTSRH-1.md` §13.5/§13.9 — статус PR-7 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_ADVANCED_SEARCH=false` эндпоинты недоступны (ассоциированный mount не монтируется — см. app.ts:176). При включении: фронт может создавать/редактировать/делить фильтры, хранить UI-колонки в `User.preferences`, сайдбар готов к списку избранных (getUserFavorites).
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
 
 ---
 
