@@ -1504,6 +1504,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - Опциональный пункт: MCP-tool `search_issues` — вынести в отдельный follow-up тикет TTSRH-38, **не** в этот PR.
 - **Merge-ready check:** все Definition of Done пункты из §7 зелёные; UAT-чек-лист подписан.
 - **Оценка:** ~6ч.
+- **Статус: 🚧 В работе** — docs полностью написаны (`jql.md`, `search.md`, секция TTQL в `checkpoints.md`, append к `api/reference.md`, append к `architecture/backend-modules.md`); feature flag cutover — **отдельный** ops-change post-merge (`FEATURES_ADVANCED_SEARCH=true` в staging → UAT → production; `FEATURES_CHECKPOINT_TTQL=true` после отдельного UAT). MCP-tool `search_issues` вынесен в TTSRH-38 follow-up.
 
 ### 13.9 Итог: список PR
 
@@ -1530,8 +1531,8 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 🟢 Merged ([#119](https://github.com/NovakPAai/tasktime-mvp/pull/119)) |
 | 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 🟢 Merged ([#120](https://github.com/NovakPAai/tasktime-mvp/pull/120)) |
 | 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | ✅ Done (готов к push после merge PR-18) |
-| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | 📋 Планируется |
-| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 📋 Планируется |
+| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | ✅ Done ([#122](https://github.com/NovakPAai/tasktime-mvp/pull/122)) |
+| 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 🚧 В работе |
 | **Итого** | | | **199** | | | |
 
 **Дельта к §8 (278ч):** план покрывает ~199ч. Недостающие ~79ч — это (a) code review + фиксы (~8ч per §8), (b) security review + фиксы (~4ч), (c) докуметация JQL полная (~6ч уже в PR-21, ~0ч дополнительно), (d) профайлинг + composite-index tuning (~4ч в PR-20), (e) fuzz-harness extended (~4ч в PR-5); остальное — buffer на unknown unknowns и Phase-2-проникновение. Реалистичный календарный план — 8–10 недель при одном fullstack-разработчике или 5–6 недель при параллельной работе двоих (backend + frontend после PR-5).
