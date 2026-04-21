@@ -12,6 +12,7 @@ import { loadCustomFields } from './search.schema.loader.js';
 import { functionsForVariant } from './search.functions.js';
 import { searchIssues } from './search.service.js';
 import { searchRateLimit } from './search.rate-limit.js';
+import { suggest } from './search.suggest.js';
 import type { QueryVariant } from './search.types.js';
 
 /**
@@ -234,9 +235,59 @@ async function resolveAccessibleProjectIds(req: AuthRequest): Promise<Accessible
   };
 }
 
+// ─── GET /search/suggest ────────────────────────────────────────────────────
+
+const suggestQuerySchema = z.object({
+  jql: z.string().max(10_000).optional(),
+  cursor: z.string().optional(),
+  field: z.string().max(200).optional(),
+  operator: z.string().max(20).optional(),
+  prefix: z.string().max(200).optional(),
+  variant: z.enum(['default', 'checkpoint']).optional(),
+});
+
+router.get(
+  '/search/suggest',
+  // Autocomplete is called on every keystroke (editor debounces 150ms on the
+  // frontend), but spam-protect anyway — 30 req/min caps an abusive client at
+  // one request every 2s, still usable by a real user typing at ~10 chars/s
+  // after debounce applies.
+  searchRateLimit,
+  validateDto(suggestQuerySchema, 'query'),
+  async (req: Request, res: Response, next): Promise<void> => {
+    try {
+      const auth = req as AuthRequest;
+      if (!auth.user) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const { projectIds } = await resolveAccessibleProjectIds(auth);
+      const { jql, cursor: cursorRaw, field, operator, prefix, variant } =
+        req.query as z.infer<typeof suggestQuerySchema>;
+      const cursor = Number.parseInt(cursorRaw ?? '0', 10);
+      const customFields = await loadCustomFields();
+      const result = await suggest(
+        jql ?? '',
+        Number.isFinite(cursor) ? cursor : 0,
+        {
+          userId: auth.user.userId,
+          accessibleProjectIds: projectIds,
+          variant: (variant === 'checkpoint' ? 'checkpoint' : 'default') as QueryVariant,
+          field,
+          operator,
+          prefix,
+        },
+        customFields,
+      );
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── Still-stubbed endpoints ────────────────────────────────────────────────
 
-router.get('/search/suggest', notImplemented('GET /search/suggest'));
 router.post('/search/export', notImplemented('POST /search/export'));
 
 export default router;

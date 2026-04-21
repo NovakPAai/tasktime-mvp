@@ -2,7 +2,67 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.32**
+**Last version: 2.33**
+
+---
+
+## [2.33] [2026-04-21] feat(search): TTSRH-1 PR-6 — Value Suggesters backend + GET /search/suggest + /implement-tz playbook
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/suggesters`
+
+### Что было
+
+После PR-5 `GET /search/suggest` возвращал 501. Редактор TTS-QL не мог предлагать значения — пользователь писал всё руками.
+
+### Что теперь
+
+`GET /api/search/suggest` live. 13 провайдеров значений из §5.11 ТЗ:
+
+- **`search.suggest.types.ts`** — `Completion { kind, label, insert, detail?, icon?, score }`, `PositionContext`, `SuggestContext`, `SuggestResponse`.
+- **`search.suggest.position.ts`** — позиционный анализатор. Tokenize'ит source до cursor, применяет heuristic rules: после `AND`/`OR`/`NOT`/пусто → field; после field → operator; после op/`IN (` → value; после `ORDER BY` → field; fails open на tokenizer-ошибках. Корректно обрабатывает editing-in-progress (только для Ident/String/Number/RelativeDate/CustomField, не для delimiters).
+- **`search.suggest.rank.ts`** — fuzzy-ranking: exact (1.0) → startsWith (0.75) → contains (0.5) → subsequence (0.25). Case-insensitive. Пустой prefix возвращает input-order.
+- **`search.suggest.static.ts`** — static suggesters без DB: `suggestFields` (system + custom), `suggestFunctions` (filter by variant, MVP-only), `suggestEnum` (priority/statusCategory/aiStatus/aiAssigneeType/checkpointState), `suggestBool`, `suggestDateShortcuts` (now/today/startOfX/-7d), `suggestOperators` (TtqlOpKind → display label).
+- **`search.suggest.providers.ts`** — 9 DB-backed провайдеров: Users (scoped по UserProjectRole), Projects, Statuses (system-keys + WorkflowStatus с color-dot), IssueTypes, Sprints (+ 3 function-shortcuts первыми), Releases (+ 4 function-shortcuts), Issues (key-based или title-substring, scoped), Labels (raw-SQL `jsonb_array_elements_text` на LABEL-type CFs), Groups, CheckpointTypes. Все scope'ятся по `accessibleProjectIds` (R3).
+- **`search.suggest.ts`** — orchestrator. Два пути: Basic-builder (explicit field/op/prefix) и text-editor (analyse position). Routing по type с fallbacks: unknown field → functions, unknown type → empty.
+- **`search.router.ts`** — `GET /search/suggest?jql=&cursor=&field=&operator=&prefix=&variant=` подключён. Authenticate + Zod query params + accessibleProjectIds.
+- **`.claude/commands/implement-tz.md`** — новый **/implement-tz playbook**: декомпозиция ТЗ → план PR'ов → цикл (branch → implement → test → docs → commit → pre-push-reviewer → fix → check prev CI → merge → rebase → push → schedule auto-check). Пользователь пишет `Реализуй ТЗ X` — цикл запускается автоматически.
+
+### Тесты (433 passing, +36 к PR-5)
+
+- **`tests/search-suggest.unit.test.ts`** (36 кейсов):
+  - Position analyser: 8 сценариев (пустой, after AND/NOT/(, after field, after op, IN (, dedupe picked, unterminated string, ORDER BY).
+  - rankByPrefix: 7 кейсов (пустой prefix, exact/startsWith/contains/subsequence tiers, case-insensitive, no-match).
+  - suggestFields: 3 (system + custom + quoted wrap).
+  - suggestFunctions: 4 (variant filter, Phase-2 exclude).
+  - suggestEnum: 5 (per-field mapping, dedupe picked, case-insensitive, unknown field, by type).
+  - suggestBool/DateShortcuts/Operators: 3.
+
+DB-backed провайдеры тестируются в integration layer (требуют Postgres).
+
+### Изменения
+
+- `backend/src/modules/search/search.suggest.types.ts` — новый.
+- `backend/src/modules/search/search.suggest.position.ts` — новый.
+- `backend/src/modules/search/search.suggest.rank.ts` — новый.
+- `backend/src/modules/search/search.suggest.static.ts` — новый.
+- `backend/src/modules/search/search.suggest.providers.ts` — новый.
+- `backend/src/modules/search/search.suggest.ts` — новый (orchestrator).
+- `backend/src/modules/search/search.router.ts` — `GET /search/suggest` подключён.
+- `backend/tests/search-suggest.unit.test.ts` — новый.
+- `backend/package.json` — `test:parser` включает suggest-тест.
+- `.claude/commands/implement-tz.md` — playbook для запуска циклов.
+- `docs/tz/TTSRH-1.md` §13.9 — статус PR-6 → ✅ Done.
+
+### Влияние на prod
+
+Под `FEATURES_ADVANCED_SEARCH=false` — эндпоинт недоступен. При включении: auto-complete в редакторе + в Basic-chip popover работают одинаково (single source of truth).
+
+### Проверки
+
+- `npx tsc --noEmit` — чисто
+- `npm run lint` — 0 errors, 0 new warnings
+- `npm run test:parser` — **433 passing**
 
 ---
 
