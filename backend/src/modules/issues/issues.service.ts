@@ -165,7 +165,7 @@ export async function listIssues(
         workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
         _count: { select: { children: true } },
       },
-      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
       skip,
       take,
     }),

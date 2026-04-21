@@ -221,11 +221,13 @@ export default function IssueDetailPage() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [iss, cmts, logs, hist] = await Promise.all([
-        issuesApi.getIssue(id),
-        commentsApi.listComments(id),
-        timeApi.getIssueLogs(id),
-        api.get<AuditEntry[]>(`/issues/${id}/history`).then(r => r.data),
+      const isKey = /^[A-Z]+-\d+$/.test(id);
+      const iss = await (isKey ? issuesApi.getIssueByKey(id) : issuesApi.getIssue(id));
+      const uuid = iss.id;
+      const [cmts, logs, hist] = await Promise.all([
+        commentsApi.listComments(uuid),
+        timeApi.getIssueLogs(uuid),
+        api.get<AuditEntry[]>(`/issues/${uuid}/history`).then(r => r.data),
       ]);
       setIssue(iss);
       setComments(cmts);
@@ -247,7 +249,7 @@ export default function IssueDetailPage() {
   }, [issue?.projectId]);
 
   // Live timer
-  const timerRunning = activeTimer?.issueId === id;
+  const timerRunning = activeTimer?.issueId === issue?.id;
   useEffect(() => {
     if (!timerRunning || !activeTimer?.startedAt) { setElapsedSec(0); return; }
     const update = () => {
@@ -260,8 +262,8 @@ export default function IssueDetailPage() {
   }, [timerRunning, activeTimer?.startedAt]);
 
   const handleAddComment = async () => {
-    if (!id || !newComment.trim()) return;
-    await commentsApi.createComment(id, newComment);
+    if (!issue || !newComment.trim()) return;
+    await commentsApi.createComment(issue.id, newComment);
     setNewComment('');
     load();
   };
@@ -272,9 +274,9 @@ export default function IssueDetailPage() {
   };
 
   const handleStartTimer = async () => {
-    if (!id) return;
+    if (!issue) return;
     try {
-      await timeApi.startTimer(id);
+      await timeApi.startTimer(issue.id);
       const t = await timeApi.getActiveTimer();
       setActiveTimer(t);
       message.success('Timer started');
@@ -282,9 +284,9 @@ export default function IssueDetailPage() {
   };
 
   const handleStopTimer = async () => {
-    if (!id) return;
+    if (!issue) return;
     try {
-      await timeApi.stopTimer(id);
+      await timeApi.stopTimer(issue.id);
       setActiveTimer(null);
       setElapsedSec(0);
       load();
@@ -293,40 +295,40 @@ export default function IssueDetailPage() {
   };
 
   const handleLogManual = async (vals: { hours: number; note?: string }) => {
-    if (!id) return;
-    await timeApi.logManual(id, vals);
+    if (!issue) return;
+    await timeApi.logManual(issue.id, vals);
     setTimeModalOpen(false);
     timeForm.resetFields();
     load();
   };
 
   const handleAssigneeChange = async (assigneeId: string | null) => {
-    if (!id) return;
+    if (!issue) return;
     try {
-      await issuesApi.assignIssue(id, assigneeId);
+      await issuesApi.assignIssue(issue.id, assigneeId);
       load();
       message.success('Assignee updated');
     } catch { message.error('Could not update assignee'); }
   };
 
   const handleToggleAiEligible = async (checked: boolean) => {
-    if (!id || !issue) return;
+    if (!issue) return;
     try {
-      await issuesApi.updateAiFlags(id, {
+      await issuesApi.updateAiFlags(issue.id, {
         aiEligible: checked,
         aiAssigneeType: checked ? 'AGENT' : 'HUMAN',
       });
-      const updated = await issuesApi.getIssue(id);
+      const updated = await issuesApi.getIssue(issue.id);
       setIssue(updated);
       message.success(checked ? 'Marked as agent-eligible' : 'Marked as human-only');
     } catch { message.error('Could not update agent flag'); }
   };
 
   const handleAiEstimate = async () => {
-    if (!id) return;
+    if (!issue) return;
     setAiEstimateLoading(true);
     try {
-      await aiApi.estimateIssue({ issueId: id });
+      await aiApi.estimateIssue({ issueId: issue.id });
       await load();
       message.success('Оценка трудоёмкости обновлена');
     } catch (err: unknown) {
@@ -338,9 +340,9 @@ export default function IssueDetailPage() {
   };
 
   const handleDeleteIssue = async () => {
-    if (!id) return;
+    if (!issue) return;
     try {
-      await issuesApi.deleteIssue(id);
+      await issuesApi.deleteIssue(issue.id);
       message.success('Issue deleted');
       navigate(-1);
     } catch { message.error('Failed to delete issue'); }
@@ -389,9 +391,9 @@ export default function IssueDetailPage() {
     acceptanceCriteria?: string;
     dueDate?: dayjs.Dayjs | null;
   }) => {
-    if (!id) return;
+    if (!issue) return;
     try {
-      await issuesApi.updateIssue(id, {
+      await issuesApi.updateIssue(issue.id, {
         title: vals.title,
         issueTypeConfigId: vals.issueTypeConfigId,
         priority: vals.priority,
@@ -401,7 +403,7 @@ export default function IssueDetailPage() {
         dueDate: vals.dueDate ? vals.dueDate.format('YYYY-MM-DD') : null,
       });
       if (editCustomFields.length > 0) {
-        await issueCustomFieldsApi.updateFields(id, editCustomFields.map(f => ({
+        await issueCustomFieldsApi.updateFields(issue.id, editCustomFields.map(f => ({
           customFieldId: f.customFieldId,
           value: editCustomValues[f.customFieldId] ?? null,
         })));
@@ -416,10 +418,10 @@ export default function IssueDetailPage() {
   };
 
   const handleAiDecompose = async () => {
-    if (!id) return;
+    if (!issue) return;
     setAiDecomposeLoading(true);
     try {
-      const res = await aiApi.decomposeIssue({ issueId: id });
+      const res = await aiApi.decomposeIssue({ issueId: issue.id });
       await load();
       message.success(`Создано подзадач: ${res.createdCount}`);
     } catch (err: unknown) {
@@ -588,7 +590,7 @@ export default function IssueDetailPage() {
                 return (
                   <Link
                     key={child.id}
-                    to={`/issues/${child.id}`}
+                    to={`/issues/${(issue.project?.key ?? '') + '-' + child.number}`}
                     style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, backgroundColor: isDark ? '#0F1320' : '#FFFFFF', border: `1px solid ${C.border}` }}
                   >
                     <span style={{ backgroundColor: childTypeCfg.bg, color: childTypeCfg.text, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 3, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '12px' }}>
@@ -934,10 +936,10 @@ export default function IssueDetailPage() {
                   style={{ width: 120 }}
                   value={issue.aiExecutionStatus ?? 'NOT_STARTED'}
                   onChange={async val => {
-                    if (!id) return;
+                    if (!issue) return;
                     try {
-                      await issuesApi.updateAiStatus(id, val as AiExecutionStatus);
-                      const updated = await issuesApi.getIssue(id);
+                      await issuesApi.updateAiStatus(issue.id, val as AiExecutionStatus);
+                      const updated = await issuesApi.getIssue(issue.id);
                       setIssue(updated);
                     } catch { message.error('Could not update agent status'); }
                   }}
@@ -1061,7 +1063,8 @@ export default function IssueDetailPage() {
             setMoveModalOpen(false);
             // If moved to another project, navigate to new issue URL
             if (movedIssue.projectId !== issue.projectId) {
-              navigate(`/issues/${movedIssue.id}`);
+              const key = movedIssue.project?.key;
+              navigate(key ? `/issues/${key}-${movedIssue.number}` : `/issues/${movedIssue.id}`);
             } else {
               setIssue(movedIssue);
             }
