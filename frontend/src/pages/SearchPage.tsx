@@ -164,9 +164,12 @@ export default function SearchPage() {
           }}
         >
           <div>
-            <label htmlFor="jql-input" style={{ display: 'block', fontSize: 12, color: c.t3, marginBottom: 6 }}>
+            {/* CM6 editor provides its own aria-label on the contenteditable node;
+                this visual label is purely decorative (aria-hidden) to avoid a
+                dangling htmlFor association. */}
+            <div aria-hidden="true" style={{ fontSize: 12, color: c.t3, marginBottom: 6 }}>
               JQL / TTS-QL <span style={{ color: c.t3, fontSize: 11 }}>(/ — фокус, Ctrl/Cmd+Enter — выполнить)</span>
-            </label>
+            </div>
             <JqlEditor
               value={jqlDraft}
               onChange={setJqlDraft}
@@ -221,12 +224,12 @@ export default function SearchPage() {
               >
                 Выполнить
               </button>
-              <div id="jql-status-line" role="status" aria-live="polite" style={{ color: c.t3, fontSize: 12 }}>
-                {isValidating && load.status === 'idle' && 'Проверка запроса…'}
-                {!isValidating && load.status === 'idle' && 'Введите запрос и нажмите Ctrl+Enter'}
-                {load.status === 'loading' && 'Выполняется…'}
-                {load.status === 'ok' && `Найдено: ${load.total}`}
-                {load.status === 'error' && <span style={{ color: '#e5484d' }}>Ошибка: {load.message}</span>}
+              <div id="jql-status-line" role="status" aria-live="polite" style={{ color: c.t3, fontSize: 12, display: 'flex', gap: 8 }}>
+                {isValidating && <span>Проверка запроса…</span>}
+                {!isValidating && load.status === 'idle' && <span>Введите запрос и нажмите Ctrl+Enter</span>}
+                {load.status === 'loading' && <span>Выполняется…</span>}
+                {!isValidating && load.status === 'ok' && <span>Найдено: {load.total}</span>}
+                {!isValidating && load.status === 'error' && <span style={{ color: '#e5484d' }}>Ошибка: {load.message}</span>}
               </div>
             </div>
           </div>

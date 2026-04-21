@@ -29,7 +29,9 @@ export function useJqlValidation(
   value: string,
   opts: { debounceMs?: number; variant?: 'default' | 'checkpoint' } = {},
 ): UseJqlValidationResult {
-  const debounceMs = opts.debounceMs ?? 300;
+  // Destructure to primitives so the effect dep array doesn't depend on the `opts`
+  // object identity — inline objects at the call site would otherwise break debouncing.
+  const { debounceMs = 300, variant } = opts;
   const [errors, setErrors] = useState<InlineError[]>([]);
   const [isValidating, setIsValidating] = useState(false);
   const reqIdRef = useRef(0);
@@ -45,7 +47,7 @@ export function useJqlValidation(
     const handle = setTimeout(() => {
       const reqId = ++reqIdRef.current;
       setIsValidating(true);
-      void validateJql(value, opts.variant)
+      void validateJql(value, variant)
         .then((res) => {
           // Stale response — a newer request already fired.
           if (reqId !== reqIdRef.current) return;
@@ -72,7 +74,7 @@ export function useJqlValidation(
       // Bump reqId so any in-flight response is treated as stale.
       reqIdRef.current += 1;
     };
-  }, [value, debounceMs, opts.variant]);
+  }, [value, debounceMs, variant]);
 
   return { errors, isValidating };
 }

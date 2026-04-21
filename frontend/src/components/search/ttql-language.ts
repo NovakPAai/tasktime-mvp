@@ -100,16 +100,17 @@ const parser: StreamParser<State> = {
         state.lastWasIdent = false;
         return 'keyword';
       }
-      // Function call? Peek next non-space for `(`.
       state.lastWasIdent = true;
-      let saved = stream.pos;
-      while (stream.peek() === ' ') { stream.next(); saved++; }
-      if (stream.peek() === '(') {
-        stream.pos = saved;
-        return 'function';
-      }
-      stream.pos = saved;
-      return 'variableName';
+      // Function call? Look ahead past spaces WITHOUT advancing stream.pos permanently —
+      // we need to restore to the post-identifier position so spaces are tokenized cleanly.
+      const postIdent = stream.pos;
+      while (stream.peek() === ' ') stream.next();
+      const isFn = stream.peek() === '(';
+      stream.pos = postIdent;
+      // StreamLanguage recognises legacy-mode token names. 'def' maps to
+      // `t.definition(t.variableName)` in the default tag mapping, so function
+      // names get a distinct color without needing a custom `tokenTable`.
+      return isFn ? 'def' : 'variableName';
     }
 
     // Unknown — consume one char to avoid infinite loop.
@@ -128,7 +129,7 @@ const highlight = HighlightStyle.define([
   { tag: t.keyword, color: '#c678dd', fontWeight: '500' },
   { tag: t.string, color: '#98c379' },
   { tag: t.number, color: '#d19a66' },
-  { tag: t.function(t.variableName), color: '#61afef', fontStyle: 'italic' },
+  { tag: t.definition(t.variableName), color: '#61afef', fontStyle: 'italic' }, // function calls
   { tag: t.variableName, color: '#e5c07b' },
   { tag: t.typeName, color: '#56b6c2' },
   { tag: t.operator, color: '#abb2bf' },

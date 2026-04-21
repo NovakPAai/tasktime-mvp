@@ -20,7 +20,7 @@
  *   • Не throws на невалидных `errors[i].start > end` — фильтрует молча.
  */
 import { useEffect, useMemo, useRef } from 'react';
-import { EditorView, keymap, Decoration, type DecorationSet } from '@codemirror/view';
+import { EditorView, keymap, Decoration, placeholder as cmPlaceholder, type DecorationSet } from '@codemirror/view';
 import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { bracketMatching, indentOnInput } from '@codemirror/language';
@@ -130,6 +130,7 @@ export default function JqlEditor({
       errorTheme,
       buildTheme(isLight),
       ttqlLanguage(),
+      cmPlaceholder(placeholder),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({
         'aria-label': 'JQL / TTS-QL query editor',
@@ -156,8 +157,8 @@ export default function JqlEditor({
         }
       }),
     ],
-    // Rebuild theme/aria extensions if they change. Language/history/etc. are stable.
-    [isLight, ariaDescribedBy],
+    // Rebuild on theme/aria/placeholder change. Language/history/etc. are stable.
+    [isLight, ariaDescribedBy, placeholder],
   );
 
   // Mount once per extensions-signature.
