@@ -24,8 +24,10 @@ import { useParams } from 'react-router-dom';
 
 import { searchIssues, type IssueSearchRow } from '../api/search';
 import { getSavedFilter, markSavedFilterUsed } from '../api/savedFilters';
+import JqlEditor from '../components/search/JqlEditor.lazy';
 import { useThemeStore } from '../store/theme.store';
 import { useSearchUrlState } from './search/useSearchUrlState';
+import { useJqlValidation } from './search/useJqlValidation';
 
 type LoadState = { status: 'idle' } | { status: 'loading' } | { status: 'ok'; total: number; issues: IssueSearchRow[] } | { status: 'error'; message: string };
 
@@ -38,6 +40,7 @@ export default function SearchPage() {
   const { state, updateUrl } = useSearchUrlState();
   const [jqlDraft, setJqlDraft] = useState(state.jql);
   const [load, setLoad] = useState<LoadState>({ status: 'idle' });
+  const { errors: inlineErrors, isValidating } = useJqlValidation(jqlDraft);
 
   // Sync draft when URL changes (browser back/forward).
   useEffect(() => {
@@ -162,37 +165,45 @@ export default function SearchPage() {
         >
           <div>
             <label htmlFor="jql-input" style={{ display: 'block', fontSize: 12, color: c.t3, marginBottom: 6 }}>
-              JQL / TTS-QL
+              JQL / TTS-QL <span style={{ color: c.t3, fontSize: 11 }}>(/ — фокус, Ctrl/Cmd+Enter — выполнить)</span>
             </label>
-            <textarea
-              id="jql-input"
-              data-testid="search-jql-input"
+            <JqlEditor
               value={jqlDraft}
-              onChange={(e) => setJqlDraft(e.target.value)}
-              onKeyDown={(e) => {
-                // Ctrl/Cmd+Enter submits. Plain Enter must insert a newline so
-                // multi-line JQL stays editable.
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              placeholder='project = "TTMP" AND assignee = currentUser()'
-              spellCheck={false}
-              rows={3}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
-                fontSize: 13,
-                padding: 10,
-                border: `1px solid ${c.border}`,
-                borderRadius: 6,
-                background: isLight ? '#FAFBFC' : '#080B14',
-                color: c.t1,
-                resize: 'vertical',
-              }}
+              onChange={setJqlDraft}
+              onSubmit={(v) => updateUrl({ jql: v.trim(), page: 1 }, { push: true })}
+              errors={inlineErrors}
+              isLight={isLight}
+              ariaDescribedBy="jql-status-line"
             />
+            {inlineErrors.length > 0 && (
+              <ul
+                data-testid="jql-error-banner"
+                role="alert"
+                aria-live="polite"
+                style={{
+                  listStyle: 'none',
+                  padding: '8px 10px',
+                  margin: '6px 0 0',
+                  border: `1px solid #e5484d`,
+                  borderRadius: 6,
+                  background: isLight ? '#fef0f0' : '#2d1414',
+                  color: '#e5484d',
+                  fontSize: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                }}
+              >
+                {inlineErrors.slice(0, 5).map((err, i) => (
+                  <li key={`${err.start}-${err.end}-${i}`}>
+                    <strong>[{err.start}:{err.end}]</strong> {err.message}
+                  </li>
+                ))}
+                {inlineErrors.length > 5 && (
+                  <li style={{ color: c.t3 }}>…ещё {inlineErrors.length - 5} ошибок.</li>
+                )}
+              </ul>
+            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
               <button
                 data-testid="search-run"
@@ -210,8 +221,9 @@ export default function SearchPage() {
               >
                 Выполнить
               </button>
-              <div role="status" aria-live="polite" style={{ color: c.t3, fontSize: 12 }}>
-                {load.status === 'idle' && 'Введите запрос и нажмите Enter'}
+              <div id="jql-status-line" role="status" aria-live="polite" style={{ color: c.t3, fontSize: 12 }}>
+                {isValidating && load.status === 'idle' && 'Проверка запроса…'}
+                {!isValidating && load.status === 'idle' && 'Введите запрос и нажмите Ctrl+Enter'}
                 {load.status === 'loading' && 'Выполняется…'}
                 {load.status === 'ok' && `Найдено: ${load.total}`}
                 {load.status === 'error' && <span style={{ color: '#e5484d' }}>Ошибка: {load.message}</span>}

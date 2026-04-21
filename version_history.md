@@ -2,7 +2,64 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.36**
+**Last version: 2.37**
+
+---
+
+## [2.37] [2026-04-21] feat(frontend): TTSRH-1 PR-10 — JqlEditor (CodeMirror 6) + inline errors + lazy-load
+
+**PR:** (to be filled after push)
+**Ветка:** `ttsrh-1/jql-editor`
+
+### Что было
+
+После PR-9 SearchPage использовал plain `<textarea>` для JQL — без подсветки, без автокомплита, без inline-diagnostics. Редактор из §5.7 ТЗ не существовал, а без него feature flag не мог быть включён для UAT.
+
+### Что теперь
+
+Полноценный CodeMirror 6 редактор TTS-QL с lazy-load'ом, подсветкой и подключенным `/search/validate`:
+
+- **`frontend/src/components/search/ttql-language.ts`** (~100L) — `StreamLanguage` адаптер для TTS-QL. Классификатор токенов зеркалит backend `search.tokenizer.ts`: keywords (`AND/OR/NOT/IN/IS/EMPTY/NULL/ORDER/BY/ASC/DESC/TRUE/FALSE` + history-keywords), strings (с backslash-escape), numbers (int + decimal + relative-date `-7d`/`+1w`/`-1M`), operators (`!=/<=/>=/!~/=/</>/~`), custom-field prefix (`cf[`), comments (`-- …`). Function detection через lookahead на `(`. `HighlightStyle.define` — цвета в стиле One-Dark (keywords/functions/strings/numbers различимы, operators/punctuation — muted).
+- **`frontend/src/components/search/JqlEditor.tsx`** (~200L) — главный компонент:
+  - Extensions: `history()` (undo/redo), `bracketMatching()`, `closeBrackets()`, `indentOnInput()`, `lineWrapping`, наш `ttqlLanguage()`, error `StateField`/theme.
+  - Keymap: `Mod-Enter` → submit (preventDefault), + defaultKeymap/historyKeymap/closeBracketsKeymap/searchKeymap.
+  - Inline errors: `Decoration.mark({class: 'ttql-error', attributes: {title}})` через `StateField<DecorationSet>` + `StateEffect<InlineError[]>`. Squiggle = `text-decoration: underline wavy #e5484d`. `title`-attribute показывает сообщение ошибки на hover.
+  - Theme: dynamic (light/dark) через `EditorView.theme` + `buildTheme(isLight)`.
+  - a11y: `aria-label="JQL / TTS-QL query editor"`, `aria-describedby` к status-line в SearchPage (A11Y-1).
+  - `onChange/onSubmit` через refs — стабильная идентичность extensions, ре-mount только при смене theme/a11y.
+  - Sync external `value` (URL-driven) через `view.dispatch({ changes })` только если отличается (избегаем лишних ре-parse'ов).
+  - Global `/` hotkey → focus editor. Respect input/textarea/contenteditable focus (чтобы слэш оставался символом).
+- **`frontend/src/components/search/JqlEditor.lazy.tsx`** (~40L) — `React.lazy(() => import('./JqlEditor'))` + Suspense fallback с placeholder-высотой, чтобы избежать layout shift при подгрузке.
+- **`frontend/src/pages/search/useJqlValidation.ts`** (~70L) — debounced `POST /search/validate`:
+  - 300ms debounce.
+  - `reqIdRef` увеличивается на каждый новый запрос; stale responses игнорируются.
+  - Network errors сбрасывают `errors` в []. Пустой JQL → не триггерит запрос.
+  - Cleanup корректно отменяет timer + bumps reqId.
+  - Возвращает `{errors, isValidating}` для UI-banner'а.
+- **`frontend/src/pages/SearchPage.tsx`** — `textarea` заменён на `<JqlEditor>` (lazy-wrapped). Добавлены:
+  - Error-banner (`role="alert" aria-live="polite"`) с первыми 5 ошибками формата `[start:end] message`, остаток в виде «…ещё N ошибок».
+  - Status-line обновлён: `'Проверка запроса…'` пока debounced-валидация в полёте, `'Введите запрос и нажмите Ctrl+Enter'` когда idle.
+- **Новые deps**: `@codemirror/state`, `@codemirror/view`, `@codemirror/language`, `@codemirror/autocomplete`, `@codemirror/search`, `@codemirror/commands`, `@lezer/highlight`. В production bundle'е выделен отдельный chunk `JqlEditor-*.js` (309KB raw / **101KB gzip**) — грузится только при первом входе на `/search`.
+
+### Изменения
+
+- `frontend/src/components/search/ttql-language.ts` — новый.
+- `frontend/src/components/search/JqlEditor.tsx` — новый.
+- `frontend/src/components/search/JqlEditor.lazy.tsx` — новый.
+- `frontend/src/pages/search/useJqlValidation.ts` — новый.
+- `frontend/src/pages/SearchPage.tsx` — textarea → JqlEditor, + error-banner, + isValidating status.
+- `frontend/package.json` / `package-lock.json` — + 7 CM6 deps.
+- `docs/tz/TTSRH-1.md` §13.6/§13.9 — статус PR-10 → ✅ Done.
+
+### Влияние на prod
+
+Под `VITE_FEATURES_ADVANCED_SEARCH=false` CodeMirror не грузится вообще (route не смонтирован, chunk не реквестится). При включении: editor ленится, подхватывается за ~100ms после mount'а страницы. Main bundle unchanged по размеру (lazy-split'ин).
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) — чисто
+- `npm run lint` (frontend) — 0 errors, 0 new warnings
+- `npm run build` (Vite) — чисто, 4.57s. Chunk `JqlEditor` = **101KB gzip** (60% бюджета NFR-5 ≤ 160KB gzip).
 
 ---
 
