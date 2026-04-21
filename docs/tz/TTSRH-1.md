@@ -1339,6 +1339,7 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
   - `frontend/src/api/search.ts`, `frontend/src/api/savedFilters.ts` (тонкие клиенты для PR-5, PR-6, PR-7).
 - **Merge-ready check:** страница открывается, URL-sync работает на пустом JQL, снэпшот-тест layout.
 - **Оценка:** ~6ч.
+- **Статус: ✅ Done** — API-клиенты `api/search.ts` (searchIssues/validate/schema/suggest/export) + `api/savedFilters.ts` (CRUD/share/favorite/markUsed + preferences). `pages/SearchPage.tsx` переписан: 3-column grid (320px | fr | 360px), JQL-textarea + Ctrl/Cmd+Enter submit + status-line (`role=status aria-live`), results preview (PR-14 заменит полной таблицей). `useSearchUrlState` hook синхронизирует `?jql=&view=&columns=&page=`. Route `/search/saved/:filterId` — fetch SavedFilter → replace URL state + markSavedFilterUsed. Sidebar: «Избранные фильтры» submenu (до 5, fetch `listSavedFilters('favorite')` при `isActive('/search')`). Frontend CI = lint+typecheck+build (без unit-тестов); E2E идут в PR-20.
 
 #### PR-10: JqlEditor (CodeMirror 6) + inline errors
 - **Branch:** `ttsrh-1/jql-editor`
@@ -1501,8 +1502,8 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 5 | `ttsrh-1/endpoints` | `/search/issues` + rate-limit + timeout + fuzz-harness | 10 | PR-4 | TTSRH-7, TTSRH-11 | 🟢 Merged ([#104](https://github.com/NovakPAai/tasktime-mvp/pull/104)) |
 | 6 | `ttsrh-1/suggesters` | Value Suggesters backend + `/search/suggest` | 10 | PR-5 | TTSRH-25 | 🟢 Merged ([#106](https://github.com/NovakPAai/tasktime-mvp/pull/106)) |
 | 7 | `ttsrh-1/saved-filters` | SavedFilter CRUD/share/favorite + User.preferences | 8 | PR-5 | TTSRH-8, TTSRH-9 | 🟢 Merged ([#107](https://github.com/NovakPAai/tasktime-mvp/pull/107)) |
-| 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | ✅ Done (готов к push после merge PR-7) |
-| 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | 📋 Планируется |
+| 8 | `ttsrh-1/export` | `/search/export` CSV/XLSX | 4 | PR-5 | TTSRH-10 | 🟢 Merged ([#108](https://github.com/NovakPAai/tasktime-mvp/pull/108)) |
+| 9 | `ttsrh-1/frontend-shell` | SearchPage shell + route + sidebar + URL sync | 6 | PR-5 | TTSRH-12, часть TTSRH-19 | ✅ Done (готов к push после merge PR-8) |
 | 10 | `ttsrh-1/jql-editor` | JqlEditor (CM6) + inline errors + lazy-load | 13 | PR-9 | TTSRH-13, TTSRH-14 | 📋 Планируется |
 | 11 | `ttsrh-1/value-suggester` | ValueSuggesterPopup + CM6 adapter | 10 | PR-6, PR-10 | TTSRH-26 | 📋 Планируется |
 | 12 | `ttsrh-1/basic-builder` | BasicFilterBuilder + Basic↔Advanced toggle | 12 | PR-11 | TTSRH-15 | 📋 Планируется |
