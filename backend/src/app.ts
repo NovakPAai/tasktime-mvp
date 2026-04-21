@@ -60,6 +60,7 @@ import './modules/releases/checkpoints/checkpoint-triggers.service.js';
 
 export function createApp() {
   const app = express();
+  app.set('trust proxy', 1);
 
   // Global middleware
   app.use(helmet());

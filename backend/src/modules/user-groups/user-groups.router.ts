@@ -4,7 +4,6 @@ import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { logAudit } from '../../shared/middleware/audit.js';
-import type { AuthRequest } from '../../shared/types/index.js';
 import {
   createUserGroupDto,
   updateUserGroupDto,
@@ -13,6 +12,7 @@ import {
 } from './user-groups.dto.js';
 import * as service from './user-groups.service.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { asyncHandler, authHandler } from '../../shared/utils/async-handler.js';
 
 const listQuerySchema = z.object({
   search: z.string().optional(),
@@ -31,115 +31,95 @@ const router = Router();
 router.use(authenticate);
 router.use(requireRole('ADMIN'));
 
-router.get('/', async (req, res, next) => {
-  try {
-    const parsed = listQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      throw new AppError(400, 'Некорректные параметры фильтра', parsed.error.flatten());
-    }
-    res.json(await service.listGroups(parsed.data));
-  } catch (err) { next(err); }
-});
+router.get('/', asyncHandler(async (req, res) => {
+  const parsed = listQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new AppError(400, 'Некорректные параметры фильтра', parsed.error.flatten());
+  }
+  res.json(await service.listGroups(parsed.data));
+}));
 
-router.post('/', validate(createUserGroupDto), async (req: AuthRequest, res, next) => {
-  try {
-    const group = await service.createGroup(req.body);
-    await logAudit(req, 'user_group.created', 'user_group', group.id, { name: group.name });
-    res.status(201).json(group);
-  } catch (err) { next(err); }
-});
+router.post('/', validate(createUserGroupDto), authHandler(async (req, res) => {
+  const group = await service.createGroup(req.body);
+  await logAudit(req, 'user_group.created', 'user_group', group.id, { name: group.name });
+  res.status(201).json(group);
+}));
 
-router.get('/:id', async (req, res, next) => {
-  try {
-    res.json(await service.getGroup(req.params.id as string));
-  } catch (err) { next(err); }
-});
+router.get('/:id', asyncHandler(async (req, res) => {
+  res.json(await service.getGroup(req.params.id as string));
+}));
 
-router.patch('/:id', validate(updateUserGroupDto), async (req: AuthRequest, res, next) => {
-  try {
-    const groupId = req.params.id as string;
-    const before = await service.getGroup(groupId);
-    const updated = await service.updateGroup(groupId, req.body);
-    const action = req.body.name && req.body.name !== before.name
-      ? 'user_group.renamed'
-      : 'user_group.updated';
-    await logAudit(req, action, 'user_group', groupId, {
-      before: { name: before.name, description: before.description },
-      after: req.body,
-    });
-    res.json(updated);
-  } catch (err) { next(err); }
-});
+router.patch('/:id', validate(updateUserGroupDto), authHandler(async (req, res) => {
+  const groupId = req.params.id as string;
+  const before = await service.getGroup(groupId);
+  const updated = await service.updateGroup(groupId, req.body);
+  const action = req.body.name && req.body.name !== before.name
+    ? 'user_group.renamed'
+    : 'user_group.updated';
+  await logAudit(req, action, 'user_group', groupId, {
+    before: { name: before.name, description: before.description },
+    after: req.body,
+  });
+  res.json(updated);
+}));
 
-router.get('/:id/impact', async (req, res, next) => {
-  try {
-    res.json(await service.getGroupImpact(req.params.id as string));
-  } catch (err) { next(err); }
-});
+router.get('/:id/impact', asyncHandler(async (req, res) => {
+  res.json(await service.getGroupImpact(req.params.id as string));
+}));
 
-router.delete('/:id', async (req: AuthRequest, res, next) => {
-  try {
-    // confirm=true is mandatory for destructive group delete — without it return 412 + impact.
-    // This matches spec §5.6 / FR-A9: DELETE group requires confirm + list of affected.
-    if (req.query.confirm !== 'true') {
-      const impact = await service.getGroupImpact(req.params.id as string);
-      throw new AppError(412, 'CONFIRM_REQUIRED: добавьте ?confirm=true', { impact });
-    }
-    const result = await service.deleteGroup(req.params.id as string);
-    await logAudit(req, 'user_group.deleted', 'user_group', req.params.id as string, {
-      name: result.name,
-      removedMembers: result.removedMembers,
-      removedBindings: result.removedBindings,
-    });
-    res.json(result);
-  } catch (err) { next(err); }
-});
+router.delete('/:id', authHandler(async (req, res) => {
+  // confirm=true is mandatory for destructive group delete — without it return 412 + impact.
+  // This matches spec §5.6 / FR-A9: DELETE group requires confirm + list of affected.
+  if (req.query.confirm !== 'true') {
+    const impact = await service.getGroupImpact(req.params.id as string);
+    throw new AppError(412, 'CONFIRM_REQUIRED: добавьте ?confirm=true', { impact });
+  }
+  const result = await service.deleteGroup(req.params.id as string);
+  await logAudit(req, 'user_group.deleted', 'user_group', req.params.id as string, {
+    name: result.name,
+    removedMembers: result.removedMembers,
+    removedBindings: result.removedBindings,
+  });
+  res.json(result);
+}));
 
-router.post('/:id/members', validate(addMembersDto), async (req: AuthRequest, res, next) => {
-  try {
-    const groupId = req.params.id as string;
-    const result = await service.addMembers(groupId, req.body.userIds, req.user!.userId);
-    await logAudit(req, 'user_group.members_changed', 'user_group', groupId, {
-      added: req.body.userIds,
-      removed: [],
-    });
-    res.json(result);
-  } catch (err) { next(err); }
-});
+router.post('/:id/members', validate(addMembersDto), authHandler(async (req, res) => {
+  const groupId = req.params.id as string;
+  const result = await service.addMembers(groupId, req.body.userIds, req.user!.userId);
+  await logAudit(req, 'user_group.members_changed', 'user_group', groupId, {
+    added: req.body.userIds,
+    removed: [],
+  });
+  res.json(result);
+}));
 
-router.delete('/:id/members/:userId', async (req: AuthRequest, res, next) => {
-  try {
-    const groupId = req.params.id as string;
-    const userId = req.params.userId as string;
-    const result = await service.removeMember(groupId, userId);
-    await logAudit(req, 'user_group.members_changed', 'user_group', groupId, {
-      added: [],
-      removed: [userId],
-    });
-    res.json(result);
-  } catch (err) { next(err); }
-});
+router.delete('/:id/members/:userId', authHandler(async (req, res) => {
+  const groupId = req.params.id as string;
+  const userId = req.params.userId as string;
+  const result = await service.removeMember(groupId, userId);
+  await logAudit(req, 'user_group.members_changed', 'user_group', groupId, {
+    added: [],
+    removed: [userId],
+  });
+  res.json(result);
+}));
 
-router.post('/:id/project-roles', validate(grantProjectRoleDto), async (req: AuthRequest, res, next) => {
-  try {
-    const groupId = req.params.id as string;
-    const binding = await service.grantProjectRole(groupId, req.body);
-    await logAudit(req, 'project_group_role.granted', 'user_group', groupId, {
-      projectId: req.body.projectId,
-      roleId: req.body.roleId,
-    });
-    res.status(201).json(binding);
-  } catch (err) { next(err); }
-});
+router.post('/:id/project-roles', validate(grantProjectRoleDto), authHandler(async (req, res) => {
+  const groupId = req.params.id as string;
+  const binding = await service.grantProjectRole(groupId, req.body);
+  await logAudit(req, 'project_group_role.granted', 'user_group', groupId, {
+    projectId: req.body.projectId,
+    roleId: req.body.roleId,
+  });
+  res.status(201).json(binding);
+}));
 
-router.delete('/:id/project-roles/:projectId', async (req: AuthRequest, res, next) => {
-  try {
-    const groupId = req.params.id as string;
-    const projectId = req.params.projectId as string;
-    const result = await service.revokeProjectRole(groupId, projectId);
-    await logAudit(req, 'project_group_role.revoked', 'user_group', groupId, { projectId });
-    res.json(result);
-  } catch (err) { next(err); }
-});
+router.delete('/:id/project-roles/:projectId', authHandler(async (req, res) => {
+  const groupId = req.params.id as string;
+  const projectId = req.params.projectId as string;
+  const result = await service.revokeProjectRole(groupId, projectId);
+  await logAudit(req, 'project_group_role.revoked', 'user_group', groupId, { projectId });
+  res.json(result);
+}));
 
 export default router;

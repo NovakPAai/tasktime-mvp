@@ -23,6 +23,7 @@ import { AppError } from '../../../shared/middleware/error-handler.js';
 import { hasAnySystemRole } from '../../../shared/auth/roles.js';
 import type { AuthRequest } from '../../../shared/types/index.js';
 import * as burndown from './burndown.service.js';
+import { authHandler } from '../../../shared/utils/async-handler.js';
 
 const router = Router();
 router.use(authenticate);
@@ -79,21 +80,17 @@ async function assertReleasePermission(
 router.get(
   '/releases/:releaseId/burndown',
   validate(burndownQueryDto, 'query'),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const releaseId = req.params.releaseId as string;
-      await assertReleaseRead(req, releaseId);
-      const { metric, from, to } = req.query as {
-        metric: burndown.BurndownMetric;
-        from?: string;
-        to?: string;
-      };
-      const data = await burndown.getBurndown(releaseId, { metric, from, to });
-      res.json(data);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const releaseId = req.params.releaseId as string;
+    await assertReleaseRead(req, releaseId);
+    const { metric, from, to } = req.query as {
+      metric: burndown.BurndownMetric;
+      from?: string;
+      to?: string;
+    };
+    const data = await burndown.getBurndown(releaseId, { metric, from, to });
+    res.json(data);
+  }),
 );
 
 // FR-31 / SEC-8: backfill requires SUPER_ADMIN/ADMIN. RELEASE_MANAGER deliberately not listed.
@@ -101,27 +98,23 @@ router.post(
   '/releases/:releaseId/burndown/backfill',
   requireRole('SUPER_ADMIN', 'ADMIN'),
   validate(backfillDto, 'body'),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const releaseId = req.params.releaseId as string;
-      // We don't call assertReleaseRead here — the requireRole gate above is strictly stronger
-      // (ADMIN/SUPER_ADMIN have global access). Release existence is validated inside
-      // captureSnapshot → 404 bubbles out naturally, no silent insert on a missing release.
-      const dateStr = (req.body as { date?: string }).date;
-      const date = dateStr ? new Date(`${dateStr}T00:00:00.000Z`) : undefined;
-      const snapshot = await burndown.backfillSnapshot(releaseId, date);
-      await logAudit(req, 'burndown.backfilled', 'release', releaseId, {
-        snapshotDate: snapshot.snapshotDate.toISOString().slice(0, 10),
-      });
-      res.status(201).json({
-        id: snapshot.id,
-        snapshotDate: snapshot.snapshotDate.toISOString().slice(0, 10),
-        capturedAt: snapshot.capturedAt.toISOString(),
-      });
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const releaseId = req.params.releaseId as string;
+    // We don't call assertReleaseRead here — the requireRole gate above is strictly stronger
+    // (ADMIN/SUPER_ADMIN have global access). Release existence is validated inside
+    // captureSnapshot → 404 bubbles out naturally, no silent insert on a missing release.
+    const dateStr = (req.body as { date?: string }).date;
+    const date = dateStr ? new Date(`${dateStr}T00:00:00.000Z`) : undefined;
+    const snapshot = await burndown.backfillSnapshot(releaseId, date);
+    await logAudit(req, 'burndown.backfilled', 'release', releaseId, {
+      snapshotDate: snapshot.snapshotDate.toISOString().slice(0, 10),
+    });
+    res.status(201).json({
+      id: snapshot.id,
+      snapshotDate: snapshot.snapshotDate.toISOString().slice(0, 10),
+      capturedAt: snapshot.capturedAt.toISOString(),
+    });
+  }),
 );
 
 export default router;

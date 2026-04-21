@@ -4,7 +4,7 @@ import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { aiEstimateDto, aiDecomposeDto, aiSuggestAssigneeDto } from './ai.dto.js';
 import * as aiService from './ai.service.js';
-import type { AuthRequest } from '../../shared/types/index.js';
+import { authHandler } from '../../shared/utils/async-handler.js';
 
 const router = Router();
 router.use(authenticate);
@@ -13,42 +13,30 @@ router.post(
   '/ai/estimate',
   requireRole('ADMIN', 'USER'),
   validate(aiEstimateDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const result = await aiService.estimateIssue(req.body);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const result = await aiService.estimateIssue(req.body);
+    res.json(result);
+  }),
 );
 
 router.post(
   '/ai/decompose',
   requireRole('ADMIN', 'USER'),
   validate(aiDecomposeDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const result = await aiService.decomposeIssue(req.body);
-      res.status(201).json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const result = await aiService.decomposeIssue(req.body);
+    res.status(201).json(result);
+  }),
 );
 
 router.post(
   '/ai/suggest-assignee',
   requireRole('ADMIN', 'USER'),
   validate(aiSuggestAssigneeDto),
-  async (req: AuthRequest, res, next) => {
-    try {
-      const result = await aiService.suggestAssignee(req.body);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  authHandler(async (req, res) => {
+    const result = await aiService.suggestAssignee(req.body);
+    res.json(result);
+  }),
 );
 
 export default router;

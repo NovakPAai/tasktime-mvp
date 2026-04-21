@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
-import type { AuthRequest } from '../../shared/types/index.js';
 import { getUserSecurity } from './user-security.service.js';
+import { authHandler } from '../../shared/utils/async-handler.js';
 
 /**
  * TTSEC-2 Phase 2 security endpoints.
@@ -16,21 +16,17 @@ import { getUserSecurity } from './user-security.service.js';
 
 const router = Router();
 
-router.get('/users/me/security', authenticate, async (req: AuthRequest, res, next) => {
-  try {
-    res.json(await getUserSecurity(req.user!.userId));
-  } catch (err) { next(err); }
-});
+router.get('/users/me/security', authenticate, authHandler(async (req, res) => {
+  res.json(await getUserSecurity(req.user!.userId));
+}));
 
 router.get(
   '/admin/users/:id/security',
   authenticate,
   requireRole('ADMIN'),
-  async (req: AuthRequest, res, next) => {
-    try {
-      res.json(await getUserSecurity(req.params.id as string));
-    } catch (err) { next(err); }
-  },
+  authHandler(async (req, res) => {
+    res.json(await getUserSecurity(req.params.id as string));
+  }),
 );
 
 export default router;

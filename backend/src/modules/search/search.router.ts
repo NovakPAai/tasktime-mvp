@@ -13,6 +13,7 @@ import { functionsForVariant } from './search.functions.js';
 import { searchIssues } from './search.service.js';
 import { searchRateLimit } from './search.rate-limit.js';
 import type { QueryVariant } from './search.types.js';
+import { asyncHandler } from '../../shared/utils/async-handler.js';
 
 /**
  * TTSRH-1 PR-3 — live endpoints for `/search/validate` and `/search/schema`.
@@ -48,92 +49,84 @@ const validateDtoSchema = z.object({
 router.post(
   '/search/validate',
   validateDto(validateDtoSchema),
-  async (req: Request, res: Response, next): Promise<void> => {
-    try {
-      const { jql, variant } = req.body as z.infer<typeof validateDtoSchema>;
-      const parseResult = parse(jql);
-      if (!parseResult.ast) {
-        res.json({
-          valid: false,
-          errors: parseResult.errors,
-          warnings: [],
-          ast: null,
-        });
-        return;
-      }
-      const customFields = await loadCustomFields();
-      const ctx = createValidatorContext({
-        variant: (variant as QueryVariant | undefined) ?? 'default',
-        customFields,
-      });
-      const result = runValidator(parseResult.ast, ctx);
+  asyncHandler(async (req: Request, res: Response) => {
+    const { jql, variant } = req.body as z.infer<typeof validateDtoSchema>;
+    const parseResult = parse(jql);
+    if (!parseResult.ast) {
       res.json({
-        valid: result.valid && parseResult.errors.length === 0,
-        errors: [...parseResult.errors, ...result.errors],
-        warnings: result.warnings,
-        ast: parseResult.ast,
+        valid: false,
+        errors: parseResult.errors,
+        warnings: [],
+        ast: null,
       });
-    } catch (err) {
-      next(err);
+      return;
     }
-  },
+    const customFields = await loadCustomFields();
+    const ctx = createValidatorContext({
+      variant: (variant as QueryVariant | undefined) ?? 'default',
+      customFields,
+    });
+    const result = runValidator(parseResult.ast, ctx);
+    res.json({
+      valid: result.valid && parseResult.errors.length === 0,
+      errors: [...parseResult.errors, ...result.errors],
+      warnings: result.warnings,
+      ast: parseResult.ast,
+    });
+  }),
 );
 
 // ─── GET /search/schema ─────────────────────────────────────────────────────
 
 router.get(
   '/search/schema',
-  async (req: Request, res: Response, next): Promise<void> => {
-    try {
-      const variant = (req.query.variant === 'checkpoint' ? 'checkpoint' : 'default') as QueryVariant;
-      const customFields = await loadCustomFields();
-      res.json({
-        variant,
-        fields: [
-          ...SYSTEM_FIELDS.map((f) => ({
-            name: f.name,
-            label: f.label,
-            type: f.type,
-            synonyms: f.synonyms,
-            operators: f.operators,
-            sortable: f.sortable,
-            custom: false,
-            description: f.description ?? null,
-          })),
-          ...customFields.map((cf) => ({
-            name: cf.name,
-            label: cf.name,
-            type: cf.type,
-            synonyms: [] as string[],
-            operators: cf.operators,
-            sortable: false,
-            custom: true,
-            uuid: cf.id,
-            description: null,
-          })),
-        ],
-        functions: functionsForVariant(variant).map((fn) => ({
-          name: fn.name,
-          // Map internal validator-only pseudo-types (OFFSET / ISSUE_KEY / ANY) to
-          // surface types the editor/frontend can render — they're not TTS-QL types.
-          args: fn.args.map((a) => ({
-            name: a.name,
-            type:
-              a.type === 'OFFSET' ? 'TEXT' :
-              a.type === 'ISSUE_KEY' ? 'TEXT' :
-              a.type === 'ANY' ? 'TEXT' :
-              a.type,
-            optional: a.optional,
-          })),
-          returnType: fn.returnType,
-          phase: fn.phase,
-          description: fn.description,
+  asyncHandler(async (req: Request, res: Response) => {
+    const variant = (req.query.variant === 'checkpoint' ? 'checkpoint' : 'default') as QueryVariant;
+    const customFields = await loadCustomFields();
+    res.json({
+      variant,
+      fields: [
+        ...SYSTEM_FIELDS.map((f) => ({
+          name: f.name,
+          label: f.label,
+          type: f.type,
+          synonyms: f.synonyms,
+          operators: f.operators,
+          sortable: f.sortable,
+          custom: false,
+          description: f.description ?? null,
         })),
-      });
-    } catch (err) {
-      next(err);
-    }
-  },
+        ...customFields.map((cf) => ({
+          name: cf.name,
+          label: cf.name,
+          type: cf.type,
+          synonyms: [] as string[],
+          operators: cf.operators,
+          sortable: false,
+          custom: true,
+          uuid: cf.id,
+          description: null,
+        })),
+      ],
+      functions: functionsForVariant(variant).map((fn) => ({
+        name: fn.name,
+        // Map internal validator-only pseudo-types (OFFSET / ISSUE_KEY / ANY) to
+        // surface types the editor/frontend can render — they're not TTS-QL types.
+        args: fn.args.map((a) => ({
+          name: a.name,
+          type:
+            a.type === 'OFFSET' ? 'TEXT' :
+            a.type === 'ISSUE_KEY' ? 'TEXT' :
+            a.type === 'ANY' ? 'TEXT' :
+            a.type,
+          optional: a.optional,
+        })),
+        returnType: fn.returnType,
+        phase: fn.phase,
+        description: fn.description,
+      })),
+    });
+  }),
 );
 
 // ─── POST /search/issues ────────────────────────────────────────────────────
@@ -148,45 +141,41 @@ router.post(
   '/search/issues',
   searchRateLimit,
   validateDto(issuesDtoSchema),
-  async (req: Request, res: Response, next): Promise<void> => {
-    try {
-      const auth = req as AuthRequest;
-      if (!auth.user) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-      const { projectIds, overflowed } = await resolveAccessibleProjectIds(auth);
-      const { jql, startAt, limit } = req.body as z.infer<typeof issuesDtoSchema>;
-      const output = await searchIssues(
-        { jql, startAt, limit },
-        { userId: auth.user.userId, accessibleProjectIds: projectIds },
-      );
-      if (output.kind === 'error') {
-        res.status(output.status).json({
-          error: output.code,
-          message: output.message,
-          parseErrors: output.parseErrors,
-          validationErrors: output.validationErrors,
-          compileErrors: output.compileErrors,
-        });
-        return;
-      }
-      res.json({
-        total: output.total,
-        startAt: output.startAt,
-        limit: output.limit,
-        issues: output.issues,
-        warnings: output.warnings,
-        compileWarnings: output.compileWarnings,
-        // When the user has access to more than `MAX_ACCESSIBLE_PROJECTS` projects
-        // (realistic only for global-read roles in huge tenants), tell them that
-        // search results may be incomplete.
-        ...(overflowed ? { projectScopeOverflowed: true } : {}),
-      });
-    } catch (err) {
-      next(err);
+  asyncHandler(async (req: Request, res: Response) => {
+    const auth = req as AuthRequest;
+    if (!auth.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
     }
-  },
+    const { projectIds, overflowed } = await resolveAccessibleProjectIds(auth);
+    const { jql, startAt, limit } = req.body as z.infer<typeof issuesDtoSchema>;
+    const output = await searchIssues(
+      { jql, startAt, limit },
+      { userId: auth.user.userId, accessibleProjectIds: projectIds },
+    );
+    if (output.kind === 'error') {
+      res.status(output.status).json({
+        error: output.code,
+        message: output.message,
+        parseErrors: output.parseErrors,
+        validationErrors: output.validationErrors,
+        compileErrors: output.compileErrors,
+      });
+      return;
+    }
+    res.json({
+      total: output.total,
+      startAt: output.startAt,
+      limit: output.limit,
+      issues: output.issues,
+      warnings: output.warnings,
+      compileWarnings: output.compileWarnings,
+      // When the user has access to more than `MAX_ACCESSIBLE_PROJECTS` projects
+      // (realistic only for global-read roles in huge tenants), tell them that
+      // search results may be incomplete.
+      ...(overflowed ? { projectScopeOverflowed: true } : {}),
+    });
+  }),
 );
 
 /**
