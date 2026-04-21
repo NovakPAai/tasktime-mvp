@@ -157,7 +157,10 @@ async function invalidateSprintCaches(projectId: string, sprintId?: string): Pro
   await Promise.all([
     delCacheByPrefix(`sprints:project:${projectId}:`),
     delCacheByPrefix('sprints:all:'),
-    ...(sprintId ? [delCachedJson(`sprint:issues:${sprintId}`)] : []),
+    ...(sprintId ? [
+      delCachedJson(`sprint:issues:${sprintId}`),
+      delCachedJson(`sprint:burndown:${sprintId}`),
+    ] : []),
   ]);
 }
 
@@ -425,5 +428,108 @@ export async function listAllSprints(filters: ListAllSprintsFilters, pagination?
 
   const result = buildPaginatedResponse(sprints.map(mapSprintWithStats), total, p);
   await setCachedJson(cacheKey, result);
+  return result;
+}
+
+export type BurndownPoint = { date: string; value: number };
+
+export type SprintBurndownResult = {
+  sprintId: string;
+  totalIssues: number;
+  series: BurndownPoint[];
+  idealLine: BurndownPoint[];
+};
+
+export async function getSprintBurndown(id: string): Promise<SprintBurndownResult> {
+  const cacheKey = `sprint:burndown:${id}`;
+  const cached = await getCachedJson<SprintBurndownResult>(cacheKey);
+  if (cached) return cached;
+
+  const sprint = await prisma.sprint.findUnique({
+    where: { id },
+    include: {
+      issues: {
+        select: { id: true, status: true, updatedAt: true },
+      },
+    },
+  });
+  if (!sprint) {
+    throw new AppError(404, 'Sprint not found');
+  }
+
+  const { startDate, endDate, issues } = sprint;
+  const empty: SprintBurndownResult = { sprintId: id, totalIssues: issues.length, series: [], idealLine: [] };
+
+  if (!startDate || !endDate) return empty;
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const today = new Date();
+  const chartEnd = today < end ? today : end;
+
+  const doneStatuses = new Set(['DONE', 'CANCELLED']);
+  const completedByDate = new Map<string, Date>();
+
+  const doneIssueIds = issues.filter(i => doneStatuses.has(i.status)).map(i => i.id);
+  if (doneIssueIds.length > 0) {
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        entityType: 'issue',
+        entityId: { in: doneIssueIds },
+        action: 'issue.status_changed',
+        createdAt: { gte: start },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { entityId: true, createdAt: true, details: true },
+    });
+
+    for (const log of logs) {
+      if (!completedByDate.has(log.entityId)) {
+        const details = log.details as Record<string, unknown> | null;
+        const newStatus = details?.status as string | undefined;
+        if (newStatus && doneStatuses.has(newStatus)) {
+          completedByDate.set(log.entityId, log.createdAt);
+        }
+      }
+    }
+
+    // Issues with no audit log entry (pre-logging data) are excluded from
+    // completedByDate so they don't corrupt the historical series with updatedAt noise.
+  }
+
+  const series: BurndownPoint[] = [];
+  const cur = new Date(start);
+  cur.setHours(0, 0, 0, 0);
+  const chartEndDay = new Date(chartEnd);
+  chartEndDay.setHours(23, 59, 59, 999);
+
+  while (cur <= chartEndDay) {
+    const dayEnd = new Date(cur);
+    dayEnd.setHours(23, 59, 59, 999);
+    const doneCount = [...completedByDate.values()].filter(d => d <= dayEnd).length;
+    series.push({
+      date: cur.toISOString().slice(0, 10),
+      value: issues.length - doneCount,
+    });
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000));
+  const idealLine: BurndownPoint[] = [];
+  const idealCur = new Date(start);
+  idealCur.setHours(0, 0, 0, 0);
+  const idealEnd = new Date(end);
+  idealEnd.setHours(0, 0, 0, 0);
+
+  let dayIdx = 0;
+  while (idealCur <= idealEnd) {
+    const remaining = Math.round(issues.length * (1 - dayIdx / totalDays));
+    idealLine.push({ date: idealCur.toISOString().slice(0, 10), value: Math.max(0, remaining) });
+    idealCur.setDate(idealCur.getDate() + 1);
+    dayIdx++;
+  }
+
+  const result: SprintBurndownResult = { sprintId: id, totalIssues: issues.length, series, idealLine };
+  await setCachedJson(cacheKey, result, 60);
   return result;
 }

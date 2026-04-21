@@ -16,6 +16,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
 import type { Sprint, Issue, SprintState, IssueStatus, IssuePriority, Team, Project } from '../types';
 import SprintIssuesDrawer from '../components/sprints/SprintIssuesDrawer';
+import SprintBurndownChart from '../components/sprints/SprintBurndownChart';
 import { hasAnyRequiredRole } from '../lib/roles';
 
 // ─── Design tokens (Paper artboard 28O-0 dark / 2D3-0 light) ────────────────
@@ -595,6 +596,11 @@ export default function SprintsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── Burndown chart (TTMP-144) ───────────────────────────────────── */}
+        {selectedSprint && (
+          <SprintBurndownChart sprintId={selectedSprint.id} isDark={mode !== 'light'} />
         )}
 
         {/* ── Issues table card ───────────────────────────────────────────── */}

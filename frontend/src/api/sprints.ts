@@ -96,3 +96,17 @@ export async function estimateAllSprintIssues(sprintId: string): Promise<Estimat
 
 // Re-export PaginationMeta for convenience
 export type { PaginationMeta };
+
+export interface BurndownPoint { date: string; value: number }
+
+export interface SprintBurndownData {
+  sprintId: string;
+  totalIssues: number;
+  series: BurndownPoint[];
+  idealLine: BurndownPoint[];
+}
+
+export async function getSprintBurndown(sprintId: string): Promise<SprintBurndownData> {
+  const { data } = await api.get<SprintBurndownData>(`/sprints/${sprintId}/burndown`);
+  return data;
+}

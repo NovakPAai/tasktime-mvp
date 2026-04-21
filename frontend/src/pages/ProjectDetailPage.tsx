@@ -705,7 +705,19 @@ export default function ProjectDetailPage() {
             size="small"
             rowSelection={rowSelection}
             onRow={(record) => ({
-              onClick: () => navigate(`/issues/${record.id}`),
+              onClick: (e) => {
+                const url = `/issues/${project.key}-${record.number}`;
+                if (e.metaKey || e.ctrlKey) {
+                  window.open(url, '_blank', 'noreferrer');
+                } else {
+                  navigate(url);
+                }
+              },
+              onAuxClick: (e: React.MouseEvent) => {
+                if (e.button === 1) {
+                  window.open(`/issues/${project.key}-${record.number}`, '_blank', 'noreferrer');
+                }
+              },
               style: { cursor: 'pointer' },
             })}
           />

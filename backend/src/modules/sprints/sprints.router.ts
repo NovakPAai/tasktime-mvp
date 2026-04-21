@@ -51,6 +51,14 @@ router.get('/sprints/:id/issues', asyncHandler(async (req, res) => {
   res.json(sprintDetails);
 }));
 
+// TTMP-144: Sprint burndown chart data
+router.get('/sprints/:id/burndown', authHandler(async (req, res) => {
+  const projectId = await projectIdFromSprint(req.params.id as string);
+  await assertProjectPermission(req.user!, projectId, ['SPRINTS_VIEW']);
+  const data = await sprintsService.getSprintBurndown(req.params.id as string);
+  res.json(data);
+}));
+
 // Backlog (issues without sprint)
 router.get('/projects/:projectId/backlog', asyncHandler(async (req, res) => {
   const { page, limit } = req.query as { page?: string; limit?: string };
