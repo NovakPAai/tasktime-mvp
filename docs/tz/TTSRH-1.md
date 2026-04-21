@@ -1532,9 +1532,31 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 | 17 | `ttsrh-1/checkpoint-search-integration` | `/preview` + violatedCheckpoints* функции + поля + suggesters | 6 | PR-5, PR-16 | TTSRH-32, TTSRH-37 | 🟢 Merged ([#119](https://github.com/NovakPAai/tasktime-mvp/pull/119)) |
 | 18 | `ttsrh-1/checkpoint-admin-ui` | Segment-mode + JqlEditor КТ + Preview panel + mode-icon | 11 | PR-10, PR-15, PR-17 | TTSRH-33, TTSRH-34, TTSRH-35 | 🟢 Merged ([#120](https://github.com/NovakPAai/tasktime-mvp/pull/120)) |
 | 19 | `ttsrh-1/checkpoint-converter` | Structured → TTQL converter (one-way) | 3 | PR-18 | TTSRH-36 | 🟢 Merged ([#121](https://github.com/NovakPAai/tasktime-mvp/pull/121)) |
-| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | ✅ Done ([#122](https://github.com/NovakPAai/tasktime-mvp/pull/122)) |
+| 20 | `ttsrh-1/e2e-perf` | E2E + perf 100K seed + Lighthouse budget + axe-core | 9 | PR-12, PR-13, PR-14, PR-17, PR-19 | TTSRH-20 | 🟢 Merged ([#122](https://github.com/NovakPAai/tasktime-mvp/pull/122)) |
 | 21 | `ttsrh-1/docs-cutover` | Документация + feature flag cutover | 6 | PR-20 | TTSRH-21, TTSRH-22 | 🟢 Merged ([#123](https://github.com/NovakPAai/tasktime-mvp/pull/123)) |
 | **Итого** | | | **199** | | | |
+
+### 13.9.1 Эпик завершён — 2026-04-21
+
+**Все 21 PR merged в `main`.** Финальный deploy на staging:
+
+- **Main HEAD sha:** `9c1e526` (включает PR-20, PR-21 и чужие коммиты из #111).
+- **Build and Publish Images:** образы запушены в `ghcr.io/novakpaai/tasktime-{backend,web,pipeline}:main` через `workflow_dispatch` (auto-trigger упал из-за approval-гейта на не-TTSRH PR #111; запустили вручную как workaround).
+- **Deploy Staging:** [run 24741886078](https://github.com/NovakPAai/tasktime-mvp/actions/runs/24741886078) — SUCCESS.
+
+**Feature flags в prod — отдельный cutover (вне scope PR-цикла):**
+
+1. На staging: `FEATURES_ADVANCED_SEARCH=true` → UAT по чек-листу §7.
+2. После signoff → в production.
+3. `FEATURES_CHECKPOINT_TTQL=true` — отдельный UAT (минимум 1 неделя в prod `FEATURES_ADVANCED_SEARCH`).
+
+**Известные технические долги / Phase-2 (не блокируют MVP):**
+- **TTSRH-23** — `WAS`/`CHANGED` + модель `FieldChangeLog`.
+- **TTSRH-24** — `pg_trgm` + `unaccent` + PG FTS.
+- **TTSRH-38** — MCP-tool `search_issues` (опционально).
+- **T-12** — shared-URL cross-user E2E (второй session-fixture).
+- **Full T-19** — data-testid'ы на `AdminReleaseCheckpointTypesPage` form для полного TTQL flow теста.
+- **Composite-индексы** по profiling (§3.3) — follow-up миграция после запуска в prod.
 
 **Дельта к §8 (278ч):** план покрывает ~199ч. Недостающие ~79ч — это (a) code review + фиксы (~8ч per §8), (b) security review + фиксы (~4ч), (c) докуметация JQL полная (~6ч уже в PR-21, ~0ч дополнительно), (d) профайлинг + composite-index tuning (~4ч в PR-20), (e) fuzz-harness extended (~4ч в PR-5); остальное — buffer на unknown unknowns и Phase-2-проникновение. Реалистичный календарный план — 8–10 недель при одном fullstack-разработчике или 5–6 недель при параллельной работе двоих (backend + frontend после PR-5).
 
