@@ -80,7 +80,64 @@
 
 ## [2.48] [2026-04-21] feat(e2e): TTSRH-1 PR-20 — E2E smoke/axe + perf-seed harness + Lighthouse budget
 
-*(entry из ветки `ttsrh-1/e2e-perf` — добавляется в main при merge PR #122)*
+**PR:** [#122](https://github.com/NovakPAai/tasktime-mvp/pull/122)
+**Ветка:** `ttsrh-1/e2e-perf`
+
+### Что было
+
+После PR-19 весь бек/фронт `/search` и admin «КТ-TTQL» собран, но не покрыт end-to-end тестами. Нет инструментов для воспроизводимого perf-замера T-8 (p95 < 400ms на 100K) и нет бюджета bundle-size/a11y для `/search` (NFR-5 ≤ 160KB gzip initial).
+
+### Что теперь
+
+- **`frontend/e2e/specs/20-search.spec.ts`** — Playwright smoke + axe для `/search`:
+  - Shell renders (3-панельный layout, все testid видны).
+  - URL round-trip: ввод JQL через CM6 → Run → URL содержит `?jql=` → reload сохраняет state (**T-9**).
+  - Save-модалка открывается из sidebar-кнопки, кнопка disabled при пустом JQL, Escape закрывает.
+  - axe-core на wcag2a/aa — 0 critical/serious violations (A11Y-1..4).
+  - Graceful skip если `FEATURES_ADVANCED_SEARCH` off в env.
+- **`frontend/e2e/specs/21-checkpoints-ttql.spec.ts`** — Admin «Типы КТ» smoke + axe:
+  - Страница `/admin/release-checkpoint-types` рендерится для ADMIN.
+  - Create-type modal поднимает `checkpoint-condition-mode-control` + `condition-mode-segmented` (PR-18 wiring).
+  - axe-core — 0 critical/serious violations.
+  - **Полный T-19** (create TTQL → violations → COMBINED → regen → preview) отложен до wiring data-testid'ов на admin-form (next pass).
+- **`backend/tests/fixtures/search-seed-100k.ts`** — seed-хелпер:
+  - `seedSearchPerfFixture({ total, prisma, projectId, creatorId, seed })` — mulberry32-seeded детерминистичный генератор.
+  - chunked `createMany` по 5_000 rows, idempotent-префикс `TT_PERF_SEED_` (pre-run `deleteMany`).
+  - Auto-pick first Project + first non-bot User.
+  - `npm run db:seed:search-100k` — opt-in (не в CI, для ops benchmark VM).
+- **`.lighthouserc.json`** + **`.github/workflows/lighthouse.yml`**:
+  - desktop preset, 3 runs, target `/search`.
+  - assertions: performance ≥ 0.85 warn, accessibility ≥ 0.9 **error**, `resource-summary:script:size` ≤ 500KB error, uses-text-compression error.
+  - workflow запускается на PR touch'ing frontend, `continue-on-error: true` (advisory) до стабилизации thresholds.
+
+### Изменения
+
+- `frontend/e2e/specs/20-search.spec.ts` — новый (~145L).
+- `frontend/e2e/specs/21-checkpoints-ttql.spec.ts` — новый (~90L).
+- `backend/tests/fixtures/search-seed-100k.ts` — новый (~130L).
+- `backend/package.json` — + `db:seed:search-100k` script.
+- `frontend/.lighthouserc.json` — новый.
+- `.github/workflows/lighthouse.yml` — новый.
+- `docs/tz/TTSRH-1.md` §13.7 PR-19 / §13.8 PR-20 / §13.9 — статусы обновлены (PR-19 → 🟢 Merged, PR-20 → 🚧 В работе).
+
+### Влияние на prod
+
+Нулевое. Все изменения:
+- **Новые тестовые файлы** (не билдятся в prod-bundle).
+- **Новый seed-скрипт** — opt-in, не запускается в CI.
+- **Новый CI workflow** — advisory, `continue-on-error: true`, не блокирует merge.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend + backend) — 0 ошибок.
+- `npm run lint` — pre-existing warnings only (не от этого PR).
+- E2E локально не запускали (нужен запущенный frontend + API), гоняется в e2e-staging после merge.
+
+### Известные ограничения / follow-ups
+
+- **T-12** (shared-URL cross-user) — требует второго authenticated-session в `test.ts` fixtures. Follow-up.
+- **Full T-19** (TTQL → violations → COMBINED → regen) — требует data-testid на `AdminReleaseCheckpointTypesPage` форму. Wiring — follow-up 30 мин.
+- **Composite-индексы** по profiling (§3.3) — отдельная follow-up миграция, не в PR-20.
 
 ---
 
