@@ -183,7 +183,7 @@ export default function SearchPage() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Поиск задач</h1>
         <div style={{ color: c.t3, fontSize: 12 }}>
-          TTS-QL · <a href="https://github.com/NovakPAai/tasktime-mvp/blob/main/docs/tz/TTSRH-1.md" target="_blank" rel="noreferrer" style={{ color: c.acc }}>справка</a>
+          TTS-QL · <a href="https://github.com/NovakPAai/tasktime-mvp/blob/main/docs/tz/TTSRH-1.md" target="_blank" rel="noreferrer" style={{ color: c.acc, textDecoration: 'underline' }}>справка</a>
         </div>
       </header>
 
