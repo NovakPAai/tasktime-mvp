@@ -334,7 +334,7 @@ body {
 #root {
   flex: 1;
   display: flex;
-  min-height: 100vh;
+  flex-direction: column;
 }
 
 ::-webkit-scrollbar {

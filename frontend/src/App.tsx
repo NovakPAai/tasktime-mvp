@@ -63,6 +63,17 @@ import PipelineDashboardPage from './pages/PipelineDashboardPage';
 import SearchPage from './pages/SearchPage';
 import { features as frontendFeatures } from './lib/features';
 
+// ConfigProvider sets fontFamily/fontSize/lineHeight via design tokens, but
+// antd's CSS-in-JS injects a .ant-app class rule that wins in the cascade
+// (class 0,1,0 > element 0,0,1). The 'inherit' values here force the app
+// shell to defer to body/root tokens instead of antd defaults.
+const ANT_APP_STYLE: React.CSSProperties = {
+  flex: 1,
+  fontFamily: 'inherit',
+  fontSize: 'inherit',
+  lineHeight: 'inherit',
+};
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
   if (loading) return <LoadingSpinner />;
@@ -166,7 +177,7 @@ export default function App() {
 
   return (
     <ConfigProvider theme={antTheme}>
-      <AntApp>
+      <AntApp style={ANT_APP_STYLE}>
         <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
