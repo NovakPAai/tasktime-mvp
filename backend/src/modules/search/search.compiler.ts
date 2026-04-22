@@ -202,6 +202,16 @@ class Builder {
       const hits = this.ctx.customFields.filter((f) => f.name.toLowerCase() === lc);
       return hits.length === 1 ? hits[0]! : null;
     }
+    // `labels` / `label` ident → first LABEL-typed custom field (Prisma stores
+    // labels in IssueCustomFieldValue, not on the Issue row). If no such CF is
+    // registered in the workspace, return null — compileSystemClause will then
+    // emit a MATCH_NONE (+warning) rather than a hard UNRESOLVED_FIELD.
+    if (ref.kind === 'Ident') {
+      const lc = ref.name.toLowerCase();
+      if (lc === 'labels' || lc === 'label') {
+        return this.ctx.customFields.find((f) => f.fieldType === 'LABEL') ?? null;
+      }
+    }
     return null;
   }
 
@@ -283,6 +293,26 @@ function compileSystemClause(
     errors: builder.errors,
   };
 
+  // Derived system fields — no direct column on `issues`. Handle before the
+  // generic SYSTEM_FIELD_COLUMN path so they don't fall through to UNRESOLVED_FIELD.
+  if (field.name === 'statuscategory') {
+    return compileStatusCategory(c, sysCtx);
+  }
+  if (field.name === 'labels') {
+    // `labels` is registered as a system field for discoverability (Basic builder
+    // menu + /schema endpoint), but Prisma stores values via
+    // IssueCustomFieldValue. resolveCustomField() picks the first LABEL-typed CF
+    // in the workspace; if none exists, the query yields no rows and we surface
+    // a non-fatal warning so the UI can prompt the admin.
+    builder.warnings.push({
+      code: 'UNRESOLVED_FIELD',
+      message: 'No LABEL-typed custom field is configured in the workspace. Query will return 0 rows.',
+      field: 'labels',
+      hint: 'Admin → Custom Fields → add a field of type LABEL.',
+    });
+    return MATCH_NONE;
+  }
+
   switch (c.op.kind) {
     case 'Compare':
       return compileCompare(field, c.op.op, c.op.value, sysCtx);
@@ -298,6 +328,83 @@ function compileSystemClause(
       builder.errors.push({ code: 'UNSUPPORTED_OP', message: 'History operators (WAS/CHANGED) are not supported by the compiler yet.' });
       return MATCH_NONE;
   }
+}
+
+// ─── statusCategory compiler ────────────────────────────────────────────────
+
+/**
+ * Derived-field compiler for `statusCategory`. Maps the three category enum
+ * values (TODO / IN_PROGRESS / DONE) to sets of `IssueStatus` enum values on
+ * the Issue row — correct for both workflow-managed and legacy issues because
+ * `Issue.status` is always populated.
+ *
+ * Mapping is application-level policy per JIRA convention:
+ *   - TODO        ← OPEN
+ *   - IN_PROGRESS ← IN_PROGRESS, REVIEW
+ *   - DONE        ← DONE, CANCELLED
+ */
+const STATUS_CATEGORY_TO_ISSUE_STATUS: Record<string, readonly string[]> = {
+  TODO: ['OPEN'],
+  IN_PROGRESS: ['IN_PROGRESS', 'REVIEW'],
+  DONE: ['DONE', 'CANCELLED'],
+};
+
+function compileStatusCategory(c: ClauseNode, ctx: SystemContext): Prisma.IssueWhereInput {
+  // statusCategory is always populated (Issue.status is a non-null enum with
+  // a DB default). IS [NOT] EMPTY collapses deterministically.
+  if (c.op.kind === 'IsEmpty') {
+    return c.op.negated ? MATCH_ALL : MATCH_NONE;
+  }
+
+  // Extract the raw category tokens (TODO / IN_PROGRESS / DONE) from the clause.
+  const tokens: string[] = [];
+  if (c.op.kind === 'Compare') {
+    const t = categoryTokenFrom(c.op.value);
+    if (t === null) {
+      ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: 'statusCategory expects TODO | IN_PROGRESS | DONE.', field: 'statuscategory' });
+      return MATCH_NONE;
+    }
+    tokens.push(t);
+  } else if (c.op.kind === 'In') {
+    for (const v of c.op.values) {
+      const t = categoryTokenFrom(v);
+      if (t === null) {
+        ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: 'statusCategory expects TODO | IN_PROGRESS | DONE.', field: 'statuscategory' });
+        return MATCH_NONE;
+      }
+      tokens.push(t);
+    }
+  } else {
+    ctx.errors.push({ code: 'UNSUPPORTED_OP', message: `Operator ${c.op.kind} is not supported for statusCategory.`, field: 'statuscategory' });
+    return MATCH_NONE;
+  }
+
+  // Expand category tokens → IssueStatus[] (dedup).
+  const statusSet = new Set<string>();
+  for (const t of tokens) {
+    const mapped = STATUS_CATEGORY_TO_ISSUE_STATUS[t];
+    if (!mapped) {
+      ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: `Unknown statusCategory: ${t}`, field: 'statuscategory' });
+      return MATCH_NONE;
+    }
+    for (const s of mapped) statusSet.add(s);
+  }
+  const statuses = [...statusSet];
+
+  const negated = c.op.kind === 'Compare' ? c.op.op === '!=' : c.op.negated;
+  // Cast via `any` once — Prisma's generated IssueStatus enum isn't exported
+  // as a value from @prisma/client, so we emit the string IDs and let Prisma's
+  // runtime validator enforce them (invalid token already rejected above by
+  // STATUS_CATEGORY_TO_ISSUE_STATUS lookup).
+  const where = { status: { in: statuses } } as unknown as Prisma.IssueWhereInput;
+  return negated ? { NOT: where } : where;
+}
+
+/** Extract an uppercase category ident from Compare/In value. Returns null for non-idents. */
+function categoryTokenFrom(expr: Expr): string | null {
+  if (expr.kind === 'Ident') return expr.name.toUpperCase();
+  if (expr.kind === 'String') return expr.value.toUpperCase();
+  return null;
 }
 
 // ─── Compare ────────────────────────────────────────────────────────────────
