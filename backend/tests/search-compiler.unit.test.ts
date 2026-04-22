@@ -20,6 +20,7 @@ const PROJECTS: readonly string[] = ['proj-a', 'proj-b', 'proj-c'];
 function makeCtx(overrides: Partial<CompileContext> = {}): CompileContext {
   return {
     accessibleProjectIds: PROJECTS,
+    referenceValues: new Map(),
     customFields: [],
     resolved: { currentUserId: 'user-1', calls: new Map() },
     now: ANCHOR,
@@ -62,6 +63,67 @@ describe('compiler — scope filter (R3)', () => {
   it('no accessible projects → scope is empty; query matches nothing', () => {
     const r = compileFromSource('priority = HIGH', makeCtx({ accessibleProjectIds: [] }));
     expect(topScope(r)).toEqual({ projectId: { in: [] } });
+  });
+});
+
+// ─── reference value → id translation ──────────────────────────────────────
+
+describe('compiler — reference fields translate user-facing values to row ids', () => {
+  const refs = (entries: Record<string, Record<string, string>>): Map<string, Map<string, string>> =>
+    new Map(Object.entries(entries).map(([k, v]) => [k, new Map(Object.entries(v))]));
+
+  it('project = "TTMP" → projectId = <uuid>', () => {
+    const r = compileFromSource('project = "TTMP"', makeCtx({
+      referenceValues: refs({ project: { ttmp: 'proj-a' } }),
+    }));
+    expect(innerWhere(r)).toEqual({ projectId: 'proj-a' });
+  });
+
+  it('assignee = "alice@x.com" → assigneeId = <uuid>', () => {
+    const r = compileFromSource('assignee = "alice@x.com"', makeCtx({
+      referenceValues: refs({ assignee: { 'alice@x.com': 'user-1' } }),
+    }));
+    expect(innerWhere(r)).toEqual({ assigneeId: 'user-1' });
+  });
+
+  it('sprint IN ("Sprint 1", "Sprint 2") → sprintId IN [<uuids>]', () => {
+    const r = compileFromSource('sprint IN ("Sprint 1", "Sprint 2")', makeCtx({
+      referenceValues: refs({ sprint: { 'sprint 1': 's-1', 'sprint 2': 's-2' } }),
+    }));
+    expect(innerWhere(r)).toEqual({ sprintId: { in: ['s-1', 's-2'] } });
+  });
+
+  it('type = BUG (ident) → issueTypeConfigId = <uuid>', () => {
+    const r = compileFromSource('type = BUG', makeCtx({
+      referenceValues: refs({ type: { bug: 'type-bug' } }),
+    }));
+    expect(innerWhere(r)).toEqual({ issueTypeConfigId: 'type-bug' });
+  });
+
+  it('parent = "TTMP-123" → parentId = <uuid>', () => {
+    const r = compileFromSource('parent = "TTMP-123"', makeCtx({
+      referenceValues: refs({ parent: { 'ttmp-123': 'issue-1' } }),
+    }));
+    expect(innerWhere(r)).toEqual({ parentId: 'issue-1' });
+  });
+
+  it('release = "v1.0" → releaseId = <uuid>', () => {
+    const r = compileFromSource('release = "v1.0"', makeCtx({
+      referenceValues: refs({ release: { 'v1.0': 'rel-1' } }),
+    }));
+    expect(innerWhere(r)).toEqual({ releaseId: 'rel-1' });
+  });
+
+  it('unknown value falls through (scope filter then yields zero rows)', () => {
+    const r = compileFromSource('project = "UNKNOWN"', makeCtx({
+      referenceValues: refs({ project: { ttmp: 'proj-a' } }),
+    }));
+    expect(innerWhere(r)).toEqual({ projectId: 'UNKNOWN' });
+  });
+
+  it('UUID literal passes through unchanged (empty map, backward compat)', () => {
+    const r = compileFromSource('assignee = "user-42"', makeCtx());
+    expect(innerWhere(r)).toEqual({ assigneeId: 'user-42' });
   });
 });
 

@@ -45,10 +45,15 @@ export async function suggest(
   ctx: SuggestContext,
   customFields: readonly CustomFieldDef[],
 ): Promise<SuggestResponse> {
-  // Basic-builder path: caller passes field/operator/prefix directly.
-  if (ctx.field || ctx.operator || ctx.prefix !== undefined) {
+  // Basic-builder path: caller pinned the clause context by passing `field`.
+  // The CM6 editor sends `prefix` on every keystroke (for its own filtering),
+  // so we cannot treat `prefix` alone as an opt-in to this shortcut — doing so
+  // routes every in-editor completion through `completionsForField('', '=', …)`,
+  // which falls through to `suggestFunctions` and hides the real suggestions.
+  // Require `field` to be explicit; `operator`/`prefix` only modulate the result.
+  if (ctx.field) {
     const completions = await completionsForField(
-      ctx.field ?? '',
+      ctx.field,
       ctx.operator ?? '=',
       ctx.prefix ?? '',
       ctx,
@@ -59,13 +64,16 @@ export async function suggest(
       completions,
       context: {
         expectedField: ctx.field,
-        expectedType: typeFor(ctx.field ?? '', customFields),
+        expectedType: typeFor(ctx.field, customFields),
         inValueList: false,
       },
     };
   }
 
-  // Text-editor path: analyse cursor position in the raw JQL.
+  // Text-editor path: analyse cursor position in the raw JQL. The tokenizer
+  // derives its own prefix from the token at the cursor, so `ctx.prefix`
+  // (when sent by the CM6 editor) is ignored here — the editor uses it only
+  // for its local filtering display.
   const pos = analysePosition(source, cursor);
   switch (pos.expected) {
     case 'field':

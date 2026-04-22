@@ -6,6 +6,11 @@
  *
  * Публичный API:
  *   • available — имена всех доступных колонок (system + custom).
+ *   • primary — подмножество `available`, которое показывается по умолчанию
+ *     (обычно — системные поля). Нужен, чтобы при большом каталоге
+ *     кастомных полей не выгружать весь список; JIRA-подобный UX: пустой
+ *     поисковый ввод = только primary, ввод → фильтр по всем `available`.
+ *   • getLabel — опциональный human-readable label для отображения.
  *   • selected — текущие selected columns.
  *   • onChange(selected) — новый порядок/набор.
  *   • onClose — закрыть popover.
@@ -16,10 +21,17 @@
  *   • `available` (left list) всегда показывается в фиксированном order'е.
  *   • Duplicate guard: drop одного имени дважды в Selected — игнорируется.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export interface ColumnConfiguratorProps {
   available: string[];
+  /**
+   * Подмножество `available`, показываемое при пустом поиске. Если не задано
+   * — показываются все `available` (старое поведение). При наборе в поисковом
+   * поле фильтр работает поверх всего `available`.
+   */
+  primary?: string[];
+  getLabel?: (name: string) => string;
   selected: string[];
   onChange: (next: string[]) => void;
   onClose?: () => void;
@@ -30,12 +42,15 @@ type DragFrom = 'available' | { list: 'selected'; index: number };
 
 export default function ColumnConfigurator({
   available,
+  primary,
+  getLabel,
   selected,
   onChange,
   onClose,
   isLight = false,
 }: ColumnConfiguratorProps) {
   const [dragData, setDragData] = useState<{ name: string; from: DragFrom } | null>(null);
+  const [query, setQuery] = useState('');
 
   const c = isLight
     ? { text: '#1F2328', border: '#D0D7DE', muted: '#656D76', hover: '#F6F8FA', selected: '#EFF4FF' }
@@ -102,38 +117,95 @@ export default function ColumnConfigurator({
     gap: 6,
   };
 
+  const labelFor = useCallback(
+    (name: string): string => getLabel?.(name) ?? name,
+    [getLabel],
+  );
+  const trimmed = query.trim().toLowerCase();
+  // Empty query + primary set defined → only show primary names, so a huge
+  // custom-field catalogue (could be 100+ fields across all projects in the
+  // search results) doesn't dump into the UI. Typing widens the search to
+  // all `available`, matching JIRA's column-picker behaviour.
+  const visibleAvailable = useMemo(() => {
+    const base = trimmed === '' && primary ? primary : available;
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const name of base) {
+      if (selectedSet.has(name)) continue;
+      if (seen.has(name)) continue;
+      if (trimmed !== '') {
+        const hay = `${name} ${labelFor(name)}`.toLowerCase();
+        if (!hay.includes(trimmed)) continue;
+      }
+      seen.add(name);
+      out.push(name);
+    }
+    return out;
+  }, [trimmed, primary, available, selectedSet, labelFor]);
+  const hiddenCount =
+    trimmed === '' && primary
+      ? available.filter((n) => !primary.includes(n) && !selectedSet.has(n)).length
+      : 0;
+
   return (
     <div data-testid="column-configurator" style={{ display: 'flex', gap: 12, minWidth: 400 }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 11, color: c.muted, marginBottom: 6, textTransform: 'uppercase' }}>
           Доступные
         </div>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск поля…"
+          data-testid="col-search"
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            marginBottom: 6,
+            padding: '4px 8px',
+            fontSize: 12,
+            border: `1px solid ${c.border}`,
+            borderRadius: 4,
+            background: 'transparent',
+            color: c.text,
+            fontFamily: 'inherit',
+          }}
+        />
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDropToAvailable}
           style={{ minHeight: 120, maxHeight: 300, overflowY: 'auto' }}
         >
-          {available
-            .filter((n) => !selectedSet.has(n))
-            .map((name) => (
-              <div
-                key={name}
-                draggable
-                onDragStart={onDragStart(name, 'available')}
-                style={cellStyle}
-                data-testid={`col-available-${name}`}
+          {visibleAvailable.map((name) => (
+            <div
+              key={name}
+              draggable
+              onDragStart={onDragStart(name, 'available')}
+              style={cellStyle}
+              data-testid={`col-available-${name}`}
+            >
+              <span>{labelFor(name)}</span>
+              <button
+                type="button"
+                onClick={() => onChange([...selected, name])}
+                aria-label={`Add ${name}`}
+                style={{ background: 'transparent', border: 'none', color: c.muted, cursor: 'pointer', fontSize: 13 }}
               >
-                <span>{name}</span>
-                <button
-                  type="button"
-                  onClick={() => onChange([...selected, name])}
-                  aria-label={`Add ${name}`}
-                  style={{ background: 'transparent', border: 'none', color: c.muted, cursor: 'pointer', fontSize: 13 }}
-                >
-                  →
-                </button>
-              </div>
-            ))}
+                →
+              </button>
+            </div>
+          ))}
+          {visibleAvailable.length === 0 && (
+            <div style={{ color: c.muted, fontSize: 11, padding: 8 }}>
+              {trimmed ? 'Ничего не найдено' : 'Все поля уже добавлены'}
+            </div>
+          )}
+          {hiddenCount > 0 && (
+            <div style={{ color: c.muted, fontSize: 11, padding: '6px 2px' }}>
+              Ещё {hiddenCount} {pluralize(hiddenCount, 'поле', 'поля', 'полей')} — начните вводить для поиска
+            </div>
+          )}
         </div>
       </div>
       <div style={{ flex: 1 }}>
@@ -157,7 +229,7 @@ export default function ColumnConfigurator({
             >
               <span>
                 <span style={{ color: c.muted, marginRight: 6 }}>⋮⋮</span>
-                {name}
+                {labelFor(name)}
               </span>
               <button
                 type="button"
@@ -196,4 +268,12 @@ export default function ColumnConfigurator({
       </div>
     </div>
   );
+}
+
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
 }

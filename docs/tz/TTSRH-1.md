@@ -236,22 +236,32 @@ CUSTOM_FIELD   ::= "cf" "[" UUID "]" | '"' NAME '"'
 
 ### 5.2 Поля TTS-QL — реестр (system)
 
+> **Reference-value resolution (post-release 2026-04-22).** Все reference-поля
+> (`project`, `assignee`, `reporter`, `sprint`, `release`, `type`, `parent`,
+> `epic`, `issue`, `key`) принимают user-facing идентификатор, а не UUID.
+> Препроцессор `search.reference-resolver.ts` перед компиляцией обходит AST,
+> собирает литералы по каждому полю и пакетно резолвит их в row-id через
+> Prisma. Без этого шага compiler сравнивал бы UUID-колонку с человеко-читаемой
+> строкой и всегда возвращал бы пустой результат. Неизвестные значения
+> пропускаются без изменений — top-level scope-фильтр (R3) даёт 0 строк, что
+> совпадает с поведением JIRA на несуществующих ключах.
+
 | Поле | Синонимы | Тип | Операторы | Прим. |
 |------|----------|-----|-----------|-------|
-| `project` | `proj` | Project-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | по `key` или `id` |
-| `key`, `issuekey` | — | Issue-ref | `=`, `!=`, `IN`, `NOT IN` | `PRJ-123` |
+| `project` | `proj` | Project-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | `TTMP` (key) или UUID; key → id резолвится препроцессором |
+| `key`, `issuekey` | — | Issue-ref | `=`, `!=`, `IN`, `NOT IN` | `PRJ-123` — резолвится препроцессором в `Issue.id` |
 | `summary` | `title` | TEXT | `~`, `!~`, `=`, `!=`, `IS [NOT] EMPTY` | ILIKE |
 | `description` | — | TEXT | `~`, `!~`, `IS [NOT] EMPTY` | |
 | `status` | — | Status-ref | `=`, `!=`, `IN`, `NOT IN`, `CHANGED*`, `WAS*` | имя WorkflowStatus или systemKey (OPEN/IN_PROGRESS/REVIEW/DONE/CANCELLED) |
 | `statusCategory` | `category` | Enum | `=`, `!=`, `IN`, `NOT IN` | `TODO`/`IN_PROGRESS`/`DONE` |
 | `priority` | — | Enum | `=`, `!=`, `IN`, `NOT IN` | CRITICAL/HIGH/MEDIUM/LOW |
-| `type`, `issuetype` | — | Type-ref | `=`, `!=`, `IN`, `NOT IN` | systemKey (TASK/EPIC/…) или UUID |
-| `assignee` | — | User-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | email / id / `currentUser()` |
-| `reporter`, `creator` | — | User-ref | то же | |
-| `sprint` | — | Sprint-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | имя / id / функции |
-| `release`, `fixVersion` | — | Release-ref | то же | |
-| `parent` | — | Issue-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | |
-| `epic` | — | Issue-ref | `=`, `IN` | parent, если type=EPIC |
+| `type`, `issuetype` | — | Type-ref | `=`, `!=`, `IN`, `NOT IN` | `BUG` (systemKey) / `"Bug"` (name) / UUID — резолвится препроцессором |
+| `assignee` | — | User-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | email / name / id / `currentUser()` — резолвится препроцессором (scope по `UserProjectRole`, `isActive=true`) |
+| `reporter`, `creator` | — | User-ref | то же | то же |
+| `sprint` | — | Sprint-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | name / id / функции — резолвится препроцессором (scope по `accessibleProjectIds`) |
+| `release`, `fixVersion` | — | Release-ref | то же | name / id / функции — резолвится препроцессором (scope по `accessibleProjectIds`) |
+| `parent` | — | Issue-ref | `=`, `!=`, `IN`, `NOT IN`, `IS [NOT] EMPTY` | `PRJ-123` (key) или UUID — резолвится препроцессором |
+| `epic` | — | Issue-ref | `=`, `IN` | `PRJ-123` (key) или UUID; parent, если type=EPIC |
 | `due`, `dueDate` | — | DATE | `=`, `!=`, `>`, `<`, `>=`, `<=`, `IS [NOT] EMPTY` | + relative: `due <= "7d"` |
 | `created` | — | DATETIME | то же | |
 | `updated` | — | DATETIME | то же | |
@@ -363,20 +373,22 @@ hasCheckpointViolation = true                 -- булев-аналог без 
 jql text
   │
   ▼
-┌────────────┐    ┌───────────┐    ┌────────────────┐    ┌────────────────────┐
-│ Tokenizer  │───▶│  Parser   │───▶│   Validator    │───▶│  Compiler          │
-│  (regex-   │    │ (recursive│    │ (resolve field │    │ (AST → Prisma where│
-│   lexer)   │    │  descent) │    │  + type check) │    │  + raw SQL для CF) │
-└────────────┘    └───────────┘    └────────────────┘    └─────────┬──────────┘
-                                                                    │
-                                                                    ▼
-                                                   prisma.issue.findMany({where, orderBy, ...})
+┌────────────┐    ┌───────────┐    ┌────────────────┐    ┌────────────────┐    ┌────────────────────┐
+│ Tokenizer  │───▶│  Parser   │───▶│   Validator    │───▶│ Reference      │───▶│  Compiler          │
+│  (regex-   │    │ (recursive│    │ (resolve field │    │ resolver       │    │ (AST → Prisma where│
+│   lexer)   │    │  descent) │    │  + type check) │    │ (key/email/... │    │  + raw SQL для CF) │
+│            │    │           │    │                │    │  → row id)     │    │                    │
+└────────────┘    └───────────┘    └────────────────┘    └────────────────┘    └─────────┬──────────┘
+                                                                                          │
+                                                                                          ▼
+                                                                   prisma.issue.findMany({where, orderBy, ...})
 ```
 
 - **Tokenizer**: поддерживает `STRING` с escape, `NUMBER`, `IDENT`, `KEYWORD`, `LPAREN/RPAREN`, `COMMA`, `OP` (`=/!=/>/<=/>=/<=/~/!~`), `RELATIVE_DATE`. Возвращает массив `{type, value, start, end}` — позиции для error reporting.
 - **Parser**: recursive descent. На каждой ноде хранит `span: {start, end}` для инлайн-подчёркивания ошибок в редакторе.
 - **Validator**: семантика — поле существует? тип значения совместим с оператором? функция зарегистрирована? Ошибки накапливает в `errors: ValidationError[]`, не прерывая (для UX автодополнения).
-- **Compiler**: строит Prisma `WhereInput`. Для кастомных полей — `Prisma.sql\`SELECT id FROM issue_custom_field_values WHERE ...\`` с `id IN` под-запросом. Для связей — под-запрос по `IssueLink`. Агрегатные поля (`timeSpent`) — `HAVING`-клауза через `$queryRaw` или материализованное поле. Верхний AND всегда добавляет scope: `projectId IN (:accessibleProjectIds)`.
+- **Reference resolver** *(добавлено 2026-04-22)*: обходит AST, группирует строковые литералы по reference-полям (`project`, `assignee`/`reporter`, `sprint`, `release`, `type`, `parent`/`epic`/`issue`/`key`) и одним батчем на каждое семейство полей резолвит их через Prisma в row-id. Результат кладётся в `CompileContext.referenceValues: Map<fieldName, Map<lc-value, id>>`. Неизвестные значения пропускаются как есть — scope-фильтр гарантирует 0 строк вместо ложного false-positive. Без этой стадии compiler сравнивал бы UUID-колонку с литералом `"TTMP"` / `"alice@x.com"` и запрос всегда бы возвращал пустой набор. Compiler остаётся чистой функцией (DB-free), async-часть изолирована в resolver'е.
+- **Compiler**: строит Prisma `WhereInput`. Для кастомных полей — `Prisma.sql\`SELECT id FROM issue_custom_field_values WHERE ...\`` с `id IN` под-запросом. Для связей — под-запрос по `IssueLink`. Агрегатные поля (`timeSpent`) — `HAVING`-клауза через `$queryRaw` или материализованное поле. Верхний AND всегда добавляет scope: `projectId IN (:accessibleProjectIds)`. Для reference-полей — lookup в `ctx.referenceValues[fieldName]`; если значение не найдено (unknown), литерал передаётся в Prisma как есть и отсекается scope-фильтром.
 
 #### Пример компиляции
 
@@ -388,13 +400,13 @@ project = "TTMP" AND assignee = currentUser() AND status IN (OPEN, IN_PROGRESS)
 ORDER BY priority DESC, updated DESC
 ```
 
-Выход:
+Выход (после reference-resolver'а `"TTMP"` → `<uuid>`):
 ```ts
 prisma.issue.findMany({
   where: {
     AND: [
       { projectId: { in: accessibleProjectIds } },  // scope
-      { project: { key: 'TTMP' } },
+      { projectId: '<uuid-of-TTMP>' },              // preresolved из ctx.referenceValues.project
       { assigneeId: ctx.userId },
       { OR: [{ status: 'OPEN' }, { status: 'IN_PROGRESS' }] },
       { priority: 'HIGH' },
@@ -481,6 +493,14 @@ prisma.issue.findMany({
   - в рамках текущего фильтра — в `SavedFilter.columns`;
   - как дефолт пользователя — в `User.preferences.searchDefaults.columns`.
 - Сортировка — клик по заголовку колонки переписывает `ORDER BY` в JQL (с сохранением остального).
+
+**Custom fields в результатах (post-release 2026-04-22):**
+- Backend `POST /search/issues` возвращает `issue.customFieldValues: [{customFieldId, value}]` (add в Prisma `include`). Frontend `ResultsTable` распаковывает JSON-обёртку `{v: ...}` и форматирует arrays/booleans/objects для отображения.
+- Результаты могут содержать задачи из разных проектов, поэтому список кастомных полей в конфигураторе — **глобальный каталог** (`/search/schema`), не scope'нутый на текущий результат: иначе пользователь не смог бы добавить колонку для поля, которого нет в первой странице выдачи, но есть в следующих.
+- Чтобы глобальный каталог кастомных полей не превращал picker в нечитаемую свалку при большом числе полей, «Доступные» панель имеет **поисковую строку** (JIRA-style):
+  - пустой ввод → показываются только «primary» (system) поля + подсказка `«Ещё N полей — начните вводить для поиска»`;
+  - любой набранный префикс → фильтр работает по всему `available` (system + custom), case-insensitive, сопоставляет имя и label.
+- Конфигуратор принимает новые пропсы: `primary?: string[]` (что показывать по умолчанию) и `getLabel?: (name) => string` (human-readable подпись, для custom-полей — из `SchemaField.label`).
 
 ### 5.9 Безопасность и RBAC
 
@@ -572,6 +592,10 @@ GET /api/search/suggest?jql=<text>&cursor=<offset>
 - Tab / Enter — вставить выбранное (для Enum — без кавычек; для User — с форматом `"email@host"`).
 - Esc — закрыть без вставки.
 - Клавиши ↑/↓ — навигация, Home/End — границы.
+
+**Routing `/suggest` — default vs basic-mode (post-release 2026-04-22):**
+- CM6 CompletionSource отправляет параметр `prefix` на каждый keystroke — это его собственное поле фильтрации, не сигнал «Basic-mode». Backend **не** берёт Basic-builder shortcut только потому что `prefix !== undefined`: триггером остаётся только явный `field` (опционально с `operator`/`prefix`).
+- Иначе любой in-editor запрос падал в `completionsForField('', '=', prefix, …)` → `typeFor('')` = undefined → fallback на `suggestFunctions(prefix)`, и пользователь вместо field/operator/value suggestions видел только список функций. Guard в `search.suggest.ts` требует `ctx.field`, иначе идёт cursor-analysis path (editor mode).
 
 **Basic-mode интеграция:**
 - Chip для поля `assignee` открывает Popover, который рендерится тем же компонентом `ValueSuggesterPopup`, что и для Advanced, но с `mode=multi` для IN-clause (чекбоксы) и с preview выбранных chip'ов внизу.
@@ -1559,6 +1583,23 @@ PR-20 ─► PR-21 (docs + feature flag cutover)
 - **Composite-индексы** по profiling (§3.3) — follow-up миграция после запуска в prod.
 
 **Дельта к §8 (278ч):** план покрывает ~199ч. Недостающие ~79ч — это (a) code review + фиксы (~8ч per §8), (b) security review + фиксы (~4ч), (c) докуметация JQL полная (~6ч уже в PR-21, ~0ч дополнительно), (d) профайлинг + composite-index tuning (~4ч в PR-20), (e) fuzz-harness extended (~4ч в PR-5); остальное — buffer на unknown unknowns и Phase-2-проникновение. Реалистичный календарный план — 8–10 недель при одном fullstack-разработчике или 5–6 недель при параллельной работе двоих (backend + frontend после PR-5).
+
+### 13.9.2 Post-release фиксы — 2026-04-22
+
+После старта UAT на staging всплыли три корреляционных класса багов: (a) compiler никогда не матчил reference-поля по user-facing идентификаторам, (b) value-suggest в in-editor mode всегда показывал function suggestions, (c) ColumnConfigurator не видел кастомных полей.
+
+| # | Проблема | Симптом | Корень | Фикс |
+|---|----------|---------|--------|------|
+| 1 | `project = "TTMP"` возвращает пусто (а также `assignee`, `reporter`, `sprint`, `release`, `type`, `parent`, `epic`, `issue`, `key`) | UI Results area показывает «Всего: 0» на заведомо валидный JQL | Compiler клал строковый литерал напрямую в Prisma-фильтр на UUID-колонку; suggest вставляет `key`/`email`/`name`/`systemKey`, а не UUID | Новый модуль `search.reference-resolver.ts` — обход AST, сбор литералов по reference-полям, батчевые Prisma-lookup'ы, результат в `CompileContext.referenceValues`. Compiler подменяет литералы на row-id перед `wrapColumn(...)`. Unknown значения → scope-фильтр даёт 0 строк (как в JIRA). Обновлены §5.2 и §5.5. |
+| 2 | Suggestions в редакторе не зависят от позиции курсора / набранного текста | Пользователь печатает `proj` — popup показывает `now()`, `today()`, `currentUser()`… | CM6 CompletionSource на каждый keystroke шлёт параметр `prefix` (своё локальное поле фильтрации), а backend trigger-ил Basic-builder shortcut по условию `prefix !== undefined`, попадая в `completionsForField('', '=', prefix)` → fallback `suggestFunctions(prefix)`. | Guard в `search.suggest.ts` требует `ctx.field` для Basic-builder пути; только `prefix` → cursor-analysis path (editor mode). Обновлён §5.11. Unit-тест-регрессия в `search-suggest.unit.test.ts`. |
+| 3 | Custom fields нельзя добавить как колонку | `ColumnConfigurator` показывает только system-колонки | (a) `AVAILABLE_COLUMNS` в `SearchPage.tsx` — хардкод без schema-fetch; (b) backend `searchIssues` не включал `customFieldValues` в Prisma payload; (c) добавление всех CF в список одной пачкой перегружает picker. | (a) `SearchPage` делает `getSearchSchema()` на mount и мёржит custom-имена в `AVAILABLE_COLUMNS`; (b) Prisma `include` в `search.service.ts` добавил `customFieldValues: { select: { customFieldId, value } }`, `ResultsTable` распаковывает `{v: ...}` envelope; (c) `ColumnConfigurator` получил search-box + новый prop `primary` — при пустом вводе показывает только primary (system), при наборе — фильтр по всему `available`. Обновлён §5.8. |
+
+**Покрытие тестами:** 487 backend tests pass (parser suite, включая 7 новых в compiler и 2 новых в suggest). Frontend — typecheck clean. Интеграционные/e2e fixtures для новой column-picker UX — follow-up (см. TTSRH-39 ниже).
+
+**Follow-ups (не входят в TTSRH-1):**
+- **TTSRH-? (WorkflowStatus по имени):** `status = "In Review"` по-прежнему мапится на `IssueStatus` enum (OPEN/IN_PROGRESS/REVIEW/DONE/CANCELLED), а не на `workflow_status_id`. Denormalised-колонка `Issue.status` сохранена для обратной совместимости; полный переход требует либо миграции join'а в compiler, либо маппинга name → systemKey. Out-of-scope для данного хот-фикса.
+- **TTSRH-? (`linkedIssue` clause):** поле зарегистрировано в `SYSTEM_FIELDS` как ISSUE-ref, но отсутствует в `SYSTEM_FIELD_COLUMN` — сейчас возвращает `UNRESOLVED_FIELD`. Pre-existing, вне scope фикса.
+- **TTSRH-39 (column-picker E2E):** добавить e2e-сценарий, чтобы пользователь мог найти кастомное поле через search-box и добавить в результаты.
 
 ### 13.10 Phase 2 (не включена в TTSRH-1)
 

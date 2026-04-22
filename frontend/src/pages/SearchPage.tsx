@@ -24,7 +24,7 @@ import { useParams } from 'react-router-dom';
 import { Button, Popover } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 
-import { searchIssues, type IssueSearchRow } from '../api/search';
+import { getSearchSchema, searchIssues, type IssueSearchRow, type SchemaField } from '../api/search';
 import { getSavedFilter, markSavedFilterUsed, type SavedFilter } from '../api/savedFilters';
 import BasicFilterBuilder from '../components/search/BasicFilterBuilder';
 import { canBasicize } from '../components/search/basic-filter-model';
@@ -66,13 +66,31 @@ export default function SearchPage() {
     () => ['key', 'summary', 'type', 'status', 'priority', 'assignee', 'sprint', 'updated'],
     [],
   );
-  const AVAILABLE_COLUMNS = useMemo(
+  const SYSTEM_COLUMNS = useMemo(
     () => [
       'key', 'summary', 'type', 'status', 'priority', 'assignee', 'creator',
       'project', 'projectKey', 'sprint', 'release', 'due', 'created', 'updated',
       'description',
     ],
     [],
+  );
+  const [customFields, setCustomFields] = useState<SchemaField[]>([]);
+  // Fetch the field schema once per mount so the column picker can offer
+  // custom fields. Failures degrade silently — the user still sees the
+  // hard-coded system columns, same as before schema integration.
+  useEffect(() => {
+    let cancelled = false;
+    void getSearchSchema('default')
+      .then((schema) => {
+        if (cancelled) return;
+        setCustomFields(schema.fields.filter((f) => f.custom));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const AVAILABLE_COLUMNS = useMemo(
+    () => [...SYSTEM_COLUMNS, ...customFields.map((f) => f.name)],
+    [SYSTEM_COLUMNS, customFields],
   );
   const displayedColumns = state.columns.length > 0 ? state.columns : DEFAULT_COLUMNS;
 
@@ -364,6 +382,8 @@ export default function SearchPage() {
                       content={
                         <ColumnConfigurator
                           available={AVAILABLE_COLUMNS}
+                          primary={SYSTEM_COLUMNS}
+                          getLabel={(name) => customFields.find((f) => f.name === name)?.label ?? name}
                           selected={displayedColumns}
                           onChange={(next) => updateUrl({ columns: next }, { push: false })}
                           onClose={() => setColumnConfigOpen(false)}
@@ -391,6 +411,7 @@ export default function SearchPage() {
                 <ResultsTable
                   issues={load.issues}
                   columns={displayedColumns}
+                  customFields={customFields}
                   total={load.total}
                   page={state.page}
                   pageSize={PAGE_SIZE}

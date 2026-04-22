@@ -26,6 +26,7 @@ import { compile } from '../../search/search.compiler.js';
 import { executeCustomFieldPredicates } from '../../search/search.custom-field.executor.js';
 import { resolveFunctions } from '../../search/search.function-resolver.js';
 import { parse } from '../../search/search.parser.js';
+import { resolveReferenceValues } from '../../search/search.reference-resolver.js';
 import { loadCustomFields } from '../../search/search.schema.loader.js';
 import { createValidatorContext, validate } from '../../search/search.validator.js';
 
@@ -87,8 +88,12 @@ export async function resolveTtqlMatchedIds(
       });
 
       // Phase 4: compile to Prisma where.
+      const referenceValues = await resolveReferenceValues(parseResult.ast, {
+        accessibleProjectIds: ctx.accessibleProjectIds,
+      });
       const compiled = compile(parseResult.ast, {
         accessibleProjectIds: ctx.accessibleProjectIds,
+        referenceValues,
         customFields,
         resolved,
         now: ctx.now,

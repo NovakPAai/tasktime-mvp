@@ -19,6 +19,12 @@ import api from './client';
 // returned by the API under arbitrary string keys — an intersection with a
 // Record keeps them accessible (as `unknown`) without suppressing typos on the
 // named fields (a bare `[key: string]: unknown` index signature would).
+export interface IssueCustomFieldValueRow {
+  customFieldId: string;
+  /** JSON envelope — values are wrapped as `{ v: <payload> }`. */
+  value: unknown;
+}
+
 export type IssueSearchRow = {
   id: string;
   projectId: string;
@@ -30,6 +36,7 @@ export type IssueSearchRow = {
   project: { id: string; key: string; name: string };
   assignee: { id: string; name: string; email: string } | null;
   workflowStatus: { id: string; name: string; category: string; color: string | null; systemKey: string | null } | null;
+  customFieldValues?: IssueCustomFieldValueRow[];
 } & Record<string, unknown>;
 
 export interface SearchIssuesResponse {
