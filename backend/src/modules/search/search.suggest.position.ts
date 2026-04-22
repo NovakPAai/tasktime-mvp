@@ -34,13 +34,18 @@ export function analysePosition(source: string, cursor: number): PositionContext
   const before = source.slice(0, pos);
 
   // Tokenize the text up to the cursor. On tokenizer errors (e.g. unterminated
-  // string), fall back to treating everything as "field expected with empty
-  // prefix" — editor experience degrades gracefully.
+  // string), try a recovery pass — the common case is a user still typing
+  // inside a quoted string, especially for non-ASCII field names like
+  // `"Мои задачи"`. Treat everything after the last unclosed quote as the
+  // prefix being typed, and analyse the tokens before it as context.
+  // Without this, the tokenizer throws UNTERMINATED_STRING and the fallback
+  // to `emptyField()` drops the user's partially-typed prefix, returning an
+  // unfiltered dump of every field.
   let tokens: Token[];
   try {
     tokens = tokenize(before);
   } catch {
-    return emptyField();
+    return recoverFromUnterminatedString(before);
   }
 
   // Strip trailing Eof token for easier last-token access.
@@ -63,6 +68,31 @@ export function analysePosition(source: string, cursor: number): PositionContext
   if (effectiveTokens.length === 0) return withPrefix(emptyField(), prefix);
 
   return analyseAfterTokens(effectiveTokens, prefix);
+}
+
+/**
+ * Recover position analysis when the tokenizer failed — most often because
+ * the cursor sits inside an unclosed string literal (user typing a quoted
+ * field name or value, including non-ASCII like Cyrillic). Finds the last
+ * unescaped `"` / `'` before the cursor, re-tokenises the pre-quote portion,
+ * and treats the suffix as the typed prefix. Bails to `emptyField()` if the
+ * pre-quote prefix is itself malformed — a rare case we accept degrades to
+ * an unfiltered list, same as before the recovery.
+ */
+function recoverFromUnterminatedString(before: string): PositionContext {
+  const lastQuote = Math.max(before.lastIndexOf('"'), before.lastIndexOf("'"));
+  if (lastQuote < 0) return emptyField();
+  const pre = before.slice(0, lastQuote);
+  const partialPrefix = before.slice(lastQuote + 1);
+  let preTokens: Token[];
+  try {
+    preTokens = tokenize(pre);
+  } catch {
+    return withPrefix(emptyField(), partialPrefix);
+  }
+  const real = preTokens.filter((t) => t.kind !== 'Eof');
+  if (real.length === 0) return withPrefix(emptyField(), partialPrefix);
+  return analyseAfterTokens(real, partialPrefix);
 }
 
 // ─── Heuristics ─────────────────────────────────────────────────────────────

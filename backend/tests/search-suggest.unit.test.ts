@@ -67,9 +67,26 @@ describe('position analyser — cursor at structural boundaries', () => {
     expect(p.pickedValues).toContain('OPEN');
   });
 
-  it('unterminated string → graceful fallback to field', () => {
+  it('unterminated string → recovers context from last quote, prefix = typed suffix', () => {
+    // `summary = "oops` — user is still typing the value. The tokenizer would
+    // otherwise throw UNTERMINATED_STRING and the analyser would dump all
+    // fields; recovery slices at the last `"`, re-tokenises the left side,
+    // and keeps the typed suffix as the prefix.
     const p = analysePosition('summary = "oops', 15);
+    expect(p.expected).toBe('value');
+    expect(p.field).toBe('summary');
+    expect(p.prefix).toBe('oops');
+  });
+
+  it('Cyrillic multi-word custom field name in unterminated quotes → field context with prefix', () => {
+    // `"Мои зад` at clause start — user is picking a field by quoted name.
+    // Backend tokenizer cannot treat Cyrillic as an Ident (ASCII-only class),
+    // so the prefix only reaches the suggester when recovery preserves it
+    // from the unterminated string. Without this path, every keystroke inside
+    // a Cyrillic-quoted field name returned the full field list unranked.
+    const p = analysePosition('"Мои зад', 8);
     expect(p.expected).toBe('field');
+    expect(p.prefix).toBe('Мои зад');
   });
 
   it('ORDER BY → expect field', () => {

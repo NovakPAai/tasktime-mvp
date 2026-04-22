@@ -2,7 +2,34 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.50**
+**Last version: 2.51**
+
+---
+
+## [2.51] [2026-04-22] fix(ttsrh-1): post-release — unicode-aware autocomplete для кастомных полей
+
+**PR:** (to be filled after push)
+**Ветка:** `fix/ttsrh-1-cyrillic-cf-autocomplete`
+
+### Что было
+
+После деплоя v2.50 выяснилось: автокомплит не работает для кастомных полей с кириллическими / многословными именами (`"Мои задачи"`, `"工時"` и т.п.). Пользователь набирает `"Мо` — popup либо показывает весь список без фильтра, либо вставка разрушает текст типа `"Мо"Мои задачи"`.
+
+### Корень
+
+1. **Backend** (`search.suggest.position.ts`): токенизатор кидает `UNTERMINATED_STRING` на недописанной кавычке, `catch` возвращал `emptyField()` с пустым `prefix` — suggest-pipeline получал отрывочный ввод без контекста и отдавал весь список полей.
+2. **Frontend** (`ttql-completion.ts`): `IDENT_RE = /[\w."-]*/` без флага `u`. В JavaScript `\w` = `[A-Za-z0-9_]`, кириллица не попадает → `context.matchBefore` даёт `from == cursor` (неверный диапазон вставки), а `validFor` закрывает popup при первом же не-ASCII символе.
+
+### Что теперь
+
+- **Backend** — `analysePosition` получил `recoverFromUnterminatedString`: режет по последней открывающей кавычке, токенизирует префикс-часть, оставляет typed suffix как `prefix` и прогоняет через `analyseAfterTokens`. Теперь `"Мои зад` → `{expected: 'field', prefix: 'Мои зад'}`.
+- **Frontend** — `IDENT_RE` переписан в Unicode-aware `/[\p{L}\p{N}_."-]*/u`. `matchBefore` корректно захватывает кириллические слова; `validFor` держит popup открытым при наборе любых unicode-букв.
+- **Тесты** — новый regression-case «Cyrillic multi-word custom field name in unterminated quotes → field context with prefix»; обновлён существующий `unterminated string → graceful fallback` (теперь корректно возвращает `value`-контекст с prefix'ом). 488 backend tests pass.
+- **Документация** — в §13.9.2 добавлена строка #4 к таблице post-release фиксов.
+
+### Связано
+
+- TTSRH-1 (Advanced Search) — post-release hardening #2.
 
 ---
 
