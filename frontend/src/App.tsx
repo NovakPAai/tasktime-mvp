@@ -63,6 +63,13 @@ import PipelineDashboardPage from './pages/PipelineDashboardPage';
 import SearchPage from './pages/SearchPage';
 import { features as frontendFeatures } from './lib/features';
 
+const ANT_APP_STYLE: React.CSSProperties = {
+  flex: 1,
+  fontFamily: 'inherit',
+  fontSize: 'inherit',
+  lineHeight: 'inherit',
+};
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
   if (loading) return <LoadingSpinner />;
@@ -166,7 +173,7 @@ export default function App() {
 
   return (
     <ConfigProvider theme={antTheme}>
-      <AntApp style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit' }}>
+      <AntApp style={ANT_APP_STYLE}>
         <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

@@ -45,6 +45,7 @@ import { useJqlValidation } from './search/useJqlValidation';
 type LoadState = { status: 'idle' } | { status: 'loading' } | { status: 'ok'; total: number; issues: IssueSearchRow[] } | { status: 'error'; message: string };
 
 const PAGE_SIZE = 50;
+const CONTENT_OFFSET_PX = 120;
 
 export default function SearchPage() {
   const { mode } = useThemeStore();
@@ -171,7 +172,9 @@ export default function SearchPage() {
     <div
       data-testid="search-page"
       style={{
-        minHeight: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
         padding: '16px 20px',
         background: c.bg,
         color: c.t1,
@@ -193,7 +196,8 @@ export default function SearchPage() {
           gridTemplateColumns: '320px minmax(0, 1fr) 360px',
           gap: 12,
           alignItems: 'stretch',
-          minHeight: 'calc(100vh - 120px)',
+          flex: 1,
+          minHeight: 0,
         }}
       >
         {/* Column 1 — SavedFiltersSidebar */}
@@ -207,7 +211,7 @@ export default function SearchPage() {
             minHeight: 480,
             color: c.t1,
             overflowY: 'auto',
-            maxHeight: 'calc(100vh - 120px)',
+            maxHeight: `calc(100vh - ${CONTENT_OFFSET_PX}px)`,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -427,6 +431,8 @@ export default function SearchPage() {
             borderRadius: 8,
             padding: 16,
             minHeight: 480,
+            overflowY: 'auto',
+            maxHeight: `calc(100vh - ${CONTENT_OFFSET_PX}px)`,
             color: c.t3,
             fontSize: 12,
           }}
