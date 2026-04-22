@@ -166,7 +166,7 @@ export default function App() {
 
   return (
     <ConfigProvider theme={antTheme}>
-      <AntApp>
+      <AntApp style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit' }}>
         <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

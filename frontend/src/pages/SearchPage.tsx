@@ -193,6 +193,7 @@ export default function SearchPage() {
           gridTemplateColumns: '320px minmax(0, 1fr) 360px',
           gap: 12,
           alignItems: 'stretch',
+          minHeight: 'calc(100vh - 120px)',
         }}
       >
         {/* Column 1 — SavedFiltersSidebar */}
