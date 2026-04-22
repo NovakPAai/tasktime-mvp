@@ -33,10 +33,12 @@ server {
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
   add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
   # CVE-10: Content Security Policy
-  # NOTE: CodeMirror 6 uses document.adoptedStyleSheets (Constructable Stylesheets API).
-  # In modern browsers these are governed by script-src (the JS bundle is already 'self'),
-  # NOT style-src. The 'unsafe-inline' below covers CM6's <style>-tag fallback path for
-  # older browsers. No additional style-src directive is required for adoptedStyleSheets.
+  # 'unsafe-inline' in style-src is required for two runtime style-injection mechanisms:
+  #   1. Ant Design v5 CSS-in-JS (@ant-design/cssinjs) injects <style> tags at runtime.
+  #   2. CodeMirror 6 (style-mod) falls back to <style> tag injection on browsers that
+  #      do not support the Constructable Stylesheets API (document.adoptedStyleSheets).
+  #      On modern browsers (Chrome 111+, Firefox 101+) CM6 uses adoptedStyleSheets,
+  #      which are governed by script-src 'self' (the JS bundle), not style-src.
   # TODO: migrate to nonce-based CSP when backend SSR is introduced (Phase 2).
   add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none';" always;
   # CVE-03: HSTS (enable when TLS is active)

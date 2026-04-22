@@ -45,7 +45,9 @@ import { useJqlValidation } from './search/useJqlValidation';
 type LoadState = { status: 'idle' } | { status: 'loading' } | { status: 'ok'; total: number; issues: IssueSearchRow[] } | { status: 'error'; message: string };
 
 const PAGE_SIZE = 50;
-const CONTENT_OFFSET_PX = 120;
+// 72px = page padding-top (16) + padding-bottom (16) + header row with margin (~40).
+// Topbar height is taken from the --topbar-h CSS variable (48px, styles.css).
+const SIDEBAR_MAX_H = 'calc(100vh - var(--topbar-h) - 72px)';
 
 export default function SearchPage() {
   const { mode } = useThemeStore();
@@ -229,7 +231,7 @@ export default function SearchPage() {
             minHeight: 480,
             color: c.t1,
             overflowY: 'auto',
-            maxHeight: `calc(100vh - ${CONTENT_OFFSET_PX}px)`,
+            maxHeight: SIDEBAR_MAX_H,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -277,6 +279,8 @@ export default function SearchPage() {
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
+            overflowY: 'auto',
+            maxHeight: SIDEBAR_MAX_H,
           }}
         >
           <div>
@@ -453,7 +457,7 @@ export default function SearchPage() {
             padding: 16,
             minHeight: 480,
             overflowY: 'auto',
-            maxHeight: `calc(100vh - ${CONTENT_OFFSET_PX}px)`,
+            maxHeight: SIDEBAR_MAX_H,
             color: c.t3,
             fontSize: 12,
           }}
