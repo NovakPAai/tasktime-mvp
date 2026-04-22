@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { analysePosition } from '../src/modules/search/search.suggest.position.js';
 import { rankByPrefix } from '../src/modules/search/search.suggest.rank.js';
+import { suggest } from '../src/modules/search/search.suggest.js';
 import {
   suggestBool,
   suggestDateShortcuts,
@@ -226,5 +227,34 @@ describe('suggestOperators', () => {
   it('maps TtqlOpKind to display operators', () => {
     const c = suggestOperators(['EQ', 'NEQ', 'IS_EMPTY', 'IS_NOT_EMPTY'], '');
     expect(c.map((x) => x.insert).sort()).toEqual(['!=', '=', 'IS EMPTY', 'IS NOT EMPTY']);
+  });
+});
+
+// ─── Orchestrator routing ───────────────────────────────────────────────────
+
+describe('suggest() — routing between basic-builder and text-editor paths', () => {
+  const baseCtx = {
+    userId: 'u1',
+    accessibleProjectIds: [] as string[],
+    variant: 'default' as const,
+  };
+
+  it('prefix alone (no field) does not trigger the basic-builder shortcut — editor path fires', async () => {
+    // Regression guard: the CM6 completion source sends `prefix` on every
+    // keystroke. If the backend treats `prefix !== undefined` as an opt-in to
+    // the basic-builder shortcut, every in-editor request falls through to
+    // `suggestFunctions()` (because the field is unknown), and the user sees
+    // function suggestions instead of fields/operators/values.
+    const r = await suggest('prior', 5, { ...baseCtx, prefix: 'prior' }, []);
+    expect(r.completions.some((c) => c.kind === 'field' && c.insert === 'priority')).toBe(true);
+    // And we must NOT be drowning in function suggestions.
+    const funcOnly = r.completions.every((c) => c.kind === 'function');
+    expect(funcOnly).toBe(false);
+  });
+
+  it('explicit field param routes via basic-builder (operator suggestions for a field)', async () => {
+    const r = await suggest('', 0, { ...baseCtx, field: 'priority' }, []);
+    // Priority type → enum values; confirm we get them, not function list.
+    expect(r.completions.some((c) => c.insert === 'HIGH')).toBe(true);
   });
 });

@@ -421,11 +421,12 @@ function compileCompare(
     return MATCH_NONE;
   }
 
-  const value = evaluateValue(valueExpr, field.type, ctx);
-  if (value.kind === 'error') {
-    ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: value.message, field: field.name });
+  const rawValue = evaluateValue(valueExpr, field.type, ctx);
+  if (rawValue.kind === 'error') {
+    ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: rawValue.message, field: field.name });
     return MATCH_NONE;
   }
+  const value = resolveReferenceEvaluated(field.name, rawValue, ctx);
 
   // Text fields with `~` / `!~`
   if (op === '~' || op === '!~') {
@@ -476,8 +477,8 @@ function compileIn(
     ctx.errors.push({ code: 'UNRESOLVED_FIELD', message: `No column for \`${field.name}\`.`, field: field.name });
     return MATCH_NONE;
   }
-  const resolved = values.map((v) => evaluateValue(v, field.type, ctx));
-  const erroring = resolved.filter((r) => r.kind === 'error');
+  const resolvedRaw = values.map((v) => evaluateValue(v, field.type, ctx));
+  const erroring = resolvedRaw.filter((r) => r.kind === 'error');
   if (erroring.length > 0) {
     for (const e of erroring) {
       if (e.kind === 'error') ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: e.message, field: field.name });
@@ -485,6 +486,7 @@ function compileIn(
     return MATCH_NONE;
   }
 
+  const resolved = resolvedRaw.map((r) => resolveReferenceEvaluated(field.name, r, ctx));
   const primitives = resolved.flatMap((r) => flattenResolvedValue(r));
   if (primitives.length === 0) return MATCH_NONE;
 
@@ -521,6 +523,43 @@ function compileIsEmpty(field: { name: string; type: TtqlType }, negated: boolea
   if (!col) return MATCH_NONE;
   const rhs = negated ? { not: null } : null;
   return wrapColumn(col, rhs);
+}
+
+// ─── Reference-value translation (user-facing name/key/email → row id) ──────
+
+/**
+ * Reference-type system fields whose Prisma column is a UUID, not the
+ * user-facing identifier. The suggest endpoint inserts `TTMP` (project key),
+ * `"alice@x.com"` (user email), `"Sprint 1"` (sprint name), `BUG`
+ * (issue-type systemKey), `TTMP-123` (issue key) — so every clause on these
+ * fields has to be rewritten before the where-clause reaches Prisma, else the
+ * compare runs UUID = "human text" and always matches nothing.
+ *
+ * The caller pre-resolves the referenced literals into
+ * `CompileContext.referenceValues` (see `search.reference-resolver.ts`); this
+ * helper looks up and substitutes. Unknown values fall through unchanged so
+ * the top-level scope filter (or simple id-mismatch) yields zero rows — same
+ * as JIRA's behaviour on non-existent keys.
+ *
+ * Substitutes only `string` values; `scalar-id` / `id-list` already contain
+ * ids produced by the function resolver.
+ */
+const REFERENCE_FIELDS: ReadonlySet<string> = new Set([
+  'project', 'assignee', 'reporter', 'sprint', 'release',
+  'type', 'parent', 'epic', 'issue', 'key',
+]);
+
+function resolveReferenceEvaluated(
+  fieldName: string,
+  value: EvaluatedValue,
+  ctx: SystemContext,
+): EvaluatedValue {
+  if (!REFERENCE_FIELDS.has(fieldName)) return value;
+  if (value.kind !== 'string') return value;
+  const lookup = ctx.ctx.referenceValues.get(fieldName);
+  if (!lookup) return value;
+  const mapped = lookup.get(value.value.toLowerCase());
+  return mapped ? { kind: 'string', value: mapped } : value;
 }
 
 // ─── Value evaluator ────────────────────────────────────────────────────────

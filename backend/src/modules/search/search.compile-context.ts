@@ -58,6 +58,25 @@ export interface CompileContext {
    * produces a where-clause that matches nothing.
    */
   accessibleProjectIds: readonly string[];
+  /**
+   * Pre-resolved `user-facing value → row id` lookups for reference-type system
+   * fields. Keyed by the TTS-QL field's canonical name (e.g. `project`,
+   * `assignee`, `sprint`, `release`, `type`, `parent`, `epic`, `issue`, `key`).
+   *
+   * The inner map is case-insensitive (keys must be lowercased on insertion):
+   *   - `project`       → project key (`TTMP` → uuid)
+   *   - `assignee`/`reporter` → email OR full name (`alice@x.com` / `alice` → uuid)
+   *   - `sprint`        → sprint name (`Sprint 1` → uuid)
+   *   - `release`       → release name (`v1.0` → uuid)
+   *   - `type`          → issue-type `systemKey` OR name (`BUG` / `bug` → uuid)
+   *   - `parent`/`epic`/`issue`/`key` → issue key (`ttmp-123` → uuid)
+   *
+   * The compiler substitutes the RHS of a clause via this map. Unknown values
+   * fall through unchanged — the top-level scope filter then yields zero rows
+   * (matching JIRA behaviour on unknown keys). Populated by
+   * `search.reference-resolver.ts` in the caller, so the compiler stays DB-free.
+   */
+  referenceValues: ReadonlyMap<string, ReadonlyMap<string, string>>;
   /** Custom-field registry (already loaded in the caller, typically via Redis cache). */
   customFields: readonly CustomFieldDef[];
   /** Pre-resolved DB-dependent function outputs. */
