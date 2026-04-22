@@ -61,6 +61,7 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 import UatTestsPage from './pages/UatTestsPage';
 import PipelineDashboardPage from './pages/PipelineDashboardPage';
 import SearchPage from './pages/SearchPage';
+import SearchHelpPage from './pages/SearchHelpPage';
 import { features as frontendFeatures } from './lib/features';
 
 // ConfigProvider sets fontFamily/fontSize/lineHeight via design tokens, but
@@ -206,6 +207,7 @@ export default function App() {
             {/* TTSRH-1 PR-1: /search mounted only when advanced-search flag is on.
                 When disabled, the <Route path="*"> catch-all below redirects to "/". */}
             {frontendFeatures.advancedSearch && <Route path="search" element={<SearchPage />} />}
+            {frontendFeatures.advancedSearch && <Route path="search/help" element={<SearchHelpPage />} />}
             {frontendFeatures.advancedSearch && <Route path="search/saved/:filterId" element={<SearchPage />} />}
             <Route path="uat" element={<UatTestsPage />} />
             {/*
