@@ -76,10 +76,17 @@ function toCmCompletion(item: TtqlCompletion): CmCompletion {
 
 /**
  * Word-boundary regex matching TTS-QL tokens. Allows dotted paths, cf-prefix and digits.
- * CM6 uses this for `from`/`to` calculation — the text from `from..pos` is what the user
- * has already typed and we overwrite with the chosen completion.
+ * CM6 uses this for `from`/`to` calculation — the text from `from..pos` is what the
+ * user has already typed and we overwrite with the chosen completion.
+ *
+ * Uses Unicode property escapes (`\p{L}` / `\p{N}` with the `u` flag) so non-ASCII
+ * custom-field names like `"Мои задачи"` or `"工時"` are matched end-to-end. The
+ * bare `\w` in JS is ASCII-only and would collapse `matchBefore` to `from == pos`
+ * the moment the cursor entered a Cyrillic character, silently breaking both
+ * `from` calculation (wrong insertion range) and `validFor` (popup closes on the
+ * next keystroke).
  */
-const IDENT_RE = /[\w."-]*/;
+const IDENT_RE = /[\p{L}\p{N}_."-]*/u;
 
 export function ttqlCompletionSource(triggerChars: Set<string>) {
   return async function source(context: CompletionContext): Promise<CompletionResult | null> {
