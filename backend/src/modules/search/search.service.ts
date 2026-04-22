@@ -17,6 +17,7 @@ import { compile } from './search.compiler.js';
 import { executeCustomFieldPredicates } from './search.custom-field.executor.js';
 import { resolveFunctions } from './search.function-resolver.js';
 import { parse } from './search.parser.js';
+import { resolveReferenceValues } from './search.reference-resolver.js';
 import { loadCustomFields } from './search.schema.loader.js';
 import { createValidatorContext, validate } from './search.validator.js';
 import type { ParseError } from './search.ast.js';
@@ -38,14 +39,17 @@ export interface SearchIssuesContext {
 
 /**
  * Shape of a single issue in the `/search/issues` response. Mirrors the fixed
- * Prisma `include` below. When PR-9+ adds a user-configurable column set, this
- * type will need to become generic over the include payload.
+ * Prisma `include` below. `customFieldValues` is included unconditionally so
+ * the ResultsTable can render user-configured custom-field columns without a
+ * second round-trip; the payload is bounded by (issues × configured CFs),
+ * which for MVP (50 rows × ~20 CFs) is well under any row-size limit.
  */
 export type IssueSearchResult = Prisma.IssueGetPayload<{
   include: {
     assignee: { select: { id: true; name: true; email: true } };
     project: { select: { id: true; key: true; name: true } };
     workflowStatus: { select: { id: true; name: true; category: true; color: true; systemKey: true } };
+    customFieldValues: { select: { customFieldId: true; value: true } };
   };
 }>;
 
@@ -130,8 +134,12 @@ export async function searchIssues(
   });
 
   // Phase 4 — compile AST to Prisma where.
+  const referenceValues = await resolveReferenceValues(ast, {
+    accessibleProjectIds: ctx.accessibleProjectIds,
+  });
   const compiled = compile(ast, {
     accessibleProjectIds: ctx.accessibleProjectIds,
+    referenceValues,
     customFields,
     resolved,
     now,
@@ -172,6 +180,7 @@ export async function searchIssues(
               assignee: { select: { id: true, name: true, email: true } },
               project: { select: { id: true, key: true, name: true } },
               workflowStatus: { select: { id: true, name: true, category: true, color: true, systemKey: true } },
+              customFieldValues: { select: { customFieldId: true, value: true } },
             },
           }),
           prisma.issue.count({ where: exec.where }),

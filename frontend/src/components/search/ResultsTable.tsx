@@ -21,11 +21,19 @@
 import { useMemo } from 'react';
 import { Table, Tag, type TableProps } from 'antd';
 
-import type { IssueSearchRow } from '../../api/search';
+import type { IssueSearchRow, SchemaField } from '../../api/search';
 
 export interface ResultsTableProps {
   issues: IssueSearchRow[];
   columns: string[];
+  /**
+   * Custom-field metadata from `/search/schema`. Used to resolve column names
+   * that aren't system fields — the compiler stores values under
+   * `issue.customFieldValues[]` keyed by `customFieldId`, so the table needs
+   * the `{ id, name }` mapping to find them. Optional so the legacy prop
+   * shape (system-only columns) keeps working.
+   */
+  customFields?: SchemaField[];
   total: number;
   page: number;
   pageSize: number;
@@ -91,7 +99,34 @@ function rewriteOrderBy(jql: string, field: string, dir: SortState): string {
   return `${withoutOrderBy.trim()} ORDER BY ${field} ${kw}`.trim();
 }
 
-function renderCell(col: string, issue: IssueSearchRow): React.ReactNode {
+/**
+ * Unwrap the JSON envelope `{ v: ... }` used for custom-field values in
+ * Postgres. Backend stores every CF value under the `v` key so queries can
+ * target a stable path; when rendering we transparently drop the wrapper.
+ */
+function extractCustomFieldValue(raw: unknown): unknown {
+  if (raw && typeof raw === 'object' && 'v' in raw) {
+    return (raw as { v: unknown }).v;
+  }
+  return raw;
+}
+
+function formatCustomFieldValue(v: unknown): React.ReactNode {
+  if (v === null || v === undefined) return '—';
+  if (Array.isArray(v)) {
+    if (v.length === 0) return '—';
+    return v.map((x) => (x === null || x === undefined ? '' : String(x))).join(', ');
+  }
+  if (typeof v === 'boolean') return v ? 'Да' : 'Нет';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+function renderCell(
+  col: string,
+  issue: IssueSearchRow,
+  customFieldsByName: Map<string, SchemaField>,
+): React.ReactNode {
   switch (col) {
     case 'key':
       return (
@@ -126,13 +161,23 @@ function renderCell(col: string, issue: IssueSearchRow): React.ReactNode {
       return (issue as unknown as { sprint?: { name: string } }).sprint?.name ?? '—';
     case 'release':
       return (issue as unknown as { release?: { name: string } }).release?.name ?? '—';
-    default:
-      // Custom fields / unknown — render raw value as string.
+    default: {
+      // Custom fields — look up by configured name (case-insensitive to match
+      // the backend schema loader), then extract the `{ v: ... }` envelope.
+      const cf = customFieldsByName.get(col.toLowerCase());
+      if (cf?.uuid && issue.customFieldValues) {
+        const row = issue.customFieldValues.find((r) => r.customFieldId === cf.uuid);
+        if (!row) return '—';
+        return formatCustomFieldValue(extractCustomFieldValue(row.value));
+      }
+      // Unknown column — attempt the legacy flat-key lookup so older
+      // integrations (exported rows with flat keys) don't silently render '—'.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const v = (issue as any)[col];
       if (v === null || v === undefined) return '—';
       if (typeof v === 'object') return JSON.stringify(v);
       return String(v);
+    }
   }
 }
 
@@ -149,6 +194,7 @@ function priorityColor(p: string): string {
 export default function ResultsTable({
   issues,
   columns,
+  customFields,
   total,
   page,
   pageSize,
@@ -159,14 +205,22 @@ export default function ResultsTable({
   selectedIds,
 }: ResultsTableProps) {
   const currentSort = useMemo(() => parseOrderBy(currentJql), [currentJql]);
+  // Case-insensitive name → SchemaField index. Built once per customFields
+  // change so renderCell can resolve custom-field columns in O(1).
+  const customFieldsByName = useMemo(() => {
+    const map = new Map<string, SchemaField>();
+    for (const cf of customFields ?? []) map.set(cf.name.toLowerCase(), cf);
+    return map;
+  }, [customFields]);
 
   const tableCols: TableProps<IssueSearchRow>['columns'] = columns.map((col) => {
     const isSortable = SORTABLE.has(col);
     const sortOrder: SortState =
       currentSort?.field === col.toLowerCase() ? currentSort.dir : null;
+    const cf = customFieldsByName.get(col.toLowerCase());
     return {
       key: col,
-      title: COLUMN_LABELS[col] ?? col,
+      title: COLUMN_LABELS[col] ?? cf?.label ?? col,
       dataIndex: col,
       // `compare: false` suppresses Ant Table client-side sort — we rewrite
       // JQL's ORDER BY on onChange and let the backend re-order. Without this,
@@ -174,7 +228,7 @@ export default function ResultsTable({
       sorter: isSortable ? { compare: () => 0, multiple: 0 } : false,
       sortOrder,
       showSorterTooltip: isSortable ? undefined : false,
-      render: (_: unknown, issue: IssueSearchRow) => renderCell(col, issue),
+      render: (_: unknown, issue: IssueSearchRow) => renderCell(col, issue, customFieldsByName),
     };
   });
 

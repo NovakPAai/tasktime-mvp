@@ -202,6 +202,16 @@ class Builder {
       const hits = this.ctx.customFields.filter((f) => f.name.toLowerCase() === lc);
       return hits.length === 1 ? hits[0]! : null;
     }
+    // `labels` / `label` ident → first LABEL-typed custom field (Prisma stores
+    // labels in IssueCustomFieldValue, not on the Issue row). If no such CF is
+    // registered in the workspace, return null — compileSystemClause will then
+    // emit a MATCH_NONE (+warning) rather than a hard UNRESOLVED_FIELD.
+    if (ref.kind === 'Ident') {
+      const lc = ref.name.toLowerCase();
+      if (lc === 'labels' || lc === 'label') {
+        return this.ctx.customFields.find((f) => f.fieldType === 'LABEL') ?? null;
+      }
+    }
     return null;
   }
 
@@ -283,6 +293,26 @@ function compileSystemClause(
     errors: builder.errors,
   };
 
+  // Derived system fields — no direct column on `issues`. Handle before the
+  // generic SYSTEM_FIELD_COLUMN path so they don't fall through to UNRESOLVED_FIELD.
+  if (field.name === 'statuscategory') {
+    return compileStatusCategory(c, sysCtx);
+  }
+  if (field.name === 'labels') {
+    // `labels` is registered as a system field for discoverability (Basic builder
+    // menu + /schema endpoint), but Prisma stores values via
+    // IssueCustomFieldValue. resolveCustomField() picks the first LABEL-typed CF
+    // in the workspace; if none exists, the query yields no rows and we surface
+    // a non-fatal warning so the UI can prompt the admin.
+    builder.warnings.push({
+      code: 'UNRESOLVED_FIELD',
+      message: 'No LABEL-typed custom field is configured in the workspace. Query will return 0 rows.',
+      field: 'labels',
+      hint: 'Admin → Custom Fields → add a field of type LABEL.',
+    });
+    return MATCH_NONE;
+  }
+
   switch (c.op.kind) {
     case 'Compare':
       return compileCompare(field, c.op.op, c.op.value, sysCtx);
@@ -300,6 +330,83 @@ function compileSystemClause(
   }
 }
 
+// ─── statusCategory compiler ────────────────────────────────────────────────
+
+/**
+ * Derived-field compiler for `statusCategory`. Maps the three category enum
+ * values (TODO / IN_PROGRESS / DONE) to sets of `IssueStatus` enum values on
+ * the Issue row — correct for both workflow-managed and legacy issues because
+ * `Issue.status` is always populated.
+ *
+ * Mapping is application-level policy per JIRA convention:
+ *   - TODO        ← OPEN
+ *   - IN_PROGRESS ← IN_PROGRESS, REVIEW
+ *   - DONE        ← DONE, CANCELLED
+ */
+const STATUS_CATEGORY_TO_ISSUE_STATUS: Record<string, readonly string[]> = {
+  TODO: ['OPEN'],
+  IN_PROGRESS: ['IN_PROGRESS', 'REVIEW'],
+  DONE: ['DONE', 'CANCELLED'],
+};
+
+function compileStatusCategory(c: ClauseNode, ctx: SystemContext): Prisma.IssueWhereInput {
+  // statusCategory is always populated (Issue.status is a non-null enum with
+  // a DB default). IS [NOT] EMPTY collapses deterministically.
+  if (c.op.kind === 'IsEmpty') {
+    return c.op.negated ? MATCH_ALL : MATCH_NONE;
+  }
+
+  // Extract the raw category tokens (TODO / IN_PROGRESS / DONE) from the clause.
+  const tokens: string[] = [];
+  if (c.op.kind === 'Compare') {
+    const t = categoryTokenFrom(c.op.value);
+    if (t === null) {
+      ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: 'statusCategory expects TODO | IN_PROGRESS | DONE.', field: 'statuscategory' });
+      return MATCH_NONE;
+    }
+    tokens.push(t);
+  } else if (c.op.kind === 'In') {
+    for (const v of c.op.values) {
+      const t = categoryTokenFrom(v);
+      if (t === null) {
+        ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: 'statusCategory expects TODO | IN_PROGRESS | DONE.', field: 'statuscategory' });
+        return MATCH_NONE;
+      }
+      tokens.push(t);
+    }
+  } else {
+    ctx.errors.push({ code: 'UNSUPPORTED_OP', message: `Operator ${c.op.kind} is not supported for statusCategory.`, field: 'statuscategory' });
+    return MATCH_NONE;
+  }
+
+  // Expand category tokens → IssueStatus[] (dedup).
+  const statusSet = new Set<string>();
+  for (const t of tokens) {
+    const mapped = STATUS_CATEGORY_TO_ISSUE_STATUS[t];
+    if (!mapped) {
+      ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: `Unknown statusCategory: ${t}`, field: 'statuscategory' });
+      return MATCH_NONE;
+    }
+    for (const s of mapped) statusSet.add(s);
+  }
+  const statuses = [...statusSet];
+
+  const negated = c.op.kind === 'Compare' ? c.op.op === '!=' : c.op.negated;
+  // Cast via `any` once — Prisma's generated IssueStatus enum isn't exported
+  // as a value from @prisma/client, so we emit the string IDs and let Prisma's
+  // runtime validator enforce them (invalid token already rejected above by
+  // STATUS_CATEGORY_TO_ISSUE_STATUS lookup).
+  const where = { status: { in: statuses } } as unknown as Prisma.IssueWhereInput;
+  return negated ? { NOT: where } : where;
+}
+
+/** Extract an uppercase category ident from Compare/In value. Returns null for non-idents. */
+function categoryTokenFrom(expr: Expr): string | null {
+  if (expr.kind === 'Ident') return expr.name.toUpperCase();
+  if (expr.kind === 'String') return expr.value.toUpperCase();
+  return null;
+}
+
 // ─── Compare ────────────────────────────────────────────────────────────────
 
 function compileCompare(
@@ -314,11 +421,12 @@ function compileCompare(
     return MATCH_NONE;
   }
 
-  const value = evaluateValue(valueExpr, field.type, ctx);
-  if (value.kind === 'error') {
-    ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: value.message, field: field.name });
+  const rawValue = evaluateValue(valueExpr, field.type, ctx);
+  if (rawValue.kind === 'error') {
+    ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: rawValue.message, field: field.name });
     return MATCH_NONE;
   }
+  const value = resolveReferenceEvaluated(field.name, rawValue, ctx);
 
   // Text fields with `~` / `!~`
   if (op === '~' || op === '!~') {
@@ -369,8 +477,8 @@ function compileIn(
     ctx.errors.push({ code: 'UNRESOLVED_FIELD', message: `No column for \`${field.name}\`.`, field: field.name });
     return MATCH_NONE;
   }
-  const resolved = values.map((v) => evaluateValue(v, field.type, ctx));
-  const erroring = resolved.filter((r) => r.kind === 'error');
+  const resolvedRaw = values.map((v) => evaluateValue(v, field.type, ctx));
+  const erroring = resolvedRaw.filter((r) => r.kind === 'error');
   if (erroring.length > 0) {
     for (const e of erroring) {
       if (e.kind === 'error') ctx.errors.push({ code: 'UNRESOLVED_VALUE', message: e.message, field: field.name });
@@ -378,6 +486,7 @@ function compileIn(
     return MATCH_NONE;
   }
 
+  const resolved = resolvedRaw.map((r) => resolveReferenceEvaluated(field.name, r, ctx));
   const primitives = resolved.flatMap((r) => flattenResolvedValue(r));
   if (primitives.length === 0) return MATCH_NONE;
 
@@ -414,6 +523,43 @@ function compileIsEmpty(field: { name: string; type: TtqlType }, negated: boolea
   if (!col) return MATCH_NONE;
   const rhs = negated ? { not: null } : null;
   return wrapColumn(col, rhs);
+}
+
+// ─── Reference-value translation (user-facing name/key/email → row id) ──────
+
+/**
+ * Reference-type system fields whose Prisma column is a UUID, not the
+ * user-facing identifier. The suggest endpoint inserts `TTMP` (project key),
+ * `"alice@x.com"` (user email), `"Sprint 1"` (sprint name), `BUG`
+ * (issue-type systemKey), `TTMP-123` (issue key) — so every clause on these
+ * fields has to be rewritten before the where-clause reaches Prisma, else the
+ * compare runs UUID = "human text" and always matches nothing.
+ *
+ * The caller pre-resolves the referenced literals into
+ * `CompileContext.referenceValues` (see `search.reference-resolver.ts`); this
+ * helper looks up and substitutes. Unknown values fall through unchanged so
+ * the top-level scope filter (or simple id-mismatch) yields zero rows — same
+ * as JIRA's behaviour on non-existent keys.
+ *
+ * Substitutes only `string` values; `scalar-id` / `id-list` already contain
+ * ids produced by the function resolver.
+ */
+const REFERENCE_FIELDS: ReadonlySet<string> = new Set([
+  'project', 'assignee', 'reporter', 'sprint', 'release',
+  'type', 'parent', 'epic', 'issue', 'key',
+]);
+
+function resolveReferenceEvaluated(
+  fieldName: string,
+  value: EvaluatedValue,
+  ctx: SystemContext,
+): EvaluatedValue {
+  if (!REFERENCE_FIELDS.has(fieldName)) return value;
+  if (value.kind !== 'string') return value;
+  const lookup = ctx.ctx.referenceValues.get(fieldName);
+  if (!lookup) return value;
+  const mapped = lookup.get(value.value.toLowerCase());
+  return mapped ? { kind: 'string', value: mapped } : value;
 }
 
 // ─── Value evaluator ────────────────────────────────────────────────────────

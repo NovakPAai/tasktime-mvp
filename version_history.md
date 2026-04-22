@@ -2,7 +2,37 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.49**
+**Last version: 2.50**
+
+---
+
+## [2.50] [2026-04-22] fix(ttsrh-1): post-release — reference values + suggest routing + custom-field columns
+
+**PR:** (to be filled after push)
+**Ветка:** `fix/ttsrh-1-post-release-references-suggest-columns`
+
+### Что было
+
+После merge эпика TTSRH-1 и включения UAT на staging всплыли три класса багов:
+1. **Reference-поля возвращали пустой результат** — `project = "TTMP"`, `assignee = "alice@x.com"`, `sprint = "Sprint 1"`, `type = BUG`, `parent = "TTMP-123"` и т.д. Compiler клал строковый литерал напрямую в Prisma-фильтр на UUID-колонку; suggest при этом вставляет key / email / name / systemKey / issue-key — не UUID.
+2. **Suggestions в редакторе игнорировали контекст курсора** — пользователь печатает `proj`, popup показывает `now()`, `today()`, `currentUser()` вместо полей. Backend trigger-ил Basic-builder shortcut по `prefix !== undefined` — а CM6 шлёт `prefix` на каждый keystroke для своей локальной фильтрации.
+3. **Кастомные поля недоступны в ColumnConfigurator** — `AVAILABLE_COLUMNS` хардкод без schema-fetch; backend не включал `customFieldValues` в payload; добавление всех CF в список — плохой UX при большом каталоге.
+
+### Что теперь
+
+- **Reference resolver** — новый модуль `backend/src/modules/search/search.reference-resolver.ts`. Обходит AST, собирает литералы по reference-полям, одним батчем на каждое семейство (User / Sprint / Release / IssueTypeConfig / Issue / Project) резолвит через Prisma. Результат → `CompileContext.referenceValues`. Compiler подменяет литералы на row-id перед `wrapColumn(...)`. Неизвестные значения — scope-фильтр даёт 0 строк.
+- **Suggest routing guard** — `backend/src/modules/search/search.suggest.ts` требует `ctx.field` для Basic-builder пути; только `prefix` → cursor-analysis path (editor mode).
+- **Custom-field columns end-to-end**:
+  - backend `searchIssues` Prisma `include` добавил `customFieldValues: { select: { customFieldId, value } }`;
+  - `SearchPage.tsx` делает `getSearchSchema()` на mount и мёржит custom-имена в `AVAILABLE_COLUMNS`;
+  - `ResultsTable.tsx` распаковывает `{v: ...}` envelope;
+  - `ColumnConfigurator.tsx` — search-box + новый prop `primary` (при пустом вводе показываются только system, при наборе — фильтр по всему каталогу, JIRA-style).
+- **Документация** — §5.2 / §5.5 / §5.8 / §5.11 обновлены; добавлен §13.9.2 «Post-release фиксы» с таблицей симптом → корень → фикс.
+- **Тесты** — 7 новых в `search-compiler.unit.test.ts` (reference-value translation), 2 новых в `search-suggest.unit.test.ts` (routing guard). 487 backend tests pass.
+
+### Связано
+
+- TTSRH-1 (Advanced Search) — post-release hardening.
 
 ---
 

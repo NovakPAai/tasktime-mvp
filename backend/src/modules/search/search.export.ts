@@ -37,6 +37,7 @@ import { compile, type CompileIssue } from './search.compiler.js';
 import { executeCustomFieldPredicates } from './search.custom-field.executor.js';
 import { resolveFunctions } from './search.function-resolver.js';
 import { parse } from './search.parser.js';
+import { resolveReferenceValues } from './search.reference-resolver.js';
 import { SYSTEM_FIELDS } from './search.schema.js';
 import { loadCustomFields } from './search.schema.loader.js';
 import { createValidatorContext, validate, type ValidationIssue } from './search.validator.js';
@@ -174,8 +175,12 @@ export async function prepareExport(input: ExportInput, ctx: ExportContext): Pro
     variant: 'default',
   });
 
+  const referenceValues = await resolveReferenceValues(ast, {
+    accessibleProjectIds: ctx.accessibleProjectIds,
+  });
   const compiled = compile(ast, {
     accessibleProjectIds: ctx.accessibleProjectIds,
+    referenceValues,
     customFields,
     resolved,
     now,

@@ -62,6 +62,7 @@ function makeCtx(): CompileContext {
   const resolved: ResolvedFunctions = { currentUserId: 'u-1', calls: new Map() };
   return {
     accessibleProjectIds: PROJECTS,
+    referenceValues: new Map(),
     customFields: [],
     resolved,
     now: ANCHOR,
