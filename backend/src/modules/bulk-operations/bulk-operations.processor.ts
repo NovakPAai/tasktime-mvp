@@ -333,28 +333,32 @@ async function publishEvents(
   items: Array<{ issueId: string; issueKey: string; outcome: BulkItemOutcome; errorCode: string; errorMessage: string }>,
 ): Promise<void> {
   const channel = eventsChannel(operationId);
-  await publishToChannel(channel, {
-    event: 'progress',
-    data: {
-      processed: op.processed,
-      succeeded: op.succeeded,
-      failed: op.failed,
-      skipped: op.skipped,
-      etaSeconds: estimateEta(op),
-    },
-  });
-  for (const item of items) {
-    await publishToChannel(channel, {
-      event: 'item',
+  // Fan-out параллельно: при batch=25 где все failed это 26 sequential publish
+  // round-trip'ов = ~130 мс на cross-AZ Redis. Promise.all — ~5 мс.
+  await Promise.all([
+    publishToChannel(channel, {
+      event: 'progress',
       data: {
-        issueId: item.issueId,
-        issueKey: item.issueKey,
-        outcome: item.outcome,
-        errorCode: item.errorCode,
-        errorMessage: item.errorMessage,
+        processed: op.processed,
+        succeeded: op.succeeded,
+        failed: op.failed,
+        skipped: op.skipped,
+        etaSeconds: estimateEta(op),
       },
-    });
-  }
+    }),
+    ...items.map((item) =>
+      publishToChannel(channel, {
+        event: 'item',
+        data: {
+          issueId: item.issueId,
+          issueKey: item.issueKey,
+          outcome: item.outcome,
+          errorCode: item.errorCode,
+          errorMessage: item.errorMessage,
+        },
+      }),
+    ),
+  ]);
 }
 
 // ────── Finalize ─────────────────────────────────────────────────────────────

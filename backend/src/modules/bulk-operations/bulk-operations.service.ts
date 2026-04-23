@@ -411,8 +411,16 @@ export async function retryFailedItems(
   }
 
   // Собираем items для повтора (retention ≤ 30 дней — после зачистки 410 Gone).
+  // CANCELLED_BY_USER намеренно исключаем: юзер отменил эти items, ретраить их
+  // без явного нового запуска = игнорирование его решения. Прочие SKIPPED
+  // (ALREADY_IN_TARGET_STATE, NO_ACCESS) тоже retry'ятся в scope — processor
+  // повторно их SKIP'нет, user-facing это дешево. STALE_STATUS — legitimate retry.
   const failedItems = await prisma.bulkOperationItem.findMany({
-    where: { operationId, outcome: { in: ['FAILED', 'SKIPPED'] } },
+    where: {
+      operationId,
+      outcome: { in: ['FAILED', 'SKIPPED'] },
+      errorCode: { not: 'CANCELLED_BY_USER' },
+    },
     select: { issueId: true },
   });
   if (failedItems.length === 0) {
@@ -498,6 +506,10 @@ export async function retryFailedItems(
 /**
  * Async iterator через BulkOperationItem для CSV-стрима report.csv. Читаем
  * cursor-based пагинацией по 1000 строк, чтобы не держать все items в памяти.
+ *
+ * @internal Caller ОБЯЗАН пройти authorization-check через `getBulkOperation`
+ * до вызова — функция сама по себе доверяет operationId и не разделяет
+ * ownership. В router'е это делается до `streamReportItems`.
  */
 export async function* streamReportItems(operationId: string): AsyncIterable<{
   issueKey: string;

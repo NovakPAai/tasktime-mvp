@@ -232,8 +232,12 @@ router.get('/bulk-operations/:id/stream', async (req: AuthRequest, res: Response
       res.write(`: ping\n\n`);
     }, 20_000);
 
-    // Cleanup при disconnect клиента / ошибке.
+    // Cleanup при disconnect клиента / ошибке — одноразовый, иначе
+    // subscriber.quit() может вызваться дважды (close + error events).
+    let cleanedUp = false;
     const cleanup = async () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       clearInterval(heartbeat);
       try {
         await subscriber.quit();
@@ -266,21 +270,35 @@ router.get('/bulk-operations/:id/report.csv', async (req: AuthRequest, res: Resp
       systemRoles: req.user!.systemRoles,
     });
 
+    // operationId — UUID (только [a-z0-9-]), filename safe без RFC 5987 quoting.
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="bulk-op-${operationId}.csv"`);
 
     const csv = format({ headers: ['issueKey', 'outcome', 'errorCode', 'errorMessage', 'processedAt'], writeBOM: true });
+    csv.on('error', (csvErr) => {
+      captureError(csvErr, { fn: 'CSV stream error', operationId });
+      if (!res.headersSent) next(csvErr);
+      else res.destroy(csvErr);
+    });
     csv.pipe(res);
-    for await (const row of service.streamReportItems(operationId)) {
-      csv.write({
-        issueKey: row.issueKey,
-        outcome: row.outcome,
-        errorCode: row.errorCode,
-        errorMessage: row.errorMessage,
-        processedAt: row.processedAt.toISOString(),
-      });
+    try {
+      for await (const row of service.streamReportItems(operationId)) {
+        csv.write({
+          issueKey: row.issueKey,
+          outcome: row.outcome,
+          errorCode: row.errorCode,
+          errorMessage: row.errorMessage,
+          processedAt: row.processedAt.toISOString(),
+        });
+      }
+      csv.end();
+    } catch (streamErr) {
+      // Ошибка после pipe: headers уже отправлены, next(err) не поможет.
+      // Разрушаем stream, чтобы клиент получил abrupt close а не молчаливо
+      // truncated CSV.
+      captureError(streamErr, { fn: 'CSV iterate error', operationId });
+      csv.destroy(streamErr as Error);
     }
-    csv.end();
   } catch (err) {
     next(err);
   }

@@ -85,6 +85,23 @@ describe('retryFailedItems', () => {
     await expect(retryFailedItems('op-1', actor, KEY)).rejects.toMatchObject({ statusCode: 410 });
   });
 
+  it('query для retry items исключает CANCELLED_BY_USER errorCode', async () => {
+    mockPrisma.bulkOperation.findUnique.mockResolvedValue({
+      id: 'op-1', createdById: 'u1', status: 'CANCELLED', type: 'TRANSITION',
+      scopeKind: 'ids', scopeJql: null, payload: {},
+    });
+    mockPrisma.bulkOperationItem.findMany.mockResolvedValue([]);
+    await expect(retryFailedItems('op-1', actor, KEY)).rejects.toMatchObject({ statusCode: 410 });
+    expect(mockPrisma.bulkOperationItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          errorCode: { not: 'CANCELLED_BY_USER' },
+          outcome: { in: ['FAILED', 'SKIPPED'] },
+        }),
+      }),
+    );
+  });
+
   it('happy: создаёт новую op с scope=ids, RPUSH pending, audit', async () => {
     mockPrisma.bulkOperation.findUnique
       .mockResolvedValueOnce({
