@@ -8,7 +8,7 @@
 
 ## [2.54] [2026-04-23] feat(auth): TTBULK-1 PR-2 — effective system roles (DIRECT ∪ GROUP) + Redis TTL-cache
 
-**PR:** (to be filled after push)
+**PR:** [#144](https://github.com/NovakPAai/tasktime-mvp/pull/144) (merged 2026-04-23)
 **Ветка:** `ttbulk-1/auth-effective-roles`
 
 ### Что было

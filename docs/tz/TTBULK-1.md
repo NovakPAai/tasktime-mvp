@@ -1041,7 +1041,7 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
 | №  | Branch                          | Scope (коротко)                                              | Часы | Зависимости       | Сабтаски           | Статус        |
 |----|---------------------------------|--------------------------------------------------------------|------|-------------------|--------------------|---------------|
 | 1  | `ttbulk-1/schema`               | Prisma models + enums + UserGroupSystemRole + AuditLog.bulkOperationId + feature-flag scaffolding | 4    | —                 | migration + mount  | 🟢 Merged (#143) |
-| 2  | `ttbulk-1/auth-effective-roles` | `getEffectiveUserSystemRoles` + auth middleware + Redis cache | 4    | PR-1              | resolver + tests   | ✅ Done        |
+| 2  | `ttbulk-1/auth-effective-roles` | `getEffectiveUserSystemRoles` + auth middleware + Redis cache | 4    | PR-1              | resolver + tests   | 🟢 Merged (#144) |
 | 3  | `ttbulk-1/service-core`         | DTO + preview/create/get/cancel + Redis pending queue + previewToken | 12   | PR-2              | service + router   | 📋 Планируется |
 | 4  | `ttbulk-1/processor`            | TransitionExecutor + processor cron + recovery + retention + AuditLog.bulkOperationId | 14   | PR-3              | executor + processor | 📋 Планируется |
 | 5  | `ttbulk-1/executors`            | 6 executors (Assign/EditField/EditCustomField/MoveToSprint/AddComment/Delete) | 14   | PR-4              | per-executor + tests | 📋 Планируется |
