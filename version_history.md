@@ -2,7 +2,40 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.60**
+**Last version: 2.61**
+
+---
+
+## [2.61] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-9a — wizard skeleton + API client + types + BulkActionsBar кнопка
+
+**PR:** [#151](https://github.com/NovakPAai/tasktime-mvp/pull/151)
+**Ветка:** `ttbulk-1/wizard-modal-a`
+
+### Что было
+
+Backend массовых операций полностью готов (PR-1..8: schema, auth, service, processor, 7 executors, SSE, runtime settings, admin-roles). Фронтенд пока не имел ни типов, ни клиента, ни UI — пользователь не мог запустить операцию из UI; всё вызывалось вручную через curl.
+
+### Что теперь
+
+- **`frontend/src/types/bulk.types.ts`** — зеркало backend DTO: `BulkOperationType` (7), `BulkOperationStatus` (6), `BulkScope` (ids/jql), `BulkOperationPayload` (discriminated union по type), `BulkPreviewResponse`, `BulkOperation`, `BulkOperationListResponse`, `BulkCreateResponse` + UI-хелперы `OPERATION_LABELS`, `STATUS_COLORS`, `BULK_OPS_MAX_ITEMS_HARD_LIMIT`, `isBulkOperationPayload` type-guard.
+- **`frontend/src/api/bulkOperations.ts`** — typed client: `preview / create / get / cancel / listMine / retryFailed / downloadReport` + `streamUrl(id)` helper для PR-10 SSE hook. `Idempotency-Key` в HTTP-заголовке (match backend router contract).
+- **`BulkOperationWizardModal.tsx`** — скелет 4-step Ant `Steps` + Modal, state reset на mount. Step1 реализован; Step2-4 — placeholder Alert.
+- **`Step1PickOperation.tsx`** — Radio-список 7 типов с description'ами + DELETE warning tag.
+- **Integration в `BulkActionsBar.tsx`**: кнопка «Массовые операции» gated под `features.bulkOps`. Modal close → `onCleared()`.
+
+### Влияние на prod
+
+Gated под `VITE_FEATURES_BULK_OPS=false` — кнопка не видна до cutover (PR-12).
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) → 0 errors.
+- `npm run lint` — 0 новых warnings.
+- Pre-push review: 🟠 2 → fixed (Idempotency-Key header drift, alreadyExisted stripped field), 🟡 3 → fixed.
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §3.2, §8.1, §13.6 PR-9.
 
 ---
 
