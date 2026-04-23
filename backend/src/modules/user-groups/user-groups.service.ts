@@ -192,7 +192,12 @@ export async function addMembers(groupId: string, userIds: string[], addedById: 
 
   // TTBULK-1 PR-2: если группа имеет системные роли (UserGroupSystemRole),
   // эффективный набор новых членов меняется — сбрасываем их Redis-кэш.
-  await invalidateUserSystemRolesCacheForUsers(userIds);
+  // Гейтим по result.count: createMany(skipDuplicates) пропускает существующих
+  // членов, но точный дельта-сет ids не возвращает. При count===0 пропускаем инвалидацию;
+  // при count>0 допускаем лёгкое over-invalidation (редкий bulk-add, TTL всё равно 60с).
+  if (result.count > 0) {
+    await invalidateUserSystemRolesCacheForUsers(userIds);
+  }
 
   return { added: result.count };
 }

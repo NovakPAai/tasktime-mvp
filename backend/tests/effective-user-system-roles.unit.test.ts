@@ -113,14 +113,24 @@ describe('getEffectiveUserSystemRoles — Redis TTL-кэш', () => {
     );
   });
 
-  it('graceful fallback: Redis недоступен (getCachedJson=null) — идём в БД и всё равно работаем', async () => {
+  it('cache-miss также покрывает Redis-down: redis.ts глотает ошибки в getCachedJson, возвращая null', async () => {
+    // `shared/redis.ts` оборачивает `redis.get` в try/catch и возвращает null при любой ошибке
+    // (Redis unavailable / timeout / parse error). Поэтому миддлвара видит ровно тот же путь,
+    // что обычный cache-miss: null → идём в БД, пишем через setCachedJson (no-op при down).
     mockRedis.getCachedJson.mockResolvedValue(null);
     mockPrisma.userSystemRole.findMany.mockResolvedValue([{ role: 'USER' }]);
     mockPrisma.userGroupSystemRole.findMany.mockResolvedValue([]);
     const roles = await getEffectiveUserSystemRoles('u1');
     expect(roles).toEqual(['USER']);
-    // setCachedJson всё равно вызывается (no-op если Redis down, но контракт — писать).
+    // setCachedJson всё равно вызывается (silently no-op если Redis down — контракт redis.ts).
     expect(mockRedis.setCachedJson).toHaveBeenCalled();
+  });
+
+  it('пробрасывает ошибку если БД падает (чтобы middleware fail-open мог перехватить)', async () => {
+    mockRedis.getCachedJson.mockResolvedValue(null);
+    mockPrisma.userSystemRole.findMany.mockRejectedValue(new Error('DB down'));
+    mockPrisma.userGroupSystemRole.findMany.mockResolvedValue([]);
+    await expect(getEffectiveUserSystemRoles('u1')).rejects.toThrow('DB down');
   });
 });
 

@@ -31,6 +31,7 @@ export function hasGlobalProjectReadAccess(userRoles: SystemRoleType[]): boolean
 const SYSROLES_CACHE_PREFIX = 'user:sysroles:';
 const SYSROLES_CACHE_TTL_SECONDS = 60;
 
+/** @internal — exported for unit-test assertions only; не использовать из app-кода. */
 export function sysRolesCacheKey(userId: string): string {
   return `${SYSROLES_CACHE_PREFIX}${userId}`;
 }

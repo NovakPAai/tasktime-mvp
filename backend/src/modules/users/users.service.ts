@@ -120,6 +120,9 @@ export async function setSystemRoles(actor: RoleChangeActor, targetId: string, r
     },
   });
 
+  // TTBULK-1 PR-2: эффективные роли в Redis-кэше устарели после bulk-мутации.
+  await invalidateUserSystemRolesCache(targetId);
+
   return formatUser(updated);
 }
 
