@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_ITEMS_HARD_LIMIT } from '../bulk-operations/bulk-operations.dto.js';
 
 export const createUserDto = z.object({
   email: z.string().email(),
@@ -36,7 +37,22 @@ export const updateSystemSettingsDto = z.object({
   sessionLifetimeMinutes: z.number().int().min(5).max(10080),
 });
 
+// TTBULK-1 PR-7 — bulk operations runtime limits.
+// maxItems max = MAX_ITEMS_HARD_LIMIT (10k), чтобы устранить silent-clamp
+// между DTO-валидацией и service-clamp'ом. Если в будущем hard-cap расширят —
+// поднимется и этот bound.
+export const updateBulkOpsSettingsDto = z
+  .object({
+    maxConcurrentPerUser: z.number().int().min(1).max(20).optional(),
+    maxItems: z.number().int().min(100).max(MAX_ITEMS_HARD_LIMIT).optional(),
+  })
+  .refine(
+    (v) => v.maxConcurrentPerUser !== undefined || v.maxItems !== undefined,
+    { message: 'Нужно передать хотя бы одно поле (maxConcurrentPerUser или maxItems)' },
+  );
+
 export type CreateUserDto = z.infer<typeof createUserDto>;
 export type UpdateUserAdminDto = z.infer<typeof updateUserAdminDto>;
 export type AssignProjectRoleDto = z.infer<typeof assignProjectRoleDto>;
 export type UpdateSystemSettingsDto = z.infer<typeof updateSystemSettingsDto>;
+export type UpdateBulkOpsSettingsDto = z.infer<typeof updateBulkOpsSettingsDto>;

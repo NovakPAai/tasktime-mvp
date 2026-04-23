@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockPrisma, mockRedis, mockSearchIssues } = vi.hoisted(() => {
+const { mockPrisma, mockRedis, mockSearchIssues, mockBulkOpsSettings } = vi.hoisted(() => {
   const mockPrisma = {
     bulkOperation: {
       findUnique: vi.fn(),
@@ -37,7 +37,9 @@ const { mockPrisma, mockRedis, mockSearchIssues } = vi.hoisted(() => {
     isRedisAvailable: vi.fn(),
   };
   const mockSearchIssues = vi.fn();
-  return { mockPrisma, mockRedis, mockSearchIssues };
+  // TTBULK-1 PR-7 — runtime settings mock; defaults соответствуют PR-3/PR-4 значениям.
+  const mockBulkOpsSettings = vi.fn().mockResolvedValue({ maxConcurrentPerUser: 3, maxItems: 10_000 });
+  return { mockPrisma, mockRedis, mockSearchIssues, mockBulkOpsSettings };
 });
 
 vi.mock('../src/prisma/client.js', () => ({ prisma: mockPrisma }));
@@ -58,6 +60,14 @@ vi.mock('../src/shared/auth/roles.js', async () => {
 });
 vi.mock('../src/modules/search/search.service.js', () => ({
   searchIssues: mockSearchIssues,
+}));
+vi.mock('../src/modules/bulk-operations/bulk-operations-settings.service.js', () => ({
+  getBulkOpsSettings: mockBulkOpsSettings,
+  setBulkOpsSettings: vi.fn(),
+  BULK_OPS_MAX_CONCURRENT_MIN: 1,
+  BULK_OPS_MAX_CONCURRENT_MAX: 20,
+  BULK_OPS_MAX_ITEMS_MIN: 100,
+  BULK_OPS_MAX_ITEMS_MAX: 50_000,
 }));
 
 const service = await import('../src/modules/bulk-operations/bulk-operations.service.js');

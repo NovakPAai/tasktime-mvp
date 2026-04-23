@@ -1,35 +1,45 @@
-import { useState, useEffect } from 'react';
-import { InputNumber, Button, Form, message } from 'antd';
+import { useState, useEffect, useCallback } from 'react';
+import { InputNumber, Button, Form, message, Result } from 'antd';
 import { adminApi } from '../../api/admin';
+import type { BulkOpsSettings } from '../../api/admin';
 
 export default function AdminSystemPage() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [sessionLifetimeMinutes, setSessionLifetimeMinutes] = useState<number>(60);
   const [jwtExpiresIn, setJwtExpiresIn] = useState<string>('1h');
   const [form] = Form.useForm();
 
+  // TTBULK-1 PR-7 — bulk operations runtime limits.
+  const [bulkOps, setBulkOps] = useState<BulkOpsSettings>({ maxConcurrentPerUser: 3, maxItems: 10000 });
+  const [bulkOpsSaving, setBulkOpsSaving] = useState(false);
+  const [bulkOpsForm] = Form.useForm();
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [sys, bulk] = await Promise.all([
+        adminApi.getSystemSettings(),
+        adminApi.getBulkOpsSettings(),
+      ]);
+      setSessionLifetimeMinutes(sys.sessionLifetimeMinutes);
+      setJwtExpiresIn(sys.jwtExpiresIn);
+      form.setFieldsValue({ sessionLifetimeMinutes: sys.sessionLifetimeMinutes });
+      setBulkOps(bulk);
+      bulkOpsForm.setFieldsValue(bulk);
+    } catch {
+      setLoadError('Не удалось загрузить системные настройки');
+      message.error('Не удалось загрузить системные настройки');
+    } finally {
+      setLoading(false);
+    }
+  }, [form, bulkOpsForm]);
+
   useEffect(() => {
-    let isMounted = true;
-
-    adminApi.getSystemSettings()
-      .then(settings => {
-        if (!isMounted) return;
-        setSessionLifetimeMinutes(settings.sessionLifetimeMinutes);
-        setJwtExpiresIn(settings.jwtExpiresIn);
-        form.setFieldsValue({ sessionLifetimeMinutes: settings.sessionLifetimeMinutes });
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        message.error('Не удалось загрузить системные настройки');
-      })
-      .finally(() => {
-        if (!isMounted) return;
-        setLoading(false);
-      });
-
-    return () => { isMounted = false; };
-  }, [form]);
+    void loadAll();
+  }, [loadAll]);
 
   const handleSave = async (values: { sessionLifetimeMinutes: number }) => {
     setSaving(true);
@@ -44,11 +54,36 @@ export default function AdminSystemPage() {
     }
   };
 
+  const handleBulkOpsSave = async (values: BulkOpsSettings) => {
+    setBulkOpsSaving(true);
+    try {
+      const updated = await adminApi.setBulkOpsSettings(values);
+      setBulkOps(updated);
+      bulkOpsForm.setFieldsValue(updated);
+      message.success('Лимиты массовых операций сохранены');
+    } catch {
+      message.error('Не удалось сохранить лимиты массовых операций');
+    } finally {
+      setBulkOpsSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
         <span>Загрузка...</span>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Result
+        status="warning"
+        title={loadError}
+        subTitle="Попробуйте перезагрузить страницу или обратитесь к администратору."
+        extra={<Button type="primary" onClick={() => void loadAll()}>Повторить</Button>}
+      />
     );
   }
 
@@ -129,6 +164,69 @@ export default function AdminSystemPage() {
         (пользователь выйдет не позже этого срока). Скользящая сессия — более ранний выход при бездействии,
         настраивается выше без перезапуска.
       </p>
+
+      {/* ── Массовые операции (TTBULK-1 PR-7) ── */}
+      <p style={{ margin: '32px 0 16px', fontWeight: 500, color: 'rgba(0,0,0,0.65)', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 8 }}>
+        Массовые операции
+      </p>
+      <p style={{ margin: '0 0 16px', color: 'rgba(0,0,0,0.45)', fontSize: 12, lineHeight: 1.6 }}>
+        Runtime-лимиты на массовые операции (BULK_OPERATOR). Изменения вступают в силу в течение 60 секунд.
+      </p>
+
+      <Form form={bulkOpsForm} layout="vertical" onFinish={handleBulkOpsSave} initialValues={bulkOps}>
+        <Form.Item
+          label="Максимум одновременных операций на пользователя"
+          name="maxConcurrentPerUser"
+          extra={`Текущее значение: ${bulkOps.maxConcurrentPerUser}. Диапазон: 1..20.`}
+          rules={[
+            { required: true, message: 'Укажите значение' },
+            {
+              validator: (_, value) =>
+                Number.isInteger(value) && value >= 1 && value <= 20
+                  ? Promise.resolve()
+                  : Promise.reject('Значение должно быть от 1 до 20'),
+            },
+          ]}
+        >
+          <InputNumber
+            min={1}
+            max={20}
+            step={1}
+            style={{ width: 200 }}
+            aria-label="Максимум одновременных массовых операций на пользователя"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Максимум элементов в одной операции"
+          name="maxItems"
+          extra={`Текущее значение: ${bulkOps.maxItems}. Диапазон: 100..10000 (hard-cap соответствует MAX_ITEMS_HARD_LIMIT в API).`}
+          rules={[
+            { required: true, message: 'Укажите значение' },
+            {
+              validator: (_, value) =>
+                Number.isInteger(value) && value >= 100 && value <= 10_000
+                  ? Promise.resolve()
+                  : Promise.reject('Значение должно быть от 100 до 10000'),
+            },
+          ]}
+        >
+          <InputNumber
+            min={100}
+            max={10_000}
+            step={100}
+            style={{ width: 200 }}
+            addonAfter="шт"
+            aria-label="Максимум элементов в одной массовой операции"
+          />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="primary" htmlType="submit" loading={bulkOpsSaving}>
+            Сохранить
+          </Button>
+        </Form.Item>
+      </Form>
     </div>
   );
 }

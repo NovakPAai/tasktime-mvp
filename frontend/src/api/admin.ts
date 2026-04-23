@@ -8,6 +8,11 @@ export interface SystemSettings {
   jwtExpiresIn: string;
 }
 
+export interface BulkOpsSettings {
+  maxConcurrentPerUser: number;
+  maxItems: number;
+}
+
 export interface ProjectRole {
   id: string;
   role: 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
@@ -96,6 +101,15 @@ export const adminApi = {
 
   setSessionLifetime: (sessionLifetimeMinutes: number) =>
     api.patch<SystemSettings>('/admin/settings/system', { sessionLifetimeMinutes }).then(r => r.data),
+
+  // TTBULK-1 PR-7 — bulk operations runtime limits.
+  getBulkOpsSettings: () =>
+    api.get<BulkOpsSettings>('/admin/system-settings/bulk-operations').then(r => r.data),
+
+  // API accepts partial (Zod `.refine` — минимум одно поле), но UI всегда
+  // шлёт оба значения — тип сигнатуры отражает реальный call-site контракт.
+  setBulkOpsSettings: (settings: BulkOpsSettings) =>
+    api.patch<BulkOpsSettings>('/admin/system-settings/bulk-operations', settings).then(r => r.data),
 };
 
 export interface AdminStats {

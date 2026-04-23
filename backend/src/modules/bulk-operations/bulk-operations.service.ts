@@ -49,19 +49,13 @@ import {
 } from '../../shared/redis.js';
 import { searchIssues } from '../search/search.service.js';
 import type { OperationPayload } from './bulk-operations.dto.js';
-import { MAX_ITEMS_HARD_LIMIT } from './bulk-operations.dto.js';
+import { getBulkOpsSettings } from './bulk-operations-settings.service.js';
 import type { BulkExecutorActor } from './bulk-operations.types.js';
 
 // ────── Константы / конфигурация ─────────────────────────────────────────────
 
 /** TTL preview-токена в Redis. Пользователь обязан подтвердить submit до истечения. */
 const PREVIEW_TOKEN_TTL_SECONDS = Number(process.env.BULK_OP_PREVIEW_TTL_SECONDS ?? 15 * 60);
-
-/** Default concurrency quota per user (runtime может переопределить в PR-7 через System settings). */
-const DEFAULT_MAX_CONCURRENT_PER_USER = Number(process.env.BULK_OP_MAX_CONCURRENT_PER_USER ?? 3);
-
-/** Hard-cap on items per operation (DTO уже clamp'ит на 10k; SystemSettings (PR-7) может <= этого). */
-const DEFAULT_MAX_ITEMS = Number(process.env.BULK_OP_MAX_ITEMS ?? MAX_ITEMS_HARD_LIMIT);
 
 const PREVIEW_KEY_PREFIX = 'bulk-op:preview:';
 const PENDING_KEY_PREFIX = 'bulk-op:';
@@ -248,6 +242,19 @@ export async function createBulkOperation(
     throw new AppError(400, 'No eligible items in preview', { code: 'NO_ELIGIBLE_ITEMS' });
   }
 
+  // Runtime-limits из System settings (PR-7). Читаем один раз на create.
+  const { maxConcurrentPerUser, maxItems } = await getBulkOpsSettings();
+
+  // Safety check: админ мог понизить maxItems между preview и create — отклоняем
+  // submit со старым (большим) scope'ом, чтобы избежать обхода нового лимита.
+  if (preview.eligibleIds.length > maxItems) {
+    throw new AppError(400, 'Too many items in scope', {
+      code: 'TOO_MANY_ITEMS',
+      limit: maxItems,
+      received: preview.eligibleIds.length,
+    });
+  }
+
   // Concurrency-quota per user.
   const activeCount = await prisma.bulkOperation.count({
     where: {
@@ -255,11 +262,11 @@ export async function createBulkOperation(
       status: { in: ['QUEUED', 'RUNNING'] },
     },
   });
-  if (activeCount >= DEFAULT_MAX_CONCURRENT_PER_USER) {
+  if (activeCount >= maxConcurrentPerUser) {
     throw new AppError(429, 'Too many concurrent bulk operations', {
       code: 'TOO_MANY_CONCURRENT',
       retryAfter: 60,
-      limit: DEFAULT_MAX_CONCURRENT_PER_USER,
+      limit: maxConcurrentPerUser,
       active: activeCount,
     });
   }
@@ -439,14 +446,15 @@ export async function retryFailedItems(
   }
 
   // Concurrency-quota + Redis availability — те же проверки что в createBulkOperation.
+  const { maxConcurrentPerUser } = await getBulkOpsSettings();
   const activeCount = await prisma.bulkOperation.count({
     where: { createdById: ctx.userId, status: { in: ['QUEUED', 'RUNNING'] } },
   });
-  if (activeCount >= DEFAULT_MAX_CONCURRENT_PER_USER) {
+  if (activeCount >= maxConcurrentPerUser) {
     throw new AppError(429, 'Too many concurrent bulk operations', {
       code: 'TOO_MANY_CONCURRENT',
       retryAfter: 60,
-      limit: DEFAULT_MAX_CONCURRENT_PER_USER,
+      limit: maxConcurrentPerUser,
       active: activeCount,
     });
   }
@@ -593,12 +601,16 @@ async function resolveScope(
   scope: { kind: 'ids'; issueIds: string[] } | { kind: 'jql'; jql: string },
   ctx: BulkExecutorContext,
 ): Promise<{ issueIds: string[]; totalMatched: number; warnings: string[] }> {
+  // Runtime maxItems из System settings (PR-7). Читаем один раз на preview —
+  // внутри цикла и в обеих ветках используем одно и то же значение, чтобы
+  // половина scope'а не отсекалась новым лимитом в середине.
+  const { maxItems } = await getBulkOpsSettings();
+
   if (scope.kind === 'ids') {
-    // Hard-cap уже применён DTO (MAX_ITEMS_HARD_LIMIT = 10k). Runtime-lim может быть <= этого.
-    if (scope.issueIds.length > DEFAULT_MAX_ITEMS) {
+    if (scope.issueIds.length > maxItems) {
       throw new AppError(400, 'Too many items in scope', {
         code: 'TOO_MANY_ITEMS',
-        limit: DEFAULT_MAX_ITEMS,
+        limit: maxItems,
         received: scope.issueIds.length,
       });
     }
@@ -618,7 +630,7 @@ async function resolveScope(
   const issueIds: string[] = [];
   let totalMatched = 0;
   let startAt = 0;
-  while (issueIds.length < DEFAULT_MAX_ITEMS) {
+  while (issueIds.length < maxItems) {
     const result = await searchIssues(
       { jql: scope.jql, startAt, limit: SEARCH_PAGE_SIZE },
       {
@@ -633,16 +645,16 @@ async function resolveScope(
     totalMatched = result.total;
     for (const i of result.issues) {
       issueIds.push(i.id);
-      if (issueIds.length >= DEFAULT_MAX_ITEMS) break;
+      if (issueIds.length >= maxItems) break;
     }
     if (result.issues.length < SEARCH_PAGE_SIZE) break;
     startAt += SEARCH_PAGE_SIZE;
     // MAX_START_AT в search.service = 10000 — наш loop упирается в тот же лимит.
-    if (startAt >= DEFAULT_MAX_ITEMS) break;
+    if (startAt >= maxItems) break;
   }
 
   const warnings: string[] = [];
-  if (totalMatched > DEFAULT_MAX_ITEMS) {
+  if (totalMatched > maxItems) {
     warnings.push('TRUNCATED_TO_MAX_ITEMS');
   }
 

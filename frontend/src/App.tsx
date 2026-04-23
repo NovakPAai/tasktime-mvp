@@ -45,6 +45,7 @@ import {
   canViewUserGroups,
   canManageCheckpoints,
   canViewCheckpointAudit,
+  canManageSystemSettings,
 } from './lib/roles';
 import AdminTransitionScreensPage from './pages/admin/AdminTransitionScreensPage';
 import AdminTransitionScreenEditorPage from './pages/admin/AdminTransitionScreenEditorPage';
@@ -258,7 +259,7 @@ export default function App() {
               path="admin/checkpoint-audit"
               element={<AdminGate allow={canViewCheckpointAudit}><AdminCheckpointAuditPage /></AdminGate>}
             />
-            <Route path="admin/system" element={<AdminSystemPage />} />
+            <Route path="admin/system" element={<AdminGate allow={canManageSystemSettings}><AdminSystemPage /></AdminGate>} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="pipeline" element={<PipelineDashboardPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
