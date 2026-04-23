@@ -13,7 +13,7 @@
  * См. docs/tz/TTBULK-1.md §4, §13.1.
  */
 
-import { Router, type Response } from 'express';
+import { Router, type Response, type NextFunction, type Request } from 'express';
 import { authenticate } from '../../shared/middleware/auth.js';
 
 const router = Router();
@@ -22,10 +22,16 @@ const router = Router();
 // `authenticate` middleware стоит уже сейчас — в PR-3 все bulk-ops routes будут
 // за `authenticate + requireRole('BULK_OPERATOR')` (см. §4.1), поэтому ставим
 // auth-gate заранее, чтобы не оставить стаб открытым даже теоретически.
-router.get('/bulk-operations/ping', authenticate, (_req, res: Response) => {
-  res.status(501).json({
-    message: 'Not implemented yet. TTBULK-1 rolls out in phases — см. docs/tz/TTBULK-1.md §13.',
-  });
+// try/catch + next(err) — консистентно с saved-filters / search / issues.router.ts
+// (любая неожиданная ошибка уходит в global errorHandler).
+router.get('/bulk-operations/ping', authenticate, (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.status(501).json({
+      message: 'Not implemented yet. TTBULK-1 rolls out in phases — см. docs/tz/TTBULK-1.md §13.',
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
