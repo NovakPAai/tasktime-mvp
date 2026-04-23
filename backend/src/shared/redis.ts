@@ -112,6 +112,54 @@ export async function incrWithTtl(key: string, ttlSeconds: number): Promise<numb
 }
 
 /**
+ * TTBULK-1: RPUSH строк в Redis-список. Используется для pending-очереди
+ * массовых операций (`bulk-op:{id}:pending`), обработчик выполняет LPOP
+ * пачку (processor в PR-4).
+ *
+ * Семантика возврата:
+ *   • число ≥ 1 — длина списка после push'а (success).
+ *   • 0         — values пуст, Redis не трогался (caller получает noop, но
+ *                 это НЕ сигнал ошибки).
+ *   • null      — Redis недоступен (connect fail / socket error / exception).
+ *
+ * Caller обязан различать 0 и null: bulk-operations.service реагирует на
+ * null как 503 + rollback, но 0 — не должен (см. pre-push-reviewer #7).
+ */
+export async function rpushList(key: string, values: string[]): Promise<number | null> {
+  if (values.length === 0) return 0;
+  const redis = await getRedisClientInternal();
+  if (!redis) return null;
+  try {
+    return await redis.rPush(key, values);
+  } catch (err) {
+    captureError(err, { fn: 'rpushList', key });
+    return null;
+  }
+}
+
+/**
+ * TTBULK-1: атомарный GET+DEL одним round-trip'ом (node-redis v4/v5 `getDel`).
+ * Используется для one-shot previewToken'ов: две одновременные create-запроса
+ * с одним token'ом не должны обе увидеть данные (double-consume race).
+ *
+ * Возвращает распарсенный JSON значения или null, если ключа нет (expired /
+ * уже consumed). Silent-no-op при Redis-down (null) — caller трактует как
+ * "token отсутствует" что эквивалентно 409 PREVIEW_EXPIRED.
+ */
+export async function atomicGetDelJson<T>(key: string): Promise<T | null> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return null;
+  try {
+    const raw = await redis.getDel(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    captureError(err, { fn: 'atomicGetDelJson', key });
+    return null;
+  }
+}
+
+/**
  * Delete all keys whose name starts with `prefix`.
  * Uses SCAN to avoid blocking the server; safe on large keyspaces.
  */
