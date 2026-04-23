@@ -8,7 +8,7 @@
 
 ## [2.59] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-7 — runtime System settings для массовых операций (maxConcurrentPerUser / maxItems) + AdminSystemPage UI
 
-**PR:** [#149](https://github.com/NovakPAai/tasktime-mvp/pull/149)
+**PR:** [#149](https://github.com/NovakPAai/tasktime-mvp/pull/149) (merged 2026-04-23)
 **Ветка:** `ttbulk-1/system-settings`
 
 ### Что было

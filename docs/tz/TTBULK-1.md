@@ -1046,8 +1046,8 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
 | 4  | `ttbulk-1/processor`            | TransitionExecutor + processor cron + recovery + retention + AuditLog.bulkOperationId | 14   | PR-3              | executor + processor | 🟢 Merged (#146) |
 | 5  | `ttbulk-1/executors`            | 6 executors (Assign/EditField/EditCustomField/MoveToSprint/AddComment/Delete) | 14   | PR-4              | per-executor + tests | 🟢 Merged (#147) |
 | 6  | `ttbulk-1/streaming-report`     | SSE + Redis pub/sub + report.csv + retry-failed              | 8    | PR-3, PR-4        | router + processor hook | 🟢 Merged (#148) |
-| 7  | `ttbulk-1/system-settings`      | maxConcurrentPerUser / maxItems API + AdminSystemPage UI     | 4    | PR-3              | backend + UI       | ✅ Done |
-| 8  | `ttbulk-1/admin-roles`          | BULK_OPERATOR in admin roles UI + group-assign endpoints     | 8    | PR-2              | endpoints + UI     | 📋 Планируется |
+| 7  | `ttbulk-1/system-settings`      | maxConcurrentPerUser / maxItems API + AdminSystemPage UI     | 4    | PR-3              | backend + UI       | 🟢 Merged (#149) |
+| 8  | `ttbulk-1/admin-roles`          | BULK_OPERATOR in admin roles UI + group-assign endpoints     | 8    | PR-2              | endpoints + UI     | ✅ Done |
 | 9  | `ttbulk-1/wizard-modal`         | BulkOperationWizardModal (4 steps + preview + conflicts)     | 14   | PR-3              | 4 step components  | 📋 Планируется |
 | 10 | `ttbulk-1/progress-drawer`      | ProgressDrawer + SSE hook + floating chip + zustand store    | 8    | PR-6, PR-9        | hook + drawer + chip | 📋 Планируется |
 | 11 | `ttbulk-1/operations-page`      | /operations page + retry UI + AuditLog badge in IssuePage    | 8    | PR-10             | page + badge       | 📋 Планируется |
