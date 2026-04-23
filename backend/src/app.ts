@@ -47,6 +47,7 @@ import checkpointAuditRouter from './modules/releases/checkpoints/audit.router.j
 import burndownRouter from './modules/releases/checkpoints/burndown.router.js';
 import searchRouter from './modules/search/search.router.js';
 import savedFiltersRouter from './modules/saved-filters/saved-filters.router.js';
+import bulkOperationsRouter from './modules/bulk-operations/bulk-operations.router.js';
 import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
 import userGroupsRouter from './modules/user-groups/user-groups.router.js';
 import userSecurityRouter from './modules/user-security/user-security.router.js';
@@ -177,6 +178,13 @@ export function createApp() {
   if (features.advancedSearch) {
     app.use('/api', searchRouter);
     app.use('/api', savedFiltersRouter);
+  }
+
+  // TTBULK-1 PR-1: массовые операции над issue'ами. Роутер монтируется только
+  // под feature-флагом до PR-12 (UAT cutover). При выключенном флаге /api/bulk-operations/*
+  // проваливается на дефолтный 404 Express'а. См. docs/tz/TTBULK-1.md §13.1.
+  if (features.bulkOps) {
+    app.use('/api', bulkOperationsRouter);
   }
 
   // Public: project workflow scheme

@@ -41,6 +41,7 @@ model User {
   checkpointTemplatesCreated CheckpointTemplate[]    @relation("checkpointTemplateCreator")
   savedFilters               SavedFilter[]           @relation("savedFilterOwner")
   savedFilterShares          SavedFilterShare[]      @relation("savedFilterShareUser")
+  bulkOperations             BulkOperation[]
 
   @@map("users")
 }
@@ -51,6 +52,10 @@ enum SystemRoleType {
   RELEASE_MANAGER
   USER
   AUDITOR
+  // TTBULK-1: разрешение на запуск массовых операций. Системная, независимая —
+  // не даёт read-доступа, только возможность инициировать bulk. Per-item RBAC
+  // в executor'ах остаётся в силе (см. docs/tz/TTBULK-1.md §7.1).
+  BULK_OPERATOR
 }
 
 model UserSystemRole {
@@ -595,12 +600,20 @@ model AuditLog {
   userAgent  String?  @map("user_agent")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  // TTBULK-1 §5.4: ссылка на массовую операцию, в рамках которой была сделана эта
+  // запись. `AuditLog` в данном репозитории выполняет роль `IssueHistory` из ТЗ
+  // (см. delta в §13.1). `onDelete: SetNull` — при retention-зачистке старой
+  // операции метка сбрасывается, но запись audit-log'а остаётся для forensics.
+  bulkOperationId String?        @map("bulk_operation_id")
+  bulkOperation   BulkOperation? @relation(fields: [bulkOperationId], references: [id], onDelete: SetNull)
+
   user User? @relation(fields: [userId], references: [id])
 
   @@index([entityType, entityId])
   @@index([userId])
   @@index([createdAt])
   @@index([action])
+  @@index([bulkOperationId])
   @@map("audit_logs")
 }
 
@@ -1080,7 +1093,8 @@ model UserGroup {
 
   members           UserGroupMember[]
   projectRoles      ProjectGroupRole[]
-  savedFilterShares SavedFilterShare[] @relation("savedFilterShareGroup")
+  savedFilterShares SavedFilterShare[]    @relation("savedFilterShareGroup")
+  systemRoles       UserGroupSystemRole[]
 
   @@index([name])
   @@map("user_groups")
@@ -1206,26 +1220,26 @@ model CheckpointTemplateItem {
 }
 
 model ReleaseCheckpoint {
-  id                      String                  @id @default(uuid())
-  releaseId               String                  @map("release_id")
-  checkpointTypeId        String                  @map("checkpoint_type_id")
-  criteriaSnapshot        Json                    @map("criteria_snapshot")
-  offsetDaysSnapshot      Int                     @map("offset_days_snapshot")
+  id                    String                  @id @default(uuid())
+  releaseId             String                  @map("release_id")
+  checkpointTypeId      String                  @map("checkpoint_type_id")
+  criteriaSnapshot      Json                    @map("criteria_snapshot")
+  offsetDaysSnapshot    Int                     @map("offset_days_snapshot")
   // TTSRH-1 §5.12: immutable snapshot TTQL + mode at checkpoint creation time.
   // Even если parent CheckpointType редактируется позже, already-created
   // ReleaseCheckpoint evaluate'ится по snapshot'у (FR-25 backward-compat).
-  ttqlSnapshot            String?                 @map("ttql_snapshot") @db.Text
-  conditionModeSnapshot   CheckpointConditionMode @default(STRUCTURED) @map("condition_mode_snapshot")
-  deadline                DateTime                @db.Date
-  state                   CheckpointState         @default(PENDING)
-  lastEvaluatedAt         DateTime?               @map("last_evaluated_at")
-  applicableIssueIds      Json                    @default("[]") @map("applicable_issue_ids")
-  passedIssueIds          Json                    @default("[]") @map("passed_issue_ids")
-  violations              Json                    @default("[]")
-  violationsHash          String                  @default("") @map("violations_hash")
-  lastWebhookSentAt       DateTime?               @map("last_webhook_sent_at")
-  createdAt               DateTime                @default(now()) @map("created_at")
-  updatedAt               DateTime                @updatedAt @map("updated_at")
+  ttqlSnapshot          String?                 @map("ttql_snapshot") @db.Text
+  conditionModeSnapshot CheckpointConditionMode @default(STRUCTURED) @map("condition_mode_snapshot")
+  deadline              DateTime                @db.Date
+  state                 CheckpointState         @default(PENDING)
+  lastEvaluatedAt       DateTime?               @map("last_evaluated_at")
+  applicableIssueIds    Json                    @default("[]") @map("applicable_issue_ids")
+  passedIssueIds        Json                    @default("[]") @map("passed_issue_ids")
+  violations            Json                    @default("[]")
+  violationsHash        String                  @default("") @map("violations_hash")
+  lastWebhookSentAt     DateTime?               @map("last_webhook_sent_at")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
 
   release         Release                    @relation(fields: [releaseId], references: [id], onDelete: Cascade)
   checkpointType  CheckpointType             @relation(fields: [checkpointTypeId], references: [id], onDelete: Restrict)
@@ -1336,4 +1350,109 @@ model SavedFilterShare {
   @@index([userId])
   @@index([groupId])
   @@map("saved_filter_shares")
+}
+
+// ===== TTBULK-1: Bulk Operations =====
+//
+// See docs/tz/TTBULK-1.md §5 for the full data model rationale.
+// Retention: BulkOperation — 90d; BulkOperationItem — 30d (only failed/skipped
+// rows are persisted; succeeded items leave their trace in AuditLog via
+// AuditLog.bulkOperationId). Pending queue lives in Redis, not here.
+
+enum BulkOperationType {
+  TRANSITION
+  ASSIGN
+  EDIT_FIELD
+  EDIT_CUSTOM_FIELD
+  MOVE_TO_SPRINT
+  ADD_COMMENT
+  DELETE
+}
+
+enum BulkOperationStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+/// Minimal: only failed + skipped items are persisted; succeeded items
+/// are reflected solely via AuditLog for the affected issue (§5.0).
+enum BulkItemOutcome {
+  FAILED
+  SKIPPED
+}
+
+model BulkOperation {
+  id              String              @id @default(uuid())
+  createdById     String              @map("created_by_id")
+  type            BulkOperationType
+  status          BulkOperationStatus @default(QUEUED)
+  scopeKind       String              @map("scope_kind") // 'ids' | 'jql'
+  /// Snapshot JQL (for 'jql' scope) — ≤ 4000 chars, null для 'ids'
+  scopeJql        String?             @map("scope_jql")
+  /// Discriminated payload snapshot (see DTO in PR-3). Long user-generated text
+  /// (ADD_COMMENT body) is truncated to 500 chars for retention; full comment
+  /// lives in the Comment table as the normal side-effect.
+  payload         Json
+  idempotencyKey  String              @map("idempotency_key")
+  total           Int
+  processed       Int                 @default(0)
+  succeeded       Int                 @default(0)
+  failed          Int                 @default(0)
+  skipped         Int                 @default(0)
+  cancelRequested Boolean             @default(false) @map("cancel_requested")
+  /// Last beat from the worker — used by recovery cron to detect stalled jobs
+  heartbeatAt     DateTime?           @map("heartbeat_at")
+  startedAt       DateTime?           @map("started_at")
+  finishedAt      DateTime?           @map("finished_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  createdBy User                @relation(fields: [createdById], references: [id])
+  items     BulkOperationItem[]
+  auditLogs AuditLog[]
+
+  @@unique([createdById, idempotencyKey])
+  @@index([createdById, createdAt])
+  @@index([status, heartbeatAt])
+  @@index([createdAt]) // retention sweep
+  @@map("bulk_operations")
+}
+
+/// Persisted ONLY for items that failed or were skipped.
+/// Succeeded items leave their trace in AuditLog, not here (§5.0).
+model BulkOperationItem {
+  id           String          @id @default(uuid())
+  operationId  String          @map("operation_id")
+  issueId      String          @map("issue_id")
+  /// Denormalised key so report stays readable if the issue is later deleted
+  issueKey     String          @map("issue_key")
+  outcome      BulkItemOutcome
+  errorCode    String          @map("error_code") // machine-readable
+  errorMessage String          @map("error_message") // ≤ 500 chars, truncated
+  processedAt  DateTime        @default(now()) @map("processed_at")
+
+  operation BulkOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([operationId])
+  @@index([processedAt]) // retention sweep
+  @@map("bulk_operation_items")
+}
+
+/// TTBULK-1 §5.1: system role assignment through group (previously UserGroup
+/// stored only project-level roles via ProjectGroupRole).
+model UserGroupSystemRole {
+  id        String         @id @default(uuid())
+  groupId   String         @map("group_id")
+  role      SystemRoleType
+  createdAt DateTime       @default(now()) @map("created_at")
+  createdBy String?        @map("created_by")
+
+  group UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, role])
+  @@index([groupId])
+  @@map("user_group_system_roles")
 }

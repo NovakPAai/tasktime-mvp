@@ -781,10 +781,11 @@ BULK_OP_ITEMS_RETENTION_DAYS=30           # хранение failed/skipped item
 - **База:** все ветки создаются от свежего `main`, PR-ы мерджатся напрямую в `main` (консистентно с TTSRH-1 / TTMP-160).
 - **Именование веток:** `ttbulk-1/<scope>`.
 - **Имя коммита:** `feat(bulk-ops): TTBULK-1 PR-<N> — <summary>` / `feat(admin): …` / `chore(bulk-ops): …`.
-- **Feature flag:**
-  - Backend — `BULK_OP_PROCESSOR_ENABLED=false` по умолчанию до PR-12 (UAT cutover). При `false` роут `/api/bulk-operations/*` возвращает 404, а cron-tick'и не запускаются.
+- **Feature flag (cutover gate):**
+  - Backend — `FEATURES_BULK_OPS=false` по умолчанию до PR-12 (UAT cutover); консистентно с `FEATURES_ADVANCED_SEARCH` в `shared/features.ts`. При `false` роут `/api/bulk-operations/*` не монтируется → fall-through 404.
   - Frontend — `VITE_FEATURES_BULK_OPS=false`. При `false` кнопка «Массовые операции» в `BulkActionsBar` и маршрут `/operations` скрыты.
   - Оба флага переводятся в `true` в PR-12 (единый UAT-коммит с docs и e2e).
+- **Kill-switch (ops):** `BULK_OP_PROCESSOR_ENABLED=true` (default) — читается в PR-4 при регистрации processor-cron'а. Позволяет остановить фоновую обработку без rebuild'а (для incident-response), независимо от feature-flag'а.
 - **Размер PR:** целимся 400–900 строк diff. PR-4, PR-5, PR-9 потенциально крупнее — при 1000+ строк разбиваем на два follow-up'а.
 - **CI:** каждый PR — `npm run lint` (0 errors, 0 новых warnings), `npx tsc --noEmit`, `npm run test:parser` + `test:bulk-ops` (новый pure-unit script, добавляется в PR-3), Playwright e2e (PR-9+).
 - **Pre-push review gate:** каждый PR проходит `pre-push-reviewer` агента ДО push'а. 🟠+🟡 фиксы — follow-up коммит `chore(bulk-ops): TTBULK-1 PR-<N> — pre-push review fixups`.
@@ -840,11 +841,11 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
     3. `CREATE TABLE bulk_operations`, `bulk_operation_items`, `user_group_system_roles`.
     4. `ALTER TABLE audit_logs ADD COLUMN bulk_operation_id UUID REFERENCES bulk_operations(id) ON DELETE SET NULL` + индекс.
   - `backend/src/prisma/schema.prisma` — модели `BulkOperation`, `BulkOperationItem`, `UserGroupSystemRole`, новое значение `SystemRoleType.BULK_OPERATOR`, `AuditLog.bulkOperationId`.
-  - ENV-флаги `BULK_OP_PROCESSOR_ENABLED=false`, `VITE_FEATURES_BULK_OPS=false` в `backend/src/config.ts` / `frontend/.env.example`.
-  - Пустой модуль `backend/src/modules/bulk-operations/` с `bulk-operations.router.ts`, возвращающим 404 при выключенном флаге; mount в `app.ts`.
+  - Feature-flag `FEATURES_BULK_OPS=false` в `backend/src/shared/features.ts` (паттерн `advancedSearch`) + `VITE_FEATURES_BULK_OPS=false` в `frontend/src/lib/features.ts` и `frontend/.env.example`.
+  - Пустой модуль `backend/src/modules/bulk-operations/` с `bulk-operations.router.ts` (на PR-1 — stub-ping → 501 `Not Implemented`); условный mount в `app.ts` под `if (features.bulkOps)` — при выключенном флаге роут не существует → 404.
   - `prisma generate`, `make test` (регрессии existing).
 - **Не включает:** ни preview-логику, ни executor'ов, ни UI — только схема + инфраструктура.
-- **Merge-ready check:** миграция применяется/откатывается на чистой БД; `SELECT 'BULK_OPERATOR'::SystemRoleType` работает; при `BULK_OP_PROCESSOR_ENABLED=false` `/api/bulk-operations/*` → 404.
+- **Merge-ready check:** миграция применяется/откатывается на чистой БД; `SELECT 'BULK_OPERATOR'::"SystemRoleType"` работает; при `FEATURES_BULK_OPS=false` `/api/bulk-operations/*` → 404; при `true` — `/api/bulk-operations/ping` → 501.
 - **Security-review:** схема + миграция (FK, on-delete-policy, индексы).
 - **Оценка:** ~4ч.
 
@@ -1015,7 +1016,7 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
   - `docs/user-manual/bulk-operations.md` — пользовательская инструкция со скриншотами (все 7 операций + retry + cancel + как найти изменение в истории задачи).
   - `docs/OPERATIONS_RUNBOOK.md` — раздел «Forensics для массовых операций» с SQL-примерами (§7.4) + операционные алёрты.
   - Обновление §5.0/§5.4 ТЗ — sanitize `IssueHistory` → `AuditLog` (docs-correction).
-  - **Cutover:** `BULK_OP_PROCESSOR_ENABLED=true` в `backend/src/config.ts` default; `VITE_FEATURES_BULK_OPS=true` в `frontend/.env`.
+  - **Cutover:** `FEATURES_BULK_OPS=true` в `backend/src/shared/features.ts` default; `VITE_FEATURES_BULK_OPS=true` в `frontend/.env` + `.env.staging`.
   - Manual UAT по чек-листу §15 (все 17 пунктов).
 - **Не включает:** metrics/alerts (PR-13).
 - **Merge-ready check:** все e2e зелёные; k6 p95 < 60s; feature-flag flip не ломает legacy `BulkStatusWizardModal` на Sprint-борде.
@@ -1039,7 +1040,7 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
 
 | №  | Branch                          | Scope (коротко)                                              | Часы | Зависимости       | Сабтаски           | Статус        |
 |----|---------------------------------|--------------------------------------------------------------|------|-------------------|--------------------|---------------|
-| 1  | `ttbulk-1/schema`               | Prisma models + enums + UserGroupSystemRole + AuditLog.bulkOperationId + feature-flag scaffolding | 4    | —                 | migration + mount  | 📋 Планируется |
+| 1  | `ttbulk-1/schema`               | Prisma models + enums + UserGroupSystemRole + AuditLog.bulkOperationId + feature-flag scaffolding | 4    | —                 | migration + mount  | 🚧 В работе    |
 | 2  | `ttbulk-1/auth-effective-roles` | `getEffectiveUserSystemRoles` + auth middleware + Redis cache | 4    | PR-1              | resolver + tests   | 📋 Планируется |
 | 3  | `ttbulk-1/service-core`         | DTO + preview/create/get/cancel + Redis pending queue + previewToken | 12   | PR-2              | service + router   | 📋 Планируется |
 | 4  | `ttbulk-1/processor`            | TransitionExecutor + processor cron + recovery + retention + AuditLog.bulkOperationId | 14   | PR-3              | executor + processor | 📋 Планируется |
