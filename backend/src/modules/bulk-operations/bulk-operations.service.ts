@@ -381,6 +381,182 @@ export async function cancelBulkOperation(
 
 // ────── list ─────────────────────────────────────────────────────────────────
 
+// ────── retry-failed (PR-6) ─────────────────────────────────────────────────
+
+/**
+ * Создаёт новую операцию со scope=failed items исходной операции.
+ * Требования:
+ *   • Исходная op должна быть в терминальном статусе (не QUEUED/RUNNING).
+ *   • Failed/skipped items ещё не зачищены retention-cron'ом.
+ *   • Юзер — owner исходной op (404 на чужую).
+ *
+ * Новая op имеет тот же payload и scope.kind='ids' с issueIds из
+ * BulkOperationItem WHERE outcome IN ('FAILED','SKIPPED'). Полный цикл
+ * create (concurrency-quota, idempotency, RPUSH) — через createBulkOperation.
+ */
+export async function retryFailedItems(
+  operationId: string,
+  ctx: BulkExecutorActor,
+  idempotencyKey: string,
+): Promise<{ id: string; status: BulkOperationStatus; alreadyExisted: boolean }> {
+  const source = await prisma.bulkOperation.findUnique({
+    where: { id: operationId },
+    select: { id: true, createdById: true, status: true, type: true, scopeKind: true, scopeJql: true, payload: true },
+  });
+  if (!source || source.createdById !== ctx.userId) {
+    throw new AppError(404, 'Bulk operation not found');
+  }
+  if (source.status === 'QUEUED' || source.status === 'RUNNING') {
+    throw new AppError(409, 'Source operation still in progress', { code: 'SOURCE_NOT_TERMINAL' });
+  }
+
+  // Собираем items для повтора (retention ≤ 30 дней — после зачистки 410 Gone).
+  // CANCELLED_BY_USER намеренно исключаем: юзер отменил эти items, ретраить их
+  // без явного нового запуска = игнорирование его решения. Прочие SKIPPED
+  // (ALREADY_IN_TARGET_STATE, NO_ACCESS) тоже retry'ятся в scope — processor
+  // повторно их SKIP'нет, user-facing это дешево. STALE_STATUS — legitimate retry.
+  const failedItems = await prisma.bulkOperationItem.findMany({
+    where: {
+      operationId,
+      outcome: { in: ['FAILED', 'SKIPPED'] },
+      errorCode: { not: 'CANCELLED_BY_USER' },
+    },
+    select: { issueId: true },
+  });
+  if (failedItems.length === 0) {
+    throw new AppError(410, 'No failed/skipped items to retry (or retention cleanup already happened)', {
+      code: 'NO_RETRY_ITEMS',
+    });
+  }
+
+  // Идемпотентность — проверяем существующий retry по (userId, idempotencyKey).
+  const existing = await prisma.bulkOperation.findUnique({
+    where: { createdById_idempotencyKey: { createdById: ctx.userId, idempotencyKey } },
+    select: { id: true, status: true },
+  });
+  if (existing) {
+    return { id: existing.id, status: existing.status, alreadyExisted: true };
+  }
+
+  // Concurrency-quota + Redis availability — те же проверки что в createBulkOperation.
+  const activeCount = await prisma.bulkOperation.count({
+    where: { createdById: ctx.userId, status: { in: ['QUEUED', 'RUNNING'] } },
+  });
+  if (activeCount >= DEFAULT_MAX_CONCURRENT_PER_USER) {
+    throw new AppError(429, 'Too many concurrent bulk operations', {
+      code: 'TOO_MANY_CONCURRENT',
+      retryAfter: 60,
+      limit: DEFAULT_MAX_CONCURRENT_PER_USER,
+      active: activeCount,
+    });
+  }
+  if (!(await isRedisAvailable())) {
+    throw new AppError(503, 'Backend queue unavailable', { code: 'QUEUE_UNAVAILABLE' });
+  }
+
+  const issueIds = failedItems.map((i) => i.issueId);
+  let operation: { id: string; status: BulkOperationStatus };
+  try {
+    operation = await prisma.bulkOperation.create({
+      data: {
+        createdById: ctx.userId,
+        type: source.type,
+        status: 'QUEUED',
+        // Retry всегда scope=ids (снапшот предыдущих failed/skipped ID'ов), даже
+        // если исходная op была scope=jql — TZ §4.1 POST /:id/retry-failed.
+        scopeKind: 'ids',
+        scopeJql: null,
+        payload: source.payload as Prisma.InputJsonValue,
+        idempotencyKey,
+        total: issueIds.length,
+      },
+      select: { id: true, status: true },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, 'idempotency_key')) {
+      const raced = await prisma.bulkOperation.findUnique({
+        where: { createdById_idempotencyKey: { createdById: ctx.userId, idempotencyKey } },
+        select: { id: true, status: true },
+      });
+      if (raced) return { id: raced.id, status: raced.status, alreadyExisted: true };
+    }
+    throw err;
+  }
+
+  const pushed = await rpushList(pendingQueueKey(operation.id), issueIds);
+  if (pushed === null) {
+    await prisma.bulkOperation.delete({ where: { id: operation.id } });
+    throw new AppError(503, 'Backend queue unavailable', { code: 'QUEUE_UNAVAILABLE' });
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'bulk_operation.retry_failed',
+      entityType: 'bulk_operation',
+      entityId: operation.id,
+      userId: ctx.userId,
+      bulkOperationId: operation.id,
+      details: { sourceOperationId: operationId, retryItemCount: issueIds.length },
+    },
+  });
+
+  return { id: operation.id, status: operation.status, alreadyExisted: false };
+}
+
+/**
+ * Async iterator через BulkOperationItem для CSV-стрима report.csv. Читаем
+ * cursor-based пагинацией по 1000 строк, чтобы не держать все items в памяти.
+ *
+ * @internal Caller ОБЯЗАН пройти authorization-check через `getBulkOperation`
+ * до вызова — функция сама по себе доверяет operationId и не разделяет
+ * ownership. В router'е это делается до `streamReportItems`.
+ */
+export async function* streamReportItems(operationId: string): AsyncIterable<{
+  issueKey: string;
+  outcome: string;
+  errorCode: string;
+  errorMessage: string;
+  processedAt: Date;
+}> {
+  const PAGE = 1000;
+  let cursor: string | null = null;
+  while (true) {
+    const items: Array<{
+      id: string;
+      issueKey: string;
+      outcome: string;
+      errorCode: string;
+      errorMessage: string;
+      processedAt: Date;
+    }> = await prisma.bulkOperationItem.findMany({
+      where: { operationId },
+      take: PAGE,
+      orderBy: { id: 'asc' },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        issueKey: true,
+        outcome: true,
+        errorCode: true,
+        errorMessage: true,
+        processedAt: true,
+      },
+    });
+    if (items.length === 0) break;
+    for (const row of items) {
+      yield {
+        issueKey: row.issueKey,
+        outcome: row.outcome,
+        errorCode: row.errorCode,
+        errorMessage: row.errorMessage,
+        processedAt: row.processedAt,
+      };
+    }
+    if (items.length < PAGE) break;
+    cursor = items[items.length - 1].id;
+  }
+}
+
 export async function listBulkOperations(
   ctx: BulkExecutorActor,
   query: { limit?: number; startAt?: number; status?: BulkOperationStatus; type?: BulkOperationType },

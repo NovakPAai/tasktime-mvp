@@ -32,7 +32,7 @@ import type { BulkItemOutcome, BulkOperation, BulkOperationStatus, Prisma } from
 import type { ScheduledTask } from 'node-cron';
 import cron from 'node-cron';
 import { prisma } from '../../prisma/client.js';
-import { acquireLock, releaseLock, lpopListBatch } from '../../shared/redis.js';
+import { acquireLock, releaseLock, lpopListBatch, publishToChannel } from '../../shared/redis.js';
 import { runInBulkOperationContext } from '../../shared/bulk-operation-context.js';
 import { getEffectiveUserSystemRoles } from '../../shared/auth/roles.js';
 import { captureError } from '../../shared/utils/logger.js';
@@ -288,6 +288,11 @@ async function processOperationBatch(op: BulkOperation): Promise<TickResult> {
   // Если queue ещё не пуст и cancel не запрошен — следующий tick продолжит.
   // Иначе финализируем.
   const updated = await prisma.bulkOperation.findUniqueOrThrow({ where: { id: op.id } });
+
+  // TTBULK-1 PR-6: публикуем progress-event + каждый item в SSE-канал после
+  // каждого batch'а. Клиент видит инкремент счётчиков в live-режиме.
+  await publishEvents(op.id, updated, itemsToInsert);
+
   if (updated.cancelRequested) {
     return { kind: 'processed', operationId: op.id, batchSize: batch.length, finalized: await finalizeCancelled(updated) };
   }
@@ -295,6 +300,65 @@ async function processOperationBatch(op: BulkOperation): Promise<TickResult> {
     return { kind: 'processed', operationId: op.id, batchSize: batch.length, finalized: await finalize(updated) };
   }
   return { kind: 'processed', operationId: op.id, batchSize: batch.length, finalized: null };
+}
+
+// ────── SSE event publishing ────────────────────────────────────────────────
+
+function eventsChannel(operationId: string): string {
+  return `bulk-op:${operationId}:events`;
+}
+
+/** ETA rolling average — grubo оцениваем на основе processed / (now - startedAt). */
+function estimateEta(op: BulkOperation): number | null {
+  if (!op.startedAt || op.processed === 0) return null;
+  const elapsedMs = Date.now() - op.startedAt.getTime();
+  const remaining = Math.max(op.total - op.processed, 0);
+  if (remaining === 0) return 0;
+  const msPerItem = elapsedMs / op.processed;
+  return Math.round((msPerItem * remaining) / 1000);
+}
+
+/**
+ * Публикует SSE events после batch-обработки:
+ *   • один `progress` event со счётчиками;
+ *   • по одному `item` event на каждый записанный failed/skipped (succeeded
+ *     items не пишутся в `BulkOperationItem` — их trace в AuditLog).
+ *
+ * Каждая публикация — fire-and-forget; Redis down = null, SSE-клиент
+ * переживёт через polling-fallback.
+ */
+async function publishEvents(
+  operationId: string,
+  op: BulkOperation,
+  items: Array<{ issueId: string; issueKey: string; outcome: BulkItemOutcome; errorCode: string; errorMessage: string }>,
+): Promise<void> {
+  const channel = eventsChannel(operationId);
+  // Fan-out параллельно: при batch=25 где все failed это 26 sequential publish
+  // round-trip'ов = ~130 мс на cross-AZ Redis. Promise.all — ~5 мс.
+  await Promise.all([
+    publishToChannel(channel, {
+      event: 'progress',
+      data: {
+        processed: op.processed,
+        succeeded: op.succeeded,
+        failed: op.failed,
+        skipped: op.skipped,
+        etaSeconds: estimateEta(op),
+      },
+    }),
+    ...items.map((item) =>
+      publishToChannel(channel, {
+        event: 'item',
+        data: {
+          issueId: item.issueId,
+          issueKey: item.issueKey,
+          outcome: item.outcome,
+          errorCode: item.errorCode,
+          errorMessage: item.errorMessage,
+        },
+      }),
+    ),
+  ]);
 }
 
 // ────── Finalize ─────────────────────────────────────────────────────────────
@@ -331,6 +395,11 @@ async function finalize(op: BulkOperation): Promise<BulkOperationStatus> {
         skipped: op.skipped,
       } as Prisma.InputJsonValue,
     },
+  });
+  // Финальный status-event — SSE-клиент закрывает соединение после этого.
+  await publishToChannel(eventsChannel(op.id), {
+    event: 'status',
+    data: { status, finishedAt: new Date().toISOString() },
   });
   return status;
 }
@@ -387,6 +456,10 @@ async function finalizeCancelled(op: BulkOperation): Promise<BulkOperationStatus
       bulkOperationId: op.id,
       details: { drainedFromQueue: drained } as Prisma.InputJsonValue,
     },
+  });
+  await publishToChannel(eventsChannel(op.id), {
+    event: 'status',
+    data: { status: 'CANCELLED', finishedAt: new Date().toISOString() },
   });
   return 'CANCELLED';
 }
