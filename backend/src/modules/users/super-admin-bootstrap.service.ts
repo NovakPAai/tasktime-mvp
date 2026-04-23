@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma/client.js';
 import { deleteUserSession } from '../../shared/redis.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { invalidateUserSystemRolesCache } from '../../shared/auth/roles.js';
 
 type PromoteUserToSuperAdminInput = {
   email: string;
@@ -40,6 +41,9 @@ export async function promoteUserToSuperAdmin({ email }: PromoteUserToSuperAdmin
   ]);
 
   await deleteUserSession(user.id);
+
+  // TTBULK-1 PR-2: freshly-promoted SUPER_ADMIN should take effect immediately, not wait 60s.
+  await invalidateUserSystemRolesCache(user.id);
 
   return {
     id: user.id,

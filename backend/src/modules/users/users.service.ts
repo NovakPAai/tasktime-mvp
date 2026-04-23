@@ -1,6 +1,6 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
-import { isSuperAdmin } from '../../shared/auth/roles.js';
+import { isSuperAdmin, invalidateUserSystemRolesCache } from '../../shared/auth/roles.js';
 import type { SystemRoleType } from '@prisma/client';
 import type { UpdatePreferencesDto, UpdateUserDto } from './users.dto.js';
 
@@ -120,6 +120,9 @@ export async function setSystemRoles(actor: RoleChangeActor, targetId: string, r
     },
   });
 
+  // TTBULK-1 PR-2: эффективные роли в Redis-кэше устарели после bulk-мутации.
+  await invalidateUserSystemRolesCache(targetId);
+
   return formatUser(updated);
 }
 
@@ -162,6 +165,9 @@ export async function addSystemRole(actor: RoleChangeActor, targetId: string, ro
       details: { role },
     },
   });
+
+  // TTBULK-1 PR-2: эффективные роли в Redis-кэше устарели — сбрасываем.
+  await invalidateUserSystemRolesCache(targetId);
 
   const updated = await prisma.user.findUniqueOrThrow({
     where: { id: targetId },
@@ -216,6 +222,9 @@ export async function removeSystemRole(actor: RoleChangeActor, targetId: string,
       details: { role },
     },
   });
+
+  // TTBULK-1 PR-2: эффективные роли в Redis-кэше устарели — сбрасываем.
+  await invalidateUserSystemRolesCache(targetId);
 }
 
 export async function getSystemRoles(userId: string): Promise<SystemRoleType[]> {

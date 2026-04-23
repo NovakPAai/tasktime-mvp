@@ -2,7 +2,44 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.53**
+**Last version: 2.54**
+
+---
+
+## [2.54] [2026-04-23] feat(auth): TTBULK-1 PR-2 — effective system roles (DIRECT ∪ GROUP) + Redis TTL-cache
+
+**PR:** (to be filled after push)
+**Ветка:** `ttbulk-1/auth-effective-roles`
+
+### Что было
+
+`req.user.systemRoles` в `authenticate` middleware брались **напрямую из JWT-payload**'а. Это означает: после того как админ даёт юзеру системную роль (DIRECT), новая роль не начинает действовать до перелогина (JWT снапшотится при login). В TTBULK-1 добавлена ещё и **групповая** выдача системных ролей (`UserGroupSystemRole`), и TZ §5.5 требует, чтобы grant через группу (напр., добавили юзера в группу, которая уже имеет `BULK_OPERATOR`) срабатывал в пределах минуты без переавторизации.
+
+### Что теперь
+
+- **`getEffectiveUserSystemRoles(userId)`** в `shared/auth/roles.ts` — вычисляет UNION(DIRECT ∪ GROUP) через `prisma.userSystemRole` + `prisma.userGroupSystemRole { group: { members: { some: { userId } } } }`. Redis-TTL кэш 60с по ключу `user:sysroles:{userId}`.
+- **`authenticate` middleware** после JWT-decode перезапрашивает эффективные роли через этот resolver. **Fail-open** паттерн: при любой ошибке (БД недоступна, Redis down) падает в JWT-роли, как в sliding-session fallback.
+- **Инвалидация кэша** на всех точках изменения эффективного сета:
+  - `users.service.addSystemRole` / `removeSystemRole` → `invalidateUserSystemRolesCache(targetId)`.
+  - `user-groups.service.addMembers` / `removeMember` / `deleteGroup` → `invalidateUserSystemRolesCacheForUsers(affectedMembers)`.
+  - (PR-8 добавит инвалидацию на `UserGroupSystemRole` grant/revoke).
+- **Unit-тесты** (13 в `tests/effective-user-system-roles.unit.test.ts`): пустой сет, только DIRECT, только GROUP, UNION, dedupe (роль и в DIRECT и в GROUP, multiple group-assignments одной роли), cache-hit, cache-miss → БД + SET с TTL=60, инвалидация одиночная, bulk-инвалидация, bulk пустым массивом (no-op), формат ключа.
+
+### Влияние на prod
+
+- **Latency:** +1 Redis GET + (cache-miss) 2 parallel SELECT на `authenticate`. При cache-hit это ~0.5ms; при miss ~5-10ms. Фиксированный upper-bound на каждый запрос.
+- **Consistency:** grant через группу срабатывает за ≤60с (TTL); revoke — сразу (инвалидация). Консистентно с TTSEC-2 TTL на проектные permissions.
+- **Fallback:** при Redis/БД недоступности middleware возвращается к JWT-ролям (те же роли, что до PR-2) — zero downtime.
+
+### Проверки
+
+- `npx tsc --noEmit` → 0 errors.
+- `npm run lint` → 0 errors, 0 new warnings.
+- `npm run test:parser` → 501/501 passed (13 новых).
+
+### Связано
+
+- TTBULK-1 (Bulk Operations) — см. `docs/tz/TTBULK-1.md` §5.5, §13.4 PR-2.
 
 ---
 

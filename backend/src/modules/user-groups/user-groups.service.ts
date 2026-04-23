@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
+import { invalidateUserSystemRolesCacheForUsers } from '../../shared/auth/roles.js';
 import type {
   CreateUserGroupDto,
   UpdateUserGroupDto,
@@ -127,6 +128,10 @@ export async function deleteGroup(id: string) {
   await prisma.userGroup.delete({ where: { id } });
   await invalidatePairs(affectedPairs);
 
+  // TTBULK-1 PR-2: удаление группы с системными ролями (Cascade на UserGroupSystemRole)
+  // отнимает их у всех членов — сбрасываем sys-roles кэш.
+  await invalidateUserSystemRolesCacheForUsers(group.members.map(m => m.userId));
+
   return {
     name: group.name,
     affectedPairs,
@@ -184,6 +189,16 @@ export async function addMembers(groupId: string, userIds: string[], addedById: 
   // Only the projects this group is bound to are affected by the new members — exact invalidation.
   const pairs = userIds.flatMap(uid => group.projectRoles.map(pr => ({ userId: uid, projectId: pr.projectId })));
   await invalidatePairs(pairs);
+
+  // TTBULK-1 PR-2: если группа имеет системные роли (UserGroupSystemRole),
+  // эффективный набор новых членов меняется — сбрасываем их Redis-кэш.
+  // Гейтим по result.count: createMany(skipDuplicates) пропускает существующих
+  // членов, но точный дельта-сет ids не возвращает. При count===0 пропускаем инвалидацию;
+  // при count>0 допускаем лёгкое over-invalidation (редкий bulk-add, TTL всё равно 60с).
+  if (result.count > 0) {
+    await invalidateUserSystemRolesCacheForUsers(userIds);
+  }
+
   return { added: result.count };
 }
 
@@ -206,6 +221,10 @@ export async function removeMember(groupId: string, userId: string) {
   });
 
   await invalidatePairs(bindings.map(b => ({ userId, projectId: b.projectId })));
+
+  // TTBULK-1 PR-2: удалённый участник мог терять системные роли через эту группу.
+  await invalidateUserSystemRolesCacheForUsers([userId]);
+
   return { ok: true };
 }
 
