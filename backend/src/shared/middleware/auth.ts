@@ -5,6 +5,8 @@ import { AppError } from './error-handler.js';
 import type { AuthRequest } from '../types/index.js';
 import { getUserSession, touchUserSession, isRedisAvailable } from '../redis.js';
 import { getSessionLifetimeMinutes, SYSTEM_ACCOUNT_DOMAIN } from '../utils/session-settings.js';
+import { getEffectiveUserSystemRoles } from '../auth/roles.js';
+import { captureError } from '../utils/logger.js';
 
 // In-process counter — exported so health/metrics endpoints can expose it.
 export const sessionFallbackCounter = { total: 0, redis_unavailable: 0, session_missing: 0 };
@@ -23,10 +25,22 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
     return next(new AppError(401, 'Invalid or expired token'));
   }
 
+  // TTBULK-1 PR-2: эффективные системные роли = UNION(DIRECT, GROUP) с Redis TTL-кэшем 60с.
+  // JWT-payload снапшотит DIRECT-роли при login; чтобы grant через группу срабатывал в пределах
+  // 60с без переавторизации, перезапрашиваем эффективный набор. Fallback на JWT-роли при любой
+  // ошибке (БД недоступна, Redis down) — fail-open как в sliding-session logic ниже.
+  let effectiveRoles: SystemRoleType[];
+  try {
+    effectiveRoles = await getEffectiveUserSystemRoles(payload.userId);
+  } catch (err) {
+    captureError(err, { fn: 'authenticate.getEffectiveUserSystemRoles', userId: payload.userId });
+    effectiveRoles = payload.systemRoles as SystemRoleType[];
+  }
+
   req.user = {
     userId: payload.userId,
     email: payload.email,
-    systemRoles: payload.systemRoles as SystemRoleType[],
+    systemRoles: effectiveRoles,
   };
 
   // Sliding session check — skip for system accounts
