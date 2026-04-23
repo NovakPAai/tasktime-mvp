@@ -112,6 +112,29 @@ export async function incrWithTtl(key: string, ttlSeconds: number): Promise<numb
 }
 
 /**
+ * TTBULK-1: RPUSH строк в Redis-список. Используется для pending-очереди
+ * массовых операций (`bulk-op:{id}:pending`), обработчик выполняет LPOP
+ * пачку (processor в PR-4).
+ *
+ * Graceful no-op при отсутствии Redis — caller обязан сам реагировать на
+ * Redis-down (в bulk-operations.service это 503 при create, чтобы не создать
+ * "безвоздушную" операцию без pending-queue).
+ *
+ * Возвращает длину списка после push'а, либо `null` если Redis недоступен.
+ */
+export async function rpushList(key: string, values: string[]): Promise<number | null> {
+  if (values.length === 0) return null;
+  const redis = await getRedisClientInternal();
+  if (!redis) return null;
+  try {
+    return await redis.rPush(key, values);
+  } catch (err) {
+    captureError(err, { fn: 'rpushList', key });
+    return null;
+  }
+}
+
+/**
  * Delete all keys whose name starts with `prefix`.
  * Uses SCAN to avoid blocking the server; safe on large keyspaces.
  */

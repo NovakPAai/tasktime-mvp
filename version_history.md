@@ -2,7 +2,50 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.54**
+**Last version: 2.55**
+
+---
+
+## [2.55] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-3 — service core (preview + create + cancel + list)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttbulk-1/service-core`
+
+### Что было
+
+После PR-1 (schema) и PR-2 (effective roles) роутер `/api/bulk-operations/*` существовал только как stub-ping (501). Реальной бизнес-логики (dry-run, резолв scope, создание фоновой операции, pending-queue) не было.
+
+### Что теперь
+
+- **`bulk-operations.types.ts`** — контракт `BulkExecutor<P>` + `PreflightResult` discriminated union (ELIGIBLE/SKIPPED/CONFLICT). Реализации executor'ов — PR-4/PR-5; контракт нужен уже сейчас для типизации preflight-цикла в service'е.
+- **`bulk-operations.dto.ts`** — Zod схемы: `scopeDto` (discriminated union ids|jql), `operationPayloadDto` (7 типов operation'ов), `previewBulkOperationDto`, `createBulkOperationDto`, `listQueryDto`. `MAX_ITEMS_HARD_LIMIT=10k` экспортируется как константа для service'а.
+- **`bulk-operations.service.ts`** — 5 публичных функций:
+  - `previewBulkOperation` — резолв scope → issueIds (для jql через `searchIssues`), silent-truncate + warning `TRUNCATED_TO_MAX_ITEMS` если total > limit, загрузка issue-metadata, per-item preflight (в PR-3 executor'ы — stubs ELIGIBLE), запись previewToken в Redis с TTL 15мин.
+  - `createBulkOperation` — idempotency по `(createdById, idempotencyKey)`, owner-check previewToken'а, concurrency-quota (max 3 active/user), Redis availability check, создание `BulkOperation`, RPUSH eligibleIds в `bulk-op:{id}:pending`, audit-log, удаление previewToken (one-shot), rollback операции в FAILED если RPUSH упал после create.
+  - `getBulkOperation` — 404 на чужую (не разглашаем существование).
+  - `cancelBulkOperation` — idempotent (no-op в терминальном статусе), устанавливает `cancel_requested=true` + audit.
+  - `listBulkOperations` — пагинированный список моих операций с фильтрами по status/type.
+- **`bulk-operations.router.ts`** — 5 endpoints под `authenticate + requireRole('BULK_OPERATOR')`:
+  - `POST /preview`, `POST /`, `GET /:id`, `POST /:id/cancel`, `GET /`
+  - Rate-limit 30 req/min/user на preview + create.
+  - `Idempotency-Key` header обязателен на POST / (UUID, 400 при отсутствии/невалидности).
+  - `resolveAccessibleProjectIds` локально (консистентно с search.router.ts).
+- **Redis helper `rpushList(key, values)`** в `shared/redis.ts` — RPUSH с graceful no-op при Redis-down.
+- **21 pure-unit тест** в `tests/bulk-operations-service.unit.test.ts`.
+
+### Влияние на prod
+
+При `FEATURES_BULK_OPS=false` (default) роутер всё ещё не монтируется — код лежит dormant. Activation в PR-12 (UAT cutover). Processor (PR-4) ещё не написан, поэтому даже при включении флага operation'ы останутся в QUEUED навечно — это ожидаемо.
+
+### Проверки
+
+- `npx tsc --noEmit` → 0 errors.
+- `npm run lint` → 0 errors, 0 new warnings.
+- `npm run test:parser` → 523/523 passed (21 новых).
+
+### Связано
+
+- TTBULK-1 (Bulk Operations) — см. `docs/tz/TTBULK-1.md` §4, §13.4 PR-3.
 
 ---
 
