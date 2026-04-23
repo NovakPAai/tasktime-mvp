@@ -138,6 +138,31 @@ export async function rpushList(key: string, values: string[]): Promise<number |
 }
 
 /**
+ * TTBULK-1 PR-4: LPOP пачки строк из Redis-списка. Processor берёт до `count`
+ * issueId'шников из pending-очереди `bulk-op:{id}:pending` за один round-trip.
+ *
+ * Возврат:
+ *   • `string[]` — фактическая пачка (≤ count). Пустой массив — список пуст.
+ *   • `null` — Redis недоступен; processor должен пропустить tick (lock
+ *     освободится, recovery подхватит позже).
+ */
+export async function lpopListBatch(key: string, count: number): Promise<string[] | null> {
+  if (count < 1) return [];
+  const redis = await getRedisClientInternal();
+  if (!redis) return null;
+  try {
+    // node-redis v5: `lPopCount(key, count)` для батч-LPOP (Redis 6.2+).
+    // Возвращает `string[] | null` — null когда список пуст.
+    const res = await redis.lPopCount(key, count);
+    if (res === null) return [];
+    return res;
+  } catch (err) {
+    captureError(err, { fn: 'lpopListBatch', key });
+    return null;
+  }
+}
+
+/**
  * TTBULK-1: атомарный GET+DEL одним round-trip'ом (node-redis v4/v5 `getDel`).
  * Используется для one-shot previewToken'ов: две одновременные create-запроса
  * с одним token'ом не должны обе увидеть данные (double-consume race).

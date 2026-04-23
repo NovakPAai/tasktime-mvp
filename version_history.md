@@ -2,7 +2,54 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.55**
+**Last version: 2.56**
+
+---
+
+## [2.56] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-4 — TransitionExecutor + processor (cron + recovery + retention)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttbulk-1/processor`
+
+### Что было
+
+После PR-1..PR-3 созданы schema + auth effective roles + service-core (preview/create/cancel). Но **processor'а не было** — operation'ы оставались в QUEUED вечно, никто не дренил Redis-очередь `bulk-op:{id}:pending`. Не было ни реальных executor'ов, ни recovery после рестарта инстанса, ни retention cron'а.
+
+### Что теперь
+
+- **`shared/bulk-operation-context.ts`** — AsyncLocalStorage для `bulkOperationId`; processor оборачивает каждый `execute()` в `runInBulkOperationContext(opId, fn)`, а audit-записи в `workflow-engine.service.executeTransition` автоматически подтягивают id через `getCurrentBulkOperationId()` и проставляют колонку `audit_logs.bulk_operation_id` (§5.4). Вне bulk — контекст пуст → null (не затрагивает обычные HTTP-запросы).
+- **`executors/transition.executor.ts`** — первый реальный `BulkExecutor<TransitionPayload>`:
+  - **preflight-матрица:** NO_ACCESS (без SUPER/ADMIN и без UserProjectRole), NO_TRANSITION (transitionId нет в доступных), ALREADY_IN_TARGET_STATE, WORKFLOW_REQUIRED_FIELDS (CONFLICT с requiredFields, если не переданы fieldOverrides), ELIGIBLE + preview diff.
+  - **execute:** вызывает существующий `executeTransition` под контекстом.
+- **`executors/index.ts`** — registry с `getExecutor(type)`. PR-4 регистрирует только TRANSITION; остальные 6 — PR-5.
+- **`bulk-operations.processor.ts`** — фоновый processor с 3 cron-задачами:
+  - **tick** (default ~5с): Redis-lock `bulk-ops:tick` (TTL 30с) → `findFirst` QUEUED/RUNNING ORDER BY createdAt ASC → LPOP пачки 25 → per-item preflight+execute → createMany items + increment counters + heartbeat. Финализация когда `processed >= total`: SUCCEEDED (failed=0), PARTIAL (failed>0 && succeeded>0), FAILED (succeeded=0). Cancel → SKIPPED CANCELLED_BY_USER + финализация CANCELLED с дренажем queue.
+  - **recovery** (default ~1 мин): stale `RUNNING` (heartbeat < now - 300с) → reset в QUEUED.
+  - **retention** (default ночью): DELETE items > 30 дней + ops > 90 дней в терминальном статусе.
+- **Redis helpers:** `lpopListBatch(key, count)` — `lPopCount` в node-redis v5 (Redis 6.2+).
+- **`server.ts`** — запуск/стоп scheduler'а через `start/stopBulkOperationsScheduler` + drain на SIGTERM.
+- **`workflow-engine.service.ts:executeTransition`** — +1 строка: `bulkOperationId: getCurrentBulkOperationId() ?? null` в auditLog.create. Обратно совместимо (NULL для не-bulk).
+
+### Unit-тесты (21 новых)
+
+- `bulk-operations-processor.unit.test.ts` (13 тестов): lock-skip, idle, QUEUED→RUNNING, eligible+skipped batch с finalize SUCCEEDED, CONFLICT→SKIPPED, EXECUTOR_ERROR → FAILED, deleted issue→SKIPPED DELETED, Redis-down → пропуск tick, неизвестный executor → EXECUTOR_NOT_IMPLEMENTED, cancel drain → CANCELLED, PARTIAL branch, SUCCEEDED с skipped, recovery, retention.
+- `transition-executor.unit.test.ts` (8 тестов): NO_ACCESS / NO_TRANSITION / ALREADY_IN_TARGET_STATE / CONFLICT requiredFields / ELIGIBLE через override / SUPER_ADMIN bypass / preview diff shape / execute passthrough.
+
+### Влияние на prod
+
+- При `FEATURES_BULK_OPS=false` (default) — scheduler всё равно не запускается до PR-12; но даже если кто-то вручную выставит `BULK_OP_PROCESSOR_ENABLED=true` — без флага роут недоступен, никто не создаст операцию.
+- **Memory pattern:** один lock глобальный — одна активная операция в мире за tick. Расширение до N-параллельных tick'ов по projectId — Phase 2.
+- **`AuditLog.bulkOperationId`** теперь проставляется для issue.transitioned (PR-4 scope). Остальные 6 типов — PR-5 расширят, но без изменения сигнатуры функций благодаря AsyncLocalStorage.
+
+### Проверки
+
+- `npx tsc --noEmit` → 0 errors.
+- `npm run lint` → 0 errors, 0 new warnings.
+- `npm run test:parser` → 546/546 passed (21 новых в PR-4).
+
+### Связано
+
+- TTBULK-1 (Bulk Operations) — см. `docs/tz/TTBULK-1.md` §5.4, §6.3, §6.4, §13.5 PR-4.
 
 ---
 

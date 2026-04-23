@@ -4,18 +4,23 @@ import {
   startCheckpointScheduler,
   stopCheckpointScheduler,
 } from './modules/releases/checkpoints/checkpoint-scheduler.service.js';
+import {
+  startBulkOperationsScheduler,
+  stopBulkOperationsScheduler,
+} from './modules/bulk-operations/bulk-operations.processor.js';
 
 const app = createApp();
 
 const server = app.listen(config.PORT, () => {
   console.log(`Flow Universe API running on port ${config.PORT} [${config.NODE_ENV}]`);
   startCheckpointScheduler();
+  startBulkOperationsScheduler();
 });
 
 async function shutdown(signal: string) {
   console.log(`[${signal}] shutting down…`);
-  // Drain any in-flight scheduler tick before closing the HTTP server so writes complete.
-  await stopCheckpointScheduler();
+  // Drain in-flight scheduler ticks before closing HTTP — writes must complete.
+  await Promise.allSettled([stopCheckpointScheduler(), stopBulkOperationsScheduler()]);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10_000).unref();
 }
