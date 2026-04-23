@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { InputNumber, Button, Form, message } from 'antd';
 import { adminApi } from '../../api/admin';
+import type { BulkOpsSettings } from '../../api/admin';
 
 export default function AdminSystemPage() {
   const [loading, setLoading] = useState(true);
@@ -9,27 +10,33 @@ export default function AdminSystemPage() {
   const [jwtExpiresIn, setJwtExpiresIn] = useState<string>('1h');
   const [form] = Form.useForm();
 
+  // TTBULK-1 PR-7 — bulk operations runtime limits.
+  const [bulkOps, setBulkOps] = useState<BulkOpsSettings>({ maxConcurrentPerUser: 3, maxItems: 10000 });
+  const [bulkOpsSaving, setBulkOpsSaving] = useState(false);
+  const [bulkOpsForm] = Form.useForm();
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [sys, bulk] = await Promise.all([
+        adminApi.getSystemSettings(),
+        adminApi.getBulkOpsSettings(),
+      ]);
+      setSessionLifetimeMinutes(sys.sessionLifetimeMinutes);
+      setJwtExpiresIn(sys.jwtExpiresIn);
+      form.setFieldsValue({ sessionLifetimeMinutes: sys.sessionLifetimeMinutes });
+      setBulkOps(bulk);
+      bulkOpsForm.setFieldsValue(bulk);
+    } catch {
+      message.error('Не удалось загрузить системные настройки');
+    } finally {
+      setLoading(false);
+    }
+  }, [form, bulkOpsForm]);
+
   useEffect(() => {
-    let isMounted = true;
-
-    adminApi.getSystemSettings()
-      .then(settings => {
-        if (!isMounted) return;
-        setSessionLifetimeMinutes(settings.sessionLifetimeMinutes);
-        setJwtExpiresIn(settings.jwtExpiresIn);
-        form.setFieldsValue({ sessionLifetimeMinutes: settings.sessionLifetimeMinutes });
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        message.error('Не удалось загрузить системные настройки');
-      })
-      .finally(() => {
-        if (!isMounted) return;
-        setLoading(false);
-      });
-
-    return () => { isMounted = false; };
-  }, [form]);
+    void loadAll();
+  }, [loadAll]);
 
   const handleSave = async (values: { sessionLifetimeMinutes: number }) => {
     setSaving(true);
@@ -41,6 +48,20 @@ export default function AdminSystemPage() {
       message.error('Не удалось сохранить настройки');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleBulkOpsSave = async (values: BulkOpsSettings) => {
+    setBulkOpsSaving(true);
+    try {
+      const updated = await adminApi.setBulkOpsSettings(values);
+      setBulkOps(updated);
+      bulkOpsForm.setFieldsValue(updated);
+      message.success('Лимиты массовых операций сохранены');
+    } catch {
+      message.error('Не удалось сохранить лимиты массовых операций');
+    } finally {
+      setBulkOpsSaving(false);
     }
   };
 
@@ -129,6 +150,69 @@ export default function AdminSystemPage() {
         (пользователь выйдет не позже этого срока). Скользящая сессия — более ранний выход при бездействии,
         настраивается выше без перезапуска.
       </p>
+
+      {/* ── Массовые операции (TTBULK-1 PR-7) ── */}
+      <p style={{ margin: '32px 0 16px', fontWeight: 500, color: 'rgba(0,0,0,0.65)', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 8 }}>
+        Массовые операции
+      </p>
+      <p style={{ margin: '0 0 16px', color: 'rgba(0,0,0,0.45)', fontSize: 12, lineHeight: 1.6 }}>
+        Runtime-лимиты на массовые операции (BULK_OPERATOR). Изменения вступают в силу в течение 60 секунд.
+      </p>
+
+      <Form form={bulkOpsForm} layout="vertical" onFinish={handleBulkOpsSave} initialValues={bulkOps}>
+        <Form.Item
+          label="Максимум одновременных операций на пользователя"
+          name="maxConcurrentPerUser"
+          extra={`Текущее значение: ${bulkOps.maxConcurrentPerUser}. Диапазон: 1..20.`}
+          rules={[
+            { required: true, message: 'Укажите значение' },
+            {
+              validator: (_, value) =>
+                Number.isInteger(value) && value >= 1 && value <= 20
+                  ? Promise.resolve()
+                  : Promise.reject('Значение должно быть от 1 до 20'),
+            },
+          ]}
+        >
+          <InputNumber
+            min={1}
+            max={20}
+            step={1}
+            style={{ width: 200 }}
+            aria-label="Максимум одновременных массовых операций на пользователя"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Максимум элементов в одной операции"
+          name="maxItems"
+          extra={`Текущее значение: ${bulkOps.maxItems}. Диапазон: 100..50000 (hard-cap 10000 применяется на уровне API).`}
+          rules={[
+            { required: true, message: 'Укажите значение' },
+            {
+              validator: (_, value) =>
+                Number.isInteger(value) && value >= 100 && value <= 50_000
+                  ? Promise.resolve()
+                  : Promise.reject('Значение должно быть от 100 до 50000'),
+            },
+          ]}
+        >
+          <InputNumber
+            min={100}
+            max={50_000}
+            step={100}
+            style={{ width: 200 }}
+            addonAfter="шт"
+            aria-label="Максимум элементов в одной массовой операции"
+          />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="primary" htmlType="submit" loading={bulkOpsSaving}>
+            Сохранить
+          </Button>
+        </Form.Item>
+      </Form>
     </div>
   );
 }

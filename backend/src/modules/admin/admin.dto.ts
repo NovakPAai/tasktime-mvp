@@ -36,7 +36,19 @@ export const updateSystemSettingsDto = z.object({
   sessionLifetimeMinutes: z.number().int().min(5).max(10080),
 });
 
+// TTBULK-1 PR-7 — bulk operations runtime limits.
+export const updateBulkOpsSettingsDto = z
+  .object({
+    maxConcurrentPerUser: z.number().int().min(1).max(20).optional(),
+    maxItems: z.number().int().min(100).max(50_000).optional(),
+  })
+  .refine(
+    (v) => v.maxConcurrentPerUser !== undefined || v.maxItems !== undefined,
+    { message: 'Нужно передать хотя бы одно поле (maxConcurrentPerUser или maxItems)' },
+  );
+
 export type CreateUserDto = z.infer<typeof createUserDto>;
 export type UpdateUserAdminDto = z.infer<typeof updateUserAdminDto>;
 export type AssignProjectRoleDto = z.infer<typeof assignProjectRoleDto>;
 export type UpdateSystemSettingsDto = z.infer<typeof updateSystemSettingsDto>;
+export type UpdateBulkOpsSettingsDto = z.infer<typeof updateBulkOpsSettingsDto>;

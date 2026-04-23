@@ -3,7 +3,11 @@ import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole, requireSuperAdmin } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
 import * as adminService from './admin.service.js';
-import { createUserDto, updateUserAdminDto, assignProjectRoleDto, updateSystemSettingsDto } from './admin.dto.js';
+import { createUserDto, updateUserAdminDto, assignProjectRoleDto, updateSystemSettingsDto, updateBulkOpsSettingsDto } from './admin.dto.js';
+import {
+  getBulkOpsSettings,
+  setBulkOpsSettings,
+} from '../bulk-operations/bulk-operations-settings.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import { rotateUserPassword } from '../users/password-rotation.service.js';
 import type { UatRole } from './uat-tests.data.js';
@@ -168,6 +172,23 @@ router.patch('/admin/settings/system', requireSuperAdmin(), validate(updateSyste
   const settings = await adminService.getSystemSettings();
   res.json(settings);
 }));
+
+// TTBULK-1 PR-7 — runtime limits for bulk operations (SUPER_ADMIN only).
+router.get('/admin/system-settings/bulk-operations', requireSuperAdmin(), asyncHandler(async (_req, res) => {
+  const settings = await getBulkOpsSettings();
+  res.json(settings);
+}));
+
+router.patch(
+  '/admin/system-settings/bulk-operations',
+  requireSuperAdmin(),
+  validate(updateBulkOpsSettingsDto),
+  authHandler(async (req, res) => {
+    const patch = req.body as { maxConcurrentPerUser?: number; maxItems?: number };
+    const updated = await setBulkOpsSettings(req.user!.userId, patch);
+    res.json(updated);
+  }),
+);
 
 router.get('/admin/uat-tests', requireRole('ADMIN', 'USER', 'AUDITOR', 'RELEASE_MANAGER'), asyncHandler(async (req, res) => {
   const { role } = req.query as { role?: UatRole };

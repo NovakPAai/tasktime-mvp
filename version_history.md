@@ -2,7 +2,47 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.58**
+**Last version: 2.59**
+
+---
+
+## [2.59] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-7 — runtime System settings для массовых операций (maxConcurrentPerUser / maxItems) + AdminSystemPage UI
+
+**PR:** _(будет заполнено после push'а)_
+**Ветка:** `ttbulk-1/system-settings`
+
+### Что было
+
+Лимиты `maxConcurrentPerUser` (3) и `maxItems` (10000) были захардкожены через ENV-variables (`BULK_OP_MAX_CONCURRENT_PER_USER`, `BULK_OP_MAX_ITEMS`) без возможности менять их без рестарта backend. В §11.1 ТЗ TTBULK-1 runtime-настройки заявлены как MUST-HAVE (SRE меняет кап по нагрузке, без деплоя).
+
+### Что теперь
+
+- **Backend `bulk-operations-settings.service.ts`** — `getBulkOpsSettings()` с in-memory (60s) + Redis (60s) кэшем; `setBulkOpsSettings(actorId, patch)` с upsert + инвалидацией обоих слоёв + audit. Clamp на read и write: `maxConcurrentPerUser ∈ [1..20]`, `maxItems ∈ [100..10000]` (runtime-ceiling = MAX_ITEMS_HARD_LIMIT из DTO). Никогда не бросает (fallback на ENV при любых ошибках). Cache invalidation ДО audit — чтобы audit-failure не оставлял stale cache.
+- **Admin endpoints** — `GET /api/admin/system-settings/bulk-operations` и `PATCH …` (оба `requireSuperAdmin()`). Zod-DTO `updateBulkOpsSettingsDto` (partial update, max=MAX_ITEMS_HARD_LIMIT).
+- **Интеграция с bulk-operations.service**:
+  - `createBulkOperation` — читает `maxConcurrentPerUser` и применяет quota; дополнительно safety-check `preview.eligibleIds.length > maxItems` (если админ понизил лимит между preview и create — 400 TOO_MANY_ITEMS).
+  - `resolveScope` (preview) — `maxItems` из runtime-settings вместо ENV-константы; warning TRUNCATED_TO_MAX_ITEMS при превышении.
+- **Frontend AdminSystemPage.tsx** — секция «Массовые операции» с двумя `InputNumber` (maxConcurrent 1..20, maxItems 100..10000) + loadError с Ant Result fallback. Save → PATCH + reload.
+- **Frontend App.tsx** — `AdminGate allow={canManageSystemSettings}` на route `/admin/system` (раньше был открыт).
+- **API-клиент** — `adminApi.getBulkOpsSettings()`, `adminApi.setBulkOpsSettings(settings)` + типизация `BulkOpsSettings`.
+
+### Unit-тесты (+18 новых)
+
+`bulk-operations-settings.unit.test.ts`: пустой DB → defaults, clamp вверх/вниз, malformed JSON → fallback, cache HIT (не трогает Prisma), Redis DOWN → Prisma, Prisma DOWN → defaults, in-memory memo, partial patch, clamp на write, cache invalidation ДО audit (audit-failure → cache всё равно cleared), memo reset перед current-read (before-snapshot всегда свежий), NaN/non-integer edge cases.
+
+### Влияние на prod
+
+При `FEATURES_BULK_OPS=false` (текущее состояние) — dormant. Для Super Admin'а появляется секция «Массовые операции» в `/admin/system` — изменения вступают в силу в течение 60 секунд. При feature-flag flip в PR-12: SRE может наращивать каппы без рестарта.
+
+### Проверки
+
+- `npx tsc --noEmit` → 0 errors (backend + frontend).
+- `npm run test:parser` → 597/597 passed (+18 новых).
+- Pre-push review: 🟠 2 → fixed, 🟡 3 → fixed, 🔵 1 → fixed, ⚪ 2 → skipped.
+
+### Связано
+
+- TTBULK-1 (Bulk Operations) — см. `docs/tz/TTBULK-1.md` §11.1, §13.6 PR-7.
 
 ---
 
