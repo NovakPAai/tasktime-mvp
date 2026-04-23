@@ -8,7 +8,7 @@
 
 ## [2.57] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-5 — 6 executors (Assign / EditField / EditCustomField / MoveToSprint / AddComment / Delete)
 
-**PR:** (to be filled after push)
+**PR:** [#147](https://github.com/NovakPAai/tasktime-mvp/pull/147) (merged 2026-04-23)
 **Ветка:** `ttbulk-1/executors`
 
 ### Что было
