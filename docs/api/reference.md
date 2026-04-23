@@ -665,7 +665,11 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 
 | Метод | Путь | Доступ |
 |-------|------|--------|
-| `GET` | `/api/bulk-operations/ping` | 🔒 |
+| `POST` | `/api/bulk-operations/preview` | 🔒 |
+| `POST` | `/api/bulk-operations` | 🔒 |
+| `GET` | `/api/bulk-operations/:id` | 🔒 |
+| `POST` | `/api/bulk-operations/:id/cancel` | 🔒 |
+| `GET` | `/api/bulk-operations` | 🔒 |
 
 ### Comments
 
