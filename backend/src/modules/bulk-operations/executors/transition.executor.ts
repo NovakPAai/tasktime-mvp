@@ -14,15 +14,14 @@
  *   • preflight — read-only, идемпотентна.
  *   • Любая ошибка на execute пропагируется processor'у как FAILED item;
  *     остальные items в пачке продолжают обрабатываться.
- *   • Per-item RBAC — `NO_ACCESS` если юзер не имеет проектного членства или
- *     global-read роли. SUPER_ADMIN / ADMIN bypass через `hasAnySystemRole`.
+ *   • Per-item RBAC — `NO_ACCESS` если юзер не имеет проектного членства.
+ *     Только SUPER_ADMIN bypass'ает (§7.1 TZ, pre-push review PR-5 🟠).
  */
 
 import type { BulkOperationType } from '@prisma/client';
-import { prisma } from '../../../prisma/client.js';
-import { hasAnySystemRole } from '../../../shared/auth/roles.js';
 import { executeTransition, getAvailableTransitions } from '../../workflow-engine/workflow-engine.service.js';
 import type { BulkExecutor, BulkExecutorActor, IssueWithContext, PreflightResult } from '../bulk-operations.types.js';
+import { actorHasProjectAccess } from './shared.js';
 
 /** Payload TransitionExecutor'а — параметры, валидированные DTO (`TRANSITION` вариант). */
 export type TransitionPayload = {
@@ -30,22 +29,6 @@ export type TransitionPayload = {
   transitionId: string;
   fieldOverrides?: Record<string, unknown>;
 };
-
-/**
- * Проверяет, что actor видит проект issue'а. Без этого bulk-operator мог бы
- * менять статусы в проектах, к которым физически не имеет доступа (для pure
- * BULK_OPERATOR без доступа к проекту). SUPER_ADMIN/ADMIN bypass.
- */
-async function actorHasProjectAccess(actor: BulkExecutorActor, projectId: string): Promise<boolean> {
-  if (hasAnySystemRole(actor.systemRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'])) {
-    return true;
-  }
-  const membership = await prisma.userProjectRole.findFirst({
-    where: { userId: actor.userId, projectId },
-    select: { userId: true },
-  });
-  return membership !== null;
-}
 
 export const transitionExecutor: BulkExecutor<TransitionPayload> = {
   type: 'TRANSITION' satisfies BulkOperationType,

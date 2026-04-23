@@ -2,7 +2,48 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.56**
+**Last version: 2.57**
+
+---
+
+## [2.57] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-5 — 6 executors (Assign / EditField / EditCustomField / MoveToSprint / AddComment / Delete)
+
+**PR:** (to be filled after push)
+**Ветка:** `ttbulk-1/executors`
+
+### Что было
+
+После PR-4 processor обрабатывал только TRANSITION (остальные 6 типов операций финализировали FAILED EXECUTOR_NOT_IMPLEMENTED). Registry `getExecutor(type)` возвращал null для остальных.
+
+### Что теперь
+
+Все 6 оставшихся executor'ов реализованы как `BulkExecutor<Payload>`. Registry обновлён — 7 типов работают end-to-end через processor. Каждый executor:
+- **AssignExecutor** (NO_ACCESS / ALREADY_IN_TARGET_STATE / ELIGIBLE) → issues.assignIssue.
+- **EditFieldExecutor** (priority / dueDate / description.append — поддерживаются; labels.* → INVALID_FIELD_SCHEMA т.к. схема не содержит поля).
+- **EditCustomFieldExecutor** (INVALID_FIELD_SCHEMA через getApplicableFields).
+- **MoveToSprintExecutor** (SPRINT_PROJECT_MISMATCH — cross-project в Phase 1 запрещён; null sprintId — unassign).
+- **AddCommentExecutor** (comments.createComment + explicit audit — comments.service сам не пишет audit).
+- **DeleteExecutor** (security gate: помимо `BULK_OPERATOR` требует проектную `ISSUES_DELETE`; audit ДО delete для forensics).
+
+Все executor'ы пишут явный `AuditLog` с `bulkOperationId` из AsyncLocalStorage контекста (processor оборачивает execute через `runInBulkOperationContext`).
+
+### Unit-тесты (27 новых)
+
+`bulk-executors.unit.test.ts`: preflight-матрицы + execute-passthrough + SUPER_ADMIN bypass + audit-ordering для Delete.
+
+### Влияние на prod
+
+При `FEATURES_BULK_OPS=false` (default) — dormant. После активации в PR-12: все 7 операций end-to-end, forensics через `AuditLog.bulkOperationId`.
+
+### Проверки
+
+- `npx tsc --noEmit` → 0 errors.
+- `npm run lint` → 0 errors, 0 new warnings.
+- `npm run test:parser` → 575/575 passed (+27 новых).
+
+### Связано
+
+- TTBULK-1 (Bulk Operations) — см. `docs/tz/TTBULK-1.md` §6.1, §13.5 PR-5.
 
 ---
 
