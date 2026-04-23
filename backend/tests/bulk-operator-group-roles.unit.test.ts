@@ -28,8 +28,13 @@ const { mockPrisma } = vi.hoisted(() => {
 vi.mock('../src/prisma/client.js', () => ({ prisma: mockPrisma }));
 
 const mockInvalidateSysRolesCache = vi.fn();
+// NB: relative path здесь — `'../src/shared/auth/roles.js'`. Он должен совпадать с тем,
+// как user-groups.service.ts импортирует этот модуль (`'../../shared/auth/roles.js'`) —
+// Vitest матчит по resolved path. Если roles.ts когда-нибудь переедет или будет
+// ре-экспортироваться через barrel, этот mock нужно будет обновить.
 vi.mock('../src/shared/auth/roles.js', () => ({
   invalidateUserSystemRolesCacheForUsers: mockInvalidateSysRolesCache,
+  isSuperAdmin: (roles: string[]) => roles.includes('SUPER_ADMIN'),
 }));
 
 // Unused rbac helper is imported transitively; stub it out silently.
@@ -57,7 +62,10 @@ describe('grantSystemRoleToGroup', () => {
       createdBy: 'admin-1',
     });
 
-    const res = await service.grantSystemRoleToGroup('g1', 'BULK_OPERATOR', 'admin-1');
+    const res = await service.grantSystemRoleToGroup('g1', 'BULK_OPERATOR', {
+      userId: 'admin-1',
+      systemRoles: ['ADMIN'],
+    });
 
     expect(res.role).toBe('BULK_OPERATOR');
     expect(mockPrisma.userGroupSystemRole.create).toHaveBeenCalledWith({
@@ -80,7 +88,10 @@ describe('grantSystemRoleToGroup', () => {
     };
     mockPrisma.userGroupSystemRole.findUnique.mockResolvedValue(existing);
 
-    const res = await service.grantSystemRoleToGroup('g1', 'BULK_OPERATOR', 'admin-2');
+    const res = await service.grantSystemRoleToGroup('g1', 'BULK_OPERATOR', {
+      userId: 'admin-2',
+      systemRoles: ['ADMIN'],
+    });
 
     expect(res).toEqual(existing);
     expect(mockPrisma.userGroupSystemRole.create).not.toHaveBeenCalled();
@@ -97,7 +108,10 @@ describe('grantSystemRoleToGroup', () => {
       createdBy: 'admin-1',
     });
 
-    await service.grantSystemRoleToGroup('g1', 'AUDITOR', 'admin-1');
+    await service.grantSystemRoleToGroup('g1', 'AUDITOR', {
+      userId: 'admin-1',
+      systemRoles: ['ADMIN'],
+    });
 
     expect(mockPrisma.userGroupSystemRole.create).toHaveBeenCalled();
     expect(mockInvalidateSysRolesCache).not.toHaveBeenCalled();
@@ -106,10 +120,82 @@ describe('grantSystemRoleToGroup', () => {
   it('404: группа не найдена', async () => {
     mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
-    await expect(service.grantSystemRoleToGroup('missing', 'ADMIN', 'admin-1')).rejects.toMatchObject({
-      statusCode: 404,
-    });
+    await expect(
+      service.grantSystemRoleToGroup('missing', 'ADMIN', {
+        userId: 'admin-1',
+        systemRoles: ['SUPER_ADMIN'],
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
     expect(mockPrisma.userGroupSystemRole.create).not.toHaveBeenCalled();
+  });
+
+  it('🟠 403: ADMIN (не SUPER_ADMIN) не может grant SUPER_ADMIN через группу', async () => {
+    await expect(
+      service.grantSystemRoleToGroup('g1', 'SUPER_ADMIN', {
+        userId: 'admin-1',
+        systemRoles: ['ADMIN'],
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(mockPrisma.userGroup.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('🟠 403: ADMIN не может grant ADMIN через группу (privilege escalation guard)', async () => {
+    await expect(
+      service.grantSystemRoleToGroup('g1', 'ADMIN', {
+        userId: 'admin-1',
+        systemRoles: ['ADMIN'],
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('SUPER_ADMIN может grant SUPER_ADMIN — guard разрешает', async () => {
+    mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 'g1', members: [] });
+    mockPrisma.userGroupSystemRole.findUnique.mockResolvedValue(null);
+    mockPrisma.userGroupSystemRole.create.mockResolvedValue({
+      id: 'sr1',
+      role: 'SUPER_ADMIN',
+      createdAt: new Date(),
+      createdBy: 'sa-1',
+    });
+
+    const res = await service.grantSystemRoleToGroup('g1', 'SUPER_ADMIN', {
+      userId: 'sa-1',
+      systemRoles: ['SUPER_ADMIN'],
+    });
+    expect(res.role).toBe('SUPER_ADMIN');
+  });
+
+  it('🟠 P2002 race: параллельный create проигрывает @@unique → re-fetch winner', async () => {
+    mockPrisma.userGroup.findUnique.mockResolvedValue({
+      id: 'g1',
+      members: [{ userId: 'u1' }],
+    });
+    mockPrisma.userGroupSystemRole.findUnique.mockResolvedValue(null);
+    // P2002 simulation
+    class FakePrismaErr extends Error {
+      code = 'P2002';
+      clientVersion = 'x';
+      meta = { target: ['group_id', 'role'] };
+    }
+    const { Prisma } = await import('@prisma/client');
+    const p2002 = Object.assign(new FakePrismaErr(), { name: 'PrismaClientKnownRequestError' });
+    Object.setPrototypeOf(p2002, Prisma.PrismaClientKnownRequestError.prototype);
+    mockPrisma.userGroupSystemRole.create.mockRejectedValueOnce(p2002);
+    const winner = {
+      id: 'sr-winner',
+      role: 'BULK_OPERATOR',
+      createdAt: new Date(),
+      createdBy: 'admin-other',
+    };
+    mockPrisma.userGroupSystemRole.findUniqueOrThrow = vi.fn().mockResolvedValue(winner);
+
+    const res = await service.grantSystemRoleToGroup('g1', 'BULK_OPERATOR', {
+      userId: 'admin-1',
+      systemRoles: ['ADMIN'],
+    });
+
+    expect(res).toEqual(winner);
+    expect(mockPrisma.userGroupSystemRole.findUniqueOrThrow).toHaveBeenCalled();
   });
 });
 
@@ -122,7 +208,10 @@ describe('revokeSystemRoleFromGroup', () => {
     mockPrisma.userGroupSystemRole.findUnique.mockResolvedValue({ id: 'sr1' });
     mockPrisma.userGroupSystemRole.delete.mockResolvedValue({});
 
-    const res = await service.revokeSystemRoleFromGroup('g1', 'BULK_OPERATOR');
+    const res = await service.revokeSystemRoleFromGroup('g1', 'BULK_OPERATOR', {
+      userId: 'admin-1',
+      systemRoles: ['ADMIN'],
+    });
 
     expect(res).toEqual({ ok: true });
     expect(mockPrisma.userGroupSystemRole.delete).toHaveBeenCalledWith({ where: { id: 'sr1' } });
@@ -131,18 +220,24 @@ describe('revokeSystemRoleFromGroup', () => {
 
   it('404: группа не найдена', async () => {
     mockPrisma.userGroup.findUnique.mockResolvedValue(null);
-    await expect(service.revokeSystemRoleFromGroup('missing', 'ADMIN')).rejects.toMatchObject({
-      statusCode: 404,
-    });
+    await expect(
+      service.revokeSystemRoleFromGroup('missing', 'ADMIN', {
+        userId: 'admin-1',
+        systemRoles: ['SUPER_ADMIN'],
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('404: роль не назначена этой группе', async () => {
     mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 'g1', members: [] });
     mockPrisma.userGroupSystemRole.findUnique.mockResolvedValue(null);
 
-    await expect(service.revokeSystemRoleFromGroup('g1', 'ADMIN')).rejects.toMatchObject({
-      statusCode: 404,
-    });
+    await expect(
+      service.revokeSystemRoleFromGroup('g1', 'ADMIN', {
+        userId: 'admin-1',
+        systemRoles: ['SUPER_ADMIN'],
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
     expect(mockPrisma.userGroupSystemRole.delete).not.toHaveBeenCalled();
   });
 
@@ -151,7 +246,10 @@ describe('revokeSystemRoleFromGroup', () => {
     mockPrisma.userGroupSystemRole.findUnique.mockResolvedValue({ id: 'sr1' });
     mockPrisma.userGroupSystemRole.delete.mockResolvedValue({});
 
-    await service.revokeSystemRoleFromGroup('g1', 'AUDITOR');
+    await service.revokeSystemRoleFromGroup('g1', 'AUDITOR', {
+      userId: 'admin-1',
+      systemRoles: ['ADMIN'],
+    });
 
     expect(mockPrisma.userGroupSystemRole.delete).toHaveBeenCalled();
     expect(mockInvalidateSysRolesCache).not.toHaveBeenCalled();

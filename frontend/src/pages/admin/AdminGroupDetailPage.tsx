@@ -439,7 +439,16 @@ export default function AdminGroupDetailPage() {
                   <span style={{ color: 'rgba(0,0,0,0.45)', fontSize: 12 }}>
                     Системные роли, назначенные группе, наследуются всеми её участниками. Инвалидация кэша эффективных ролей — до 60с.
                   </span>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => setGrantSysOpen(true)}>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      // Clear any stale selection so re-opening never carries a role
+                      // that was already granted by another admin since last close.
+                      setGrantSysRole(undefined);
+                      setGrantSysOpen(true);
+                    }}
+                  >
                     Выдать системную роль
                   </Button>
                 </div>

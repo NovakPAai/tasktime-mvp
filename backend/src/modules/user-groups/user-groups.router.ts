@@ -135,13 +135,19 @@ router.delete('/:id/project-roles/:projectId', authHandler(async (req, res) => {
 
 // ──── TTBULK-1 PR-8 — group-level system roles ───────────────────────────────
 
+// Audit actions `system_role.granted|revoked` зеркалят TZ §7.2 соглашение для
+// group-source событий. Direct-user path использует `user.system_role_added|removed`
+// (в `users.service`). Cross-path audit-запрос обязан OR'ить оба префикса.
 router.post(
   '/:id/system-roles',
   validate(grantGroupSystemRoleDto),
   authHandler(async (req, res) => {
     const groupId = req.params.id as string;
     const role = req.body.role as SystemRoleType;
-    const created = await service.grantSystemRoleToGroup(groupId, role, req.user!.userId);
+    const created = await service.grantSystemRoleToGroup(groupId, role, {
+      userId: req.user!.userId,
+      systemRoles: req.user!.systemRoles as SystemRoleType[],
+    });
     await logAudit(req, 'system_role.granted', 'user_group', groupId, {
       role,
       source: 'group',
@@ -158,7 +164,10 @@ router.delete(
     if (!VALID_SYSTEM_ROLES.includes(role)) {
       throw new AppError(400, `Invalid system role: ${role}`);
     }
-    const result = await service.revokeSystemRoleFromGroup(groupId, role);
+    const result = await service.revokeSystemRoleFromGroup(groupId, role, {
+      userId: req.user!.userId,
+      systemRoles: req.user!.systemRoles as SystemRoleType[],
+    });
     await logAudit(req, 'system_role.revoked', 'user_group', groupId, {
       role,
       source: 'group',

@@ -2,12 +2,15 @@ import { Prisma, type SystemRoleType } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
-import { invalidateUserSystemRolesCacheForUsers } from '../../shared/auth/roles.js';
+import { invalidateUserSystemRolesCacheForUsers, isSuperAdmin } from '../../shared/auth/roles.js';
 import type {
   CreateUserGroupDto,
   UpdateUserGroupDto,
   GrantProjectRoleDto,
 } from './user-groups.dto.js';
+
+/** Actor metadata needed by system-role grant/revoke для privilege-escalation guard (PR-8). */
+export type SystemRoleActor = { userId: string; systemRoles: SystemRoleType[] };
 
 /**
  * Invalidate both the new group-aware effective cache AND the legacy per-permission cache for
@@ -324,25 +327,47 @@ export async function revokeProjectRole(groupId: string, projectId: string) {
 export async function grantSystemRoleToGroup(
   groupId: string,
   role: SystemRoleType,
-  createdBy: string,
+  actor: SystemRoleActor,
 ) {
+  // Privilege-escalation guard — зеркалим `users.service.addSystemRole`:
+  // без этой проверки любой ADMIN мог бы через группу выдать SUPER_ADMIN/ADMIN
+  // себе (создать группу → grant SUPER_ADMIN группе → добавить себя в группу
+  // → getEffectiveUserSystemRoles возвращает SUPER_ADMIN).
+  if (!isSuperAdmin(actor.systemRoles) && (role === 'SUPER_ADMIN' || role === 'ADMIN')) {
+    throw new AppError(403, 'Only super admins can assign SUPER_ADMIN or ADMIN via groups');
+  }
+
   const group = await prisma.userGroup.findUnique({
     where: { id: groupId },
     select: { id: true, members: { select: { userId: true } } },
   });
   if (!group) throw new AppError(404, 'Группа не найдена');
 
-  // Idempotent upsert: `@@unique([groupId, role])` means повторный grant — no-op.
+  // Idempotent — `@@unique([groupId, role])`: повторный grant → existing.
   const existing = await prisma.userGroupSystemRole.findUnique({
     where: { groupId_role: { groupId, role } },
     select: { id: true, role: true, createdAt: true, createdBy: true },
   });
   if (existing) return existing;
 
-  const created = await prisma.userGroupSystemRole.create({
-    data: { groupId, role, createdBy },
-    select: { id: true, role: true, createdAt: true, createdBy: true },
-  });
+  let created;
+  try {
+    created = await prisma.userGroupSystemRole.create({
+      data: { groupId, role, createdBy: actor.userId },
+      select: { id: true, role: true, createdAt: true, createdBy: true },
+    });
+  } catch (err) {
+    // P2002 race: два параллельных grant'а прошли findUnique=null; второй
+    // проигрывает @@unique. Re-fetch — возвращаем winner-запись, семантически
+    // тот же результат что и idempotent-ветка выше.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return prisma.userGroupSystemRole.findUniqueOrThrow({
+        where: { groupId_role: { groupId, role } },
+        select: { id: true, role: true, createdAt: true, createdBy: true },
+      });
+    }
+    throw err;
+  }
 
   if (group.members.length > 0) {
     await invalidateUserSystemRolesCacheForUsers(group.members.map((m) => m.userId));
@@ -351,7 +376,17 @@ export async function grantSystemRoleToGroup(
   return created;
 }
 
-export async function revokeSystemRoleFromGroup(groupId: string, role: SystemRoleType) {
+export async function revokeSystemRoleFromGroup(
+  groupId: string,
+  role: SystemRoleType,
+  actor: SystemRoleActor,
+) {
+  // Симметрично grant: ADMIN не может revoke SUPER_ADMIN/ADMIN через группу
+  // (иначе ADMIN может отозвать SUPER_ADMIN у группы и лишить оппонента прав).
+  if (!isSuperAdmin(actor.systemRoles) && (role === 'SUPER_ADMIN' || role === 'ADMIN')) {
+    throw new AppError(403, 'Only super admins can revoke SUPER_ADMIN or ADMIN via groups');
+  }
+
   const group = await prisma.userGroup.findUnique({
     where: { id: groupId },
     select: { id: true, members: { select: { userId: true } } },
