@@ -112,8 +112,10 @@ export type PreviewBulkOperationDto = z.infer<typeof previewBulkOperationDto>;
 
 export const createBulkOperationDto = z.object({
   previewToken: z.string().uuid(),
-  /** Для каждого conflictId из preview response — как поступить. */
-  conflictResolutions: z.record(z.enum(['INCLUDE', 'EXCLUDE', 'USE_OVERRIDE'])).optional(),
+  // conflictResolutions — удалён из PR-3 DTO: в PR-3 preview-stubs не возвращают
+  // conflicts (executor'ы — ELIGIBLE для всех). Поле вернётся в PR-5 вместе с
+  // реальными preflight-матрицами. Чтобы не накопить silent-drop'ов от клиентов
+  // уже сейчас, отсутствие поля = лучше, чем unused optional.
 });
 
 export type CreateBulkOperationDto = z.infer<typeof createBulkOperationDto>;

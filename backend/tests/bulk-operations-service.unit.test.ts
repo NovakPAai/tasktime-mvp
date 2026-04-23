@@ -31,9 +31,8 @@ const { mockPrisma, mockRedis, mockSearchIssues } = vi.hoisted(() => {
     auditLog: { create: vi.fn() },
   };
   const mockRedis = {
-    getCachedJson: vi.fn(),
+    atomicGetDelJson: vi.fn(),
     setCachedJson: vi.fn(),
-    delCachedJson: vi.fn(),
     rpushList: vi.fn(),
     isRedisAvailable: vi.fn(),
   };
@@ -72,12 +71,12 @@ const actor = {
 beforeEach(() => {
   vi.clearAllMocks();
   // Дефолты — каждый тест может переопределить.
-  mockRedis.getCachedJson.mockResolvedValue(null);
+  mockRedis.atomicGetDelJson.mockResolvedValue(null);
   mockRedis.setCachedJson.mockResolvedValue(undefined);
-  mockRedis.delCachedJson.mockResolvedValue(undefined);
   mockRedis.rpushList.mockResolvedValue(1);
   mockRedis.isRedisAvailable.mockResolvedValue(true);
   mockPrisma.auditLog.create.mockResolvedValue({});
+  mockPrisma.bulkOperation.delete = vi.fn().mockResolvedValue({ id: 'op-1' });
 });
 
 // ────── previewBulkOperation ─────────────────────────────────────────────────
@@ -131,13 +130,14 @@ describe('previewBulkOperation — scope=ids', () => {
 });
 
 describe('previewBulkOperation — scope=jql', () => {
-  it('happy: резолвит через searchIssues, возвращает eligible', async () => {
+  it('happy: резолвит через searchIssues (page 100), возвращает eligible', async () => {
+    // total<100 — одна страница, цикл выходит после первого iter.
     mockSearchIssues.mockResolvedValue({
       kind: 'ok',
       total: 2,
       issues: [{ id: 'i1' }, { id: 'i2' }],
       startAt: 0,
-      limit: 10000,
+      limit: 100,
       warnings: [],
       compileWarnings: [],
     });
@@ -154,26 +154,63 @@ describe('previewBulkOperation — scope=jql', () => {
     expect(res.warnings).toEqual([]);
   });
 
-  it('searchIssues возвращает total > limit → TRUNCATED_TO_MAX_ITEMS warning', async () => {
-    mockSearchIssues.mockResolvedValue({
-      kind: 'ok',
-      total: 12_547,
-      issues: Array.from({ length: 2 }, (_, i) => ({ id: `i${i}` })), // mock'им только 2 для краткости
-      startAt: 0,
-      limit: 10000,
-      warnings: [],
-      compileWarnings: [],
-    });
-    mockPrisma.issue.findMany.mockResolvedValue([
-      { id: 'i0', number: 1, title: 'A', projectId: 'p1', project: { id: 'p1', key: 'TT' } },
-      { id: 'i1', number: 2, title: 'B', projectId: 'p1', project: { id: 'p1', key: 'TT' } },
-    ]);
+  it('total > DEFAULT_MAX_ITEMS → TRUNCATED_TO_MAX_ITEMS warning (цикл останавливается на лимите)', async () => {
+    // Эмулируем "full pages" по 100 до первой неполной. Возвращаем пустые id'шники —
+    // тест фиксирует только warning, issueKey не валидируется (findMany тоже mock).
+    mockSearchIssues.mockImplementation(
+      async ({ startAt }: { startAt: number }) => ({
+        kind: 'ok',
+        total: 12_547,
+        issues: Array.from({ length: 100 }, (_, i) => ({ id: `i${startAt + i}` })),
+        startAt,
+        limit: 100,
+        warnings: [],
+        compileWarnings: [],
+      }),
+    );
+    // Для preview metadata вернём минимальный match — в этом тесте важен только warning.
+    mockPrisma.issue.findMany.mockResolvedValue([]);
     const res = await service.previewBulkOperation(
       { scope: { kind: 'jql', jql: 'project = TT' }, payload: { type: 'ASSIGN', assigneeId: null } },
       actor,
     );
     expect(res.warnings).toContain('TRUNCATED_TO_MAX_ITEMS');
     expect(res.totalMatched).toBe(12_547);
+  });
+
+  it('пагинация: page<pageSize на второй итерации → выход из цикла', async () => {
+    let call = 0;
+    mockSearchIssues.mockImplementation(async () => {
+      call++;
+      if (call === 1) {
+        return {
+          kind: 'ok',
+          total: 150,
+          issues: Array.from({ length: 100 }, (_, i) => ({ id: `a${i}` })),
+          startAt: 0,
+          limit: 100,
+          warnings: [],
+          compileWarnings: [],
+        };
+      }
+      return {
+        kind: 'ok',
+        total: 150,
+        issues: Array.from({ length: 50 }, (_, i) => ({ id: `b${i}` })),
+        startAt: 100,
+        limit: 100,
+        warnings: [],
+        compileWarnings: [],
+      };
+    });
+    mockPrisma.issue.findMany.mockResolvedValue([]);
+    const res = await service.previewBulkOperation(
+      { scope: { kind: 'jql', jql: 'project = TT' }, payload: { type: 'ASSIGN', assigneeId: null } },
+      actor,
+    );
+    expect(call).toBe(2); // точно 2 round-trip'а, не больше
+    expect(res.warnings).not.toContain('TRUNCATED_TO_MAX_ITEMS'); // 150 < 10000
+    expect(res.totalMatched).toBe(150);
   });
 
   it('searchIssues error → AppError пробрасывается', async () => {
@@ -208,7 +245,7 @@ describe('createBulkOperation', () => {
 
   it('happy: создаёт op, RPUSH, удаляет previewToken, audit', async () => {
     mockPrisma.bulkOperation.findUnique.mockResolvedValue(null); // нет дубля idempotency
-    mockRedis.getCachedJson.mockResolvedValue(previewEntry);
+    mockRedis.atomicGetDelJson.mockResolvedValue(previewEntry);
     mockPrisma.bulkOperation.count.mockResolvedValue(0); // quota ok
     mockPrisma.bulkOperation.create.mockResolvedValue({ id: 'op-1', status: 'QUEUED' });
 
@@ -217,9 +254,10 @@ describe('createBulkOperation', () => {
       { userId: 'user-1', systemRoles: ['BULK_OPERATOR'] },
     );
 
-    expect(res).toEqual({ id: 'op-1', status: 'QUEUED' });
+    expect(res).toEqual({ id: 'op-1', status: 'QUEUED', alreadyExisted: false });
     expect(mockRedis.rpushList).toHaveBeenCalledWith('bulk-op:op-1:pending', ['i1', 'i2']);
-    expect(mockRedis.delCachedJson).toHaveBeenCalledWith(expect.stringMatching(/^bulk-op:preview:/));
+    // atomicGetDelJson consume'ит токен в одном round-trip'е — отдельного delCachedJson нет.
+    expect(mockRedis.atomicGetDelJson).toHaveBeenCalledWith(expect.stringMatching(/^bulk-op:preview:/));
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ action: 'bulk_operation.created', entityId: 'op-1' }),
@@ -233,14 +271,14 @@ describe('createBulkOperation', () => {
       { previewToken: 'token-1', idempotencyKey: '11111111-1111-1111-1111-111111111111' },
       { userId: 'user-1', systemRoles: ['BULK_OPERATOR'] },
     );
-    expect(res).toEqual({ id: 'op-existing', status: 'RUNNING' });
+    expect(res).toEqual({ id: 'op-existing', status: 'RUNNING', alreadyExisted: true });
     expect(mockPrisma.bulkOperation.create).not.toHaveBeenCalled();
     expect(mockRedis.rpushList).not.toHaveBeenCalled();
   });
 
   it('истёкший previewToken → 409 PREVIEW_EXPIRED', async () => {
     mockPrisma.bulkOperation.findUnique.mockResolvedValue(null);
-    mockRedis.getCachedJson.mockResolvedValue(null);
+    mockRedis.atomicGetDelJson.mockResolvedValue(null);
     await expect(
       service.createBulkOperation(
         { previewToken: 'expired', idempotencyKey: '11111111-1111-1111-1111-111111111111' },
@@ -251,7 +289,7 @@ describe('createBulkOperation', () => {
 
   it('чужой previewToken → 404', async () => {
     mockPrisma.bulkOperation.findUnique.mockResolvedValue(null);
-    mockRedis.getCachedJson.mockResolvedValue({ ...previewEntry, userId: 'other-user' });
+    mockRedis.atomicGetDelJson.mockResolvedValue({ ...previewEntry, userId: 'other-user' });
     await expect(
       service.createBulkOperation(
         { previewToken: 'someone-elses', idempotencyKey: '11111111-1111-1111-1111-111111111111' },
@@ -262,7 +300,7 @@ describe('createBulkOperation', () => {
 
   it('quota 3 исчерпана → 429 TOO_MANY_CONCURRENT', async () => {
     mockPrisma.bulkOperation.findUnique.mockResolvedValue(null);
-    mockRedis.getCachedJson.mockResolvedValue(previewEntry);
+    mockRedis.atomicGetDelJson.mockResolvedValue(previewEntry);
     mockPrisma.bulkOperation.count.mockResolvedValue(3);
     await expect(
       service.createBulkOperation(
@@ -274,7 +312,7 @@ describe('createBulkOperation', () => {
 
   it('Redis недоступен до create → 503 QUEUE_UNAVAILABLE (op не создаётся)', async () => {
     mockPrisma.bulkOperation.findUnique.mockResolvedValue(null);
-    mockRedis.getCachedJson.mockResolvedValue(previewEntry);
+    mockRedis.atomicGetDelJson.mockResolvedValue(previewEntry);
     mockPrisma.bulkOperation.count.mockResolvedValue(0);
     mockRedis.isRedisAvailable.mockResolvedValue(false);
     await expect(
@@ -286,13 +324,12 @@ describe('createBulkOperation', () => {
     expect(mockPrisma.bulkOperation.create).not.toHaveBeenCalled();
   });
 
-  it('RPUSH упал после create → 503 + откат op в FAILED', async () => {
+  it('RPUSH упал после create → 503 + DELETE op (idempotency-slot свободен для retry)', async () => {
     mockPrisma.bulkOperation.findUnique.mockResolvedValue(null);
-    mockRedis.getCachedJson.mockResolvedValue(previewEntry);
+    mockRedis.atomicGetDelJson.mockResolvedValue(previewEntry);
     mockPrisma.bulkOperation.count.mockResolvedValue(0);
     mockPrisma.bulkOperation.create.mockResolvedValue({ id: 'op-1', status: 'QUEUED' });
     mockRedis.rpushList.mockResolvedValue(null); // Redis died after create
-    mockPrisma.bulkOperation.update.mockResolvedValue({ id: 'op-1', status: 'FAILED' });
 
     await expect(
       service.createBulkOperation(
@@ -300,14 +337,33 @@ describe('createBulkOperation', () => {
         { userId: 'user-1', systemRoles: ['BULK_OPERATOR'] },
       ),
     ).rejects.toMatchObject({ statusCode: 503 });
-    expect(mockPrisma.bulkOperation.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'op-1' }, data: expect.objectContaining({ status: 'FAILED' }) }),
+    expect(mockPrisma.bulkOperation.delete).toHaveBeenCalledWith({ where: { id: 'op-1' } });
+  });
+
+  it('P2002 race при create (параллельный запрос успел вставить) → re-fetch + alreadyExisted', async () => {
+    // findUnique ничего не находит (race window), но между ним и create'ом другой запрос
+    // успел вставить — Prisma бросает P2002. Мы должны поймать, re-fetch и вернуть existing.
+    mockPrisma.bulkOperation.findUnique
+      .mockResolvedValueOnce(null) // first check before create
+      .mockResolvedValueOnce({ id: 'op-raced', status: 'QUEUED' }); // re-fetch after P2002
+    mockRedis.atomicGetDelJson.mockResolvedValue(previewEntry);
+    mockPrisma.bulkOperation.count.mockResolvedValue(0);
+    mockPrisma.bulkOperation.create.mockRejectedValue({
+      code: 'P2002',
+      meta: { target: ['created_by_id', 'idempotency_key'] },
+    });
+
+    const res = await service.createBulkOperation(
+      { previewToken: 'token-1', idempotencyKey: '11111111-1111-1111-1111-111111111111' },
+      { userId: 'user-1', systemRoles: ['BULK_OPERATOR'] },
     );
+    expect(res).toEqual({ id: 'op-raced', status: 'QUEUED', alreadyExisted: true });
+    expect(mockRedis.rpushList).not.toHaveBeenCalled();
   });
 
   it('preview без eligibleIds → 400 NO_ELIGIBLE_ITEMS', async () => {
     mockPrisma.bulkOperation.findUnique.mockResolvedValue(null);
-    mockRedis.getCachedJson.mockResolvedValue({ ...previewEntry, eligibleIds: [] });
+    mockRedis.atomicGetDelJson.mockResolvedValue({ ...previewEntry, eligibleIds: [] });
     await expect(
       service.createBulkOperation(
         { previewToken: 'token-1', idempotencyKey: '11111111-1111-1111-1111-111111111111' },

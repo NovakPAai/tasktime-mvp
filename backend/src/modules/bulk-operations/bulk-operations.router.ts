@@ -130,7 +130,9 @@ router.post(
         { previewToken: body.previewToken, idempotencyKey },
         { userId: actor.userId, systemRoles: req.user!.systemRoles },
       );
-      res.status(201).json(result);
+      // 200 при idempotent replay, 201 при создании нового — RFC-консистентно.
+      const { alreadyExisted, ...body2 } = result;
+      res.status(alreadyExisted ? 200 : 201).json(body2);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return next(new AppError(400, 'Invalid Idempotency-Key (must be UUID)', { code: 'IDEMPOTENCY_KEY_INVALID' }));

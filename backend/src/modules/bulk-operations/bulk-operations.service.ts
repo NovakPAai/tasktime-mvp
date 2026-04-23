@@ -40,10 +40,10 @@ import type { BulkOperation, BulkOperationStatus, BulkOperationType, Prisma } fr
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
+import { isUniqueViolation } from '../../shared/utils/prisma-errors.js';
 import {
-  getCachedJson,
   setCachedJson,
-  delCachedJson,
+  atomicGetDelJson,
   rpushList,
   isRedisAvailable,
 } from '../../shared/redis.js';
@@ -67,9 +67,11 @@ const PREVIEW_KEY_PREFIX = 'bulk-op:preview:';
 const PENDING_KEY_PREFIX = 'bulk-op:';
 const PENDING_KEY_SUFFIX = ':pending';
 
+/** @internal — exported для тестов и для PR-4 processor'а (LPOP). */
 export function previewTokenKey(token: string): string {
   return `${PREVIEW_KEY_PREFIX}${token}`;
 }
+/** @internal — exported для тестов и для PR-4 processor'а. */
 export function pendingQueueKey(operationId: string): string {
   return `${PENDING_KEY_PREFIX}${operationId}${PENDING_KEY_SUFFIX}`;
 }
@@ -219,23 +221,27 @@ export async function previewBulkOperation(
 export async function createBulkOperation(
   input: { previewToken: string; idempotencyKey: string },
   ctx: BulkExecutorActor,
-): Promise<{ id: string; status: BulkOperationStatus }> {
+): Promise<{ id: string; status: BulkOperationStatus; alreadyExisted: boolean }> {
   // Idempotency — если такой ключ уже отправлен, вернуть тот же operationId.
   const existing = await prisma.bulkOperation.findUnique({
     where: { createdById_idempotencyKey: { createdById: ctx.userId, idempotencyKey: input.idempotencyKey } },
     select: { id: true, status: true },
   });
   if (existing) {
-    return { id: existing.id, status: existing.status };
+    return { id: existing.id, status: existing.status, alreadyExisted: true };
   }
 
-  // Подгружаем preview.
-  const preview = await getCachedJson<PreviewCacheEntry>(previewTokenKey(input.previewToken));
+  // Atomic GET+DEL — закрывает double-consume race: две параллельные create-запроса с
+  // одним previewToken, но разными idempotencyKey, не смогут обе увидеть данные.
+  // После consume токен исчезает из Redis → второй запрос получит 409 PREVIEW_EXPIRED.
+  const preview = await atomicGetDelJson<PreviewCacheEntry>(previewTokenKey(input.previewToken));
   if (!preview) {
     throw new AppError(409, 'Preview expired or not found', { code: 'PREVIEW_EXPIRED' });
   }
   if (preview.userId !== ctx.userId) {
     // Чужой previewToken — 404 вместо 403 (чтобы не разглашать существование).
+    // Но уже consumed — это последствие atomic GETDEL; владелец получит 409 при следующем
+    // submit'е. Приемлемо: попытка кражи токена в любом случае разрушает его валидность.
     throw new AppError(404, 'Preview not found');
   }
   if (preview.eligibleIds.length === 0) {
@@ -265,35 +271,48 @@ export async function createBulkOperation(
     });
   }
 
-  const operation = await prisma.bulkOperation.create({
-    data: {
-      createdById: ctx.userId,
-      type: preview.type,
-      status: 'QUEUED',
-      scopeKind: preview.scopeKind,
-      scopeJql: preview.scopeJql,
-      payload: preview.payload as unknown as Prisma.InputJsonValue,
-      idempotencyKey: input.idempotencyKey,
-      total: preview.eligibleIds.length,
-    },
-    select: { id: true, status: true },
-  });
+  let operation: { id: string; status: BulkOperationStatus };
+  try {
+    operation = await prisma.bulkOperation.create({
+      data: {
+        createdById: ctx.userId,
+        type: preview.type,
+        status: 'QUEUED',
+        scopeKind: preview.scopeKind,
+        scopeJql: preview.scopeJql,
+        payload: preview.payload as unknown as Prisma.InputJsonValue,
+        idempotencyKey: input.idempotencyKey,
+        total: preview.eligibleIds.length,
+      },
+      select: { id: true, status: true },
+    });
+  } catch (err) {
+    // P2002 race: между findUnique(idempotencyKey) и create параллельный запрос
+    // с тем же key успел вставить. Re-fetch и вернуть существующий.
+    if (isUniqueViolation(err, 'idempotency_key')) {
+      const raced = await prisma.bulkOperation.findUnique({
+        where: {
+          createdById_idempotencyKey: { createdById: ctx.userId, idempotencyKey: input.idempotencyKey },
+        },
+        select: { id: true, status: true },
+      });
+      if (raced) {
+        return { id: raced.id, status: raced.status, alreadyExisted: true };
+      }
+    }
+    throw err;
+  }
 
   const pushed = await rpushList(pendingQueueKey(operation.id), preview.eligibleIds);
   if (pushed === null) {
     // Redis упал между isRedisAvailable и RPUSH — операция без queue бессмысленна.
-    // Отменяем её сразу, чтобы processor не подхватил без items.
-    await prisma.bulkOperation.update({
-      where: { id: operation.id },
-      data: { status: 'FAILED', finishedAt: new Date() },
-    });
+    // DELETE (не UPDATE FAILED) — освобождает idempotency-slot, чтобы юзер мог
+    // сразу ретраить после восстановления Redis'а.
+    await prisma.bulkOperation.delete({ where: { id: operation.id } });
     throw new AppError(503, 'Backend queue unavailable, try again later', {
       code: 'QUEUE_UNAVAILABLE',
     });
   }
-
-  // Preview-токен одноразовый — удаляем, чтобы replay был невозможен.
-  await delCachedJson(previewTokenKey(input.previewToken));
 
   await prisma.auditLog.create({
     data: {
@@ -310,7 +329,7 @@ export async function createBulkOperation(
     },
   });
 
-  return { id: operation.id, status: operation.status };
+  return { id: operation.id, status: operation.status, alreadyExisted: false };
 }
 
 // ────── get ──────────────────────────────────────────────────────────────────
@@ -410,31 +429,46 @@ async function resolveScope(
     return { issueIds: scope.issueIds, totalMatched: scope.issueIds.length, warnings: [] };
   }
 
-  // scope=jql — резолвим через searchIssues. SearchIssuesContext уже
-  // принимает accessibleProjectIds как единственный authoritative scope
-  // (см. search.service.ts:33); hasGlobalRead вычисляется router'ом до
-  // вызова (resolveAccessibleProjectIds).
-  const result = await searchIssues(
-    { jql: scope.jql, startAt: 0, limit: DEFAULT_MAX_ITEMS },
-    {
-      userId: ctx.userId,
-      accessibleProjectIds: ctx.accessibleProjectIds,
-      now: new Date(),
-    },
-  );
-
-  if (result.kind === 'error') {
-    throw new AppError(result.status, result.message, { code: result.code });
+  // scope=jql — резолвим через searchIssues. SearchIssuesContext принимает
+  // accessibleProjectIds как единственный authoritative scope (search.service.ts:33).
+  //
+  // ВАЖНО: search.service clamp'ает limit до 100 (MAX_LIMIT). Поэтому резолв
+  // идёт постраничным loop'ом — иначе preview для JQL'я с > 100 матчей молча
+  // обрезался бы до 100 (pre-push-reviewer #1 🟠). Каждая страница — отдельный
+  // round-trip; на ~10k items это 100 вызовов × ~50ms = ~5с, что терпимо для
+  // user-initiated preview. В будущем можно заменить на прямой compile →
+  // prisma.findMany(select:{id}) с take=10k (refactor отложен).
+  const SEARCH_PAGE_SIZE = 100; // = search.service MAX_LIMIT
+  const issueIds: string[] = [];
+  let totalMatched = 0;
+  let startAt = 0;
+  while (issueIds.length < DEFAULT_MAX_ITEMS) {
+    const result = await searchIssues(
+      { jql: scope.jql, startAt, limit: SEARCH_PAGE_SIZE },
+      {
+        userId: ctx.userId,
+        accessibleProjectIds: ctx.accessibleProjectIds,
+        now: new Date(),
+      },
+    );
+    if (result.kind === 'error') {
+      throw new AppError(result.status, result.message, { code: result.code });
+    }
+    totalMatched = result.total;
+    for (const i of result.issues) {
+      issueIds.push(i.id);
+      if (issueIds.length >= DEFAULT_MAX_ITEMS) break;
+    }
+    if (result.issues.length < SEARCH_PAGE_SIZE) break;
+    startAt += SEARCH_PAGE_SIZE;
+    // MAX_START_AT в search.service = 10000 — наш loop упирается в тот же лимит.
+    if (startAt >= DEFAULT_MAX_ITEMS) break;
   }
 
   const warnings: string[] = [];
-  if (result.total > DEFAULT_MAX_ITEMS) {
+  if (totalMatched > DEFAULT_MAX_ITEMS) {
     warnings.push('TRUNCATED_TO_MAX_ITEMS');
   }
 
-  return {
-    issueIds: result.issues.map((i) => i.id),
-    totalMatched: result.total,
-    warnings,
-  };
+  return { issueIds, totalMatched, warnings };
 }
