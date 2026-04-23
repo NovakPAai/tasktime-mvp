@@ -30,6 +30,8 @@
 
 import { Router, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
+import { format } from '@fast-csv/format';
+import { randomUUID } from 'node:crypto';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
@@ -37,6 +39,8 @@ import { rateLimit } from '../../shared/middleware/rate-limit.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { hasGlobalProjectReadAccess } from '../../shared/auth/roles.js';
 import { prisma } from '../../prisma/client.js';
+import { createSubscriber } from '../../shared/redis.js';
+import { captureError } from '../../shared/utils/logger.js';
 import type { AuthRequest } from '../../shared/types/index.js';
 import {
   previewBulkOperationDto,
@@ -177,6 +181,136 @@ router.post(
     }
   },
 );
+
+// ────── GET /:id/stream (SSE) ────────────────────────────────────────────────
+
+/**
+ * Server-Sent Events для live-progress массовой операции.
+ * События: `progress`, `item`, `status`, `heartbeat` (keep-alive 20s).
+ *
+ * Клиент закрывает соединение по `status` event или через timeout/heartbeat miss;
+ * сервер закрывает при отсутствии Redis subscriber'а (Redis down → 503 перед
+ * стартом SSE-handshake'а; фронт fall-back на polling).
+ */
+router.get('/bulk-operations/:id/stream', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const actor = requireActor(req);
+    const operationId = req.params.id as string;
+
+    // Ownership check до раскрытия канала.
+    await service.getBulkOperation(operationId, {
+      userId: actor.userId,
+      systemRoles: req.user!.systemRoles,
+    });
+
+    const subscriber = await createSubscriber();
+    if (!subscriber) {
+      // Redis недоступен — клиент fall-back'ает на polling GET /:id.
+      throw new AppError(503, 'Event stream unavailable, use polling', { code: 'STREAM_UNAVAILABLE' });
+    }
+
+    // SSE headers — отключаем compression (nginx X-Accel-Buffering) для мгновенной доставки.
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    const channel = `bulk-op:${operationId}:events`;
+    await subscriber.subscribe(channel, (message) => {
+      try {
+        const parsed = JSON.parse(message) as { event: string; data: unknown };
+        res.write(`event: ${parsed.event}\n`);
+        res.write(`data: ${JSON.stringify(parsed.data)}\n\n`);
+      } catch (err) {
+        captureError(err, { fn: 'SSE message handler', operationId });
+      }
+    });
+
+    // Keep-alive heartbeat каждые 20с (прокси обычно закрывают idle на 30-60с).
+    const heartbeat = setInterval(() => {
+      res.write(`: ping\n\n`);
+    }, 20_000);
+
+    // Cleanup при disconnect клиента / ошибке.
+    const cleanup = async () => {
+      clearInterval(heartbeat);
+      try {
+        await subscriber.quit();
+      } catch (err) {
+        captureError(err, { fn: 'SSE cleanup', operationId });
+      }
+    };
+    req.on('close', () => void cleanup());
+    req.on('error', () => void cleanup());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ────── GET /:id/report.csv ──────────────────────────────────────────────────
+
+/**
+ * Stream-CSV отчёт по всем failed/skipped items'ам операции (succeeded items не
+ * персистятся — §5.0 minimization; их трейс в AuditLog). Cursor-based пагинация
+ * по 1000 строк, чтобы не держать всё в памяти.
+ */
+router.get('/bulk-operations/:id/report.csv', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const actor = requireActor(req);
+    const operationId = req.params.id as string;
+
+    // Ownership check.
+    await service.getBulkOperation(operationId, {
+      userId: actor.userId,
+      systemRoles: req.user!.systemRoles,
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="bulk-op-${operationId}.csv"`);
+
+    const csv = format({ headers: ['issueKey', 'outcome', 'errorCode', 'errorMessage', 'processedAt'], writeBOM: true });
+    csv.pipe(res);
+    for await (const row of service.streamReportItems(operationId)) {
+      csv.write({
+        issueKey: row.issueKey,
+        outcome: row.outcome,
+        errorCode: row.errorCode,
+        errorMessage: row.errorMessage,
+        processedAt: row.processedAt.toISOString(),
+      });
+    }
+    csv.end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ────── POST /:id/retry-failed ───────────────────────────────────────────────
+
+router.post('/bulk-operations/:id/retry-failed', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const actor = requireActor(req);
+    const operationId = req.params.id as string;
+    // Idempotency-Key: для retry header обязателен так же как для create.
+    // Если клиент не передал — генерируем новый (retry обычно инициируется из UI,
+    // и юзер ожидает "каждый клик — новая попытка"; при желании reuse клиент
+    // явно передаст тот же Idempotency-Key).
+    const idempotencyKeyRaw = req.header('Idempotency-Key') ?? randomUUID();
+    const idempotencyKey = idempotencyKeySchema.parse(idempotencyKeyRaw);
+    const result = await service.retryFailedItems(operationId, {
+      userId: actor.userId,
+      systemRoles: req.user!.systemRoles,
+    }, idempotencyKey);
+    const { alreadyExisted, ...body } = result;
+    res.status(alreadyExisted ? 200 : 201).json(body);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return next(new AppError(400, 'Invalid Idempotency-Key (must be UUID)', { code: 'IDEMPOTENCY_KEY_INVALID' }));
+    }
+    next(err);
+  }
+});
 
 // ────── GET / (list mine) ────────────────────────────────────────────────────
 

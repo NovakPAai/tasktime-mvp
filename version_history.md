@@ -2,7 +2,33 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.57**
+**Last version: 2.58**
+
+---
+
+## [2.58] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-6 — SSE + Redis pub/sub + report.csv + retry-failed
+
+**PR:** (to be filled after push)
+**Ветка:** `ttbulk-1/streaming-report`
+
+### Что было
+
+После PR-1..5 backend полностью работоспособен, но клиент не мог отслеживать прогресс live. Не было `/stream`, `/report.csv`, `/retry-failed`.
+
+### Что теперь
+
+- **Redis Pub/Sub helpers** в `shared/redis.ts`: `publishToChannel` + `createSubscriber` (duplicate-client для subscribe-mode node-redis v5).
+- **Processor публикует events** после каждого batch'а: `progress` + per-item `item` + финальный `status`.
+- **Router:** `GET /:id/stream` (SSE, heartbeat 20s, dedicated subscriber), `GET /:id/report.csv` (fast-csv streaming, cursor 1000/page), `POST /:id/retry-failed`.
+- **`@fast-csv/format`** добавлен. **10 новых unit-тестов**.
+
+### Проверки
+
+- tsc ✅, lint 0 errors ✅, test:parser 589/589 (+10 новых).
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §4.5, §6.6, §13.6 PR-6.
 
 ---
 

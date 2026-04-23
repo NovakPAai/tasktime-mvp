@@ -33,6 +33,7 @@ const { mockPrisma, mockRedis, mockTransitionExecutor, mockContext } = vi.hoiste
     acquireLock: vi.fn(),
     releaseLock: vi.fn(),
     lpopListBatch: vi.fn(),
+    publishToChannel: vi.fn().mockResolvedValue(true),
   };
   const mockTransitionExecutor = {
     type: 'TRANSITION',
@@ -50,6 +51,7 @@ vi.mock('../src/shared/redis.js', () => ({
   acquireLock: mockRedis.acquireLock,
   releaseLock: mockRedis.releaseLock,
   lpopListBatch: mockRedis.lpopListBatch,
+  publishToChannel: mockRedis.publishToChannel,
 }));
 vi.mock('../src/shared/bulk-operation-context.js', () => mockContext);
 vi.mock('../src/shared/auth/roles.js', () => ({
@@ -177,6 +179,15 @@ describe('runTickOnce — batch processing', () => {
           heartbeatAt: expect.any(Date),
         }),
       }),
+    );
+    // PR-6: SSE progress event + финальный status event (SUCCEEDED).
+    expect(mockRedis.publishToChannel).toHaveBeenCalledWith(
+      'bulk-op:op-1:events',
+      expect.objectContaining({ event: 'progress' }),
+    );
+    expect(mockRedis.publishToChannel).toHaveBeenCalledWith(
+      'bulk-op:op-1:events',
+      expect.objectContaining({ event: 'status', data: expect.objectContaining({ status: 'SUCCEEDED' }) }),
     );
   });
 

@@ -163,6 +163,53 @@ export async function lpopListBatch(key: string, count: number): Promise<string[
 }
 
 /**
+ * TTBULK-1 PR-6: Pub/Sub для SSE-стрима прогресса массовых операций.
+ *
+ * `publishToChannel` — processor публикует события (progress/status/item/heartbeat)
+ * на канале `bulk-op:{id}:events`, SSE-роут подписан через duplicate-client и
+ * форвардит в поток клиенту.
+ *
+ * Важно: node-redis v5 переводит connection в эксклюзивный subscribe-режим,
+ * поэтому subscriber должен быть отдельным клиентом (не shared singleton'ом).
+ * `createSubscriber()` возвращает свежий `client.duplicate()` под каждого
+ * SSE-consumer'а (long-lived connection = closed on client disconnect).
+ */
+export async function publishToChannel(channel: string, payload: unknown): Promise<boolean> {
+  const redis = await getRedisClientInternal();
+  if (!redis) return false;
+  try {
+    await redis.publish(channel, JSON.stringify(payload));
+    return true;
+  } catch (err) {
+    captureError(err, { fn: 'publishToChannel', channel });
+    return false;
+  }
+}
+
+/**
+ * Создаёт dedicated subscriber-client для SSE endpoint'а. Caller ОБЯЗАН
+ * вызвать `.quit()` при закрытии stream'а (cleanup на 'close' event).
+ *
+ * Возвращает null если Redis unavailable — caller должен fall-back на
+ * polling (клиент сам переключается через eventsource polyfill).
+ */
+export async function createSubscriber(): Promise<RedisClient | null> {
+  if (process.env.NODE_ENV === 'test') return null;
+  if (!config.REDIS_URL) return null;
+  const main = await getRedisClientInternal();
+  if (!main) return null;
+  try {
+    const sub = main.duplicate() as RedisClient;
+    sub.on('error', (err) => captureError(err, { fn: 'createSubscriber', event: 'subscriber-error' }));
+    await sub.connect();
+    return sub;
+  } catch (err) {
+    captureError(err, { fn: 'createSubscriber', event: 'connect-failed' });
+    return null;
+  }
+}
+
+/**
  * TTBULK-1: атомарный GET+DEL одним round-trip'ом (node-redis v4/v5 `getDel`).
  * Используется для one-shot previewToken'ов: две одновременные create-запроса
  * с одним token'ом не должны обе увидеть данные (double-consume race).

@@ -27,13 +27,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:parser": "vitest run --config vitest.parser-only.config.ts tests/search-tokenizer.unit.test.ts tests/search-parser.unit.test.ts tests/search-parser-goldenset.unit.test.ts tests/search-parser-fuzz.unit.test.ts tests/search-functions.unit.test.ts tests/search-validator.unit.test.ts tests/search-compiler.unit.test.ts tests/search-pipeline-fuzz.unit.test.ts tests/search-suggest.unit.test.ts tests/checkpoint-dto.unit.test.ts tests/checkpoint-engine-ttql.unit.test.ts tests/effective-user-system-roles.unit.test.ts tests/bulk-operations-service.unit.test.ts tests/bulk-operations-processor.unit.test.ts tests/transition-executor.unit.test.ts tests/bulk-executors.unit.test.ts",
+    "test:parser": "vitest run --config vitest.parser-only.config.ts tests/search-tokenizer.unit.test.ts tests/search-parser.unit.test.ts tests/search-parser-goldenset.unit.test.ts tests/search-parser-fuzz.unit.test.ts tests/search-functions.unit.test.ts tests/search-validator.unit.test.ts tests/search-compiler.unit.test.ts tests/search-pipeline-fuzz.unit.test.ts tests/search-suggest.unit.test.ts tests/checkpoint-dto.unit.test.ts tests/checkpoint-engine-ttql.unit.test.ts tests/effective-user-system-roles.unit.test.ts tests/bulk-operations-service.unit.test.ts tests/bulk-operations-processor.unit.test.ts tests/transition-executor.unit.test.ts tests/bulk-executors.unit.test.ts tests/bulk-operations-retry-report.unit.test.ts",
     "lint": "eslint src/ --ext .ts",
     "format": "prettier --write 'src/**/*.ts'",
     "mcp": "tsx src/mcp/server.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@fast-csv/format": "^5.0.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@prisma/client": "^6.5.0",
     "bcryptjs": "^2.4.3",
