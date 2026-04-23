@@ -10,6 +10,7 @@ import type { ConditionRule, ValidatorRule, PostFunctionRule, AvailableTransitio
 import { SYSTEM_FIELD_KEYS, SYSTEM_FIELD_META } from '../transition-screens/system-fields.js';
 import type { SystemFieldKey } from '../transition-screens/system-fields.js';
 import { scheduleRecomputeForIssue } from '../releases/checkpoints/checkpoint-triggers.service.js';
+import { getCurrentBulkOperationId } from '../../shared/bulk-operation-context.js';
 
 // ─── Redis cache helpers ──────────────────────────────────────────────────────
 
@@ -354,13 +355,16 @@ export async function executeTransition(
     runPostFunctions(issueId, actorId, postFunctionRules, updatedIssue).catch(() => {});
   }
 
-  // Audit log
+  // Audit log — TTBULK-1: bulkOperationId автоматически подтягивается из
+  // AsyncLocalStorage если transition вызван из BulkExecutor (см. §5.4).
+  // Вне bulk-контекста (обычный HTTP-запрос) getCurrentBulkOperationId()=undefined → null.
   await prisma.auditLog.create({
     data: {
       action: 'issue.transitioned',
       entityType: 'issue',
       entityId: issueId,
       userId: actorId,
+      bulkOperationId: getCurrentBulkOperationId() ?? null,
       details: {
         transitionId: transition.id,
         transitionName: transition.name,
