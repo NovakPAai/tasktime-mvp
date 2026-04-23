@@ -193,6 +193,51 @@ describe('setBulkOpsSettings', () => {
     expect(res.maxItems).toBe(10_000); // min(50000, MAX_ITEMS_HARD_LIMIT)
   });
 
+  it('🟠 cache invalidation ДО audit.create: если audit падает — кэш уже очищен (memo=null, delCachedJson вызван)', async () => {
+    mockPrisma.systemSetting.findUnique.mockResolvedValue(null);
+    mockPrisma.systemSetting.upsert.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockRejectedValue(new Error('audit table down'));
+
+    await expect(
+      svc.setBulkOpsSettings('admin-1', { maxConcurrentPerUser: 7, maxItems: 500 }),
+    ).rejects.toThrow('audit table down');
+
+    // Critical: cache должен быть очищен несмотря на audit failure —
+    // иначе следующие 60s использовали бы stale значение, хотя DB уже обновлён.
+    expect(mockRedis.delCachedJson).toHaveBeenCalledWith('settings:bulk_operations');
+  });
+
+  it('🟡 setBulkOpsSettings сбрасывает memo ПЕРЕД чтением current — before-snapshot всегда со свежего DB', async () => {
+    // Warm memo первым get'ом со значением A.
+    mockPrisma.systemSetting.findUnique.mockResolvedValueOnce({
+      key: 'bulk_operations',
+      value: JSON.stringify({ maxConcurrentPerUser: 1, maxItems: 100 }),
+    });
+    const warm = await svc.getBulkOpsSettings();
+    expect(warm.maxConcurrentPerUser).toBe(1);
+
+    // Между тем DB обновился другой сессией на значение B.
+    mockPrisma.systemSetting.findUnique.mockResolvedValueOnce({
+      key: 'bulk_operations',
+      value: JSON.stringify({ maxConcurrentPerUser: 5, maxItems: 3_000 }),
+    });
+    mockPrisma.systemSetting.upsert.mockResolvedValue({});
+
+    await svc.setBulkOpsSettings('admin-2', { maxItems: 4_000 });
+
+    // Audit `before` должен содержать B (5/3000), а не A (1/100) из memo.
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          details: expect.objectContaining({
+            before: { maxConcurrentPerUser: 5, maxItems: 3_000 },
+            after: { maxConcurrentPerUser: 5, maxItems: 4_000 },
+          }),
+        }),
+      }),
+    );
+  });
+
   it('invalidate memo: следующий getBulkOpsSettings читает свежее значение', async () => {
     // set() внутри сам вызывает getBulkOpsSettings → первый findUnique (#1),
     // затем в upsert записывает новое значение. После set — memo сброшен,

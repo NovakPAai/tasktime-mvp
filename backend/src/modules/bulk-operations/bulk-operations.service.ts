@@ -446,14 +446,15 @@ export async function retryFailedItems(
   }
 
   // Concurrency-quota + Redis availability — те же проверки что в createBulkOperation.
+  const { maxConcurrentPerUser } = await getBulkOpsSettings();
   const activeCount = await prisma.bulkOperation.count({
     where: { createdById: ctx.userId, status: { in: ['QUEUED', 'RUNNING'] } },
   });
-  if (activeCount >= DEFAULT_MAX_CONCURRENT_PER_USER) {
+  if (activeCount >= maxConcurrentPerUser) {
     throw new AppError(429, 'Too many concurrent bulk operations', {
       code: 'TOO_MANY_CONCURRENT',
       retryAfter: 60,
-      limit: DEFAULT_MAX_CONCURRENT_PER_USER,
+      limit: maxConcurrentPerUser,
       active: activeCount,
     });
   }

@@ -60,3 +60,13 @@ export function canViewCheckpointAudit(
 ): boolean {
   return hasAnySystemRole(userRoles, ['SUPER_ADMIN', 'ADMIN', 'AUDITOR']);
 }
+
+/**
+ * TTBULK-1 PR-7: system settings management (session lifetime, bulk-ops limits).
+ * Mirrors the backend `requireSuperAdmin()` gate.
+ */
+export function canManageSystemSettings(
+  userRoles: SystemRoleType[] | null | undefined,
+): boolean {
+  return hasSystemRole(userRoles, 'SUPER_ADMIN');
+}

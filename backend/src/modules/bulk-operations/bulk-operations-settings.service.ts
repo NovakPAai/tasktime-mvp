@@ -147,6 +147,10 @@ export async function setBulkOpsSettings(
   actorId: string,
   patch: Partial<BulkOpsSettings>,
 ): Promise<BulkOpsSettings> {
+  // Drop memo before reading `current` — иначе при конкурентных SA-сессиях
+  // в `details.before` audit log'а попадёт stale значение первого запроса
+  // (memo hit), а не реальное DB-состояние на момент второго setBulkOpsSettings.
+  memo = null;
   const current = await getBulkOpsSettings();
   const next: BulkOpsSettings = {
     maxConcurrentPerUser:
@@ -163,6 +167,15 @@ export async function setBulkOpsSettings(
     update: { value: JSON.stringify(next) },
   });
 
+  // Инвалидация ДО audit.create: если audit упадёт, кэш всё равно очищен,
+  // иначе получили бы stale 60s с уже-обновлённым DB-row.
+  memo = null;
+  try {
+    await delCachedJson(CACHE_KEY);
+  } catch (err) {
+    captureError(err, { fn: 'setBulkOpsSettings.delCache' });
+  }
+
   await prisma.auditLog.create({
     data: {
       action: 'system.bulk_operations_settings_changed',
@@ -172,14 +185,6 @@ export async function setBulkOpsSettings(
       details: { before: current, after: next },
     },
   });
-
-  // Инвалидация — оба слоя синхронно.
-  memo = null;
-  try {
-    await delCachedJson(CACHE_KEY);
-  } catch (err) {
-    captureError(err, { fn: 'setBulkOpsSettings.delCache' });
-  }
 
   return next;
 }

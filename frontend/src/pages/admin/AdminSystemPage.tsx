@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { InputNumber, Button, Form, message } from 'antd';
+import { InputNumber, Button, Form, message, Result } from 'antd';
 import { adminApi } from '../../api/admin';
 import type { BulkOpsSettings } from '../../api/admin';
 
 export default function AdminSystemPage() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [sessionLifetimeMinutes, setSessionLifetimeMinutes] = useState<number>(60);
   const [jwtExpiresIn, setJwtExpiresIn] = useState<string>('1h');
@@ -17,6 +18,7 @@ export default function AdminSystemPage() {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [sys, bulk] = await Promise.all([
         adminApi.getSystemSettings(),
@@ -28,6 +30,7 @@ export default function AdminSystemPage() {
       setBulkOps(bulk);
       bulkOpsForm.setFieldsValue(bulk);
     } catch {
+      setLoadError('Не удалось загрузить системные настройки');
       message.error('Не удалось загрузить системные настройки');
     } finally {
       setLoading(false);
@@ -70,6 +73,17 @@ export default function AdminSystemPage() {
       <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
         <span>Загрузка...</span>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Result
+        status="warning"
+        title={loadError}
+        subTitle="Попробуйте перезагрузить страницу или обратитесь к администратору."
+        extra={<Button type="primary" onClick={() => void loadAll()}>Повторить</Button>}
+      />
     );
   }
 
@@ -186,20 +200,20 @@ export default function AdminSystemPage() {
         <Form.Item
           label="Максимум элементов в одной операции"
           name="maxItems"
-          extra={`Текущее значение: ${bulkOps.maxItems}. Диапазон: 100..50000 (hard-cap 10000 применяется на уровне API).`}
+          extra={`Текущее значение: ${bulkOps.maxItems}. Диапазон: 100..10000 (hard-cap соответствует MAX_ITEMS_HARD_LIMIT в API).`}
           rules={[
             { required: true, message: 'Укажите значение' },
             {
               validator: (_, value) =>
-                Number.isInteger(value) && value >= 100 && value <= 50_000
+                Number.isInteger(value) && value >= 100 && value <= 10_000
                   ? Promise.resolve()
-                  : Promise.reject('Значение должно быть от 100 до 50000'),
+                  : Promise.reject('Значение должно быть от 100 до 10000'),
             },
           ]}
         >
           <InputNumber
             min={100}
-            max={50_000}
+            max={10_000}
             step={100}
             style={{ width: 200 }}
             addonAfter="шт"

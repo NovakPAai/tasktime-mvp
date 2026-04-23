@@ -106,8 +106,10 @@ export const adminApi = {
   getBulkOpsSettings: () =>
     api.get<BulkOpsSettings>('/admin/system-settings/bulk-operations').then(r => r.data),
 
-  setBulkOpsSettings: (patch: Partial<BulkOpsSettings>) =>
-    api.patch<BulkOpsSettings>('/admin/system-settings/bulk-operations', patch).then(r => r.data),
+  // API accepts partial (Zod `.refine` — минимум одно поле), но UI всегда
+  // шлёт оба значения — тип сигнатуры отражает реальный call-site контракт.
+  setBulkOpsSettings: (settings: BulkOpsSettings) =>
+    api.patch<BulkOpsSettings>('/admin/system-settings/bulk-operations', settings).then(r => r.data),
 };
 
 export interface AdminStats {

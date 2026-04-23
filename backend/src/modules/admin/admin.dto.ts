@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_ITEMS_HARD_LIMIT } from '../bulk-operations/bulk-operations.dto.js';
 
 export const createUserDto = z.object({
   email: z.string().email(),
@@ -37,10 +38,13 @@ export const updateSystemSettingsDto = z.object({
 });
 
 // TTBULK-1 PR-7 — bulk operations runtime limits.
+// maxItems max = MAX_ITEMS_HARD_LIMIT (10k), чтобы устранить silent-clamp
+// между DTO-валидацией и service-clamp'ом. Если в будущем hard-cap расширят —
+// поднимется и этот bound.
 export const updateBulkOpsSettingsDto = z
   .object({
     maxConcurrentPerUser: z.number().int().min(1).max(20).optional(),
-    maxItems: z.number().int().min(100).max(50_000).optional(),
+    maxItems: z.number().int().min(100).max(MAX_ITEMS_HARD_LIMIT).optional(),
   })
   .refine(
     (v) => v.maxConcurrentPerUser !== undefined || v.maxItems !== undefined,
