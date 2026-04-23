@@ -34,6 +34,7 @@ import cron from 'node-cron';
 import { prisma } from '../../prisma/client.js';
 import { acquireLock, releaseLock, lpopListBatch } from '../../shared/redis.js';
 import { runInBulkOperationContext } from '../../shared/bulk-operation-context.js';
+import { getEffectiveUserSystemRoles } from '../../shared/auth/roles.js';
 import { captureError } from '../../shared/utils/logger.js';
 import { pendingQueueKey } from './bulk-operations.service.js';
 import { getExecutor } from './executors/index.js';
@@ -43,9 +44,17 @@ import type { IssueWithContext, PreflightResult } from './bulk-operations.types.
 
 /** Глобальный лок против мультиинстанс-race'ов. */
 const TICK_LOCK_KEY = 'bulk-ops:tick';
-const TICK_LOCK_TTL_S = 30;
+/**
+ * TTL лока должен быть больше худшего batch-времени (25 items × ~1s в
+ * `executeTransition` = 25s) и больше cancel-drain'а (до 20k items — см.
+ * finalizeCancelled). 90s даёт ~3× headroom; env-override для staging/prod.
+ * RECOVERY_STALE_SECONDS (300s) должен быть существенно больше этого TTL,
+ * чтобы recovery не сбрасывал RUNNING op пока tick ещё держит lock.
+ */
+const TICK_LOCK_TTL_S = Number(process.env.BULK_OP_TICK_LOCK_TTL_S ?? 90);
 
 const BATCH_SIZE = Number(process.env.BULK_OP_BATCH_SIZE ?? 25);
+/** Должно быть >> TICK_LOCK_TTL_S × ожидаемое число batches-in-flight. */
 const RECOVERY_STALE_SECONDS = Number(process.env.BULK_OP_RECOVERY_STALE_SECONDS ?? 300);
 const ITEMS_RETENTION_DAYS = Number(process.env.BULK_OP_ITEMS_RETENTION_DAYS ?? 30);
 const OPS_RETENTION_DAYS = Number(process.env.BULK_OP_RETENTION_DAYS ?? 90);
@@ -161,6 +170,13 @@ async function processOperationBatch(op: BulkOperation): Promise<TickResult> {
       });
     }
   } else {
+    // Actor's эффективные системные роли (DIRECT ∪ GROUP, PR-2) — per-batch
+    // fetch, не per-item. Включает SUPER_ADMIN / ADMIN bypass для RBAC,
+    // иначе processor молча SKIP'ил бы SUPER_ADMIN-создаваемые операции без
+    // явного project-membership (§7.1).
+    const actorSystemRoles = await getEffectiveUserSystemRoles(op.createdById);
+    const actor = { userId: op.createdById, systemRoles: actorSystemRoles };
+
     // Подгружаем issue'ы для пачки одним запросом (project.key нужен для issueKey).
     const issues = await prisma.issue.findMany({
       where: { id: { in: batch } },
@@ -186,12 +202,7 @@ async function processOperationBatch(op: BulkOperation): Promise<TickResult> {
         const preflight: PreflightResult = await executor.preflight(
           issue as IssueWithContext,
           op.payload as unknown,
-          { userId: op.createdById, systemRoles: [] }, // actor systemRoles пустой здесь — executor
-                                                        // запросит per-project access через prisma.
-          // Примечание: для PR-4 actor.systemRoles не используется в TransitionExecutor
-          // сверх `hasAnySystemRole` bypass для SUPER_ADMIN/ADMIN. Processor не хранит
-          // снапшот JWT-ролей по соображениям retention; см. §7.1 — roles проверяются
-          // на уровне project-membership (ground truth в БД).
+          actor,
         );
         if (preflight.kind === 'SKIPPED') {
           counters.skipped += 1;
@@ -218,22 +229,37 @@ async function processOperationBatch(op: BulkOperation): Promise<TickResult> {
         }
         // ELIGIBLE → execute под bulkOperationId-контекстом.
         await runInBulkOperationContext(op.id, () =>
-          executor.execute(issue as IssueWithContext, op.payload as unknown, {
-            userId: op.createdById,
-            systemRoles: [],
-          }),
+          executor.execute(issue as IssueWithContext, op.payload as unknown, actor),
         );
         counters.succeeded += 1;
       } catch (err) {
-        captureError(err, { fn: 'processOperationBatch.execute', opId: op.id, issueId });
-        counters.failed += 1;
-        itemsToInsert.push({
-          issueId,
-          issueKey,
-          outcome: 'FAILED',
-          errorCode: 'EXECUTOR_ERROR',
-          errorMessage: truncate((err as { message?: string } | undefined)?.message ?? 'execution failed', 500),
-        });
+        // INVALID_TRANSITION (issue status изменился между preflight и execute)
+        // — не execution-failure, а stale state: помечаем SKIPPED / STALE_STATUS,
+        // чтобы не раздувать failed-счётчик и не превращать SUCCEEDED в PARTIAL
+        // из-за race'а. Retry-failed (PR-6) должен переобработать SKIPPED-items
+        // с этим кодом так же, как и FAILED.
+        const errAny = err as { code?: string; message?: string } | undefined;
+        const isStale = errAny?.code === 'INVALID_TRANSITION';
+        captureError(err, { fn: 'processOperationBatch.execute', opId: op.id, issueId, isStale });
+        if (isStale) {
+          counters.skipped += 1;
+          itemsToInsert.push({
+            issueId,
+            issueKey,
+            outcome: 'SKIPPED',
+            errorCode: 'STALE_STATUS',
+            errorMessage: 'Статус задачи изменился между preview и execute',
+          });
+        } else {
+          counters.failed += 1;
+          itemsToInsert.push({
+            issueId,
+            issueKey,
+            outcome: 'FAILED',
+            errorCode: 'EXECUTOR_ERROR',
+            errorMessage: truncate(errAny?.message ?? 'execution failed', 500),
+          });
+        }
       }
     }
   }
@@ -274,11 +300,18 @@ async function processOperationBatch(op: BulkOperation): Promise<TickResult> {
 // ────── Finalize ─────────────────────────────────────────────────────────────
 
 async function finalize(op: BulkOperation): Promise<BulkOperationStatus> {
-  // Правило SUCCEEDED: failed === 0 (skipped — нормальный результат preflight'а,
-  // не мешает итогу SUCCEEDED). PARTIAL — есть ≥1 succeeded и ≥1 failed;
-  // FAILED — все items failed, succeeded=0. См. §6.3 fix из pre-push review'а PR-3-плана.
+  // Status rules:
+  //   SUCCEEDED  — есть ≥1 succeeded И failed=0 (skipped допустимо — это нормальный
+  //                результат preflight'а, напр. ALREADY_IN_TARGET_STATE).
+  //   PARTIAL    — (a) есть и succeeded и failed; либо
+  //                (b) succeeded=0 && failed=0 но items были (все SKIPPED) — не
+  //                обманываем пользователя зелёной галкой если ничего не изменилось.
+  //   FAILED     — все items failed, succeeded=0.
   const status: BulkOperationStatus =
-    op.failed === 0 ? 'SUCCEEDED' : op.succeeded > 0 ? 'PARTIAL' : 'FAILED';
+    op.failed === 0 && op.succeeded > 0 ? 'SUCCEEDED'
+      : op.failed === 0 && op.succeeded === 0 ? 'PARTIAL' // all-skipped — misleading как SUCCEEDED
+        : op.succeeded > 0 ? 'PARTIAL'
+          : 'FAILED';
   await prisma.bulkOperation.update({
     where: { id: op.id },
     data: { status, finishedAt: new Date() },
@@ -304,9 +337,14 @@ async function finalize(op: BulkOperation): Promise<BulkOperationStatus> {
 
 async function finalizeCancelled(op: BulkOperation): Promise<BulkOperationStatus> {
   // Оставшиеся в pending-queue items помечаем SKIPPED CANCELLED_BY_USER.
-  // Дренаж queue — один LPOP'ом до дна (либо до лимита безопасности).
-  const MAX_DRAIN = 20_000; // защита от бесконечного цикла
+  // Дренаж queue — LPOP до дна (либо до MAX_DRAIN). При больших queue (>5k items)
+  // drain может занять > RECOVERY_STALE_SECONDS — обновляем heartbeat каждые
+  // ~10с, чтобы recovery-cron не сбросил op в QUEUED посреди дренажа
+  // (double-finalize race, pre-push review #4).
+  const MAX_DRAIN = 20_000;
+  const HEARTBEAT_INTERVAL_MS = 10_000;
   let drained = 0;
+  let lastHeartbeat = Date.now();
   const key = pendingQueueKey(op.id);
   while (drained < MAX_DRAIN) {
     const chunk = await lpopListBatch(key, BATCH_SIZE);
@@ -322,6 +360,13 @@ async function finalizeCancelled(op: BulkOperation): Promise<BulkOperationStatus
       })),
     });
     drained += chunk.length;
+    if (Date.now() - lastHeartbeat > HEARTBEAT_INTERVAL_MS) {
+      await prisma.bulkOperation.update({
+        where: { id: op.id },
+        data: { heartbeatAt: new Date() },
+      });
+      lastHeartbeat = Date.now();
+    }
   }
 
   await prisma.bulkOperation.update({

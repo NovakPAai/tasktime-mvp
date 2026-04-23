@@ -52,6 +52,17 @@ vi.mock('../src/shared/redis.js', () => ({
   lpopListBatch: mockRedis.lpopListBatch,
 }));
 vi.mock('../src/shared/bulk-operation-context.js', () => mockContext);
+vi.mock('../src/shared/auth/roles.js', () => ({
+  getEffectiveUserSystemRoles: vi.fn().mockResolvedValue([]),
+  hasGlobalProjectReadAccess: vi.fn().mockReturnValue(false),
+  hasAnySystemRole: vi.fn().mockReturnValue(false),
+  hasSystemRole: vi.fn().mockReturnValue(false),
+  isSuperAdmin: vi.fn().mockReturnValue(false),
+  computeEffectiveUserSystemRoles: vi.fn(),
+  invalidateUserSystemRolesCache: vi.fn(),
+  invalidateUserSystemRolesCacheForUsers: vi.fn(),
+  sysRolesCacheKey: (id: string) => `user:sysroles:${id}`,
+}));
 vi.mock('../src/shared/utils/logger.js', () => ({ captureError: vi.fn() }));
 vi.mock('../src/modules/bulk-operations/executors/index.js', () => ({
   getExecutor: (type: string) => (type === 'TRANSITION' ? mockTransitionExecutor : null),
@@ -159,6 +170,14 @@ describe('runTickOnce — batch processing', () => {
         expect.objectContaining({ outcome: 'SKIPPED', errorCode: 'NO_TRANSITION', operationId: 'op-1' }),
       ]),
     });
+    // heartbeat обновляется в counter-update, чтобы recovery не сбрасывал op.
+    expect(mockPrisma.bulkOperation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          heartbeatAt: expect.any(Date),
+        }),
+      }),
+    );
   });
 
   it('CONFLICT без пользовательского разрешения → SKIPPED с error-code', async () => {
@@ -294,7 +313,42 @@ describe('runTickOnce — finalize status', () => {
     if (res.kind === 'processed') expect(res.finalized).toBe('PARTIAL');
   });
 
-  it('SUCCEEDED когда failed=0 даже если есть skipped', async () => {
+  it('INVALID_TRANSITION (stale status) → SKIPPED STALE_STATUS, не FAILED', async () => {
+    mockPrisma.bulkOperation.findFirst.mockResolvedValue({ ...baseOp, status: 'RUNNING', total: 1 });
+    mockRedis.lpopListBatch.mockResolvedValue(['i1']);
+    mockPrisma.issue.findMany.mockResolvedValue([
+      { id: 'i1', number: 1, title: 'A', projectId: 'p1', project: { id: 'p1', key: 'TT' } },
+    ]);
+    mockTransitionExecutor.preflight.mockResolvedValue({ kind: 'ELIGIBLE' });
+    mockTransitionExecutor.execute.mockRejectedValue(Object.assign(new Error('INVALID_TRANSITION'), { code: 'INVALID_TRANSITION' }));
+    mockPrisma.bulkOperation.findUniqueOrThrow.mockResolvedValue({
+      ...baseOp, status: 'RUNNING', processed: 1, skipped: 1, failed: 0, succeeded: 0, total: 1,
+    });
+
+    const res = await runTickOnce();
+    expect(mockPrisma.bulkOperationItem.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ outcome: 'SKIPPED', errorCode: 'STALE_STATUS' })],
+    });
+    // succeeded=0 + failed=0 + skipped=total (1) → PARTIAL (all-skipped misleading as SUCCEEDED)
+    if (res.kind === 'processed') expect(res.finalized).toBe('PARTIAL');
+  });
+
+  it('all-skipped (succeeded=0 && failed=0) → PARTIAL (не обманываем зелёной галкой)', async () => {
+    mockPrisma.bulkOperation.findFirst.mockResolvedValue({ ...baseOp, status: 'RUNNING', total: 2 });
+    mockRedis.lpopListBatch.mockResolvedValue(['i1', 'i2']);
+    mockPrisma.issue.findMany.mockResolvedValue([
+      { id: 'i1', number: 1, title: 'A', projectId: 'p1', project: { id: 'p1', key: 'TT' } },
+      { id: 'i2', number: 2, title: 'B', projectId: 'p1', project: { id: 'p1', key: 'TT' } },
+    ]);
+    mockTransitionExecutor.preflight.mockResolvedValue({ kind: 'SKIPPED', reasonCode: 'NO_TRANSITION', reason: 'no' });
+    mockPrisma.bulkOperation.findUniqueOrThrow.mockResolvedValue({
+      ...baseOp, status: 'RUNNING', processed: 2, skipped: 2, succeeded: 0, failed: 0, total: 2,
+    });
+    const res = await runTickOnce();
+    if (res.kind === 'processed') expect(res.finalized).toBe('PARTIAL');
+  });
+
+  it('SUCCEEDED когда failed=0 И succeeded>0 даже если есть skipped', async () => {
     mockPrisma.bulkOperation.findFirst.mockResolvedValue({ ...baseOp, status: 'RUNNING', total: 2 });
     mockRedis.lpopListBatch.mockResolvedValue(['i1', 'i2']);
     mockPrisma.issue.findMany.mockResolvedValue([
