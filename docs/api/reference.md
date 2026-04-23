@@ -669,6 +669,9 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `POST` | `/api/bulk-operations` | 🔒 |
 | `GET` | `/api/bulk-operations/:id` | 🔒 |
 | `POST` | `/api/bulk-operations/:id/cancel` | 🔒 |
+| `GET` | `/api/bulk-operations/:id/stream` | 🔒 |
+| `GET` | `/api/bulk-operations/:id/report.csv` | 🔒 |
+| `POST` | `/api/bulk-operations/:id/retry-failed` | 🔒 |
 | `GET` | `/api/bulk-operations` | 🔒 |
 
 ### Comments
