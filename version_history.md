@@ -8,7 +8,7 @@
 
 ## [2.56] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-4 — TransitionExecutor + processor (cron + recovery + retention)
 
-**PR:** (to be filled after push)
+**PR:** [#146](https://github.com/NovakPAai/tasktime-mvp/pull/146) (merged 2026-04-23)
 **Ветка:** `ttbulk-1/processor`
 
 ### Что было

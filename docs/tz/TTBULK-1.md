@@ -1043,7 +1043,7 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
 | 1  | `ttbulk-1/schema`               | Prisma models + enums + UserGroupSystemRole + AuditLog.bulkOperationId + feature-flag scaffolding | 4    | —                 | migration + mount  | 🟢 Merged (#143) |
 | 2  | `ttbulk-1/auth-effective-roles` | `getEffectiveUserSystemRoles` + auth middleware + Redis cache | 4    | PR-1              | resolver + tests   | 🟢 Merged (#144) |
 | 3  | `ttbulk-1/service-core`         | DTO + preview/create/get/cancel + Redis pending queue + previewToken | 12   | PR-2              | service + router   | 🟢 Merged (#145) |
-| 4  | `ttbulk-1/processor`            | TransitionExecutor + processor cron + recovery + retention + AuditLog.bulkOperationId | 14   | PR-3              | executor + processor | ✅ Done        |
+| 4  | `ttbulk-1/processor`            | TransitionExecutor + processor cron + recovery + retention + AuditLog.bulkOperationId | 14   | PR-3              | executor + processor | 🟢 Merged (#146) |
 | 5  | `ttbulk-1/executors`            | 6 executors (Assign/EditField/EditCustomField/MoveToSprint/AddComment/Delete) | 14   | PR-4              | per-executor + tests | 📋 Планируется |
 | 6  | `ttbulk-1/streaming-report`     | SSE + Redis pub/sub + report.csv + retry-failed              | 8    | PR-3, PR-4        | router + processor hook | 📋 Планируется |
 | 7  | `ttbulk-1/system-settings`      | maxConcurrentPerUser / maxItems API + AdminSystemPage UI     | 4    | PR-3              | backend + UI       | 📋 Планируется |
