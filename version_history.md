@@ -8,7 +8,7 @@
 
 ## [2.55] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-3 — service core (preview + create + cancel + list)
 
-**PR:** (to be filled after push)
+**PR:** [#145](https://github.com/NovakPAai/tasktime-mvp/pull/145) (merged 2026-04-23)
 **Ветка:** `ttbulk-1/service-core`
 
 ### Что было
