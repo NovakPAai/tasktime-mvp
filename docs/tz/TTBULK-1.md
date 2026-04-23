@@ -1045,7 +1045,7 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
 | 3  | `ttbulk-1/service-core`         | DTO + preview/create/get/cancel + Redis pending queue + previewToken | 12   | PR-2              | service + router   | 🟢 Merged (#145) |
 | 4  | `ttbulk-1/processor`            | TransitionExecutor + processor cron + recovery + retention + AuditLog.bulkOperationId | 14   | PR-3              | executor + processor | 🟢 Merged (#146) |
 | 5  | `ttbulk-1/executors`            | 6 executors (Assign/EditField/EditCustomField/MoveToSprint/AddComment/Delete) | 14   | PR-4              | per-executor + tests | 🟢 Merged (#147) |
-| 6  | `ttbulk-1/streaming-report`     | SSE + Redis pub/sub + report.csv + retry-failed              | 8    | PR-3, PR-4        | router + processor hook | ✅ Done        |
+| 6  | `ttbulk-1/streaming-report`     | SSE + Redis pub/sub + report.csv + retry-failed              | 8    | PR-3, PR-4        | router + processor hook | 🟢 Merged (#148) |
 | 7  | `ttbulk-1/system-settings`      | maxConcurrentPerUser / maxItems API + AdminSystemPage UI     | 4    | PR-3              | backend + UI       | 📋 Планируется |
 | 8  | `ttbulk-1/admin-roles`          | BULK_OPERATOR in admin roles UI + group-assign endpoints     | 8    | PR-2              | endpoints + UI     | 📋 Планируется |
 | 9  | `ttbulk-1/wizard-modal`         | BulkOperationWizardModal (4 steps + preview + conflicts)     | 14   | PR-3              | 4 step components  | 📋 Планируется |

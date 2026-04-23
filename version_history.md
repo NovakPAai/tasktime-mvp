@@ -8,7 +8,7 @@
 
 ## [2.58] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-6 — SSE + Redis pub/sub + report.csv + retry-failed
 
-**PR:** (to be filled after push)
+**PR:** [#148](https://github.com/NovakPAai/tasktime-mvp/pull/148) (merged 2026-04-23)
 **Ветка:** `ttbulk-1/streaming-report`
 
 ### Что было
