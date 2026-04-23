@@ -2,7 +2,58 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.59**
+**Last version: 2.60**
+
+---
+
+## [2.60] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-8 — BULK_OPERATOR в admin-ролях + group-assign endpoints
+
+**PR:** [#150](https://github.com/NovakPAai/tasktime-mvp/pull/150)
+**Ветка:** `ttbulk-1/admin-roles`
+
+### Что было
+
+Системная роль `BULK_OPERATOR` существовала в Prisma enum (PR-1), `UserGroupSystemRole` модель и `getEffectiveUserSystemRoles` UNION (PR-2) были готовы, но:
+- В UI списке системных ролей (`AdminUsersPage.SYSTEM_ROLES`) BULK_OPERATOR отсутствовал — через прямой assign его нельзя было выдать.
+- Эндпоинтов для назначения системных ролей группе не было (только DIRECT через `/admin/users/:id/system-roles`).
+- `AdminGroupDetailPage` имел только 2 таба (Участники, Проектные роли); не было места назначать группе системные роли.
+- Не было cross-view эндпоинта «кто имеет эту роль» (прямых + через группы).
+
+### Что теперь
+
+- **Backend endpoints:**
+  - `POST /api/admin/user-groups/:id/system-roles` — грантит роль группе (idempotent + P2002 race-safe). Audit `system_role.granted`.
+  - `DELETE /api/admin/user-groups/:id/system-roles/:role` — отзывает. Audit `system_role.revoked`.
+  - `GET /api/admin/system-roles/:role/assignments` → `{ role, users, groups }` — cross-view.
+- **Service** (`user-groups.service.ts`):
+  - `grantSystemRoleToGroup(groupId, role, actor)` — **privilege-escalation guard** (ADMIN не может grant SUPER_ADMIN/ADMIN через группу) + idempotent upsert + P2002 catch + bulk-invalidation Redis-кэша членов.
+  - `revokeSystemRoleFromGroup(groupId, role, actor)` — симметричный guard + delete + bulk-invalidation.
+  - `getSystemRoleAssignments(role)` — parallel findMany по UserSystemRole + UserGroupSystemRole.
+  - `detailInclude` расширен `systemRoles`.
+- **DTO:** `grantGroupSystemRoleDto` с refine против `USER` (mandatory роль).
+- **Frontend:**
+  - `SystemRoleType` расширен `BULK_OPERATOR`.
+  - `AdminUsersPage.SYSTEM_ROLES` добавил `BULK_OPERATOR`.
+  - `AdminGroupDetailPage` — новый таб «Системные роли» с grant/revoke modal.
+  - `api/user-groups.ts` — `grantSystemRole`, `revokeSystemRole` + типы `UserGroupSystemRole`, `SystemRoleAssignments`.
+
+### Unit-тесты (+14 новых)
+
+`bulk-operator-group-roles.unit.test.ts`: grant happy/idempotent/empty group/404/privilege-escalation ADMIN→SUPER_ADMIN=403/P2002 race; revoke happy/404/404-role-not-assigned/empty group; getSystemRoleAssignments two lists + empty.
+
+### Влияние на prod
+
+При `FEATURES_BULK_OPS=false` (текущее) — BULK_OPERATOR можно выдавать заранее перед cutover (PR-12). Кэш эффективных ролей инвалидируется — grant/revoke через группу работает в пределах 60с.
+
+### Проверки
+
+- `npx tsc --noEmit` → 0 errors (backend + frontend).
+- `npm run test:parser` → 604/604 passed (+14 новых bulk-operator-group-roles с privilege-escalation regression).
+- Pre-push review: 🟠 2 → fixed (privilege escalation + P2002 race), 🟡 2 → fixed, 🟡 1 skipped (false-positive).
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §7.2, §13.6 PR-8.
 
 ---
 
@@ -17,32 +68,23 @@
 
 ### Что теперь
 
-- **Backend `bulk-operations-settings.service.ts`** — `getBulkOpsSettings()` с in-memory (60s) + Redis (60s) кэшем; `setBulkOpsSettings(actorId, patch)` с upsert + инвалидацией обоих слоёв + audit. Clamp на read и write: `maxConcurrentPerUser ∈ [1..20]`, `maxItems ∈ [100..10000]` (runtime-ceiling = MAX_ITEMS_HARD_LIMIT из DTO). Никогда не бросает (fallback на ENV при любых ошибках). Cache invalidation ДО audit — чтобы audit-failure не оставлял stale cache.
-- **Admin endpoints** — `GET /api/admin/system-settings/bulk-operations` и `PATCH …` (оба `requireSuperAdmin()`). Zod-DTO `updateBulkOpsSettingsDto` (partial update, max=MAX_ITEMS_HARD_LIMIT).
-- **Интеграция с bulk-operations.service**:
-  - `createBulkOperation` — читает `maxConcurrentPerUser` и применяет quota; дополнительно safety-check `preview.eligibleIds.length > maxItems` (если админ понизил лимит между preview и create — 400 TOO_MANY_ITEMS).
-  - `resolveScope` (preview) — `maxItems` из runtime-settings вместо ENV-константы; warning TRUNCATED_TO_MAX_ITEMS при превышении.
-- **Frontend AdminSystemPage.tsx** — секция «Массовые операции» с двумя `InputNumber` (maxConcurrent 1..20, maxItems 100..10000) + loadError с Ant Result fallback. Save → PATCH + reload.
-- **Frontend App.tsx** — `AdminGate allow={canManageSystemSettings}` на route `/admin/system` (раньше был открыт).
-- **API-клиент** — `adminApi.getBulkOpsSettings()`, `adminApi.setBulkOpsSettings(settings)` + типизация `BulkOpsSettings`.
+- **Backend `bulk-operations-settings.service.ts`** — `getBulkOpsSettings()` с in-memory (60s) + Redis (60s) кэшем; `setBulkOpsSettings(actorId, patch)` с upsert + инвалидацией обоих слоёв + audit. Clamp на read и write: `maxConcurrentPerUser ∈ [1..20]`, `maxItems ∈ [100..10000]`. Никогда не бросает (fallback на ENV при любых ошибках). Cache invalidation ДО audit — чтобы audit-failure не оставлял stale cache.
+- **Admin endpoints** — `GET /api/admin/system-settings/bulk-operations` и `PATCH …` (оба `requireSuperAdmin()`). Zod-DTO `updateBulkOpsSettingsDto`.
+- **Интеграция с bulk-operations.service**: `createBulkOperation`/`resolveScope` читают runtime-settings; safety-check на create (admin понизил maxItems между preview и create → 400).
+- **Frontend AdminSystemPage.tsx** — секция «Массовые операции» + loadError Result fallback. Route под `AdminGate allow={canManageSystemSettings}`.
 
 ### Unit-тесты (+18 новых)
 
-`bulk-operations-settings.unit.test.ts`: пустой DB → defaults, clamp вверх/вниз, malformed JSON → fallback, cache HIT (не трогает Prisma), Redis DOWN → Prisma, Prisma DOWN → defaults, in-memory memo, partial patch, clamp на write, cache invalidation ДО audit (audit-failure → cache всё равно cleared), memo reset перед current-read (before-snapshot всегда свежий), NaN/non-integer edge cases.
-
-### Влияние на prod
-
-При `FEATURES_BULK_OPS=false` (текущее состояние) — dormant. Для Super Admin'а появляется секция «Массовые операции» в `/admin/system` — изменения вступают в силу в течение 60 секунд. При feature-flag flip в PR-12: SRE может наращивать каппы без рестарта.
+`bulk-operations-settings.unit.test.ts`: defaults, clamp, malformed JSON, cache HIT/DOWN, memo reset, partial patch, audit-failure → cache cleared, NaN edge.
 
 ### Проверки
 
-- `npx tsc --noEmit` → 0 errors (backend + frontend).
+- `npx tsc --noEmit` → 0 errors.
 - `npm run test:parser` → 597/597 passed (+18 новых).
-- Pre-push review: 🟠 2 → fixed, 🟡 3 → fixed, 🔵 1 → fixed, ⚪ 2 → skipped.
 
 ### Связано
 
-- TTBULK-1 (Bulk Operations) — см. `docs/tz/TTBULK-1.md` §11.1, §13.6 PR-7.
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §11.1, §13.6 PR-7.
 
 ---
 

@@ -11,11 +11,22 @@ import {
   type UserGroupDetail,
   type UserGroupMember,
   type UserGroupProjectRole,
+  type UserGroupSystemRole,
 } from '../../api/user-groups';
 import { adminApi, type AdminUser } from '../../api/admin';
 import { listProjects } from '../../api/projects';
 import { roleSchemesApi, type ProjectRoleScheme } from '../../api/role-schemes';
 import type { Project } from '../../types';
+import type { SystemRoleType } from '../../types';
+
+// TTBULK-1 PR-8 — grantable system roles через группу. USER исключён (mandatory).
+const GROUP_GRANTABLE_SYSTEM_ROLES: SystemRoleType[] = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'RELEASE_MANAGER',
+  'AUDITOR',
+  'BULK_OPERATOR',
+];
 
 /**
  * TTSEC-2 Phase 3: group detail with Members + Project Roles tabs.
@@ -63,6 +74,11 @@ export default function AdminGroupDetailPage() {
   const [grantSchemeLoading, setGrantSchemeLoading] = useState(false);
   const [grantRoleId, setGrantRoleId] = useState<string | undefined>();
   const [granting, setGranting] = useState(false);
+
+  // TTBULK-1 PR-8 — Grant system role
+  const [grantSysOpen, setGrantSysOpen] = useState(false);
+  const [grantSysRole, setGrantSysRole] = useState<SystemRoleType | undefined>();
+  const [grantingSys, setGrantingSys] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -304,6 +320,35 @@ export default function AdminGroupDetailPage() {
     }
   };
 
+  // TTBULK-1 PR-8 — system-role grant/revoke через группу.
+  const handleGrantSystemRole = async () => {
+    if (!group || !grantSysRole) return;
+    setGrantingSys(true);
+    try {
+      await userGroupsApi.grantSystemRole(group.id, grantSysRole);
+      message.success('Системная роль выдана группе');
+      setGrantSysOpen(false);
+      setGrantSysRole(undefined);
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } };
+      message.error(err?.response?.data?.error || 'Не удалось выдать системную роль');
+    } finally {
+      setGrantingSys(false);
+    }
+  };
+
+  const handleRevokeSystemRole = async (role: SystemRoleType) => {
+    if (!group) return;
+    try {
+      await userGroupsApi.revokeSystemRole(group.id, role);
+      message.success('Системная роль отозвана');
+      await load();
+    } catch {
+      message.error('Не удалось отозвать системную роль');
+    }
+  };
+
   if (loading) {
     return <div className="tt-page"><div>Загрузка...</div></div>;
   }
@@ -381,6 +426,66 @@ export default function AdminGroupDetailPage() {
                   columns={projectRoleColumns}
                   pagination={false}
                   size="small"
+                />
+              </>
+            ),
+          },
+          {
+            key: 'systemRoles',
+            label: `Системные роли (${group.systemRoles.length})`,
+            children: (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 16 }}>
+                  <span style={{ color: 'rgba(0,0,0,0.45)', fontSize: 12 }}>
+                    Системные роли, назначенные группе, наследуются всеми её участниками. Инвалидация кэша эффективных ролей — до 60с.
+                  </span>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      // Clear any stale selection so re-opening never carries a role
+                      // that was already granted by another admin since last close.
+                      setGrantSysRole(undefined);
+                      setGrantSysOpen(true);
+                    }}
+                  >
+                    Выдать системную роль
+                  </Button>
+                </div>
+                <Table
+                  rowKey="id"
+                  dataSource={group.systemRoles}
+                  pagination={false}
+                  size="small"
+                  locale={{ emptyText: 'Группе не назначено ни одной системной роли' }}
+                  columns={[
+                    {
+                      title: 'Роль',
+                      dataIndex: 'role',
+                      render: (role: SystemRoleType) => (
+                        <Tag color={role === 'BULK_OPERATOR' ? 'orange' : undefined}>{role}</Tag>
+                      ),
+                    },
+                    {
+                      title: 'Назначена',
+                      dataIndex: 'createdAt',
+                      render: (v: string) => new Date(v).toLocaleString(),
+                    },
+                    {
+                      title: '',
+                      width: 60,
+                      render: (_: unknown, r: UserGroupSystemRole) => (
+                        <Popconfirm
+                          title={`Отозвать роль ${r.role} у группы?`}
+                          onConfirm={() => void handleRevokeSystemRole(r.role)}
+                          okText="Отозвать"
+                          cancelText="Отмена"
+                        >
+                          <Button size="small" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                      ),
+                    },
+                  ]}
                 />
               </>
             ),
@@ -521,6 +626,42 @@ export default function AdminGroupDetailPage() {
               value: r.id,
               label: r.name,
             }))}
+          />
+        </Space>
+      </Modal>
+
+      {/* TTBULK-1 PR-8 — system role grant */}
+      <Modal
+        title="Выдать системную роль группе"
+        open={grantSysOpen}
+        onCancel={() => {
+          setGrantSysOpen(false);
+          setGrantSysRole(undefined);
+          void load();
+        }}
+        onOk={handleGrantSystemRole}
+        okText="Выдать"
+        cancelText="Отмена"
+        confirmLoading={grantingSys}
+        okButtonProps={{ disabled: !grantSysRole }}
+        destroyOnClose
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <p style={{ color: 'rgba(0,0,0,0.45)', fontSize: 12, margin: 0 }}>
+            Роль наследуется всеми участниками группы. <strong>BULK_OPERATOR</strong> даёт
+            высокий blast-radius (массовые изменения задач) — выдавайте только доверенным группам.
+          </p>
+          <Select
+            placeholder="Роль"
+            style={{ width: '100%' }}
+            value={grantSysRole}
+            onChange={setGrantSysRole}
+            options={GROUP_GRANTABLE_SYSTEM_ROLES
+              .filter((r) => !group.systemRoles.some((sr) => sr.role === r))
+              .map((r) => ({
+                value: r,
+                label: r === 'BULK_OPERATOR' ? `${r} ⚠ высокий blast-radius` : r,
+              }))}
           />
         </Space>
       </Modal>

@@ -1,13 +1,16 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type SystemRoleType } from '@prisma/client';
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { invalidateProjectPermissionCache } from '../../shared/middleware/rbac.js';
-import { invalidateUserSystemRolesCacheForUsers } from '../../shared/auth/roles.js';
+import { invalidateUserSystemRolesCacheForUsers, isSuperAdmin } from '../../shared/auth/roles.js';
 import type {
   CreateUserGroupDto,
   UpdateUserGroupDto,
   GrantProjectRoleDto,
 } from './user-groups.dto.js';
+
+/** Actor metadata needed by system-role grant/revoke для privilege-escalation guard (PR-8). */
+export type SystemRoleActor = { userId: string; systemRoles: SystemRoleType[] };
 
 /**
  * Invalidate both the new group-aware effective cache AND the legacy per-permission cache for
@@ -49,6 +52,11 @@ const detailInclude = {
       project: { select: { id: true, key: true, name: true } },
       roleDefinition: { select: { id: true, name: true, key: true, color: true } },
     },
+  },
+  // TTBULK-1 PR-8 — system roles granted to the group (not to individual members).
+  systemRoles: {
+    select: { id: true, role: true, createdAt: true, createdBy: true },
+    orderBy: { createdAt: 'desc' as const },
   },
 } as const;
 
@@ -307,4 +315,147 @@ export async function revokeProjectRole(groupId: string, projectId: string) {
   await Promise.all(members.map(m => invalidateProjectPermissionCache(projectId, m.userId)));
 
   return { ok: true };
+}
+
+// ──── TTBULK-1 PR-8 — group-level system role management ────────────────────
+//
+// Permission model: any group member inherits `UserGroupSystemRole.role` via
+// `getEffectiveUserSystemRoles` (UNION DIRECT ∪ GROUP). Grant → invalidate
+// sys-roles Redis cache of all current members so the next request picks up
+// the new role within 60s (TTL floor). Revoke — same invalidation.
+
+export async function grantSystemRoleToGroup(
+  groupId: string,
+  role: SystemRoleType,
+  actor: SystemRoleActor,
+) {
+  // Privilege-escalation guard — зеркалим `users.service.addSystemRole`:
+  // без этой проверки любой ADMIN мог бы через группу выдать SUPER_ADMIN/ADMIN
+  // себе (создать группу → grant SUPER_ADMIN группе → добавить себя в группу
+  // → getEffectiveUserSystemRoles возвращает SUPER_ADMIN).
+  if (!isSuperAdmin(actor.systemRoles) && (role === 'SUPER_ADMIN' || role === 'ADMIN')) {
+    throw new AppError(403, 'Only super admins can assign SUPER_ADMIN or ADMIN via groups');
+  }
+
+  const group = await prisma.userGroup.findUnique({
+    where: { id: groupId },
+    select: { id: true, members: { select: { userId: true } } },
+  });
+  if (!group) throw new AppError(404, 'Группа не найдена');
+
+  // Idempotent — `@@unique([groupId, role])`: повторный grant → existing.
+  const existing = await prisma.userGroupSystemRole.findUnique({
+    where: { groupId_role: { groupId, role } },
+    select: { id: true, role: true, createdAt: true, createdBy: true },
+  });
+  if (existing) return existing;
+
+  let created;
+  try {
+    created = await prisma.userGroupSystemRole.create({
+      data: { groupId, role, createdBy: actor.userId },
+      select: { id: true, role: true, createdAt: true, createdBy: true },
+    });
+  } catch (err) {
+    // P2002 race: два параллельных grant'а прошли findUnique=null; второй
+    // проигрывает @@unique. Re-fetch — возвращаем winner-запись, семантически
+    // тот же результат что и idempotent-ветка выше.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return prisma.userGroupSystemRole.findUniqueOrThrow({
+        where: { groupId_role: { groupId, role } },
+        select: { id: true, role: true, createdAt: true, createdBy: true },
+      });
+    }
+    throw err;
+  }
+
+  if (group.members.length > 0) {
+    await invalidateUserSystemRolesCacheForUsers(group.members.map((m) => m.userId));
+  }
+
+  return created;
+}
+
+export async function revokeSystemRoleFromGroup(
+  groupId: string,
+  role: SystemRoleType,
+  actor: SystemRoleActor,
+) {
+  // Симметрично grant: ADMIN не может revoke SUPER_ADMIN/ADMIN через группу
+  // (иначе ADMIN может отозвать SUPER_ADMIN у группы и лишить оппонента прав).
+  if (!isSuperAdmin(actor.systemRoles) && (role === 'SUPER_ADMIN' || role === 'ADMIN')) {
+    throw new AppError(403, 'Only super admins can revoke SUPER_ADMIN or ADMIN via groups');
+  }
+
+  const group = await prisma.userGroup.findUnique({
+    where: { id: groupId },
+    select: { id: true, members: { select: { userId: true } } },
+  });
+  if (!group) throw new AppError(404, 'Группа не найдена');
+
+  const existing = await prisma.userGroupSystemRole.findUnique({
+    where: { groupId_role: { groupId, role } },
+    select: { id: true },
+  });
+  if (!existing) throw new AppError(404, 'Роль не назначена этой группе');
+
+  await prisma.userGroupSystemRole.delete({ where: { id: existing.id } });
+
+  if (group.members.length > 0) {
+    await invalidateUserSystemRolesCacheForUsers(group.members.map((m) => m.userId));
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Two-list view: всех кому роль назначена DIRECT, и всех групп с этой ролью.
+ * Для админского UI «Кому назначен BULK_OPERATOR».
+ */
+export async function getSystemRoleAssignments(role: SystemRoleType) {
+  const [users, groups] = await Promise.all([
+    prisma.userSystemRole.findMany({
+      where: { role },
+      select: {
+        createdAt: true,
+        user: { select: { id: true, name: true, email: true, isActive: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.userGroupSystemRole.findMany({
+      where: { role },
+      select: {
+        id: true,
+        createdAt: true,
+        group: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            _count: { select: { members: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+
+  return {
+    role,
+    users: users.map((u) => ({
+      id: u.user.id,
+      name: u.user.name,
+      email: u.user.email,
+      isActive: u.user.isActive,
+      grantedAt: u.createdAt,
+    })),
+    groups: groups.map((g) => ({
+      id: g.group.id,
+      name: g.group.name,
+      description: g.group.description,
+      memberCount: g.group._count.members,
+      grantedAt: g.createdAt,
+      assignmentId: g.id,
+    })),
+  };
 }

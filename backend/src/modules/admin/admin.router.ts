@@ -8,6 +8,7 @@ import {
   getBulkOpsSettings,
   setBulkOpsSettings,
 } from '../bulk-operations/bulk-operations-settings.service.js';
+import { getSystemRoleAssignments } from '../user-groups/user-groups.service.js';
 import { logAudit } from '../../shared/middleware/audit.js';
 import { rotateUserPassword } from '../users/password-rotation.service.js';
 import type { UatRole } from './uat-tests.data.js';
@@ -88,7 +89,14 @@ router.post(
   }),
 );
 
-const VALID_SYSTEM_ROLES: SystemRoleType[] = ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'USER', 'AUDITOR'];
+const VALID_SYSTEM_ROLES: SystemRoleType[] = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'RELEASE_MANAGER',
+  'USER',
+  'AUDITOR',
+  'BULK_OPERATOR',
+];
 
 router.delete(
   '/admin/users/:id/system-roles/:role',
@@ -119,6 +127,21 @@ router.put(
       req.body.roles as SystemRoleType[],
     );
     res.json(user);
+  }),
+);
+
+// TTBULK-1 PR-8 — unified view: кто (пользователи + группы) имеет заданную роль.
+router.get(
+  '/admin/system-roles/:role/assignments',
+  requireRole('ADMIN', 'SUPER_ADMIN'),
+  asyncHandler(async (req, res) => {
+    const role = req.params.role as SystemRoleType;
+    if (!VALID_SYSTEM_ROLES.includes(role)) {
+      res.status(400).json({ error: `Invalid system role: ${role}` });
+      return;
+    }
+    const assignments = await getSystemRoleAssignments(role);
+    res.json(assignments);
   }),
 );
 
