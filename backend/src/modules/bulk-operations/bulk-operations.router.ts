@@ -14,11 +14,15 @@
  */
 
 import { Router, type Response } from 'express';
+import { authenticate } from '../../shared/middleware/auth.js';
 
 const router = Router();
 
 // PR-1 stub: проверяет, что router смонтирован. Реальные роуты — PR-3+.
-router.get('/bulk-operations/ping', (_req, res: Response) => {
+// `authenticate` middleware стоит уже сейчас — в PR-3 все bulk-ops routes будут
+// за `authenticate + requireRole('BULK_OPERATOR')` (см. §4.1), поэтому ставим
+// auth-gate заранее, чтобы не оставить стаб открытым даже теоретически.
+router.get('/bulk-operations/ping', authenticate, (_req, res: Response) => {
   res.status(501).json({
     message: 'Not implemented yet. TTBULK-1 rolls out in phases — см. docs/tz/TTBULK-1.md §13.',
   });

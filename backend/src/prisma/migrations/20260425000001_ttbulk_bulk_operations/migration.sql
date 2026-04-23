@@ -68,6 +68,10 @@ CREATE INDEX "bulk_operations_created_by_id_created_at_idx"
     ON "bulk_operations"("created_by_id", "created_at");
 CREATE INDEX "bulk_operations_status_heartbeat_at_idx"
     ON "bulk_operations"("status", "heartbeat_at");
+-- Processor pick-query (PR-4): WHERE status IN ('QUEUED','RUNNING') ORDER BY created_at ASC LIMIT 1.
+-- Без этого composite'а планер делает bitmap-AND + filesort; с ним — прямой index-scan.
+CREATE INDEX "bulk_operations_status_created_at_idx"
+    ON "bulk_operations"("status", "created_at");
 CREATE INDEX "bulk_operations_created_at_idx"
     ON "bulk_operations"("created_at");
 

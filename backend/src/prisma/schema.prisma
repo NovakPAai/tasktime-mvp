@@ -1417,6 +1417,9 @@ model BulkOperation {
   @@unique([createdById, idempotencyKey])
   @@index([createdById, createdAt])
   @@index([status, heartbeatAt])
+  // Processor pick-query (PR-4): WHERE status IN ('QUEUED','RUNNING') ORDER BY created_at ASC LIMIT 1.
+  // Без этого composite'а планер делает bitmap-AND + filesort; с ним — прямой index-scan.
+  @@index([status, createdAt])
   @@index([createdAt]) // retention sweep
   @@map("bulk_operations")
 }
@@ -1448,6 +1451,10 @@ model UserGroupSystemRole {
   groupId   String         @map("group_id")
   role      SystemRoleType
   createdAt DateTime       @default(now()) @map("created_at")
+  // Audit-only string, no FK — консистентно с `UserSystemRole.createdBy`,
+  // `UserGroupMember.addedById` и другими audit-колонками репо. При удалении
+  // юзера-назначающего строка остаётся, ссылка превращается в stale UUID;
+  // FK здесь не нужен — это не domain-relation.
   createdBy String?        @map("created_by")
 
   group UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
