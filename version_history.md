@@ -2,7 +2,42 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.52**
+**Last version: 2.53**
+
+---
+
+## [2.53] [2026-04-23] docs(tz)+feat(bulk-ops): TTBULK-1 PR-1 — план реализации + schema foundation
+
+**PR:** (to be filled after push)
+**Ветка:** `ttbulk-1/schema`
+
+### Что было
+
+TZ TTBULK-1 (Bulk Operations) существовал как прозаический документ без детализованной декомпозиции на PR-ы: §13 содержал только табличный список из 13 пунктов без branches / scopes / merge-ready checks / security gates. Модели в схеме отсутствовали, feature-флага не было, модуля `bulk-operations` не существовало.
+
+### Что теперь
+
+- **Декомпозиция (§13).** Полный plan: §13.1 Стратегия (ветки, CI, pre-push review, security gates на PR-1/3/4/5), §13.2 DAG, §13.3–§13.8 карточки 13 PR-ов (branch/scope/не включает/merge-ready/оценка), §13.9 итоговая таблица (114ч ≈ 14.25 человеко-дней). Pre-push review (Opus 4.7) прогнан — 4 🟠 + 5 🟡 + 2 🔵 + 2 ⚪ применены.
+- **Delta к ТЗ.** `IssueHistory` как Prisma-модели в репозитории нет — executor'ы пишут в `AuditLog`. Поэтому колонка `bulkOperationId` добавляется к `AuditLog` (а не к несуществующему `IssueHistory`). Полный sanitize §5.0/§5.4/§7.4/§14 деферен на PR-12.
+- **PR-1 schema.** Миграция двухшаговая (Postgres требует `ALTER TYPE … ADD VALUE` вне транзакции):
+  - `20260425000000_ttbulk_system_role_enum` — `ALTER TYPE "SystemRoleType" ADD VALUE 'BULK_OPERATOR'`.
+  - `20260425000001_ttbulk_bulk_operations` — `CREATE TYPE` для `BulkOperationType / BulkOperationStatus / BulkItemOutcome`, `CREATE TABLE` для `bulk_operations / bulk_operation_items / user_group_system_roles`, `ALTER TABLE audit_logs ADD COLUMN bulk_operation_id` с FK `onDelete SetNull` + index.
+- **Feature-flag.** `FEATURES_BULK_OPS=false` в `backend/src/shared/features.ts` (паттерн `advancedSearch`), `VITE_FEATURES_BULK_OPS=false` в `frontend/src/lib/features.ts`. Оба — в `.env.example`. Роутер `backend/src/modules/bulk-operations/bulk-operations.router.ts` — stub `GET /bulk-operations/ping` → 501. Mount в `app.ts` условный: `if (features.bulkOps) app.use('/api', bulkOperationsRouter)`.
+
+### Влияние на prod
+
+Миграция добавляет 3 новые таблицы (пустые), 1 колонку (`audit_logs.bulk_operation_id` nullable) и расширяет enum. Никакой миграции данных, обратно совместимо — существующий код не использует новые модели. При `FEATURES_BULK_OPS=false` (default) роутер не монтируется, поведение системы не меняется.
+
+### Проверки
+
+- `npx prisma format` → schema валидна.
+- `npx prisma generate` → client генерируется без ошибок.
+- `npx tsc --noEmit` → 0 errors в backend + frontend.
+- `npm run lint` → 0 errors, 0 новых warnings.
+
+### Связано
+
+- TTBULK-1 (Bulk Operations) — см. `docs/tz/TTBULK-1.md`, PR-1/13.
 
 ---
 

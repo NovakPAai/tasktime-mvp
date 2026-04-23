@@ -9,7 +9,7 @@
 //   - sync-instances propagation (FR-15 opt-in)
 //   - Redis cache invalidation for the per-release checkpoint list
 
-import type { Prisma, ReleaseCheckpoint, CheckpointType } from '@prisma/client';
+import type { Prisma, ReleaseCheckpoint, CheckpointType, SystemRoleType } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
 import { AppError } from '../../../shared/middleware/error-handler.js';
 import { delCachedJson, getCachedJson, setCachedJson } from '../../../shared/redis.js';
@@ -777,7 +777,7 @@ export async function listViolatingIssuesForProject(
  */
 export async function listMyViolations(
   userId: string,
-  systemRoles: Array<'SUPER_ADMIN' | 'ADMIN' | 'RELEASE_MANAGER' | 'AUDITOR' | 'USER'>,
+  systemRoles: SystemRoleType[],
 ): Promise<IssueViolationSummary[]> {
   const hasGlobalRead = systemRoles.some((r) =>
     (['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'] as const).includes(r as never),
