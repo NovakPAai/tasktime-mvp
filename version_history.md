@@ -8,7 +8,7 @@
 
 ## [2.53] [2026-04-23] docs(tz)+feat(bulk-ops): TTBULK-1 PR-1 — план реализации + schema foundation
 
-**PR:** (to be filled after push)
+**PR:** [#143](https://github.com/NovakPAai/tasktime-mvp/pull/143) (merged 2026-04-23)
 **Ветка:** `ttbulk-1/schema`
 
 ### Что было
