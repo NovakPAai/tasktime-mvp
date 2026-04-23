@@ -3,7 +3,7 @@
  *
  * Публичный API (зеркалит backend router):
  *   • preview(input)         → POST /bulk-operations/preview
- *   • create(input)          → POST /bulk-operations
+ *   • create(input)          → POST /bulk-operations  (Idempotency-Key в header)
  *   • get(id)                → GET  /bulk-operations/:id
  *   • cancel(id)             → POST /bulk-operations/:id/cancel
  *   • listMine(query)        → GET  /bulk-operations
@@ -12,10 +12,13 @@
  *   • streamUrl(id)          → URL для EventSource (PR-10 hook).
  *
  * Инварианты:
- *   • `idempotencyKey` — обязателен на create/retryFailed; поставщик (caller)
- *     должен генерить uuid v4 per user-action (wizard submit / retry button).
+ *   • `Idempotency-Key` передаётся **в HTTP-заголовке** (не body), UUID v4.
+ *     Backend: `req.header('Idempotency-Key')` в `bulk-operations.router.ts:126`.
  *   • `downloadReport` возвращает Blob (не parse'ится как JSON) — caller должен
  *     использовать `saveBlob`. Response type = 'blob'.
+ *
+ * Transport contract (header/body split): backend/src/modules/bulk-operations/bulk-operations.router.ts
+ * DTO зеркало:                            backend/src/modules/bulk-operations/bulk-operations.dto.ts
  *
  * См. docs/tz/TTBULK-1.md §13.6 PR-9.
  */
@@ -39,6 +42,7 @@ export interface PreviewInput {
 
 export interface CreateInput {
   previewToken: string;
+  /** Передаётся как HTTP-заголовок `Idempotency-Key` (не в body). UUID v4. */
   idempotencyKey: string;
 }
 
@@ -57,11 +61,11 @@ export const bulkOperationsApi = {
 
   create: (input: CreateInput) =>
     api
-      .post<BulkCreateResponse>('/bulk-operations', input, {
-        // idempotencyKey goes в body — НЕ как header. Backend DTO ожидает его
-        // в body (см. createBulkOperationDto: previewToken + idempotencyKey оба
-        // в json). Header-based idempotency не реализован в PR-3.
-      })
+      .post<BulkCreateResponse>(
+        '/bulk-operations',
+        { previewToken: input.previewToken },
+        { headers: { 'Idempotency-Key': input.idempotencyKey } },
+      )
       .then((r) => r.data),
 
   get: (id: string) =>
@@ -79,9 +83,11 @@ export const bulkOperationsApi = {
 
   retryFailed: (id: string, idempotencyKey: string) =>
     api
-      .post<BulkCreateResponse>(`/bulk-operations/${id}/retry-failed`, {
-        idempotencyKey,
-      })
+      .post<BulkCreateResponse>(
+        `/bulk-operations/${id}/retry-failed`,
+        {},
+        { headers: { 'Idempotency-Key': idempotencyKey } },
+      )
       .then((r) => r.data),
 
   downloadReport: (id: string) =>

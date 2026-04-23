@@ -414,8 +414,6 @@ export default function SearchPage() {
                         void runQuery(state.jql, state.page);
                       }}
                       isLight={isLight}
-                      jql={state.jql}
-                      total={load.total}
                     />
                   </div>
                 )}

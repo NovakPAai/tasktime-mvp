@@ -67,10 +67,20 @@ export default function BulkOperationWizardModal({
     }
   }, [open]);
 
+  // Русская плюрализация: 1 → "задача", 2-4 → "задачи", 5+ → "задач".
+  // Для 11-14 — всегда "задач" (исключение стандартного правила).
+  const pluralizeTasks = (n: number): string => {
+    const mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 14) return 'задач';
+    const mod10 = n % 10;
+    if (mod10 === 1) return 'задача';
+    if (mod10 >= 2 && mod10 <= 4) return 'задачи';
+    return 'задач';
+  };
   const scopeLabel =
     scope.kind === 'ids'
-      ? `${total} выбран${total === 1 ? 'а' : total < 5 ? 'ы' : 'о'} задача`.replace(/а$/, 'а')
-      : `JQL-выборка (${total} задач)`;
+      ? `Выбрано: ${total} ${pluralizeTasks(total)}`
+      : `JQL-выборка (${total} ${pluralizeTasks(total)})`;
 
   const canNext = step === 0 ? selectedType !== undefined : false; // Step2+ в PR-9b
 

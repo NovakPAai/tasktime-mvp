@@ -1,10 +1,15 @@
 /**
  * TTBULK-1 PR-9a — types и enum'ы массовых операций.
  *
- * Зеркало backend `bulk-operations.dto.ts`. Wizard и downstream-компоненты
- * (PR-9b Step2/3, PR-10 ProgressDrawer, PR-11 OperationsPage) импортируют
- * отсюда. При изменении backend DTO — синхронизировать руками; compile-time
- * проверка обеспечивается только structural compatibility ответов API.
+ * Зеркало backend DTO. Wizard и downstream-компоненты (PR-9b Step2/3, PR-10
+ * ProgressDrawer, PR-11 OperationsPage) импортируют отсюда. При изменении
+ * backend — синхронизировать руками; compile-time проверка обеспечивается
+ * только structural compatibility ответов API.
+ *
+ * Canonical sources:
+ *   • DTO schemas:        backend/src/modules/bulk-operations/bulk-operations.dto.ts
+ *   • Transport contract: backend/src/modules/bulk-operations/bulk-operations.router.ts
+ *     (header Idempotency-Key, response shape / strip и т.д.)
  *
  * См. docs/tz/TTBULK-1.md §13.6 PR-9.
  */
@@ -167,10 +172,14 @@ export interface BulkOperationListResponse {
   limit: number;
 }
 
+/**
+ * Router: `alreadyExisted` стрипается перед `res.json(...)` (используется только
+ * для HTTP-кода: 200 на replay, 201 на create-new). Caller различает по статусу
+ * ответа, не по полю. См. bulk-operations.router.ts:138-139.
+ */
 export interface BulkCreateResponse {
   id: string;
   status: BulkOperationStatus;
-  alreadyExisted: boolean;
 }
 
 // ────── UI helpers ──────────────────────────────────────────────────────────
@@ -223,3 +232,17 @@ export const STATUS_COLORS: Record<BulkOperationStatus, string> = {
   FAILED: 'error',
   CANCELLED: 'default',
 };
+
+/**
+ * Runtime narrowing для `BulkOperation.payload`: Prisma Json → typed union.
+ *
+ * Поле возвращается бэкендом как opaque JSON (migrations могли изменить форму
+ * в прошлом). Callers обязаны проверить через этот guard перед доступом к
+ * type-specific полям (e.g. `.transitionId`) — иначе TS молчит, а runtime
+ * получит undefined.
+ */
+export function isBulkOperationPayload(v: unknown): v is BulkOperationPayload {
+  if (typeof v !== 'object' || v === null) return false;
+  const t = (v as Record<string, unknown>).type;
+  return typeof t === 'string' && (BULK_OPERATION_TYPES as readonly string[]).includes(t);
+}

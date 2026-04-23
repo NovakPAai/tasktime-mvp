@@ -27,11 +27,8 @@ export interface BulkActionsBarProps {
   selectedIds: string[];
   onCleared: () => void;
   isLight?: boolean;
-  /** Current JQL expression. When provided + `features.bulkOps` on, wizard can
-   *  operate on full JQL scope (not just `selectedIds`). */
-  jql?: string;
-  /** Total matched (by JQL) — отображается в wizard если scope=jql. */
-  total?: number;
+  // PR-9b добавит `jql?: string` + `total?: number` для JQL-scope варианта
+  // bulk-операций (без обязательного selection).
 }
 
 async function bulkDelete(ids: string[]): Promise<{ succeeded: number; failed: number }> {
@@ -49,8 +46,6 @@ export default function BulkActionsBar({
   selectedIds,
   onCleared,
   isLight = false,
-  jql,
-  total,
 }: BulkActionsBarProps) {
   const [busy, setBusy] = useState(false);
   // TTBULK-1 PR-9a — wizard. Gated под `features.bulkOps`; в PR-12 cutover флаг
@@ -149,15 +144,12 @@ export default function BulkActionsBar({
       {features.bulkOps && (
         <BulkOperationWizardModal
           open={wizardOpen}
-          // Scope — если пользователь кликнул «Массовые операции» c selection,
-          // передаём ids. JQL-вариант будет в PR-9b через доп. кнопку «Применить
-          // ко всей выборке», либо пользователь снимет selection и снова откроет.
-          scope={
-            jql && selectedIds.length === 0
-              ? { kind: 'jql', jql }
-              : { kind: 'ids', issueIds: selectedIds }
-          }
-          total={jql && selectedIds.length === 0 ? total ?? 0 : selectedIds.length}
+          // PR-9a: scope всегда = ids (компонент early-return'ит при пустом
+          // selectedIds, так что selection гарантирован). JQL-вариант (bulk
+          // «ко всей выборке» без selection) добавится в PR-9b через отдельную
+          // кнопку, которая рендерится ВНЕ этого early-return ветки.
+          scope={{ kind: 'ids', issueIds: selectedIds }}
+          total={selectedIds.length}
           onClose={() => {
             // CLAUDE.md: modal close → refresh parent. onCleared зовёт
             // runQuery в SearchPage (selectedIds reset + re-fetch).
