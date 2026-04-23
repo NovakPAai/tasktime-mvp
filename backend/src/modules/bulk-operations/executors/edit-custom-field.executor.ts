@@ -15,21 +15,15 @@
 
 import type { BulkOperationType } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
-import { hasAnySystemRole } from '../../../shared/auth/roles.js';
 import { getCurrentBulkOperationId } from '../../../shared/bulk-operation-context.js';
 import {
   upsertIssueCustomFields,
   getApplicableFields,
 } from '../../issue-custom-fields/issue-custom-fields.service.js';
 import type { BulkExecutor, BulkExecutorActor, IssueWithContext, PreflightResult } from '../bulk-operations.types.js';
+import { actorHasProjectAccess } from './shared.js';
 
 export type EditCustomFieldPayload = { type: 'EDIT_CUSTOM_FIELD'; customFieldId: string; value: unknown };
-
-async function actorHasProjectAccess(actor: BulkExecutorActor, projectId: string): Promise<boolean> {
-  if (hasAnySystemRole(actor.systemRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'])) return true;
-  const m = await prisma.userProjectRole.findFirst({ where: { userId: actor.userId, projectId }, select: { userId: true } });
-  return m !== null;
-}
 
 export const editCustomFieldExecutor: BulkExecutor<EditCustomFieldPayload> = {
   type: 'EDIT_CUSTOM_FIELD' satisfies BulkOperationType,
@@ -45,6 +39,24 @@ export const editCustomFieldExecutor: BulkExecutor<EditCustomFieldPayload> = {
         kind: 'SKIPPED',
         reasonCode: 'INVALID_FIELD_SCHEMA',
         reason: 'Custom field не применим к данной задаче (field scheme)',
+      };
+    }
+    // Scalar-type guard: `payload.value` — unknown. upsertIssueCustomFields DTO
+    // принимает string | number | boolean | string[] | null. Любой другой тип
+    // (object, mixed array) должен стать SKIPPED TYPE_MISMATCH, а не EXECUTOR_ERROR.
+    // Pre-push review PR-5 🟡 #4.
+    const v = payload.value;
+    const validType =
+      v === null ||
+      typeof v === 'string' ||
+      typeof v === 'number' ||
+      typeof v === 'boolean' ||
+      (Array.isArray(v) && v.every((x) => typeof x === 'string'));
+    if (!validType) {
+      return {
+        kind: 'SKIPPED',
+        reasonCode: 'TYPE_MISMATCH',
+        reason: 'Custom field value должен быть scalar (string/number/boolean/null) или string[]',
       };
     }
     return { kind: 'ELIGIBLE', preview: { customFieldId: payload.customFieldId } };

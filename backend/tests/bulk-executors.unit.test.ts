@@ -16,6 +16,7 @@ const { mockPrisma, mockServices, mockContext } = vi.hoisted(() => {
     userProjectRole: { findFirst: vi.fn() },
     sprint: { findUnique: vi.fn() },
     auditLog: { create: vi.fn() },
+    issue: { findUniqueOrThrow: vi.fn() },
   };
   const mockServices = {
     assignIssue: vi.fn(),
@@ -38,6 +39,16 @@ vi.mock('../src/shared/auth/roles.js', () => ({
   hasAnySystemRole: (roles: string[], required: string[]) => roles.some((r) => required.includes(r)),
 }));
 vi.mock('../src/shared/bulk-operation-context.js', () => mockContext);
+// executors/shared.ts — реальный prisma-helper, mock'им напрямую чтобы тесты
+// не завязывались на userProjectRole.findFirst в нём.
+vi.mock('../src/modules/bulk-operations/executors/shared.js', () => ({
+  actorHasProjectAccess: async (actor: { systemRoles: string[]; userId: string }, projectId: string) => {
+    if (actor.systemRoles.includes('SUPER_ADMIN')) return true;
+    // Для тестов используем тот же mock prisma.userProjectRole.findFirst.
+    const m = await mockPrisma.userProjectRole.findFirst({ where: { userId: actor.userId, projectId }, select: { userId: true } });
+    return m !== null;
+  },
+}));
 vi.mock('../src/modules/issues/issues.service.js', () => ({
   assignIssue: mockServices.assignIssue,
   updateIssue: mockServices.updateIssue,
@@ -145,12 +156,20 @@ describe('editFieldExecutor', () => {
     expect(r).toMatchObject({ kind: 'SKIPPED', reasonCode: 'TYPE_MISMATCH' });
   });
 
-  it('execute description.append объединяет с разделителем', async () => {
+  it('execute description.append делает re-read fresh description перед append (race-guard)', async () => {
+    // fresh description изменился между preflight и execute — concurrent editor
+    // добавил строку. Append должен работать поверх fresh, не preflight-snapshot.
+    mockPrisma.issue.findUniqueOrThrow.mockResolvedValue({ description: 'Updated by other user' });
     await editFieldExecutor.execute(baseIssue as never, { type: 'EDIT_FIELD', field: 'description.append', value: 'MORE' }, memberActor);
-    expect(mockServices.updateIssue).toHaveBeenCalledWith('i1', { description: 'Initial desc\n\nMORE' });
+    expect(mockPrisma.issue.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { id: 'i1' },
+      select: { description: true },
+    });
+    expect(mockServices.updateIssue).toHaveBeenCalledWith('i1', { description: 'Updated by other user\n\nMORE' });
   });
 
   it('execute description.append в пустой description — без разделителя', async () => {
+    mockPrisma.issue.findUniqueOrThrow.mockResolvedValue({ description: null });
     await editFieldExecutor.execute({ ...baseIssue, description: null } as never, { type: 'EDIT_FIELD', field: 'description.append', value: 'FIRST' }, memberActor);
     expect(mockServices.updateIssue).toHaveBeenCalledWith('i1', { description: 'FIRST' });
   });
@@ -176,6 +195,36 @@ describe('editCustomFieldExecutor', () => {
     const r = await editCustomFieldExecutor.preflight(
       baseIssue as never,
       { type: 'EDIT_CUSTOM_FIELD', customFieldId: 'cf-1', value: 'v' },
+      memberActor,
+    );
+    expect(r.kind).toBe('ELIGIBLE');
+  });
+
+  it('TYPE_MISMATCH если value — object (не scalar)', async () => {
+    mockServices.getApplicableFields.mockResolvedValue([{ customFieldId: 'cf-1' }]);
+    const r = await editCustomFieldExecutor.preflight(
+      baseIssue as never,
+      { type: 'EDIT_CUSTOM_FIELD', customFieldId: 'cf-1', value: { nested: 'obj' } },
+      memberActor,
+    );
+    expect(r).toMatchObject({ kind: 'SKIPPED', reasonCode: 'TYPE_MISMATCH' });
+  });
+
+  it('TYPE_MISMATCH если value — mixed array', async () => {
+    mockServices.getApplicableFields.mockResolvedValue([{ customFieldId: 'cf-1' }]);
+    const r = await editCustomFieldExecutor.preflight(
+      baseIssue as never,
+      { type: 'EDIT_CUSTOM_FIELD', customFieldId: 'cf-1', value: ['s', 42] },
+      memberActor,
+    );
+    expect(r).toMatchObject({ kind: 'SKIPPED', reasonCode: 'TYPE_MISMATCH' });
+  });
+
+  it('ELIGIBLE при string[] value', async () => {
+    mockServices.getApplicableFields.mockResolvedValue([{ customFieldId: 'cf-1' }]);
+    const r = await editCustomFieldExecutor.preflight(
+      baseIssue as never,
+      { type: 'EDIT_CUSTOM_FIELD', customFieldId: 'cf-1', value: ['a', 'b'] },
       memberActor,
     );
     expect(r.kind).toBe('ELIGIBLE');
@@ -278,6 +327,18 @@ describe('deleteExecutor', () => {
     expect(mockServices.getEffectiveProjectPermissions).not.toHaveBeenCalled();
   });
 
+  it('ADMIN НЕ bypass (должен получить ISSUES_DELETE явно, §7.1)', async () => {
+    mockServices.getEffectiveProjectPermissions.mockResolvedValue([]); // нет ISSUES_DELETE
+    const r = await deleteExecutor.preflight(
+      baseIssue as never,
+      { type: 'DELETE', confirmPhrase: 'DELETE' },
+      { userId: 'u-admin', systemRoles: ['ADMIN'] },
+    );
+    expect(r).toMatchObject({ kind: 'SKIPPED', reasonCode: 'NO_ACCESS' });
+    // Важно: permissions-проверка всё-таки вызывалась (не bypass).
+    expect(mockServices.getEffectiveProjectPermissions).toHaveBeenCalled();
+  });
+
   it('NO_ACCESS если permissions не содержат ISSUES_DELETE', async () => {
     mockServices.getEffectiveProjectPermissions.mockResolvedValue(['ISSUES_VIEW']);
     const r = await deleteExecutor.preflight(baseIssue as never, { type: 'DELETE', confirmPhrase: 'DELETE' }, memberActor);
@@ -290,11 +351,12 @@ describe('deleteExecutor', () => {
     expect(r.kind).toBe('ELIGIBLE');
   });
 
-  it('execute пишет audit ДО delete (чтобы forensics сохранился)', async () => {
+  it('execute: delete СНАЧАЛА, потом audit (pre-push PR-5 🟠 #2: избегаем false-positive forensic)', async () => {
     const callOrder: string[] = [];
-    mockPrisma.auditLog.create.mockImplementation(async () => { callOrder.push('audit'); return {}; });
     mockServices.deleteIssue.mockImplementation(async () => { callOrder.push('delete'); });
+    mockPrisma.auditLog.create.mockImplementation(async () => { callOrder.push('audit'); return {}; });
     await deleteExecutor.execute(baseIssue as never, { type: 'DELETE', confirmPhrase: 'DELETE' }, memberActor);
-    expect(callOrder).toEqual(['audit', 'delete']);
+    expect(callOrder).toEqual(['delete', 'audit']);
+    expect(mockServices.deleteIssue).toHaveBeenCalledWith('i1');
   });
 });

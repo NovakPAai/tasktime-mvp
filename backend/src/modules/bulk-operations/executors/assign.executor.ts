@@ -11,18 +11,12 @@
 
 import type { BulkOperationType } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
-import { hasAnySystemRole } from '../../../shared/auth/roles.js';
 import { getCurrentBulkOperationId } from '../../../shared/bulk-operation-context.js';
 import { assignIssue } from '../../issues/issues.service.js';
 import type { BulkExecutor, BulkExecutorActor, IssueWithContext, PreflightResult } from '../bulk-operations.types.js';
+import { actorHasProjectAccess } from './shared.js';
 
 export type AssignPayload = { type: 'ASSIGN'; assigneeId: string | null };
-
-async function actorHasProjectAccess(actor: BulkExecutorActor, projectId: string): Promise<boolean> {
-  if (hasAnySystemRole(actor.systemRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'])) return true;
-  const m = await prisma.userProjectRole.findFirst({ where: { userId: actor.userId, projectId }, select: { userId: true } });
-  return m !== null;
-}
 
 export const assignExecutor: BulkExecutor<AssignPayload> = {
   type: 'ASSIGN' satisfies BulkOperationType,

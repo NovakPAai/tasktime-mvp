@@ -17,22 +17,16 @@
 
 import type { BulkOperationType, Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
-import { hasAnySystemRole } from '../../../shared/auth/roles.js';
 import { getCurrentBulkOperationId } from '../../../shared/bulk-operation-context.js';
 import { updateIssue } from '../../issues/issues.service.js';
 import type { BulkExecutor, BulkExecutorActor, IssueWithContext, PreflightResult } from '../bulk-operations.types.js';
+import { actorHasProjectAccess } from './shared.js';
 
 export type EditFieldPayload = {
   type: 'EDIT_FIELD';
   field: 'priority' | 'dueDate' | 'labels.add' | 'labels.remove' | 'description.append';
   value: unknown;
 };
-
-async function actorHasProjectAccess(actor: BulkExecutorActor, projectId: string): Promise<boolean> {
-  if (hasAnySystemRole(actor.systemRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'])) return true;
-  const m = await prisma.userProjectRole.findFirst({ where: { userId: actor.userId, projectId }, select: { userId: true } });
-  return m !== null;
-}
 
 const VALID_PRIORITIES = new Set(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']);
 
@@ -84,7 +78,16 @@ export const editFieldExecutor: BulkExecutor<EditFieldPayload> = {
         await updateIssue(issue.id, { dueDate: payload.value as string | null });
         break;
       case 'description.append': {
-        const current = issue.description ?? '';
+        // Re-read description внутри execute — issue.description из
+        // processor'овского findMany мог устареть (concurrent edit другим
+        // юзером). Last-writer-wins допустим для bulk, но мы хотя бы не
+        // затрём свежие изменения, случившиеся ПОСЛЕ preflight'а.
+        // Pre-push review PR-5 🟡 #3.
+        const fresh = await prisma.issue.findUniqueOrThrow({
+          where: { id: issue.id },
+          select: { description: true },
+        });
+        const current = fresh.description ?? '';
         const separator = current.length > 0 ? '\n\n' : '';
         const newDescription = `${current}${separator}${payload.value as string}`;
         details.appendedLength = (payload.value as string).length;

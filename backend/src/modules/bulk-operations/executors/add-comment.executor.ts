@@ -12,18 +12,12 @@
 
 import type { BulkOperationType } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
-import { hasAnySystemRole } from '../../../shared/auth/roles.js';
 import { getCurrentBulkOperationId } from '../../../shared/bulk-operation-context.js';
 import { createComment } from '../../comments/comments.service.js';
 import type { BulkExecutor, BulkExecutorActor, IssueWithContext, PreflightResult } from '../bulk-operations.types.js';
+import { actorHasProjectAccess } from './shared.js';
 
 export type AddCommentPayload = { type: 'ADD_COMMENT'; body: string };
-
-async function actorHasProjectAccess(actor: BulkExecutorActor, projectId: string): Promise<boolean> {
-  if (hasAnySystemRole(actor.systemRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'])) return true;
-  const m = await prisma.userProjectRole.findFirst({ where: { userId: actor.userId, projectId }, select: { userId: true } });
-  return m !== null;
-}
 
 export const addCommentExecutor: BulkExecutor<AddCommentPayload> = {
   type: 'ADD_COMMENT' satisfies BulkOperationType,

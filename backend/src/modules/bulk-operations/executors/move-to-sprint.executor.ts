@@ -16,18 +16,12 @@
 
 import type { BulkOperationType, Sprint } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
-import { hasAnySystemRole } from '../../../shared/auth/roles.js';
 import { getCurrentBulkOperationId } from '../../../shared/bulk-operation-context.js';
 import { moveIssuesToSprint } from '../../sprints/sprints.service.js';
 import type { BulkExecutor, BulkExecutorActor, IssueWithContext, PreflightResult } from '../bulk-operations.types.js';
+import { actorHasProjectAccess } from './shared.js';
 
 export type MoveToSprintPayload = { type: 'MOVE_TO_SPRINT'; sprintId: string | null };
-
-async function actorHasProjectAccess(actor: BulkExecutorActor, projectId: string): Promise<boolean> {
-  if (hasAnySystemRole(actor.systemRoles, ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR'])) return true;
-  const m = await prisma.userProjectRole.findFirst({ where: { userId: actor.userId, projectId }, select: { userId: true } });
-  return m !== null;
-}
 
 // Per-preflight sprint lookup — кэшируем на уровне процесса Map'ой бы выгодно, но
 // Phase 1 не оптимизирует; processor batch=25 даёт 25 lookup'ов, приемлемо.
