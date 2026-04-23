@@ -615,6 +615,7 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `POST` | `/api/admin/users/:id/system-roles` | 🔒 |
 | `DELETE` | `/api/admin/users/:id/system-roles/:role` | 🔒 |
 | `PUT` | `/api/admin/users/:id/system-roles` | 🔒 |
+| `GET` | `/api/admin/system-roles/:role/assignments` | 🔒 |
 | `GET` | `/api/admin/users/:id/roles` | 🔒 |
 | `POST` | `/api/admin/users/:id/roles` | 🔒 |
 | `DELETE` | `/api/admin/users/:id/roles/:roleId` | 🔒 |
@@ -978,6 +979,8 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `DELETE` | `/api/:id/members/:userId` | 🔒 |
 | `POST` | `/api/:id/project-roles` | 🔒 |
 | `DELETE` | `/api/:id/project-roles/:projectId` | 🔒 |
+| `POST` | `/api/:id/system-roles` | 🔒 |
+| `DELETE` | `/api/:id/system-roles/:role` | 🔒 |
 
 ### user-security
 
