@@ -623,6 +623,8 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `PATCH` | `/api/admin/settings/registration` | 🔒 |
 | `GET` | `/api/admin/settings/system` | 🔒 |
 | `PATCH` | `/api/admin/settings/system` | 🔒 |
+| `GET` | `/api/admin/system-settings/bulk-operations` | 🔒 |
+| `PATCH` | `/api/admin/system-settings/bulk-operations` | 🔒 |
 | `GET` | `/api/admin/uat-tests` | 🔒 |
 | `GET` | `/api/admin/reports/issues-by-status` | 🔒 |
 | `GET` | `/api/admin/reports/issues-by-assignee` | 🔒 |

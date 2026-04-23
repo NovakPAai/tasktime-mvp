@@ -231,7 +231,7 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/admin/release-checkpoint-types` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
 | `/admin/release-checkpoint-templates` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
 | `/admin/checkpoint-audit` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
-| `/admin/system` | `AdminSystemPage` | `frontend/src/pages/admin/AdminSystemPage` | — |
+| `/admin/system` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
 | `/settings` | `SettingsPage` | `frontend/src/pages/SettingsPage` | — |
 | `/pipeline` | `PipelineDashboardPage` | `frontend/src/pages/PipelineDashboardPage` | — |
 | `/*` | `Navigate` | `frontend/src/pages/Navigate` | — |
