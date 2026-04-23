@@ -1,6 +1,6 @@
 /** Auth domain types — TTUI-125 */
 
-export type SystemRoleType = 'SUPER_ADMIN' | 'ADMIN' | 'RELEASE_MANAGER' | 'USER' | 'AUDITOR';
+export type SystemRoleType = 'SUPER_ADMIN' | 'ADMIN' | 'RELEASE_MANAGER' | 'USER' | 'AUDITOR' | 'BULK_OPERATOR';
 
 /** @deprecated Use SystemRoleType. Kept for legacy compatibility. */
 export type UserRole = SystemRoleType;

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import type { SystemRoleType } from '@prisma/client';
 import { authenticate } from '../../shared/middleware/auth.js';
 import { requireRole } from '../../shared/middleware/rbac.js';
 import { validate } from '../../shared/middleware/validate.js';
@@ -9,10 +10,20 @@ import {
   updateUserGroupDto,
   addMembersDto,
   grantProjectRoleDto,
+  grantGroupSystemRoleDto,
 } from './user-groups.dto.js';
 import * as service from './user-groups.service.js';
 import { AppError } from '../../shared/middleware/error-handler.js';
 import { asyncHandler, authHandler } from '../../shared/utils/async-handler.js';
+
+const VALID_SYSTEM_ROLES: readonly SystemRoleType[] = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'RELEASE_MANAGER',
+  'AUDITOR',
+  'USER',
+  'BULK_OPERATOR',
+];
 
 const listQuerySchema = z.object({
   search: z.string().optional(),
@@ -121,5 +132,39 @@ router.delete('/:id/project-roles/:projectId', authHandler(async (req, res) => {
   await logAudit(req, 'project_group_role.revoked', 'user_group', groupId, { projectId });
   res.json(result);
 }));
+
+// ──── TTBULK-1 PR-8 — group-level system roles ───────────────────────────────
+
+router.post(
+  '/:id/system-roles',
+  validate(grantGroupSystemRoleDto),
+  authHandler(async (req, res) => {
+    const groupId = req.params.id as string;
+    const role = req.body.role as SystemRoleType;
+    const created = await service.grantSystemRoleToGroup(groupId, role, req.user!.userId);
+    await logAudit(req, 'system_role.granted', 'user_group', groupId, {
+      role,
+      source: 'group',
+    });
+    res.status(201).json(created);
+  }),
+);
+
+router.delete(
+  '/:id/system-roles/:role',
+  authHandler(async (req, res) => {
+    const groupId = req.params.id as string;
+    const role = req.params.role as SystemRoleType;
+    if (!VALID_SYSTEM_ROLES.includes(role)) {
+      throw new AppError(400, `Invalid system role: ${role}`);
+    }
+    const result = await service.revokeSystemRoleFromGroup(groupId, role);
+    await logAudit(req, 'system_role.revoked', 'user_group', groupId, {
+      role,
+      source: 'group',
+    });
+    res.json(result);
+  }),
+);
 
 export default router;

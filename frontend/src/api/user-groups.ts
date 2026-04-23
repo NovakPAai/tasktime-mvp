@@ -1,4 +1,13 @@
 import api from './client';
+import type { SystemRoleType } from '../types';
+
+// TTBULK-1 PR-8 — group-level system role grants.
+export interface UserGroupSystemRole {
+  id: string;
+  role: SystemRoleType;
+  createdAt: string;
+  createdBy: string | null;
+}
 
 export interface UserGroupMember {
   groupId: string;
@@ -32,6 +41,7 @@ export interface UserGroupListItem {
 export interface UserGroupDetail extends UserGroupListItem {
   members: UserGroupMember[];
   projectRoles: UserGroupProjectRole[];
+  systemRoles: UserGroupSystemRole[];
 }
 
 export interface UserGroupImpact {
@@ -82,4 +92,42 @@ export const userGroupsApi = {
    */
   revokeProjectRole: (id: string, projectId: string) =>
     api.delete(`/admin/user-groups/${id}/project-roles/${projectId}`).then(r => r.data),
+
+  // TTBULK-1 PR-8 — group system-role assignments.
+  grantSystemRole: (id: string, role: SystemRoleType) =>
+    api.post<UserGroupSystemRole>(`/admin/user-groups/${id}/system-roles`, { role }).then(r => r.data),
+
+  revokeSystemRole: (id: string, role: SystemRoleType) =>
+    api.delete(`/admin/user-groups/${id}/system-roles/${role}`).then(r => r.data),
+};
+
+// TTBULK-1 PR-8 — system-role assignments (cross-group view).
+export interface SystemRoleAssignmentUser {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  grantedAt: string;
+}
+
+export interface SystemRoleAssignmentGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  memberCount: number;
+  grantedAt: string;
+  assignmentId: string;
+}
+
+export interface SystemRoleAssignments {
+  role: SystemRoleType;
+  users: SystemRoleAssignmentUser[];
+  groups: SystemRoleAssignmentGroup[];
+}
+
+export const systemRoleAssignmentsApi = {
+  get: (role: SystemRoleType) =>
+    api
+      .get<SystemRoleAssignments>(`/admin/system-roles/${role}/assignments`)
+      .then(r => r.data),
 };

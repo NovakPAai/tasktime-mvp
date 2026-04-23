@@ -22,7 +22,9 @@ const ROLE_COLORS: Record<string, string> = {
   USER: 'green',
 };
 
-const SYSTEM_ROLES: SystemRoleType[] = ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR', 'USER'];
+// TTBULK-1 PR-8 — BULK_OPERATOR added. Высокий blast-radius: пользователь может
+// массово менять/удалять задачи через scope=JQL — выдаём только доверенным.
+const SYSTEM_ROLES: SystemRoleType[] = ['SUPER_ADMIN', 'ADMIN', 'RELEASE_MANAGER', 'AUDITOR', 'BULK_OPERATOR', 'USER'];
 
 function RoleTags({ roles }: { roles: ProjectRole[] }) {
   const shown = roles.slice(0, 3);
