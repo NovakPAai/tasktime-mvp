@@ -330,7 +330,7 @@ Run `make docs` to check for staleness warnings.
 > ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
 > Обновляется автоматически при каждом изменении схемы.
 
-## Модели (56)
+## Модели (59)
 
 ### User
 
@@ -366,6 +366,7 @@ Run `make docs` to check for staleness warnings.
 | `checkpointTemplatesCreated` | `CheckpointTemplate[]` | нет |  |
 | `savedFilters` | `SavedFilter[]` | нет |  |
 | `savedFilterShares` | `SavedFilterShare[]` | нет |  |
+| `bulkOperations` | `BulkOperation[]` | нет |  |
 
 ### UserSystemRole
 
@@ -732,6 +733,8 @@ Run `make docs` to check for staleness warnings.
 | `ipAddress` | `String` | да |  |
 | `userAgent` | `String` | да |  |
 | `createdAt` | `DateTime` | нет | default: now( |
+| `bulkOperationId` | `String` | да |  |
+| `bulkOperation` | `BulkOperation` | да |  |
 | `user` | `User` | да |  |
 
 ### IssueLinkType
@@ -1223,7 +1226,58 @@ Run `make docs` to check for staleness warnings.
 | `user` | `User` | да |  |
 | `group` | `UserGroup` | да |  |
 
-## Перечисления (23)
+### BulkOperation
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `createdById` | `String` | нет |  |
+| `type` | `BulkOperationType` | нет |  |
+| `status` | `BulkOperationStatus` | нет | default: QUEUED |
+| `scopeKind` | `String` | нет |  |
+| `scopeJql` | `String` | да |  |
+| `payload` | `Json` | нет |  |
+| `idempotencyKey` | `String` | нет |  |
+| `total` | `Int` | нет |  |
+| `processed` | `Int` | нет | default: 0 |
+| `succeeded` | `Int` | нет | default: 0 |
+| `failed` | `Int` | нет | default: 0 |
+| `skipped` | `Int` | нет | default: 0 |
+| `cancelRequested` | `Boolean` | нет | default: false |
+| `heartbeatAt` | `DateTime` | да |  |
+| `startedAt` | `DateTime` | да |  |
+| `finishedAt` | `DateTime` | да |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `createdBy` | `User` | нет |  |
+| `items` | `BulkOperationItem[]` | нет |  |
+| `auditLogs` | `AuditLog[]` | нет |  |
+
+### BulkOperationItem
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `operationId` | `String` | нет |  |
+| `issueId` | `String` | нет |  |
+| `issueKey` | `String` | нет |  |
+| `outcome` | `BulkItemOutcome` | нет |  |
+| `errorCode` | `String` | нет |  |
+| `errorMessage` | `String` | нет |  |
+| `processedAt` | `DateTime` | нет | default: now( |
+| `operation` | `BulkOperation` | нет |  |
+
+### UserGroupSystemRole
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `groupId` | `String` | нет |  |
+| `role` | `SystemRoleType` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `createdBy` | `String` | да |  |
+| `group` | `UserGroup` | нет |  |
+
+## Перечисления (26)
 
 ### SystemRoleType
 
@@ -1232,6 +1286,7 @@ Run `make docs` to check for staleness warnings.
 - `RELEASE_MANAGER`
 - `USER`
 - `AUDITOR`
+- `BULK_OPERATOR`
 
 ### ProjectRole
 
@@ -1407,4 +1462,28 @@ Run `make docs` to check for staleness warnings.
 
 - `READ`
 - `WRITE`
+
+### BulkOperationType
+
+- `TRANSITION`
+- `ASSIGN`
+- `EDIT_FIELD`
+- `EDIT_CUSTOM_FIELD`
+- `MOVE_TO_SPRINT`
+- `ADD_COMMENT`
+- `DELETE`
+
+### BulkOperationStatus
+
+- `QUEUED`
+- `RUNNING`
+- `SUCCEEDED`
+- `PARTIAL`
+- `FAILED`
+- `CANCELLED`
+
+### BulkItemOutcome
+
+- `FAILED`
+- `SKIPPED`
 <!-- AUTO-GENERATED:END -->

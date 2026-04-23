@@ -661,6 +661,12 @@ The `--api` mode of `scripts/generate-docs.js` can auto-regenerate this from Ope
 | `GET` | `/api/projects/:projectId/board` | 🔒 |
 | `PATCH` | `/api/projects/:projectId/board/reorder` | 🔒 |
 
+### bulk-operations
+
+| Метод | Путь | Доступ |
+|-------|------|--------|
+| `GET` | `/api/bulk-operations/ping` | 🔒 |
+
 ### Comments
 
 | Метод | Путь | Доступ |

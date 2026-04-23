@@ -213,6 +213,7 @@ make clean && make setup
 | `FEATURES_MCP` | `true` |  |
 | `FEATURES_GITLAB` | `true` |  |
 | `FEATURES_TELEGRAM` | `false` |  |
+| `FEATURES_BULK_OPS` | `false` | При true монтируется роутер /api/bulk-operations/* (в PR-1 — только stub /ping → 501). |
 | `AI_PROVIDER` | `heuristic` | AI provider: anthropic | heuristic (heuristic = no external LLM, formula-based) |
 
 ### Frontend (`frontend/.env`)
@@ -221,6 +222,7 @@ make clean && make setup
 |-----------|---------|----------|
 | `VITE_API_URL` | `/api` |  |
 | `VITE_FEATURES_ADVANCED_SEARCH` | `false` | бэкенд вернёт 404 на /api/search/*. |
+| `VITE_FEATURES_BULK_OPS` | `false` | а бэкенд вернёт 404 на /api/bulk-operations/*. См. docs/tz/TTBULK-1.md §13.1. |
 <!-- AUTO-GENERATED:END:env -->
 
 <!-- AUTO-GENERATED:START:makefile -->
