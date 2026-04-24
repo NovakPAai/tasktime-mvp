@@ -1,0 +1,48 @@
+# TTBULK-1 PR-13 — Prometheus alerts for bulk operations.
+#
+# Сценарии:
+#   • BulkOpQueuedDepthHigh — очередь ≥10 активных операций >5m.
+#     Обычно очередь пустая или 1-2; 10+ означает что processor не
+#     успевает (worker stuck или масштабирование).
+#   • BulkOpProcessorLockedRate — tick skipped-lock rate > 0.5/s за 5m.
+#     Distributed-lock contention — процессоры конкурируют; TICK_LOCK_TTL_S
+#     слишком низкий или инстансов воркера >1 на 1 lock.
+#
+# См. docs/tz/TTBULK-1.md §12, §13.8 PR-13.
+
+groups:
+  - name: bulk_operations
+    interval: 30s
+    rules:
+      - alert: BulkOpQueuedDepthHigh
+        expr: bulk_op_queued_depth >= 10
+        for: 5m
+        labels:
+          severity: warning
+          module: bulk-operations
+        annotations:
+          summary: Bulk operations queue depth sustained ≥10
+          description: |
+            Активных операций (QUEUED+RUNNING) >= 10 уже 5+ минут. Обычно
+            processor дренит очередь за секунды. Проверь:
+              1. `bulk_op_processor_ticks_total{result="processed"}` rate —
+                 падение = worker висит на executor'е.
+              2. Redis-pending queue size (`LLEN bulk-op:{id}:pending`) —
+                 растут ли конкретные операции.
+              3. Logs processor'а на `captureError` (executeTransition и т.п.).
+
+      - alert: BulkOpProcessorLockedRate
+        expr: rate(bulk_op_processor_ticks_total{result="skipped-lock"}[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          module: bulk-operations
+        annotations:
+          summary: Bulk operations processor lock contention
+          description: |
+            Tick'и skip'аются на distributed-lock > 0.5/s за 5m. Причины:
+              - >1 worker'а инстансы конкурируют за один lock (OK если
+                один берёт, другие skipping; проверь BULK_OP_TICK_LOCK_TTL_S).
+              - Lock TTL слишком мал — tick не успевает завершить за TTL.
+            Рассмотри bump `BULK_OP_TICK_LOCK_TTL_S` (default 90s) или
+            scale-down инстансов воркера.

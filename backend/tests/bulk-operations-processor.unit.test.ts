@@ -20,6 +20,8 @@ const { mockPrisma, mockRedis, mockTransitionExecutor, mockContext } = vi.hoiste
       update: vi.fn(),
       updateMany: vi.fn(),
       deleteMany: vi.fn(),
+      // PR-13: runTickOnce вызывает count для queued depth метрики.
+      count: vi.fn().mockResolvedValue(0),
     },
     bulkOperationItem: {
       createMany: vi.fn(),
@@ -66,6 +68,13 @@ vi.mock('../src/shared/auth/roles.js', () => ({
   sysRolesCacheKey: (id: string) => `user:sysroles:${id}`,
 }));
 vi.mock('../src/shared/utils/logger.js', () => ({ captureError: vi.fn() }));
+// PR-13 metrics — stub для processor тестов; самостоятельно тестируется в bulk-metrics.unit.test.
+vi.mock('../src/modules/bulk-operations/bulk-metrics.js', () => ({
+  recordFinalize: vi.fn(),
+  recordItems: vi.fn(),
+  recordTickResult: vi.fn(),
+  setQueuedDepth: vi.fn(),
+}));
 vi.mock('../src/modules/bulk-operations/executors/index.js', () => ({
   getExecutor: (type: string) => (type === 'TRANSITION' ? mockTransitionExecutor : null),
 }));
