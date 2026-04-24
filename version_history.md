@@ -2,7 +2,44 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.66**
+**Last version: 2.67**
+
+---
+
+## [2.67] [2026-04-24] feat(bulk-ops): TTBULK-1 follow-up — friendly pickers (замена UUID-вводов)
+
+**PR:** _(будет заполнено после push'а)_
+**Ветка:** `ttbulk-1/friendly-pickers`
+
+### Что было
+
+После cutover в PR-12 BULK_OPERATOR-пользователь при настройке операций на Step 2 должен был вводить UUID'ы руками (transitionId, assigneeId, customFieldId, sprintId) — ID-first UX, изначально отложенный в §13.6 PR-9b как «rich selectors deferred». На Step 4 confirm тоже отображались только UUID'ы — непрозрачно перед submit'ом.
+
+### Что теперь
+
+**Step2Configure** — человеко-понятные пикеры вместо UUID-input'ов:
+
+- **TRANSITION** — Select целевого статуса. Фетчит `workflowEngineApi.getBatchTransitions(scope.issueIds)` на входе, агрегирует переходы по `toStatus.name` с count'ом «доступно для N/M задач». Выбор ведёт в один из `transitionId`'ов группы — executor per-issue проверяет availability (issues с недоступным переходом будут SKIPPED с `NO_TRANSITION`).
+- **ASSIGN** — searchable Select из `listUsers()` (публичный endpoint `/users`), фильтр по имени и email, опция «— Снять исполнителя —» эквивалентна `assigneeId: null`.
+- **EDIT_CUSTOM_FIELD** — Select кастом-полей из `issueCustomFieldsApi.getFields(firstIssueId)`. Input под значение — типизированный по `fieldType` (TEXT/TEXTAREA/NUMBER/DATE/SELECT/MULTI_SELECT/CHECKBOX/REFERENCE). Показывает warning'и про multi-schema.
+- **MOVE_TO_SPRINT** — Select из `listAllSprints({ state: 'ALL' }, { limit: 500 })` сгруппированный по проекту, с меткой статуса спринта (Планируется/Активен/Завершён). Опция «— Убрать из спринта —» → `sprintId: null`.
+
+**Step4Confirm** — PayloadSummary резолвит UUID'ы в человеко-читаемые имена через те же API (lazy-fetch per resolver-компонент). Fallback на Text code с UUID при ошибке.
+
+### Инварианты
+
+- JQL-скоуп (пока не в UI): fallback на UUID-ввод — сохранён как safety net.
+- При multi-project выборке TRANSITION группирует по `toStatus.name`, так как transition-UUID'ы могут отличаться между проектами. EDIT_CUSTOM_FIELD использует схему первой задачи (warning'и показаны).
+- Все новые API-вызовы защищены try/catch → silent fallback на UUID при ошибке (не блокирует submit).
+
+### Проверки
+
+- `npx tsc --noEmit` → 0 errors.
+- `npm run lint` → 0 новых warnings (все existing — из других файлов).
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §3.2, §13.6 PR-9b (deferred rich selectors).
 
 ---
 

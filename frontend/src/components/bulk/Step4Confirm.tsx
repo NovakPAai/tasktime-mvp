@@ -1,13 +1,18 @@
 /**
- * TTBULK-1 PR-9b — Step 4 wizard: подтверждение и submit.
+ * TTBULK-1 PR-9b → follow-up — Step 4 wizard: подтверждение и submit.
  *
  * Рендерит summary (operation + scope + count eligible) + для DELETE —
  * confirm-phrase gate (текст "DELETE" должен быть введён дословно). Submit
  * button → родитель вызывает `bulkOperationsApi.create`.
  *
+ * Follow-up to PR-9b: UUID'ы в payload resolve'ятся в имена пользователей,
+ * названия спринтов/статусов/кастом-полей через те же API что и Step2Configure.
+ * API-вызовы дешёвые (listUsers/listAllSprints ~однажды на сессию).
+ *
  * См. docs/tz/TTBULK-1.md §3.2 (R11-confirmation), §13.6 PR-9.
  */
 
+import { useEffect, useState } from 'react';
 import { Alert, Input, Space, Tag, Typography } from 'antd';
 import type {
   BulkOperationPayload,
@@ -16,6 +21,12 @@ import type {
   BulkScope,
 } from '../../types/bulk.types';
 import { OPERATION_LABELS } from '../../types/bulk.types';
+import { listUsers } from '../../api/auth';
+import type { User } from '../../types';
+import { listAllSprints } from '../../api/sprints';
+import type { Sprint } from '../../types/sprint.types';
+import { workflowEngineApi, type BatchTransitionsItem } from '../../api/workflow-engine';
+import { issueCustomFieldsApi, type IssueCustomFieldValue } from '../../api/issue-custom-fields';
 
 const { Text } = Typography;
 
@@ -77,7 +88,7 @@ export default function Step4Confirm({
         </div>
       </div>
 
-      <PayloadSummary payload={payload} />
+      <PayloadSummary payload={payload} scope={scope} />
 
       {destructive && (
         <Alert
@@ -105,20 +116,26 @@ export default function Step4Confirm({
   );
 }
 
-function PayloadSummary({ payload }: { payload: BulkOperationPayload | null }) {
+function PayloadSummary({
+  payload,
+  scope,
+}: {
+  payload: BulkOperationPayload | null;
+  scope: BulkScope;
+}) {
   if (!payload) return null;
 
   let summary: React.ReactNode = null;
   switch (payload.type) {
     case 'ASSIGN':
       summary = payload.assigneeId ? (
-        <Text>Assignee: <Text code>{payload.assigneeId}</Text></Text>
+        <AssigneeName userId={payload.assigneeId} />
       ) : (
-        <Text>Unassign (очистить исполнителя)</Text>
+        <Text>Снять исполнителя</Text>
       );
       break;
     case 'TRANSITION':
-      summary = <Text>Transition ID: <Text code>{payload.transitionId}</Text></Text>;
+      summary = <TransitionName transitionId={payload.transitionId} scope={scope} />;
       break;
     case 'EDIT_FIELD':
       summary = (
@@ -129,16 +146,18 @@ function PayloadSummary({ payload }: { payload: BulkOperationPayload | null }) {
       break;
     case 'EDIT_CUSTOM_FIELD':
       summary = (
-        <Text>
-          Custom field <Text code>{payload.customFieldId}</Text> = {formatValue(payload.value)}
-        </Text>
+        <CustomFieldSummary
+          customFieldId={payload.customFieldId}
+          value={payload.value}
+          scope={scope}
+        />
       );
       break;
     case 'MOVE_TO_SPRINT':
       summary = payload.sprintId ? (
-        <Text>Sprint: <Text code>{payload.sprintId}</Text></Text>
+        <SprintName sprintId={payload.sprintId} />
       ) : (
-        <Text>Remove from sprint</Text>
+        <Text>Убрать из спринта</Text>
       );
       break;
     case 'ADD_COMMENT':
@@ -152,7 +171,7 @@ function PayloadSummary({ payload }: { payload: BulkOperationPayload | null }) {
       );
       break;
     case 'DELETE':
-      return null; // summary не нужен для DELETE — всё в Alert ниже
+      return null;
   }
 
   return (
@@ -160,6 +179,145 @@ function PayloadSummary({ payload }: { payload: BulkOperationPayload | null }) {
       <Text type="secondary">Payload:</Text>
       <div style={{ marginTop: 4 }}>{summary}</div>
     </div>
+  );
+}
+
+// ────── resolver-компоненты ──────────────────────────────────────────────────
+
+function AssigneeName({ userId }: { userId: string }) {
+  const [user, setUser] = useState<User | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listUsers()
+      .then((list) => {
+        if (!cancelled) setUser(list.find((u) => u.id === userId) ?? null);
+      })
+      .catch(() => {
+        /* silent — fallback на UUID */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+  return (
+    <Text>
+      Назначить: {user ? <Text strong>{user.name} ({user.email})</Text> : <Text code>{userId}</Text>}
+    </Text>
+  );
+}
+
+function SprintName({ sprintId }: { sprintId: string }) {
+  const [sprint, setSprint] = useState<Sprint | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listAllSprints({ state: 'ALL' }, { limit: 500 })
+      .then((res) => {
+        if (cancelled) return;
+        setSprint((res.data ?? []).find((s) => s.id === sprintId) ?? null);
+      })
+      .catch(() => {
+        /* silent */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sprintId]);
+  return (
+    <Text>
+      Переместить в спринт:{' '}
+      {sprint ? (
+        <Text strong>
+          {sprint.name}
+          {sprint.project ? ` · ${sprint.project.name}` : ''}
+        </Text>
+      ) : (
+        <Text code>{sprintId}</Text>
+      )}
+    </Text>
+  );
+}
+
+function TransitionName({ transitionId, scope }: { transitionId: string; scope: BulkScope }) {
+  const [statusName, setStatusName] = useState<string | null>(null);
+  const scopeKey = scope.kind === 'ids' ? scope.issueIds.join(',') : scope.jql;
+  useEffect(() => {
+    if (scope.kind !== 'ids' || scope.issueIds.length === 0) return;
+    let cancelled = false;
+    workflowEngineApi
+      .getBatchTransitions(scope.issueIds)
+      .then((batch: BatchTransitionsItem[]) => {
+        if (cancelled) return;
+        // Step2 stores bestTransitionId из одной workflow-схемы. В multi-project
+        // выборке другие issue'и могут иметь тот же toStatus.name, но другой UUID —
+        // резолвим имя статуса через exact UUID match ИЛИ через любую задачу,
+        // где stored UUID присутствует.
+        for (const it of batch) {
+          for (const t of it.transitions) {
+            if (t.id === transitionId) {
+              setStatusName(t.toStatus.name);
+              return;
+            }
+          }
+        }
+      })
+      .catch(() => {
+        /* silent */
+      });
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transitionId, scopeKey]);
+  return (
+    <Text>
+      Перевести в статус:{' '}
+      {statusName ? <Text strong>{statusName}</Text> : <Text code>{transitionId}</Text>}
+    </Text>
+  );
+}
+
+function CustomFieldSummary({
+  customFieldId,
+  value,
+  scope,
+}: {
+  customFieldId: string;
+  value: unknown;
+  scope: BulkScope;
+}) {
+  const [field, setField] = useState<IssueCustomFieldValue | null>(null);
+  const scopeKey = scope.kind === 'ids' ? scope.issueIds.join(',') : scope.jql;
+  useEffect(() => {
+    if (scope.kind !== 'ids' || scope.issueIds.length === 0) return;
+    const firstId = scope.issueIds[0];
+    if (!firstId) return;
+    let cancelled = false;
+    issueCustomFieldsApi
+      .getFields(firstId)
+      .then((res) => {
+        if (cancelled) return;
+        setField(res.fields.find((f) => f.customFieldId === customFieldId) ?? null);
+      })
+      .catch(() => {
+        /* silent */
+      });
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customFieldId, scopeKey]);
+  return (
+    <Text>
+      Поле:{' '}
+      {field ? (
+        <Text strong>
+          {field.name} <Text type="secondary">({field.fieldType})</Text>
+        </Text>
+      ) : (
+        <Text code>{customFieldId}</Text>
+      )}{' '}
+      = {formatValue(value)}
+    </Text>
   );
 }
 
