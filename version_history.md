@@ -8,7 +8,7 @@
 
 ## [2.60] [2026-04-23] feat(bulk-ops): TTBULK-1 PR-8 — BULK_OPERATOR в admin-ролях + group-assign endpoints
 
-**PR:** [#150](https://github.com/NovakPAai/tasktime-mvp/pull/150)
+**PR:** [#150](https://github.com/NovakPAai/tasktime-mvp/pull/150) (merged 2026-04-24)
 **Ветка:** `ttbulk-1/admin-roles`
 
 ### Что было
