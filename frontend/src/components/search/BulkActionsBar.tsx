@@ -14,17 +14,21 @@
  */
 import { useState } from 'react';
 import { Button, Dropdown, Popconfirm, message, type MenuProps } from 'antd';
-import { DownOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
+import { DownOutlined, DeleteOutlined, DownloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 
 import api from '../../api/client';
 import { exportIssues } from '../../api/search';
 import { saveBlob } from '../../utils/saveBlob';
+import { features } from '../../lib/features';
+import BulkOperationWizardModal from '../bulk/BulkOperationWizardModal';
 
 export interface BulkActionsBarProps {
   /** UUID strings — come from `issue.id` via ResultsTable rowKey. */
   selectedIds: string[];
   onCleared: () => void;
   isLight?: boolean;
+  // PR-9b добавит `jql?: string` + `total?: number` для JQL-scope варианта
+  // bulk-операций (без обязательного selection).
 }
 
 async function bulkDelete(ids: string[]): Promise<{ succeeded: number; failed: number }> {
@@ -38,8 +42,15 @@ async function bulkDelete(ids: string[]): Promise<{ succeeded: number; failed: n
   return { succeeded, failed };
 }
 
-export default function BulkActionsBar({ selectedIds, onCleared, isLight = false }: BulkActionsBarProps) {
+export default function BulkActionsBar({
+  selectedIds,
+  onCleared,
+  isLight = false,
+}: BulkActionsBarProps) {
   const [busy, setBusy] = useState(false);
+  // TTBULK-1 PR-9a — wizard. Gated под `features.bulkOps`; в PR-12 cutover флаг
+  // включается и кнопка «Массовые операции» становится видна всем.
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   if (selectedIds.length === 0) return null;
 
@@ -100,6 +111,17 @@ export default function BulkActionsBar({ selectedIds, onCleared, isLight = false
       }}
     >
       <span>Выбрано: <strong>{selectedIds.length}</strong></span>
+      {features.bulkOps && (
+        <Button
+          size="small"
+          type="primary"
+          icon={<ThunderboltOutlined />}
+          onClick={() => setWizardOpen(true)}
+          disabled={busy}
+        >
+          Массовые операции
+        </Button>
+      )}
       <Dropdown menu={menu} disabled={busy}>
         <Button size="small" disabled={busy}>
           Экспорт <DownOutlined />
@@ -119,6 +141,23 @@ export default function BulkActionsBar({ selectedIds, onCleared, isLight = false
       <Button size="small" onClick={onCleared} disabled={busy}>
         Снять выделение
       </Button>
+      {features.bulkOps && (
+        <BulkOperationWizardModal
+          open={wizardOpen}
+          // PR-9a: scope всегда = ids (компонент early-return'ит при пустом
+          // selectedIds, так что selection гарантирован). JQL-вариант (bulk
+          // «ко всей выборке» без selection) добавится в PR-9b через отдельную
+          // кнопку, которая рендерится ВНЕ этого early-return ветки.
+          scope={{ kind: 'ids', issueIds: selectedIds }}
+          total={selectedIds.length}
+          onClose={() => {
+            // CLAUDE.md: modal close → refresh parent. onCleared зовёт
+            // runQuery в SearchPage (selectedIds reset + re-fetch).
+            setWizardOpen(false);
+            onCleared();
+          }}
+        />
+      )}
     </div>
   );
 }
