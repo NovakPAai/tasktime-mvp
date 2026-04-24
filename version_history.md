@@ -8,7 +8,7 @@
 
 ## [2.66] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-12 — e2e + docs + cutover (FEATURES_BULK_OPS=true)
 
-**PR:** _(будет заполнено после push'а)_
+**PR:** [#156](https://github.com/NovakPAai/tasktime-mvp/pull/156) (merged 2026-04-24)
 **Ветка:** `ttbulk-1/e2e-docs-cutover`
 
 ### Что было
