@@ -8,7 +8,7 @@
 
 ## [2.71] [2026-04-24] fix(releases): создание глобального перехода в воркфлоу-редакторе
 
-**PR:** TBD
+**PR:** [#168](https://github.com/NovakPAai/tasktime-mvp/pull/168) (merged 2026-04-24)
 **Ветка:** `fix/release-workflow-global-transition`
 
 ### Что было
