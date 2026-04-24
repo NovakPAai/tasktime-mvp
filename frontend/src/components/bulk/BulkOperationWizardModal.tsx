@@ -223,6 +223,7 @@ export default function BulkOperationWizardModal({
           operationType={selectedType}
           value={payload}
           onChange={setPayload}
+          scope={scope}
         />
       )}
 
@@ -273,7 +274,10 @@ function isCompletePayload(
     }
     case 'EDIT_CUSTOM_FIELD': {
       const cf = (p as { customFieldId?: unknown }).customFieldId;
-      return typeof cf === 'string' && cf.length > 0 && 'value' in p;
+      const val = (p as { value?: unknown }).value;
+      // value: undefined не валидно (JSON его не сериализует → backend получит
+      // absent key). Смена field в Step2 сбрасывает value=undefined до ввода.
+      return typeof cf === 'string' && cf.length > 0 && 'value' in p && val !== undefined;
     }
     case 'MOVE_TO_SPRINT':
       return 'sprintId' in p;
