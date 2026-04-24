@@ -8,7 +8,7 @@
 
 ## [2.70] [2026-04-24] fix(auth): rotate-password — clean exit + mustChangePassword=false
 
-**PR:** _(будет заполнено после push'а)_
+**PR:** [#164](https://github.com/NovakPAai/tasktime-mvp/pull/164) (merged 2026-04-24)
 **Ветка:** `fix/rotate-password-cleanup`
 
 ### Что было
