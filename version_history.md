@@ -8,7 +8,7 @@
 
 ## [2.68] [2026-04-24] feat(search): кликабельные ключи задач + удаление правой preview-панели
 
-**PR:** _(будет заполнено после push'а)_
+**PR:** [#158](https://github.com/NovakPAai/tasktime-mvp/pull/158) (merged 2026-04-24)
 **Ветка:** `feat/clickable-issue-keys`
 
 ### Что было
