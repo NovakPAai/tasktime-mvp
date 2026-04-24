@@ -254,6 +254,16 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `logout` | `() => Promise<void>` | экшен |
 | `loadUser` | `() => Promise<void>` | экшен |
 
+### `bulkOperations.store`
+
+Файл: `frontend/src/store/bulkOperations.store.ts` · 2 полей состояния · 1 экшенов
+
+| Поле / Экшен | Тип | Вид |
+|-------------|-----|-----|
+| `operations` | `Record<string, TrackedBulkOperation>` | состояние |
+| `drawerOperationId` | `string | null` | состояние |
+| `addOperation` | `(op: { id: string; status: BulkOperationStatus; snapshot?...` | экшен |
+
 ### `issues.store`
 
 Файл: `frontend/src/store/issues.store.ts` · 8 полей состояния · 3 экшенов
