@@ -213,6 +213,6 @@ See [security.md](./security.md) for full details.
 | `telegram` | `FEATURES_TELEGRAM` | `false` | Telegram-бот уведомления |
 | `advancedSearch` | `FEATURES_ADVANCED_SEARCH` | `false` |  |
 | `checkpointTtql` | `FEATURES_CHECKPOINT_TTQL` | `false` |  |
-| `bulkOps` | `FEATURES_BULK_OPS` | `false` |  |
+| `bulkOps` | `FEATURES_BULK_OPS` | `true` |  |
 | `aiProvider` | `AI_PROVIDER` | `heuristic` | AI провайдер: `anthropic` или `heuristic` |
 <!-- AUTO-GENERATED:END:features -->
