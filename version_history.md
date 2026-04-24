@@ -2,7 +2,42 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.63**
+**Last version: 2.64**
+
+---
+
+## [2.64] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-11 — /operations page + retry UI + operation detail
+
+**PR:** _(будет заполнено после push'а)_
+**Ветка:** `ttbulk-1/operations-page` (branched from `ttbulk-1/progress-drawer`)
+
+### Что было
+
+После PR-9+10 wizard + progress drawer работали, но не было:
+- Списка прошлых операций (куда zoom'нуться после закрытия chip'а).
+- Детальной страницы операции с retry.
+- Возможности dispatch'нуть retry failed извне drawer'а.
+
+### Что теперь
+
+- **`pages/OperationsPage.tsx`** — таблица `listMine` с фильтрами Status/Type + пагинация. Retry → `retryFailed(id, uuid)` → store addOperation + setDrawerOperationId.
+- **`pages/OperationDetailPage.tsx`** — detail view `/operations/:id` с `useBulkOperationStream(id)` live-обновлениями. Descriptions + buttons (Обновить / Скачать CSV / Retry / Отменить).
+- **`App.tsx`** — routes `/operations` + `/operations/:id`.
+- **`Sidebar.tsx`** — nav link «Массовые операции» под `features.bulkOps`.
+
+### Не включено (deferred в PR-12)
+
+- IssueDetailPage AuditLog badge — требует investigation History-tab structure.
+- Admin filter «Все операции» — требует backend endpoint.
+
+### Проверки
+
+- `npx tsc --noEmit` frontend → 0 errors.
+- `npm run lint` → 0 errors, 0 новых warnings.
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §3.4, §5.4, §7.4, §13.7 PR-11.
 
 ---
 

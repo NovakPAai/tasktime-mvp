@@ -413,6 +413,25 @@ export default function Sidebar({
             </>
           )}
 
+          {/* TTBULK-1 PR-11 — Massовые операции (/operations). Gated под
+              VITE_FEATURES_BULK_OPS; в PR-12 cutover флаг flip → ссылка видна. */}
+          {frontendFeatures.bulkOps && (
+            <div
+              data-testid="nav-operations"
+              style={itemStyle('/operations')}
+              onClick={() => onNavigate('/operations')}
+              onMouseEnter={() => setHovered('/operations')}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+                <rect x="2" y="3" width="12" height="2" rx="0.5" stroke={itemColor('/operations')} strokeWidth="1.3" />
+                <rect x="2" y="7" width="12" height="2" rx="0.5" stroke={itemColor('/operations')} strokeWidth="1.3" />
+                <rect x="2" y="11" width="12" height="2" rx="0.5" stroke={itemColor('/operations')} strokeWidth="1.3" />
+              </svg>
+              <span style={textStyle('/operations')}>Массовые операции</span>
+            </div>
+          )}
+
           {/* Planning submenu */}
           <div
             style={{ ...itemStyle('planning-submenu'), backgroundColor: hovered === 'planning-submenu' ? tokens.itemHoverBg : 'transparent' }}
