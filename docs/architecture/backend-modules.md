@@ -337,6 +337,7 @@ Run `make docs` to check for staleness warnings.
 | Search | `/api` | `backend/src/modules/search/search.router.js.ts` |
 | Saved Filters | `/api` | `backend/src/modules/saved-filters/saved-filters.router.js.ts` |
 | Bulk Operations | `/api` | `backend/src/modules/bulk-operations/bulk-operations.router.js.ts` |
+| Bulk Operations | `/api` | `backend/src/modules/bulk-operations/bulk-metrics.router.js.ts` |
 <!-- AUTO-GENERATED:END -->
 
 ---
