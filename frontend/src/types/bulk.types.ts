@@ -223,7 +223,17 @@ export const OPERATION_LABELS: Record<
   },
 };
 
-/** Cost-free status→color mapping used в UI preview/drawer (will expand в PR-10). */
+/** Russian labels для UI — consistent i18n с остальным интерфейсом. */
+export const STATUS_LABELS: Record<BulkOperationStatus, string> = {
+  QUEUED: 'В очереди',
+  RUNNING: 'Выполняется',
+  SUCCEEDED: 'Выполнено',
+  PARTIAL: 'Частично',
+  FAILED: 'Ошибка',
+  CANCELLED: 'Отменено',
+};
+
+/** Cost-free status→color mapping used в UI preview/drawer. */
 export const STATUS_COLORS: Record<BulkOperationStatus, string> = {
   QUEUED: 'default',
   RUNNING: 'processing',

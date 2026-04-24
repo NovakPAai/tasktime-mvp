@@ -56,6 +56,8 @@ import AdminReleaseCheckpointTypesPage from './pages/admin/AdminReleaseCheckpoin
 import AdminReleaseCheckpointTemplatesPage from './pages/admin/AdminReleaseCheckpointTemplatesPage';
 import AdminCheckpointAuditPage from './pages/admin/AdminCheckpointAuditPage';
 import AdminSystemPage from './pages/admin/AdminSystemPage';
+import OperationsPage from './pages/OperationsPage';
+import OperationDetailPage from './pages/OperationDetailPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import SettingsPage from './pages/SettingsPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
@@ -260,6 +262,11 @@ export default function App() {
               element={<AdminGate allow={canViewCheckpointAudit}><AdminCheckpointAuditPage /></AdminGate>}
             />
             <Route path="admin/system" element={<AdminGate allow={canManageSystemSettings}><AdminSystemPage /></AdminGate>} />
+            {/* TTBULK-1 PR-11 — operations page (gated под features.bulkOps).
+                Роуты всегда mounted, но навигация из sidebar прячется под флагом;
+                direct URL работает всегда (безопасно: endpoints требуют auth). */}
+            <Route path="operations" element={<OperationsPage />} />
+            <Route path="operations/:id" element={<OperationDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="pipeline" element={<PipelineDashboardPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
