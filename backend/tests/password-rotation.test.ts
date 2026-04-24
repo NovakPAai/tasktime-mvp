@@ -40,4 +40,47 @@ describe('rotateUserPassword', () => {
     });
     expect(newLogin.status).toBe(200);
   });
+
+  // clearMustChangePassword: true — CLI-скрипт path (ротация постоянного пароля).
+  // Контраст: default false preserves флаг (admin /reset-password endpoint).
+  it('clears mustChangePassword when clearMustChangePassword=true', async () => {
+    await createTestUser('temp@test.com', 'Temp1234', 'TempUser');
+    await prisma.user.update({
+      where: { email: 'temp@test.com' },
+      data: { mustChangePassword: true },
+    });
+
+    await rotateUserPassword({
+      email: 'temp@test.com',
+      newPassword: 'new-strong-password-456',
+      clearMustChangePassword: true,
+    });
+
+    const user = await prisma.user.findUnique({ where: { email: 'temp@test.com' } });
+    expect(user?.mustChangePassword).toBe(false);
+
+    // Full proof: пароль реально сменился (auth check — не только flag).
+    const login = await request.post('/api/auth/login').send({
+      email: 'temp@test.com',
+      password: 'new-strong-password-456',
+    });
+    expect(login.status).toBe(200);
+  });
+
+  // Default path (admin /reset-password endpoint) — mustChangePassword preserved.
+  it('preserves mustChangePassword when clearMustChangePassword is not set', async () => {
+    await createTestUser('admin-reset@test.com', 'Init1234', 'AdminUser');
+    await prisma.user.update({
+      where: { email: 'admin-reset@test.com' },
+      data: { mustChangePassword: true },
+    });
+
+    await rotateUserPassword({
+      email: 'admin-reset@test.com',
+      newPassword: 'admin-new-temp-789',
+    });
+
+    const user = await prisma.user.findUnique({ where: { email: 'admin-reset@test.com' } });
+    expect(user?.mustChangePassword).toBe(true);
+  });
 });

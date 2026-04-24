@@ -2,7 +2,37 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.69**
+**Last version: 2.70**
+
+---
+
+## [2.70] [2026-04-24] fix(auth): rotate-password — clean exit + mustChangePassword=false
+
+**PR:** _(будет заполнено после push'а)_
+**Ветка:** `fix/rotate-password-cleanup`
+
+### Что было
+
+После первого запуска `reset-password-staging.yml` workflow дважды упал:
+
+1. **SSH висел 5 мин + exit 255 (Broken pipe)**. Причина: `rotate-password.ts` не вызывал `process.exit(0)` — Prisma pool + Redis client (через `deleteUserSession`) держали TCP-соединения. Node-процесс внутри docker exec не завершался → SSH keep-alive таймаутился.
+
+2. **E2E test `16-bulk-operations` упал** с `expect(getByText(/Массовые операции/i))` → not visible. Снапшот показал: admin-cleanup после логина редиректится на `/change-password` («Вам назначен временный пароль»). Причина: `rotateUserPassword` обновлял `passwordHash`, но НЕ сбрасывал `mustChangePassword`. Если флаг был true (e.g. после предыдущего `admin /reset-password`), rotation оставлял его в true → фронтенд (App.tsx:85) форсил change-password flow.
+
+### Что теперь
+
+- **`rotate-password.ts`** — явно `process.exit(0)` после main() + `process.exit(1)` в catch. Форсирует termination pool connections. CLI передаёт `clearMustChangePassword: true`.
+- **`password-rotation.service.ts`** — новый опциональный параметр `clearMustChangePassword?: boolean` (default `false`). При `true` очищает `mustChangePassword` флаг. Default `false` preserves backward-compat для `POST /admin/users/reset-password` (admin set temp password, force user change). Плюс `deleteUserSession` теперь в try/catch через `captureError` — не throw'ит если Redis down после DB commit.
+- **`password-rotation.test.ts`** — два новых теста: (1) `clearMustChangePassword: true` сбрасывает флаг + реальный login check; (2) default behavior preserves флаг (регрессия-guard для admin endpoint).
+
+### Проверки
+
+- `npx tsc --noEmit` (backend) → 0 errors.
+- Integration-тесты (Postgres) — запускает CI.
+
+### Связано
+
+- TTBULK-1 epic follow-up — разблокирует автоматизированные E2E-прогоны.
 
 ---
 

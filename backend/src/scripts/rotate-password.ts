@@ -13,12 +13,22 @@ async function main() {
   const user = await rotateUserPassword({
     email: ROTATE_PASSWORD_EMAIL,
     newPassword: ROTATE_PASSWORD_NEW_PASSWORD,
+    // CLI-скрипт — ротация постоянного пароля (E2E setup / автоматизация).
+    // Admin /reset-password endpoint передаёт default false (temp + force-change).
+    clearMustChangePassword: true,
   });
 
   console.log(`Password rotated for ${user.email}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    // Explicit exit: Prisma pool + Redis (deleteUserSession) клиенты
+    // держат TCP-соединения живыми → иначе процесс висит до SIGPIPE
+    // (docker exec / ssh keeps alive ~5 мин). Форсируем termination.
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
