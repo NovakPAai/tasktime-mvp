@@ -1049,7 +1049,7 @@ PR-12 ─► PR-13 (metrics + grafana + алёрты)
 | 7  | `ttbulk-1/system-settings`      | maxConcurrentPerUser / maxItems API + AdminSystemPage UI     | 4    | PR-3              | backend + UI       | 🟢 Merged (#149) |
 | 8  | `ttbulk-1/admin-roles`          | BULK_OPERATOR in admin roles UI + group-assign endpoints     | 8    | PR-2              | endpoints + UI     | 🟢 Merged (#150) |
 | 9a | `ttbulk-1/wizard-modal-a`       | types + api client + wizard skeleton + Step1 + BulkActionsBar кнопка | 6 | PR-3 | types + api + skeleton | 🟢 Merged (#151) |
-| 9b | `ttbulk-1/wizard-modal-b`       | Step2 (config) + Step3 (preview/virtualized) + Step4 (confirm/submit) + conflicts + react-window | 8 | PR-9a | step components | 📋 Планируется |
+| 9b | `ttbulk-1/wizard-modal-b`       | Step2 (config) + Step3 (preview/virtualized) + Step4 (confirm/submit) + conflicts + react-window | 8 | PR-9a | step components | ✅ Done |
 | 10 | `ttbulk-1/progress-drawer`      | ProgressDrawer + SSE hook + floating chip + zustand store    | 8    | PR-6, PR-9        | hook + drawer + chip | 📋 Планируется |
 | 11 | `ttbulk-1/operations-page`      | /operations page + retry UI + AuditLog badge in IssuePage    | 8    | PR-10             | page + badge       | 📋 Планируется |
 | 12 | `ttbulk-1/e2e-docs-cutover`     | Playwright + k6 + docs + feature-flag flip + UAT             | 12   | PR-5, PR-7, PR-8, PR-11 | e2e + docs + cutover | 📋 Планируется |
