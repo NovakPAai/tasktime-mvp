@@ -15,6 +15,7 @@
 
 import { Button, Space, Typography, Tag } from 'antd';
 import { CloseOutlined, LoadingOutlined } from '@ant-design/icons';
+import { useShallow } from 'zustand/react/shallow';
 import { useBulkOperationsStore } from '../../store/bulkOperations.store';
 import { STATUS_COLORS } from '../../types/bulk.types';
 import { features } from '../../lib/features';
@@ -22,7 +23,16 @@ import { features } from '../../lib/features';
 const { Text } = Typography;
 
 export default function BulkOperationChips() {
-  const activeOps = useBulkOperationsStore((s) => s.getActiveOperations());
+  // Derive active ops inline с shallow equality — иначе getActiveOperations()
+  // возвращает новый array reference каждый раз, triggering re-render на
+  // каждый SSE tick (items объект элементов остаётся stable).
+  const activeOps = useBulkOperationsStore(
+    useShallow((s) =>
+      Object.values(s.operations)
+        .filter((o) => o.status === 'QUEUED' || o.status === 'RUNNING')
+        .sort((a, b) => b.addedAt - a.addedAt),
+    ),
+  );
   const setDrawerOperationId = useBulkOperationsStore((s) => s.setDrawerOperationId);
   const removeOperation = useBulkOperationsStore((s) => s.removeOperation);
   const drawerOperationId = useBulkOperationsStore((s) => s.drawerOperationId);
@@ -54,6 +64,12 @@ export default function BulkOperationChips() {
           <div
             key={op.id}
             onClick={() => setDrawerOperationId(op.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setDrawerOperationId(op.id);
+              }
+            }}
             role="button"
             tabIndex={0}
             style={{

@@ -109,8 +109,14 @@ export function useBulkOperationStream(operationId: string | null): void {
               finishedAt: data.finishedAt,
             } as BulkOperation,
           });
-          // Backend disconnect'ит — закроем клиентскую часть.
+          // Terminal status — закрываем оба канала. Polling мог быть запущен
+          // из handleError если SSE временно отваливался; без clearInterval
+          // он продолжил бы бить API до первого terminal-status tick'а poll'а.
           sse?.close();
+          if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
         } catch {
           // ignore
         }

@@ -12,6 +12,7 @@ import Sidebar from './Sidebar';
 import UatOnboardingOverlay from '../uat/UatOnboardingOverlay';
 import BulkOperationChips from '../bulk/BulkOperationChips';
 import BulkOperationProgressDrawer from '../bulk/BulkOperationProgressDrawer';
+import { features } from '../../lib/features';
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(() =>
@@ -133,9 +134,13 @@ export default function AppLayout() {
       </div>
 
       {/* TTBULK-1 PR-10 — floating chip'ы + drawer для активных массовых операций.
-          Gated внутри компонентов под features.bulkOps. */}
-      <BulkOperationChips />
-      <BulkOperationProgressDrawer />
+          Gate на mount-уровне — не грузим store subscriptions когда фича off. */}
+      {features.bulkOps && (
+        <>
+          <BulkOperationChips />
+          <BulkOperationProgressDrawer />
+        </>
+      )}
 
     </div>
   );

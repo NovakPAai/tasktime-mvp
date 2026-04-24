@@ -29,6 +29,15 @@ import { bulkOperationsApi } from '../../api/bulkOperations';
 import { STATUS_COLORS, OPERATION_LABELS } from '../../types/bulk.types';
 import { saveBlob } from '../../utils/saveBlob';
 
+// Статичные цвета для Counter'ов. В проекте нет глобальных CSS-vars вида
+// --green/--red; используем Ant hex'ы напрямую.
+const COUNTER_COLORS: Record<string, string> = {
+  green: '#52c41a',
+  red: '#ff4d4f',
+  orange: '#fa8c16',
+  blue: '#1677ff',
+};
+
 const { Text } = Typography;
 
 export default function BulkOperationProgressDrawer() {
@@ -120,15 +129,21 @@ export default function BulkOperationProgressDrawer() {
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           <Progress
             percent={percent}
-            status={isActive ? 'active' : status === 'FAILED' ? 'exception' : 'success'}
+            status={
+              isActive
+                ? 'active'
+                : status === 'FAILED' || status === 'PARTIAL'
+                  ? 'exception'
+                  : 'success'
+            }
             format={() => `${processed} / ${total}`}
           />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <Counter label="Succeeded" value={snapshot.succeeded ?? 0} color="green" />
-            <Counter label="Failed" value={snapshot.failed ?? 0} color="red" />
-            <Counter label="Skipped" value={snapshot.skipped ?? 0} color="orange" />
-            <Counter label="Processed" value={processed} color="blue" />
+            <Counter label="Выполнено" value={snapshot.succeeded ?? 0} color="green" />
+            <Counter label="Ошибок" value={snapshot.failed ?? 0} color="red" />
+            <Counter label="Пропущено" value={snapshot.skipped ?? 0} color="orange" />
+            <Counter label="Обработано" value={processed} color="blue" />
           </div>
 
           {snapshot.cancelRequested && isActive && (
@@ -169,7 +184,7 @@ function Counter({ label, value, color }: { label: string; value: number; color:
         padding: 12,
         background: 'rgba(0,0,0,0.03)',
         borderRadius: 6,
-        borderLeft: `3px solid var(--${color})`,
+        borderLeft: `3px solid ${COUNTER_COLORS[color] ?? color}`,
       }}
     >
       <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.45)' }}>{label}</div>
