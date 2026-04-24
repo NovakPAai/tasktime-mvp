@@ -8,7 +8,7 @@
 
 ## [2.67] [2026-04-24] feat(bulk-ops): TTBULK-1 follow-up — friendly pickers (замена UUID-вводов)
 
-**PR:** _(будет заполнено после push'а)_
+**PR:** [#157](https://github.com/NovakPAai/tasktime-mvp/pull/157) (merged 2026-04-24)
 **Ветка:** `ttbulk-1/friendly-pickers`
 
 ### Что было
