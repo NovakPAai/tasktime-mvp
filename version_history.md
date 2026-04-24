@@ -38,7 +38,7 @@
 
 ## [2.69] [2026-04-24] feat(releases): доработка карточки релиза + fix визуального редактора воркфлоу
 
-**PR:** TBD
+**PR:** [#159](https://github.com/NovakPAai/tasktime-mvp/pull/159) (merged 2026-04-24)
 **Ветка:** `feat/release-card-enhancements`
 
 ### Карточка релиза
