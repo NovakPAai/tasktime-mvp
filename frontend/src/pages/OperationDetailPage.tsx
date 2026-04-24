@@ -9,7 +9,7 @@
  * См. docs/tz/TTBULK-1.md §3.4, §13.7 PR-11.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -26,7 +26,7 @@ import {
 import { DownloadOutlined, ReloadOutlined, RedoOutlined, LeftOutlined } from '@ant-design/icons';
 import { bulkOperationsApi } from '../api/bulkOperations';
 import type { BulkOperation } from '../types/bulk.types';
-import { OPERATION_LABELS, STATUS_COLORS } from '../types/bulk.types';
+import { OPERATION_LABELS, STATUS_COLORS, STATUS_LABELS } from '../types/bulk.types';
 import { useBulkOperationsStore } from '../store/bulkOperations.store';
 import { useBulkOperationStream } from '../components/bulk/useBulkOperationStream';
 import { saveBlob } from '../utils/saveBlob';
@@ -53,18 +53,30 @@ export default function OperationDetailPage() {
   const [retrying, setRetrying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
+  // isMounted guard — handleCancel/Retry await'ят и могут завершиться после
+  // unmount'а (юзер back-кнопкой ушёл); без guard setState на mounted-null → warn.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // Первоначальная выборка. Stream обновит counter'ы live; при полном refresh
   // страницы (F5) эта выборка тоже источник истины.
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setLoadError(null);
     try {
       const fresh = await bulkOperationsApi.get(id);
+      if (!mountedRef.current) return;
       setOp(fresh);
       // Push в store — чтобы drawer при открытии сразу имел данные.
       addOperation({ id: fresh.id, status: fresh.status, snapshot: fresh });
     } catch (e: unknown) {
+      if (!mountedRef.current) return;
       const err = e as { response?: { status?: number; data?: { error?: string } } };
       setLoadError(
         err?.response?.status === 404
@@ -72,14 +84,13 @@ export default function OperationDetailPage() {
           : err?.response?.data?.error ?? 'Не удалось загрузить операцию',
       );
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
-  };
+  }, [id, addOperation]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [load]);
 
   // Show the freshest view: stream snapshot (если пришло) или initial fetch.
   const view = trackedSnapshot ?? op;
@@ -159,7 +170,7 @@ export default function OperationDetailPage() {
         <Title level={4} style={{ margin: 0 }}>
           Операция #{view.id.slice(0, 8)}
         </Title>
-        <Tag color={STATUS_COLORS[view.status]}>{view.status}</Tag>
+        <Tag color={STATUS_COLORS[view.status]}>{STATUS_LABELS[view.status]}</Tag>
       </div>
 
       <Progress
@@ -217,7 +228,7 @@ export default function OperationDetailPage() {
         <Button icon={<ReloadOutlined />} onClick={() => void load()}>
           Обновить
         </Button>
-        {!isActive && (
+        {(view.status === 'SUCCEEDED' || view.status === 'PARTIAL') && (
           <Button icon={<DownloadOutlined />} onClick={() => void handleDownload()}>
             Скачать отчёт CSV
           </Button>

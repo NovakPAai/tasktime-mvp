@@ -35,7 +35,12 @@ import type {
   BulkOperationStatus,
   BulkOperationType,
 } from '../types/bulk.types';
-import { BULK_OPERATION_TYPES, OPERATION_LABELS, STATUS_COLORS } from '../types/bulk.types';
+import {
+  BULK_OPERATION_TYPES,
+  OPERATION_LABELS,
+  STATUS_COLORS,
+  STATUS_LABELS,
+} from '../types/bulk.types';
 import { useBulkOperationsStore } from '../store/bulkOperations.store';
 
 const { Title, Text } = Typography;
@@ -139,10 +144,12 @@ export default function OperationsPage() {
       },
     },
     {
-      title: 'Status',
+      title: 'Статус',
       dataIndex: 'status',
-      width: 110,
-      render: (s: BulkOperationStatus) => <Tag color={STATUS_COLORS[s]}>{s}</Tag>,
+      width: 130,
+      render: (s: BulkOperationStatus) => (
+        <Tag color={STATUS_COLORS[s]}>{STATUS_LABELS[s]}</Tag>
+      ),
     },
     {
       title: '',
@@ -194,13 +201,13 @@ export default function OperationsPage() {
         <Select
           placeholder="Статус"
           allowClear
-          style={{ width: 160 }}
+          style={{ width: 180 }}
           value={filterStatus}
           onChange={(v) => {
             setStartAt(0);
             setFilterStatus(v);
           }}
-          options={STATUSES.map((s) => ({ value: s, label: s }))}
+          options={STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
         />
         <Select
           placeholder="Тип"
