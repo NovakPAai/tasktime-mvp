@@ -429,11 +429,20 @@ export default function AdminReleaseWorkflowEditorPage() {
         return;
       }
     }
+    // For global transitions the `fromStatusId` field is hidden in the drawer and
+    // therefore arrives as `undefined`. The DB column `from_status_id` is NOT NULL
+    // and the backend DTO requires a non-empty string, so we supply a nominal source:
+    // the first workflow step if available, otherwise `toStatusId` itself (self-loop).
+    // This matches the seed pattern (rwt-6: isGlobal=true + fromStatusId='rs-draft').
+    // At runtime `isGlobal=true` makes the source status irrelevant — validator treats
+    // the transition as outgoing from every step (see validateReleaseWorkflow).
+    const isGlobal = vals.isGlobal ?? false;
+    const nominalFrom = workflow?.steps[0]?.statusId ?? vals.toStatusId;
     const body = {
       name: vals.name,
-      fromStatusId: vals.fromStatusId!,
+      fromStatusId: isGlobal ? (vals.fromStatusId ?? nominalFrom) : vals.fromStatusId!,
       toStatusId: vals.toStatusId,
-      isGlobal: vals.isGlobal ?? false,
+      isGlobal,
       conditions,
     };
     try {

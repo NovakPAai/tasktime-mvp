@@ -2,7 +2,29 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.70**
+**Last version: 2.71**
+
+---
+
+## [2.71] [2026-04-24] fix(releases): создание глобального перехода в воркфлоу-редакторе
+
+**PR:** TBD
+**Ветка:** `fix/release-workflow-global-transition`
+
+### Что было
+
+В визуальном редакторе release-workflow при создании перехода с галкой «Глобальный (из любого статуса)» форма скрывает поле `fromStatusId`. В `handleSaveTransition` значение уходило как `undefined`, а Zod-DTO на бэке требует `z.string().min(1)` — возвращался 400 Validation failed. На frontend'е пользователь видел generic «Не удалось сохранить».
+
+### Что теперь
+
+Когда `isGlobal=true`, frontend подставляет номинальный источник (первый step воркфлоу, иначе — `toStatusId` для fallback). Это матчит паттерн сида (`rwt-6: isGlobal=true, fromStatusId='rs-draft'`): источник для глобальных переходов в БД хранится, но семантически игнорируется — `validateReleaseWorkflow` считает глобальный переход исходящим из каждого шага (`t.fromStatusId === step.statusId || t.isGlobal`).
+
+- **`AdminReleaseWorkflowEditorPage.tsx`** — в `handleSaveTransition` добавлена логика: `isGlobal ? (vals.fromStatusId ?? workflow.steps[0]?.statusId ?? vals.toStatusId) : vals.fromStatusId`. DB-схема `from_status_id String` (NOT NULL) остаётся нетронутой — миграции не требуется.
+
+### Проверки
+
+- `tsc --noEmit` (frontend) → 0 errors.
+- Ручной smoke: создание глобального перехода в «Стандартный релизный процесс» работает, на канвасе рендерится анимированный edge от первого шага (visual marker глобальности через `animated: t.isGlobal`).
 
 ---
 
