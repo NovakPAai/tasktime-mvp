@@ -8,7 +8,7 @@
 
 ## [2.62] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-9b — Step2 Configure + Step3 Preview (virtualized) + Step4 Confirm + submit flow
 
-**PR:** _(будет заполнено после push'а)_
+**PR:** [#152](https://github.com/NovakPAai/tasktime-mvp/pull/152) (merged 2026-04-24)
 **Ветка:** `ttbulk-1/wizard-modal-b` (branched from `ttbulk-1/wizard-modal-a`)
 
 ### Что было
