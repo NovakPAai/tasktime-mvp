@@ -22,6 +22,7 @@ import { saveBlob } from '../../utils/saveBlob';
 import { features } from '../../lib/features';
 import BulkOperationWizardModal from '../bulk/BulkOperationWizardModal';
 import type { BulkScope } from '../../types/bulk.types';
+import { useBulkOperationsStore } from '../../store/bulkOperations.store';
 
 export interface BulkActionsBarProps {
   /** UUID strings — come from `issue.id` via ResultsTable rowKey. */
@@ -52,6 +53,9 @@ export default function BulkActionsBar({
   // TTBULK-1 PR-9a — wizard. Gated под `features.bulkOps`; в PR-12 cutover флаг
   // включается и кнопка «Массовые операции» становится видна всем.
   const [wizardOpen, setWizardOpen] = useState(false);
+  // TTBULK-1 PR-10 — push созданной операции в store и открыть drawer.
+  const addBulkOperation = useBulkOperationsStore((s) => s.addOperation);
+  const setDrawerOperationId = useBulkOperationsStore((s) => s.setDrawerOperationId);
 
   // Memoize scope object — без useMemo каждый re-render создавал бы новый ref,
   // что через runPreview (useCallback deps: [scope, payload]) дёргало бы
@@ -167,6 +171,12 @@ export default function BulkActionsBar({
             // runQuery в SearchPage (selectedIds reset + re-fetch).
             setWizardOpen(false);
             onCleared();
+          }}
+          onSubmitted={(operationId) => {
+            // PR-10: push operation в store + open drawer. Wizard сам
+            // вызывает onClose() после onSubmitted (см. WizardModal.handleSubmit).
+            addBulkOperation({ id: operationId, status: 'QUEUED' });
+            setDrawerOperationId(operationId);
           }}
         />
       )}

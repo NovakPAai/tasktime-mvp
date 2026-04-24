@@ -2,7 +2,42 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.62**
+**Last version: 2.63**
+
+---
+
+## [2.63] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-10 — ProgressDrawer + SSE hook + floating chips + zustand store
+
+**PR:** _(будет заполнено после push'а)_
+**Ветка:** `ttbulk-1/progress-drawer` (branched from `ttbulk-1/wizard-modal-b`)
+
+### Что было
+
+После PR-9 wizard создавал операцию через `bulkOperationsApi.create`, но после submit не было **никакого** live-прогресса. SSE endpoint (`/stream` от PR-6) и `/report.csv` были готовы, но фронт их не использовал.
+
+### Что теперь
+
+- **`store/bulkOperations.store.ts`** (zustand) — tracked operations map + drawer state. addOperation / updateOperation / removeOperation / setDrawerOperationId / getActiveOperations.
+- **`components/bulk/useBulkOperationStream.ts`** — SSE через `EventSource` (cookie-auth). События: `progress` (счётчики), `status` (finalize + disconnect). Polling fallback 2s при SSE failure.
+- **`components/bulk/BulkOperationProgressDrawer.tsx`** — Ant Drawer width=420. Status Tag + Progress bar, 4 counters, Cancel / Download CSV / Скрыть buttons. Finalize → `finalStatusReason` Alert.
+- **`components/bulk/BulkOperationChips.tsx`** — floating fixed bottom-right, один chip на активную операцию. Клик → open drawer. Gated под `features.bulkOps`.
+- **`layout/AppLayout.tsx`** — mount chips + drawer на верхнем уровне.
+- **`BulkActionsBar.tsx`** — wizard `onSubmitted(id)` → `addOperation` + `setDrawerOperationId` → drawer открывается автоматически с новой операцией.
+
+### Влияние на prod
+
+Gated под `VITE_FEATURES_BULK_OPS=false`. После cutover (PR-12): full flow — wizard submit → chip + drawer → SSE live progress → Download CSV.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) → 0 errors.
+- `npm run lint` → 0 errors, 0 новых warnings.
+- Frontend unit-tests — vitest инфра отсутствует; Playwright e2e в PR-12.
+- Manual smoke (post-deploy bulkOps=true): submit wizard → chip + drawer → live progress → Download.
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §3.3, §8.3, §13.7 PR-10.
 
 ---
 
