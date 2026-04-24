@@ -2,7 +2,43 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.65**
+**Last version: 2.66**
+
+---
+
+## [2.66] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-12 — e2e + docs + cutover (FEATURES_BULK_OPS=true)
+
+**PR:** _(будет заполнено после push'а)_
+**Ветка:** `ttbulk-1/e2e-docs-cutover`
+
+### Что было
+
+После PR-1..11 + PR-13 система полностью реализована, но фичефлаг `false` — фичa не активна. Не было e2e smoke, k6 load, user manual, runbook forensics, бейджа «Массовая операция» на IssueDetailPage.
+
+### Что теперь
+
+**Cutover:** `backend/src/shared/features.ts` `bulkOps` default `false → true`; `frontend/src/lib/features.ts` аналогично. Rollback через env override.
+
+**IssueDetailPage badge:** `AuditEntry.bulkOperationId` тип, Tag-badge «Массовая операция» с link на `/operations/:id`.
+
+**E2E** (`frontend/e2e/specs/16-bulk-operations.spec.ts`) — 3 сценария: /operations рендерится, USER 401/403, full API flow с idempotency replay.
+
+**k6 load** (`backend/tests/bulk-operations-load.k6.js`) — 100 VUs × 100 items, p95 <5s (manual validation).
+
+**Docs:** `docs/user-manual/bulk-operations.md` + `docs/OPERATIONS_RUNBOOK.md §Bulk Operations` (forensics SQL, alerts, rollback).
+
+### Влияние на prod
+
+Фича активна для всех BULK_OPERATOR пользователей после merge. Rollback через env.
+
+### Проверки
+
+- `npx tsc --noEmit` (backend + frontend) → 0 errors.
+- `npm run test:parser` → 631/631 passed.
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §10.3, §10.4, §13.7 PR-12.
 
 ---
 
@@ -17,30 +53,28 @@ Bulk operations backend работал с PR-4+: processor тикал, SSE'ил 
 
 ### Что теперь
 
-- **`bulk-metrics.ts`** — 5 метрик через `prom-client` Registry: `bulk_op_total{type,status}`, `bulk_op_duration_seconds{type}`, `bulk_op_items_total{status}`, `bulk_op_queued_depth`, `bulk_op_processor_ticks_total{result}`.
+- **`bulk-metrics.ts`** — 5 метрик через `prom-client` Registry.
 - **`bulk-metrics.router.ts`** — `GET /api/bulk-operations/metrics` (requireRole ADMIN/SUPER_ADMIN).
-- **Processor instrumentation** — 4 hook-point'а (runTickOnce, finalize, finalizeCancelled, processOperationBatch).
-- **`deploy/grafana/bulk-operations.dashboard.json`** — 5 panels.
-- **`deploy/prometheus/bulk-operations.alerts.yml`** — 2 alerts (queue≥10/5m, skipped-lock>0.5/s/5m).
+- **Processor instrumentation** — 4 hook-point'а.
+- **Grafana dashboard** + **Prometheus alerts**.
 - **Dependency**: `prom-client ^15.x`.
 
 ### Unit-тесты (+9 новых)
 
-`bulk-metrics.unit.test.ts`: counters/gauge/histogram semantics. Processor tests updated (count mock + metrics stub).
-
-### Влияние на prod
-
-Metrics mounted независимо от feature-flag — SRE получает метрики даже при warmup. Scrapers ходят с ADMIN JWT. Overhead ~4ms на tick.
+`bulk-metrics.unit.test.ts`: counters/gauge/histogram semantics.
 
 ### Проверки
 
 - `npx tsc --noEmit` → 0 errors.
-- `npm run test:parser` → 631/631 passed (+9 новых).
-- `npm run lint` → 0 errors, 0 новых warnings.
+- `npm run test:parser` → 631/631 passed.
 
 ### Связано
 
 - TTBULK-1 — см. `docs/tz/TTBULK-1.md` §12, §13.8 PR-13.
+
+---
+
+## [2.64] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-11 — /operations page + retry UI + operation detail
 
 ---
 

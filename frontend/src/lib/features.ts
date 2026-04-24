@@ -16,7 +16,7 @@ function flag(name: string, defaultValue = false): boolean {
 
 export const features = {
   advancedSearch: flag('VITE_FEATURES_ADVANCED_SEARCH', false),
-  // TTBULK-1: cutover-флаг для массовых операций (wizard + /operations + floating chip).
-  // Keep in sync with backend `FEATURES_BULK_OPS` (docs/tz/TTBULK-1.md §13.1).
-  bulkOps: flag('VITE_FEATURES_BULK_OPS', false),
+  // TTBULK-1: **enabled by default after cutover PR-12** (docs/tz/TTBULK-1.md §13.9).
+  // Keep in sync with backend `FEATURES_BULK_OPS`. Rollback — `VITE_FEATURES_BULK_OPS=false`.
+  bulkOps: flag('VITE_FEATURES_BULK_OPS', true),
 } as const;

@@ -114,6 +114,12 @@ export interface AuditEntry {
   details?: Record<string, unknown>;
   user?: { id: string; name: string };
   createdAt: string;
+  /**
+   * TTBULK-1 PR-12: FK на `BulkOperation.id` если изменение пришло из массовой
+   * операции (см. `AuditLog.bulkOperationId` в schema.prisma, PR-1). UI рендерит
+   * бейдж «Массовая операция» → link на `/operations/:id`.
+   */
+  bulkOperationId?: string | null;
 }
 
 export interface Comment {
