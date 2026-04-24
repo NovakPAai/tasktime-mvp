@@ -81,7 +81,17 @@ router.patch('/:id/steps/:stepId', validate(updateReleaseWorkflowStepDto), authH
     req.params['stepId'] as string,
     req.body,
   );
-  await logAudit(req, 'release_workflow_step.updated', 'release_workflow_step', req.params['stepId'] as string, req.body);
+  // Position-only updates (drag-stop events from the workflow editor) are UI-only and
+  // intentionally skipped by the audit log — they'd flood the table with noise and obscure
+  // real changes (isInitial / orderIndex). The service also skips release-workflow-cache
+  // invalidation for the same reason (position is not part of the workflow engine state).
+  const isPositionOnly =
+    (req.body.positionX !== undefined || req.body.positionY !== undefined) &&
+    req.body.isInitial === undefined &&
+    req.body.orderIndex === undefined;
+  if (!isPositionOnly) {
+    await logAudit(req, 'release_workflow_step.updated', 'release_workflow_step', req.params['stepId'] as string, req.body);
+  }
   res.json(step);
 }));
 

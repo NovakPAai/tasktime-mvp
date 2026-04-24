@@ -87,8 +87,26 @@ function StatusNode({ data }: { data: StatusNodeData }) {
         position: 'relative',
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: data.color, width: 8, height: 8 }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: data.color, width: 8, height: 8 }} />
+      {/*
+        4 точки присоединения (top/right/bottom/left), каждая одновременно source и target.
+        React Flow требует разные id/type на каждый Handle → 8 компонентов (по 2 на сторону).
+        Визуально overlapping — пользователь видит 4 равных dot'а. Все одинаковой opacity,
+        чтобы 4 стороны были симметричны по affordance (раньше primary/secondary opacity
+        давало неравномерную яркость — bright на top/bottom, а на боках зависело от порядка
+        z-index'а типа handle'а).
+
+        Порядок объявления (top-target → bottom-source первыми) — legacy-fallback на случай
+        если эти IDs потеряются; в `buildEdges` они теперь проставлены явно как
+        `sourceHandle: 'bottom-source'` / `targetHandle: 'top-target'` для edge'ей из БД.
+      */}
+      <Handle id="top-target" type="target" position={Position.Top} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle id="bottom-source" type="source" position={Position.Bottom} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle id="top-source" type="source" position={Position.Top} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle id="bottom-target" type="target" position={Position.Bottom} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle id="right-source" type="source" position={Position.Right} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle id="right-target" type="target" position={Position.Right} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle id="left-source" type="source" position={Position.Left} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle id="left-target" type="target" position={Position.Left} style={{ background: data.color, width: 8, height: 8 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span
           style={{
@@ -168,7 +186,12 @@ function buildLayout(
   return steps.map((step, i) => ({
     id: step.id,
     type: 'statusNode',
-    position: { x: 200 * (i % 4), y: 160 * Math.floor(i / 4) },
+    // Stored positions win. Для новых шагов (positionX/Y = null) раскладываем сеткой
+    // 4 в ряд — пользователь может перетащить ноды, drag-stop персистит координаты.
+    position:
+      step.positionX != null && step.positionY != null
+        ? { x: step.positionX, y: step.positionY }
+        : { x: 200 * (i % 4), y: 160 * Math.floor(i / 4) },
     data: {
       label: step.status.name,
       category: step.status.category,
@@ -197,6 +220,13 @@ function buildEdges(transitions: ReleaseWorkflowTransition[], steps: ReleaseWork
       id: t.id,
       source: fromStep.id,
       target: toStep.id,
+      // Explicit handle IDs rather than relying on React Flow's first-declared default.
+      // That heuristic has shifted between @xyflow/react minor versions (DOM-order → centroid
+      // in v11); explicit IDs make rendering deterministic. When source_handle/target_handle
+      // columns land on release_workflow_transitions, read them from `t` here with these
+      // values as fallback.
+      sourceHandle: 'bottom-source',
+      targetHandle: 'top-target',
       label: t.name,
       type: 'smoothstep',
       animated: t.isGlobal,
@@ -288,6 +318,30 @@ export default function AdminReleaseWorkflowEditorPage() {
       message.error('Нельзя удалить: есть переходы от/до этого статуса');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist node position after drag. Fire-and-forget — no load() call afterwards
+  // (that would rebuild the graph from server and could snap the node back mid-interaction
+  // if the user starts another drag while the request is in flight). Errors are swallowed
+  // silently: the next drag retries the save; worst case the user re-drags after reload.
+  //
+  // Debounced per-node (300 ms): rapid successive drags of the same node coalesce into
+  // the latest position. Previously, two quick drags produced concurrent PATCHes whose
+  // arrival order was not guaranteed — staging jitter could persist the earlier position.
+  const pendingDragSaves = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const handleNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
+    const wf = workflowRef.current;
+    if (!wf) return;
+    const existing = pendingDragSaves.current.get(node.id);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      pendingDragSaves.current.delete(node.id);
+      void rwApi.updateReleaseWorkflowStep(wf.id, node.id, {
+        positionX: node.position.x,
+        positionY: node.position.y,
+      }).catch(() => { /* silent — next drag retries */ });
+    }, 300);
+    pendingDragSaves.current.set(node.id, timer);
   }, []);
 
   const runValidation = useCallback(async (wfId: string) => {
@@ -628,6 +682,7 @@ export default function AdminReleaseWorkflowEditorPage() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onEdgeClick={onEdgeClick}
+          onNodeDragStop={handleNodeDragStop}
           fitView
           fitViewOptions={{ padding: 0.3 }}
         >

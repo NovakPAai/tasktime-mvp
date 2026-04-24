@@ -29,6 +29,12 @@ export const createReleaseWorkflowStepDto = z.object({
 export const updateReleaseWorkflowStepDto = z.object({
   isInitial: z.boolean().optional(),
   orderIndex: z.number().int().nonnegative().optional(),
+  // Позиции хранятся как Float — ReactFlow допускает subpixel значения при drag.
+  // Range ±100_000 — практическая граница canvas'а при большом workflow с zoom-out.
+  // Более узкий guard раньше молча отбрасывал PATCH при большом разлёте нод (drag-stop
+  // catches() ошибку → позиция не сохранялась, пользователь видел snap-back без warning).
+  positionX: z.number().min(-100000).max(100000).optional(),
+  positionY: z.number().min(-100000).max(100000).optional(),
 });
 
 const conditionsField = z.array(z.record(z.unknown())).nullish();

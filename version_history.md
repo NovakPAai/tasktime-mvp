@@ -2,7 +2,38 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.71**
+**Last version: 2.72**
+
+---
+
+## [2.72] [2026-04-24] feat(releases): persist node positions + 4-side handles в воркфлоу-редакторе
+
+**PR:** TBD
+**Ветка:** `feat/release-workflow-editor-enhancements`
+
+### Что было
+
+В визуальном редакторе release-workflow (`AdminReleaseWorkflowEditorPage`) ноды раскладывались сеткой `200*(i%4) × 160*floor(i/4)` при каждом ререндере. Пользователь мог их перетаскивать, но **позиции не сохранялись** — после `load()` или reload страницы всё возвращалось к grid-сетке. Также у каждой ноды было только 2 точки присоединения edges (`Handle type="target"` сверху, `type="source"` снизу) — сложно было рисовать обратные/боковые переходы.
+
+### Что теперь
+
+**Положение статусов сохраняется**:
+- `ReleaseWorkflowStep` получил nullable `position_x` / `position_y` колонки (`Float?`). Миграция — `20260426000000_release_workflow_step_positions` (добавляет столбцы, без бэкфилла: у старых шагов остаётся null → frontend раскладывает сеткой как раньше).
+- `updateReleaseWorkflowStepDto` принимает `positionX`, `positionY` (с range-guard `-10_000..10_000`).
+- Сервис `updateReleaseWorkflowStep` персистит через partial-update.
+- Frontend подписан на `onNodeDragStop` из xyflow — fire-and-forget вызов `rwApi.updateReleaseWorkflowStep(wf.id, node.id, { positionX, positionY })`. Без `load()` после, чтобы не перерисовывать граф во время последующего drag. Ошибки глотаются silently (следующий drag всё равно перепишет).
+- В `buildLayout` приоритет у сохранённых позиций, fallback на prior grid-сетку для шагов без положения.
+
+**4 точки присоединения вместо 2**:
+- В `StatusNode` теперь 8 `<Handle>`-компонентов — по одному `source` и `target` на каждую из сторон (Top/Right/Bottom/Left). React Flow требует разные id для source и target даже на одной позиции.
+- Порядок объявления: `top-target` → `bottom-source` идут первыми среди своих типов. React Flow выбирает первый Handle matching type'а как default для edge'ей без `sourceHandle`/`targetHandle` — это сохраняет классический top→bottom flow для существующих переходов, рендерящихся по данным БД (они не имеют handle-id'ов).
+- Для drag-to-connect: пользователь может тянуть edge из любой из 4 точек. ⚠️ Персистентность выбора стороны для нового edge'а не реализована в этом PR (требует добавления `source_handle`/`target_handle` колонок в `release_workflow_transitions`) — после reload edge вернётся к default-routing. Оставлено как follow-up.
+
+### Проверки
+
+- `tsc --noEmit` → 0 errors (frontend + backend).
+- Migration — nullable columns, без backfill, безопасна для prod/staging (старые шаги продолжают работать через fallback).
+- Ручной smoke после деплоя: перетащить ноду в редакторе → обновить страницу → позиция сохранилась. Попробовать drag-to-connect с боковой точки.
 
 ---
 
