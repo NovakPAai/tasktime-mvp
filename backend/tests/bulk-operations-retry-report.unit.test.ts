@@ -39,6 +39,10 @@ vi.mock('../src/shared/auth/roles.js', () => ({
   hasAnySystemRole: vi.fn().mockReturnValue(false),
 }));
 vi.mock('../src/modules/search/search.service.js', () => ({ searchIssues: vi.fn() }));
+// PR-7 добавил getBulkOpsSettings в retry path; mock чтобы не лезть в prisma/redis.
+vi.mock('../src/modules/bulk-operations/bulk-operations-settings.service.js', () => ({
+  getBulkOpsSettings: vi.fn().mockResolvedValue({ maxConcurrentPerUser: 3, maxItems: 10_000 }),
+}));
 
 const { retryFailedItems, streamReportItems } = await import(
   '../src/modules/bulk-operations/bulk-operations.service.js'

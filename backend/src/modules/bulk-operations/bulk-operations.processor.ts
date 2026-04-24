@@ -33,6 +33,12 @@ import type { ScheduledTask } from 'node-cron';
 import cron from 'node-cron';
 import { prisma } from '../../prisma/client.js';
 import { acquireLock, releaseLock, lpopListBatch, publishToChannel } from '../../shared/redis.js';
+import {
+  recordFinalize,
+  recordItems,
+  recordTickResult,
+  setQueuedDepth,
+} from './bulk-metrics.js';
 import { runInBulkOperationContext } from '../../shared/bulk-operation-context.js';
 import { getEffectiveUserSystemRoles } from '../../shared/auth/roles.js';
 import { captureError } from '../../shared/utils/logger.js';
@@ -103,18 +109,34 @@ export type TickResult =
  */
 export async function runTickOnce(): Promise<TickResult> {
   const token = await acquireLock(TICK_LOCK_KEY, TICK_LOCK_TTL_S);
-  if (!token) return { kind: 'skipped-lock' };
+  if (!token) {
+    recordTickResult('skipped-lock');
+    return { kind: 'skipped-lock' };
+  }
 
   try {
+    // PR-13 metrics — текущая глубина очереди (QUEUED+RUNNING ops). Обновляется
+    // на каждом tick'е (cheap COUNT + SELECT oldest идут в одной транзакции
+    // через Prisma; реальный overhead — 2 round-trip'а, ~4ms).
+    const queuedDepth = await prisma.bulkOperation.count({
+      where: { status: { in: ['QUEUED', 'RUNNING'] } },
+    });
+    setQueuedDepth(queuedDepth);
+
     // Select oldest active op. Composite-index [status, created_at] добавлен в PR-1
     // именно под этот запрос (см. bulk_operations_status_created_at_idx).
     const op = await prisma.bulkOperation.findFirst({
       where: { status: { in: ['QUEUED', 'RUNNING'] } },
       orderBy: { createdAt: 'asc' },
     });
-    if (!op) return { kind: 'idle' };
+    if (!op) {
+      recordTickResult('idle');
+      return { kind: 'idle' };
+    }
 
-    return await processOperationBatch(op);
+    const result = await processOperationBatch(op);
+    recordTickResult('processed');
+    return result;
   } finally {
     await releaseLock(TICK_LOCK_KEY, token);
   }
@@ -285,6 +307,9 @@ async function processOperationBatch(op: BulkOperation): Promise<TickResult> {
     }),
   ]);
 
+  // PR-13 metrics: per-item outcomes — аккумулируется per-batch, перед publish.
+  recordItems(counters);
+
   // Если queue ещё не пуст и cancel не запрошен — следующий tick продолжит.
   // Иначе финализируем.
   const updated = await prisma.bulkOperation.findUniqueOrThrow({ where: { id: op.id } });
@@ -401,6 +426,11 @@ async function finalize(op: BulkOperation): Promise<BulkOperationStatus> {
     event: 'status',
     data: { status, finishedAt: new Date().toISOString() },
   });
+  // PR-13 metrics — record total + duration (startedAt → now).
+  const durationSec = op.startedAt
+    ? (Date.now() - new Date(op.startedAt).getTime()) / 1000
+    : null;
+  recordFinalize(op.type, status, durationSec);
   return status;
 }
 
@@ -461,6 +491,11 @@ async function finalizeCancelled(op: BulkOperation): Promise<BulkOperationStatus
     event: 'status',
     data: { status: 'CANCELLED', finishedAt: new Date().toISOString() },
   });
+  // PR-13 metrics — record cancelled op + duration.
+  const durationSec = op.startedAt
+    ? (Date.now() - new Date(op.startedAt).getTime()) / 1000
+    : null;
+  recordFinalize(op.type, 'CANCELLED', durationSec);
   return 'CANCELLED';
 }
 

@@ -48,6 +48,7 @@ import burndownRouter from './modules/releases/checkpoints/burndown.router.js';
 import searchRouter from './modules/search/search.router.js';
 import savedFiltersRouter from './modules/saved-filters/saved-filters.router.js';
 import bulkOperationsRouter from './modules/bulk-operations/bulk-operations.router.js';
+import bulkMetricsRouter from './modules/bulk-operations/bulk-metrics.router.js';
 import roleSchemesRouter from './modules/project-role-schemes/project-role-schemes.router.js';
 import userGroupsRouter from './modules/user-groups/user-groups.router.js';
 import userSecurityRouter from './modules/user-security/user-security.router.js';
@@ -186,6 +187,12 @@ export function createApp() {
   if (features.bulkOps) {
     app.use('/api', bulkOperationsRouter);
   }
+
+  // TTBULK-1 PR-13 — Prometheus metrics. Mounted независимо от bulkOps
+  // feature-flag'а: даже с off-flag processor может быть включён ранее через
+  // BULK_OP_PROCESSOR_ENABLED=true для warmup — metrics должен собираться.
+  // requireRole('ADMIN','SUPER_ADMIN') гейт внутри router'а.
+  app.use('/api', bulkMetricsRouter);
 
   // Public: project workflow scheme
   app.get('/api/projects/:projectId/workflow-scheme', authenticate, async (req, res, next) => {
