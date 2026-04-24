@@ -718,6 +718,25 @@ export default function IssueDetailPage() {
                     <span style={{ color: C.t3, fontSize: 11, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '14px' }}>
                       {h.user?.name ?? 'System'} · {h.action.replace('issue.', '').replace(/_/g, ' ')}
                       {h.details ? ` — ${JSON.stringify(h.details)}` : ''}
+                      {/* TTBULK-1 PR-12 — badge для записей из массовой операции. */}
+                      {h.bulkOperationId && (
+                        <a
+                          href={`/operations/${h.bulkOperationId}`}
+                          style={{
+                            marginLeft: 6,
+                            padding: '1px 6px',
+                            fontSize: 10,
+                            background: 'rgba(22,119,255,0.12)',
+                            color: '#1677ff',
+                            borderRadius: 4,
+                            textDecoration: 'none',
+                            fontWeight: 500,
+                          }}
+                          title="Открыть массовую операцию"
+                        >
+                          Массовая операция
+                        </a>
+                      )}
                     </span>
                     <div style={{ color: C.t4, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif', lineHeight: '12px' }}>
                       {new Date(h.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}

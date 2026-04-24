@@ -30,9 +30,10 @@ export const features = {
   // TTSRH-1 sub-flag: TTQL-ветка evaluator'а КТ. Отдельно от advancedSearch, чтобы
   // core-поиск можно было раскатить раньше, не влияя на scheduler КТ (см. PR-16 в §13).
   checkpointTtql: flag('FEATURES_CHECKPOINT_TTQL', false),
-  // TTBULK-1: off by default until UAT cutover (см. §13.1 в docs/tz/TTBULK-1.md).
-  // При false роут /api/bulk-operations/* не монтируется в app.ts → fall-through 404.
-  bulkOps: flag('FEATURES_BULK_OPS', false),
+  // TTBULK-1: **enabled by default после cutover PR-12** (см. §13.9 в docs/tz/TTBULK-1.md).
+  // Для отката в prod — `FEATURES_BULK_OPS=false` в env (роут /api/bulk-operations/*
+  // не монтируется → fall-through 404).
+  bulkOps: flag('FEATURES_BULK_OPS', true),
   aiProvider: (process.env.AI_PROVIDER ?? 'heuristic') as 'anthropic' | 'heuristic',
 } as const;
 
