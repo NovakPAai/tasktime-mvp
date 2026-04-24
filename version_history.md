@@ -8,8 +8,8 @@
 
 ## [2.64] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-11 — /operations page + retry UI + operation detail
 
-**PR:** _(будет заполнено после push'а)_
-**Ветка:** `ttbulk-1/operations-page` (branched from `ttbulk-1/progress-drawer`)
+**PR:** [#154](https://github.com/NovakPAai/tasktime-mvp/pull/154) (merged 2026-04-24)
+**Ветка:** `ttbulk-1/operations-page`
 
 ### Что было
 
