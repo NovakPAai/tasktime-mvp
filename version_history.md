@@ -8,8 +8,8 @@
 
 ## [2.63] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-10 — ProgressDrawer + SSE hook + floating chips + zustand store
 
-**PR:** _(будет заполнено после push'а)_
-**Ветка:** `ttbulk-1/progress-drawer` (branched from `ttbulk-1/wizard-modal-b`)
+**PR:** [#153](https://github.com/NovakPAai/tasktime-mvp/pull/153) (merged 2026-04-24)
+**Ветка:** `ttbulk-1/progress-drawer`
 
 ### Что было
 
