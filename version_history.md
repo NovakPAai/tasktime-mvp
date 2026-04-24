@@ -8,7 +8,7 @@
 
 ## [2.65] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-13 — Prometheus metrics + Grafana dashboard + alerts
 
-**PR:** _(будет заполнено после push'а)_
+**PR:** [#155](https://github.com/NovakPAai/tasktime-mvp/pull/155) (merged 2026-04-24)
 **Ветка:** `ttbulk-1/metrics`
 
 ### Что было
