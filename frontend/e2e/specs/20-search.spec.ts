@@ -42,7 +42,6 @@ test.describe('TTSRH-1: /search page smoke + a11y', () => {
     await expect(root).toBeVisible();
     await expect(page.getByTestId('search-sidebar')).toBeVisible();
     await expect(page.getByTestId('search-main')).toBeVisible();
-    await expect(page.getByTestId('search-preview')).toBeVisible();
     await expect(page.getByTestId('search-run')).toBeVisible();
     await expect(page.getByTestId('filter-mode-toggle')).toBeVisible();
   });

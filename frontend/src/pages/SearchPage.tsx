@@ -213,7 +213,7 @@ export default function SearchPage() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '320px minmax(0, 1fr) 360px',
+          gridTemplateColumns: '320px minmax(0, 1fr)',
           gap: 12,
           alignItems: 'stretch',
           flex: 1,
@@ -446,24 +446,6 @@ export default function SearchPage() {
             )}
           </div>
         </main>
-
-        {/* Column 3 — Detail preview (PR-14) */}
-        <aside
-          data-testid="search-preview"
-          style={{
-            background: c.panel,
-            border: `1px solid ${c.border}`,
-            borderRadius: 8,
-            padding: 16,
-            minHeight: 480,
-            overflowY: 'auto',
-            maxHeight: SIDEBAR_MAX_H,
-            color: c.t3,
-            fontSize: 12,
-          }}
-        >
-          Выберите задачу в таблице для preview (полный drawer — вне scope §13.6, Phase 2).
-        </aside>
       </div>
 
       <SaveFilterModal

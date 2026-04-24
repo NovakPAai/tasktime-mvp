@@ -20,6 +20,7 @@
  */
 import { useMemo } from 'react';
 import { Table, Tag, type TableProps } from 'antd';
+import { Link } from 'react-router-dom';
 
 import type { IssueSearchRow, SchemaField } from '../../api/search';
 
@@ -130,9 +131,17 @@ function renderCell(
   switch (col) {
     case 'key':
       return (
-        <span style={{ fontFamily: '"JetBrains Mono", monospace', color: '#4F6EF7' }}>
+        <Link
+          to={`/issues/${issue.id}`}
+          style={{
+            fontFamily: '"JetBrains Mono", monospace',
+            color: '#4F6EF7',
+            textDecoration: 'none',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {issue.project?.key}-{issue.number}
-        </span>
+        </Link>
       );
     case 'summary':
       return <span>{issue.title}</span>;
