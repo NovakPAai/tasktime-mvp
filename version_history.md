@@ -8,7 +8,7 @@
 
 ## [2.72] [2026-04-24] feat(releases): persist node positions + 4-side handles в воркфлоу-редакторе
 
-**PR:** TBD
+**PR:** [#169](https://github.com/NovakPAai/tasktime-mvp/pull/169) (merged 2026-04-24)
 **Ветка:** `feat/release-workflow-editor-enhancements`
 
 ### Что было
