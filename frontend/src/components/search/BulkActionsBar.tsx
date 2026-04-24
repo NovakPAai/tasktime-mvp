@@ -12,7 +12,7 @@
  * но UI-обвязка под них выходит за PR-14 (§5.8 говорит «Assign, Transition,
  * Move to sprint, Delete» — Delete достаточно для пилота).
  */
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button, Dropdown, Popconfirm, message, type MenuProps } from 'antd';
 import { DownOutlined, DeleteOutlined, DownloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 
@@ -21,6 +21,7 @@ import { exportIssues } from '../../api/search';
 import { saveBlob } from '../../utils/saveBlob';
 import { features } from '../../lib/features';
 import BulkOperationWizardModal from '../bulk/BulkOperationWizardModal';
+import type { BulkScope } from '../../types/bulk.types';
 
 export interface BulkActionsBarProps {
   /** UUID strings — come from `issue.id` via ResultsTable rowKey. */
@@ -51,6 +52,14 @@ export default function BulkActionsBar({
   // TTBULK-1 PR-9a — wizard. Gated под `features.bulkOps`; в PR-12 cutover флаг
   // включается и кнопка «Массовые операции» становится видна всем.
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Memoize scope object — без useMemo каждый re-render создавал бы новый ref,
+  // что через runPreview (useCallback deps: [scope, payload]) дёргало бы
+  // лишние preview-fetch'и в WizardModal.
+  const scope = useMemo<BulkScope>(
+    () => ({ kind: 'ids', issueIds: selectedIds }),
+    [selectedIds],
+  );
 
   if (selectedIds.length === 0) return null;
 
@@ -148,7 +157,10 @@ export default function BulkActionsBar({
           // selectedIds, так что selection гарантирован). JQL-вариант (bulk
           // «ко всей выборке» без selection) добавится в PR-9b через отдельную
           // кнопку, которая рендерится ВНЕ этого early-return ветки.
-          scope={{ kind: 'ids', issueIds: selectedIds }}
+          // useMemo стабилизирует ref — иначе каждый re-render BulkActionsBar
+          // создавал бы новый object, который через scope prop → useCallback
+          // runPreview deps → useEffect в WizardModal → лишние preview-fetch'и.
+          scope={scope}
           total={selectedIds.length}
           onClose={() => {
             // CLAUDE.md: modal close → refresh parent. onCleared зовёт

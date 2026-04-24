@@ -2,7 +2,40 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.61**
+**Last version: 2.62**
+
+---
+
+## [2.62] [2026-04-24] feat(bulk-ops): TTBULK-1 PR-9b — Step2 Configure + Step3 Preview (virtualized) + Step4 Confirm + submit flow
+
+**PR:** _(будет заполнено после push'а)_
+**Ветка:** `ttbulk-1/wizard-modal-b` (branched from `ttbulk-1/wizard-modal-a`)
+
+### Что было
+
+После PR-9a wizard отображал только Step1 (выбор типа); Step2-4 были Alert-placeholder'ами. Пользователь не мог сконфигурировать операцию, посмотреть preview или submit'нуть её из UI.
+
+### Что теперь
+
+- **`Step2Configure.tsx`** — per-type формы: TRANSITION (transitionId input), ASSIGN (assigneeId / null-unassign), EDIT_FIELD (field select + value input с вариантами для priority/dueDate/labels/description.append), EDIT_CUSTOM_FIELD (customFieldId + JSON value), MOVE_TO_SPRINT (sprintId / null-remove), ADD_COMMENT (textarea с maxLength=10k), DELETE (no config). **Scope PR-9b**: минимальные input'ы (ID-first UX); rich selectors deferred в PR-12 polish.
+- **`Step3Preview.tsx`** — Collapsible panel'ы с 3-мя секциями (eligible/skipped/conflicts) + virtualized списки через `react-window` v2 `List` (rowHeight=40, max section height=300). Conflicts inline-resolution (INCLUDE/EXCLUDE/USE_OVERRIDE) — deferred в PR-12 polish; сейчас все conflicts автоматически исключаются.
+- **`Step4Confirm.tsx`** — summary (operation + scope + eligible count), payload preview (per-type форматирование), DELETE confirm-phrase gate (Input + status=error если != 'DELETE').
+- **`BulkOperationWizardModal.tsx`** — переписан: state (step, type, payload, preview, confirmPhrase, submitting), `runPreview()` автоматически при enter step 3, submit через `bulkOperationsApi.create({ previewToken, idempotencyKey: crypto.randomUUID() })` → `onSubmitted(id)` + close. Смена type / возврат на step 2 → reset preview.
+- **Dependencies:** `react-window@^2.2.7` + `@types/react-window@^1.8.8`.
+
+### Влияние на prod
+
+Gated под `VITE_FEATURES_BULK_OPS=false` (cutover в PR-12). Full wizard flow работает.
+
+### Проверки
+
+- `npx tsc --noEmit` (frontend) → 0 errors.
+- `npm run lint` → 0 новых warnings.
+- Frontend unit-tests — vitest инфра отсутствует; Playwright e2e в PR-12.
+
+### Связано
+
+- TTBULK-1 — см. `docs/tz/TTBULK-1.md` §3.2, §8.1, §13.6 PR-9.
 
 ---
 
