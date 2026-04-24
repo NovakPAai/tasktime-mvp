@@ -2,7 +2,32 @@
 
 Все значимые изменения в проекте. Для каждого изменения указана ссылка на задачу (если есть).
 
-**Last version: 2.68**
+**Last version: 2.69**
+
+---
+
+## [2.69] [2026-04-24] feat(releases): доработка карточки релиза + fix визуального редактора воркфлоу
+
+**PR:** TBD
+**Ветка:** `feat/release-card-enhancements`
+
+### Карточка релиза
+
+- **Порядок вкладок**: «Готовность → Контрольные точки → Диаграмма сгорания → Задачи → Спринты → История». Вкладка по умолчанию — «Готовность» (раньше «Задачи»).
+- **Готовность** — две новые плитки: «Плановая дата» (`release.plannedDate`) и «Дней до релиза» (считается через `dayjs`: положит. → «N дн.», 0 → «Сегодня», отриц. → «Просрочен»). Сетка метрик `repeat(3, 1fr)` — 6 карточек в 2 ряда.
+- **Редактирование релиза** — иконка-карандаш в шапке карточки (видна для `canManage` = SUPER_ADMIN / ADMIN / RELEASE_MANAGER, скрыта для релизов в категории DONE). Модалка с полями: название, описание, уровень, плановая/фактическая даты. На Save — `updateRelease` + surgical merge в `selectedRelease` (сохраняет `_count`, `_projects`, `createdBy` при partial-response от PATCH).
+
+### Визуальный редактор воркфлоу релиза (fix багов на стейдже)
+
+- **Переходы не отображались** в ReactFlow-канвасе — кастомный `StatusNode` не имел `<Handle>`-компонентов, xyflow не мог "приклеить" рёбра. Добавлены `Handle type="target"` (Top) и `Handle type="source"` (Bottom). Заодно починилась drag-to-connect.
+- **Ошибки «400 Validation failed»** при добавлении статуса/перехода — сид создаёт release-statuses со short-slug ID (`rs-draft`, `rs-building`...), а Zod-DTO ждал `z.string().uuid()`. Ослаблено до `z.string().min(1)` для `statusId`, `fromStatusId`, `toStatusId`. Референциальная целостность сохранена (service layer + DB FK).
+- **Ghost edge на Отмена** в transition-drawer'е — drag-connect добавлял оптимистичный edge, который не откатывался при клике «Отмена». Кнопка теперь вызывает `void load()` для перезагрузки графа с сервера.
+
+### Проверки
+
+- `tsc --noEmit` → 0 errors (frontend + backend).
+- ESLint — только pre-existing unused-disable warnings, не от этих правок.
+- Pre-push review (3 🟠 + 5 🟡 + 3 🔵) — все addressable-пункты закрыты (DONE-status guard, surgical merge, resetFields, 3-col grid, ghost-edge fix, form rules).
 
 ---
 
