@@ -17,6 +17,8 @@ export interface ReleaseWorkflowStep {
   statusId: string;
   isInitial: boolean;
   orderIndex: number;
+  positionX?: number | null;
+  positionY?: number | null;
   status: ReleaseStatus;
 }
 
@@ -114,7 +116,7 @@ export async function addReleaseWorkflowStep(
 export async function updateReleaseWorkflowStep(
   workflowId: string,
   stepId: string,
-  body: { isInitial?: boolean; orderIndex?: number },
+  body: { isInitial?: boolean; orderIndex?: number; positionX?: number; positionY?: number },
 ): Promise<ReleaseWorkflowStep> {
   const { data } = await api.patch<ReleaseWorkflowStep>(
     `/admin/release-workflows/${workflowId}/steps/${stepId}`,

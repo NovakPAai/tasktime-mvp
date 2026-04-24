@@ -430,6 +430,10 @@ model ReleaseWorkflowStep {
   statusId   String  @map("status_id")
   isInitial  Boolean @default(false) @map("is_initial")
   orderIndex Int     @default(0) @map("order_index")
+  // Визуальная позиция статуса в ReactFlow-редакторе. Nullable — если не задана,
+  // frontend раскладывает ноды сеткой по indexу (fallback в buildLayout).
+  positionX  Float?  @map("position_x")
+  positionY  Float?  @map("position_y")
 
   workflow ReleaseWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   status   ReleaseStatus   @relation(fields: [statusId], references: [id])

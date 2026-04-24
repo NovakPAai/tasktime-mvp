@@ -244,12 +244,24 @@ export async function updateReleaseWorkflowStep(
       data: {
         ...(dto.isInitial !== undefined && { isInitial: dto.isInitial }),
         ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
+        ...(dto.positionX !== undefined && { positionX: dto.positionX }),
+        ...(dto.positionY !== undefined && { positionY: dto.positionY }),
       },
       include: { status: true },
     });
   });
 
-  await invalidateReleaseWorkflowCache(workflowId);
+  // Skip workflow-engine cache invalidation for position-only updates — визуальные
+  // координаты не участвуют в engine state (loadReleaseWorkflowFull не включает их,
+  // evaluation переходов по условиям не зависит от них). Делает drag-stop дешевле по
+  // Redis-трафику и не инвалидирует cache для real users во время UI-ёрзанья админа.
+  const isPositionOnly =
+    (dto.positionX !== undefined || dto.positionY !== undefined) &&
+    dto.isInitial === undefined &&
+    dto.orderIndex === undefined;
+  if (!isPositionOnly) {
+    await invalidateReleaseWorkflowCache(workflowId);
+  }
   return updated;
 }
 
