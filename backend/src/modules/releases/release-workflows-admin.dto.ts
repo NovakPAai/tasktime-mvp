@@ -16,8 +16,12 @@ export const updateReleaseWorkflowDto = z.object({
   isActive: z.boolean().optional(),
 });
 
+// statusId accepts any non-empty string (not strictly UUID): seeded release statuses
+// (see prisma/seed-release-workflow.ts) use short slugs like `rs-draft`. Referential
+// integrity is enforced by the service layer (status existence check) and the DB
+// foreign key, so the UUID-format constraint was rejecting legitimate seed IDs.
 export const createReleaseWorkflowStepDto = z.object({
-  statusId: z.string().uuid(),
+  statusId: z.string().min(1),
   isInitial: z.boolean().optional(),
   orderIndex: z.number().int().nonnegative().optional(),
 });
@@ -29,18 +33,19 @@ export const updateReleaseWorkflowStepDto = z.object({
 
 const conditionsField = z.array(z.record(z.unknown())).nullish();
 
+// See comment above createReleaseWorkflowStepDto: from/to statusId are slugs or UUIDs.
 export const createReleaseWorkflowTransitionDto = z.object({
   name: z.string().min(1).max(200),
-  fromStatusId: z.string().uuid(),
-  toStatusId: z.string().uuid(),
+  fromStatusId: z.string().min(1),
+  toStatusId: z.string().min(1),
   isGlobal: z.boolean().optional(),
   conditions: conditionsField,
 });
 
 export const updateReleaseWorkflowTransitionDto = z.object({
   name: z.string().min(1).max(200).optional(),
-  fromStatusId: z.string().uuid().optional(),
-  toStatusId: z.string().uuid().optional(),
+  fromStatusId: z.string().min(1).optional(),
+  toStatusId: z.string().min(1).optional(),
   isGlobal: z.boolean().optional(),
   conditions: conditionsField,
 });

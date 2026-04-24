@@ -29,6 +29,9 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   MinusCircleOutlined,
+  CalendarOutlined,
+  HourglassOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -205,10 +208,11 @@ interface DetailPanelProps {
   onClose: () => void;
   onTransition: (releaseId: string, transitionId: string) => Promise<void>;
   onReleasesRefresh: () => void;
+  onReleaseUpdated: (updated: Release) => void;
 }
 
-function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClose, onTransition, onReleasesRefresh }: DetailPanelProps) {
-  const [tab, setTab] = useState<DetailTab>('issues');
+function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClose, onTransition, onReleasesRefresh, onReleaseUpdated }: DetailPanelProps) {
+  const [tab, setTab] = useState<DetailTab>('readiness');
   const [items, setItems] = useState<ReleaseItem[]>([]);
   const [itemsTotal, setItemsTotal] = useState(0);
   const [itemsPage, setItemsPage] = useState(1);
@@ -239,6 +243,9 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [issueProjectFilter, setIssueProjectFilter] = useState<string | undefined>();
   const [loadingModalIssues, setLoadingModalIssues] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editForm] = Form.useForm();
 
   const loadItems = useCallback(async (id: string, page = 1) => {
     setLoadingItems(true);
@@ -309,19 +316,20 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
 
   useEffect(() => {
     if (!release) return;
-    setTab('issues');
+    setTab('readiness');
     setItems([]); setSprints([]); setReadiness(null); setHistory([]);
     setCheckpointsData(null); setCheckpointsError(false);
-    loadItems(release.id);
     loadTransitions(release.id);
   }, [release?.id]);
 
   useEffect(() => {
     if (!release) return;
+    if (tab === 'issues') loadItems(release.id);
     if (tab === 'sprints') loadSprints(release.id);
     if (tab === 'readiness') loadReadiness(release.id);
     if (tab === 'history') loadHistory(release.id);
     if (tab === 'checkpoints') loadCheckpoints(release.id);
+    // 'burndown' intentionally omitted — ReleaseBurndownChart is lazy-loaded and fetches its own data.
   }, [tab, release?.id]);
 
   const handleTransition = async (transitionId: string) => {
@@ -428,6 +436,52 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
     setAddSprintsOpen(true);
   };
 
+  const openEdit = () => {
+    if (!release) return;
+    if (release.status?.category === 'DONE') {
+      message.warning('Нельзя редактировать завершённый релиз');
+      return;
+    }
+    editForm.setFieldsValue({
+      name: release.name,
+      description: release.description ?? '',
+      level: release.level,
+      plannedDate: release.plannedDate ? dayjs(release.plannedDate) : null,
+      releaseDate: release.releaseDate ? dayjs(release.releaseDate) : null,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEdit = async (vals: {
+    name: string;
+    description?: string;
+    level: 'MINOR' | 'MAJOR';
+    plannedDate?: dayjs.Dayjs | null;
+    releaseDate?: dayjs.Dayjs | null;
+  }) => {
+    if (!release) return;
+    setEditLoading(true);
+    try {
+      const updated = await releasesApi.updateRelease(release.id, {
+        name: vals.name,
+        description: vals.description?.trim() ? vals.description : null,
+        level: vals.level,
+        plannedDate: vals.plannedDate ? vals.plannedDate.format('YYYY-MM-DD') : null,
+        releaseDate: vals.releaseDate ? vals.releaseDate.format('YYYY-MM-DD') : null,
+      });
+      message.success('Релиз обновлён');
+      setEditOpen(false);
+      editForm.resetFields();
+      onReleaseUpdated(updated);
+      onReleasesRefresh();
+    } catch (e) {
+      const err = e as AxiosError<{ error?: string }>;
+      message.error(err.response?.data?.error || 'Ошибка обновления');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   const filteredIssues = issueSearch
     ? allIssues.filter(i => i.title.toLowerCase().includes(issueSearch.toLowerCase()) || String(i.number).includes(issueSearch))
     : allIssues;
@@ -435,11 +489,11 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
   if (!release) return null;
 
   const TABS: { key: DetailTab; label: string }[] = [
-    { key: 'issues', label: 'Задачи' },
-    { key: 'sprints', label: 'Спринты' },
     { key: 'readiness', label: 'Готовность' },
     { key: 'checkpoints', label: 'Контрольные точки' },
     { key: 'burndown', label: 'Диаграмма сгорания' },
+    { key: 'issues', label: 'Задачи' },
+    { key: 'sprints', label: 'Спринты' },
     { key: 'history', label: 'История' },
   ];
 
@@ -477,15 +531,30 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              color: C.t3, padding: 4, lineHeight: 1, flexShrink: 0,
-            }}
-          >
-            <CloseOutlined style={{ fontSize: 16 }} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            {canManage && (currentStatus ?? release.status)?.category !== 'DONE' && (
+              <Tooltip title="Редактировать релиз">
+                <button
+                  onClick={openEdit}
+                  style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer',
+                    color: C.t3, padding: 4, lineHeight: 1,
+                  }}
+                >
+                  <EditOutlined style={{ fontSize: 16 }} />
+                </button>
+              </Tooltip>
+            )}
+            <button
+              onClick={onClose}
+              style={{
+                border: 'none', background: 'transparent', cursor: 'pointer',
+                color: C.t3, padding: 4, lineHeight: 1,
+              }}
+            >
+              <CloseOutlined style={{ fontSize: 16 }} />
+            </button>
+          </div>
         </div>
 
         {/* Transition buttons */}
@@ -710,13 +779,24 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
             ) : readiness ? (
               <div>
                 {/* Main metrics */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                  {[
-                    { label: 'Готовность', value: `${readiness.completionPercent}%`, icon: <CheckCircleOutlined style={{ color: '#4ADE80' }} /> },
-                    { label: 'Задачи', value: `${readiness.doneItems} / ${readiness.totalItems}`, icon: <ClockCircleOutlined style={{ color: C.acc }} /> },
-                    { label: 'Спринты закрыты', value: `${readiness.closedSprints} / ${readiness.totalSprints}`, icon: <CheckCircleOutlined style={{ color: C.acc }} /> },
-                    { label: 'В работе', value: String(readiness.inProgressItems), icon: <MinusCircleOutlined style={{ color: '#F97316' }} /> },
-                  ].map(({ label, value, icon }) => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+                  {(() => {
+                    const daysInfo = (() => {
+                      if (!release.plannedDate) return { label: 'Дней до релиза', value: '—', icon: <HourglassOutlined style={{ color: C.t4 }} /> };
+                      const diff = dayjs(release.plannedDate).startOf('day').diff(dayjs().startOf('day'), 'day');
+                      if (diff > 0) return { label: 'Дней до релиза', value: `${diff} дн.`, icon: <HourglassOutlined style={{ color: C.acc }} /> };
+                      if (diff === 0) return { label: 'Дней до релиза', value: 'Сегодня', icon: <HourglassOutlined style={{ color: '#F97316' }} /> };
+                      return { label: 'Просрочен', value: `${Math.abs(diff)} дн.`, icon: <HourglassOutlined style={{ color: '#F87171' }} /> };
+                    })();
+                    return [
+                      { label: 'Готовность', value: `${readiness.completionPercent}%`, icon: <CheckCircleOutlined style={{ color: '#4ADE80' }} /> },
+                      { label: 'Задачи', value: `${readiness.doneItems} / ${readiness.totalItems}`, icon: <ClockCircleOutlined style={{ color: C.acc }} /> },
+                      { label: 'Спринты закрыты', value: `${readiness.closedSprints} / ${readiness.totalSprints}`, icon: <CheckCircleOutlined style={{ color: C.acc }} /> },
+                      { label: 'В работе', value: String(readiness.inProgressItems), icon: <MinusCircleOutlined style={{ color: '#F97316' }} /> },
+                      { label: 'Плановая дата', value: formatDate(release.plannedDate), icon: <CalendarOutlined style={{ color: C.acc }} /> },
+                      daysInfo,
+                    ];
+                  })().map(({ label, value, icon }) => (
                     <div key={label} style={{
                       border: `1px solid ${C.border}`, borderRadius: 8,
                       padding: '14px 16px', background: C.bgCard,
@@ -1061,6 +1141,48 @@ function DetailPanel({ release, C, isDark, canManage, canBackfillBurndown, onClo
             </div>
           ))}
         </div>
+      </Modal>
+
+      {/* Edit Release Modal */}
+      <Modal
+        open={editOpen}
+        title="Редактировать релиз"
+        onCancel={() => { setEditOpen(false); editForm.resetFields(); onReleasesRefresh(); }}
+        onOk={() => editForm.submit()}
+        okText="Сохранить"
+        cancelText="Отмена"
+        confirmLoading={editLoading}
+        width={520}
+        destroyOnClose
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEdit}>
+          <Form.Item
+            name="name"
+            label="Название"
+            rules={[{ required: true, type: 'string', min: 1, max: 100, message: 'От 1 до 100 символов' }]}
+          >
+            <Input placeholder="v1.2.0 — Релиз управления правами" />
+          </Form.Item>
+
+          <Form.Item name="description" label="Описание">
+            <Input.TextArea rows={3} placeholder="Краткое описание релиза..." />
+          </Form.Item>
+
+          <Form.Item name="level" label="Уровень" rules={[{ required: true, message: 'Выберите уровень' }]}>
+            <Radio.Group>
+              <Radio value="MINOR">Minor</Radio>
+              <Radio value="MAJOR">Major</Radio>
+            </Radio.Group>
+          </Form.Item>
+
+          <Form.Item name="plannedDate" label="Плановая дата выпуска">
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+
+          <Form.Item name="releaseDate" label="Фактическая дата выпуска">
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
@@ -1678,6 +1800,23 @@ export default function GlobalReleasesPage() {
             onClose={() => { setSelectedRelease(null); void loadReleases(page); }}
             onTransition={handleTransition}
             onReleasesRefresh={() => loadReleases(page)}
+            onReleaseUpdated={(updated) => setSelectedRelease((prev) => {
+              // PATCH /releases/:id only returns { status, project } in its include — other
+              // shape fields (_count, _projects, createdBy, sprints, …) would be clobbered
+              // by a full spread. Merge only the fields the update endpoint actually sets.
+              if (!prev) return updated;
+              return {
+                ...prev,
+                name: updated.name,
+                description: updated.description,
+                level: updated.level,
+                plannedDate: updated.plannedDate,
+                releaseDate: updated.releaseDate,
+                status: updated.status ?? prev.status,
+                project: updated.project ?? prev.project,
+                updatedAt: updated.updatedAt,
+              };
+            })}
           />
         </>
       )}

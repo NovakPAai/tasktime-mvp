@@ -9,6 +9,8 @@ import {
   useNodesState,
   useEdgesState,
   MarkerType,
+  Handle,
+  Position,
   type Node,
   type Edge,
   type NodeTypes,
@@ -85,6 +87,8 @@ function StatusNode({ data }: { data: StatusNodeData }) {
         position: 'relative',
       }}
     >
+      <Handle type="target" position={Position.Top} style={{ background: data.color, width: 8, height: 8 }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: data.color, width: 8, height: 8 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span
           style={{
@@ -733,7 +737,8 @@ export default function AdminReleaseWorkflowEditorPage() {
           </Form.Item>
           <Space>
             <Button type="primary" htmlType="submit">Сохранить</Button>
-            <Button onClick={() => setTransitionDrawerOpen(false)}>Отмена</Button>
+            {/* void load() reloads server state to strip any ghost edge added optimistically by onConnect drag */}
+            <Button onClick={() => { setTransitionDrawerOpen(false); void load(); }}>Отмена</Button>
           </Space>
         </Form>
       </Drawer>
