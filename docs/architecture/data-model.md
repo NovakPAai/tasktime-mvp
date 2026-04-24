@@ -608,6 +608,8 @@ Run `make docs` to check for staleness warnings.
 | `statusId` | `String` | нет |  |
 | `isInitial` | `Boolean` | нет | default: false |
 | `orderIndex` | `Int` | нет | default: 0 |
+| `positionX` | `Float` | да |  |
+| `positionY` | `Float` | да |  |
 | `workflow` | `ReleaseWorkflow` | нет |  |
 | `status` | `ReleaseStatus` | нет |  |
 
