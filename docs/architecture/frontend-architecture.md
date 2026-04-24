@@ -232,6 +232,8 @@ When new pages/routes are added to `frontend/src/App.tsx`, or new major componen
 | `/admin/release-checkpoint-templates` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
 | `/admin/checkpoint-audit` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
 | `/admin/system` | `AdminGate` | `frontend/src/pages/AdminGate` | — |
+| `/operations` | `OperationsPage` | `frontend/src/pages/OperationsPage` | — |
+| `/operations/:id` | `OperationDetailPage` | `frontend/src/pages/OperationDetailPage` | — |
 | `/settings` | `SettingsPage` | `frontend/src/pages/SettingsPage` | — |
 | `/pipeline` | `PipelineDashboardPage` | `frontend/src/pages/PipelineDashboardPage` | — |
 | `/*` | `Navigate` | `frontend/src/pages/Navigate` | — |
