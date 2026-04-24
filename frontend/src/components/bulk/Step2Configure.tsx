@@ -12,6 +12,7 @@
  * См. docs/tz/TTBULK-1.md §3.2, §13.6 PR-9.
  */
 
+import type { ReactElement } from 'react';
 import { Form, Input, Select, DatePicker, Radio, Space, Alert } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import type {
@@ -210,7 +211,7 @@ function renderEditFieldInput(
   field: EditFieldName,
   current: unknown,
   onChange: (v: unknown) => void,
-): React.ReactElement {
+): ReactElement {
   if (field === 'priority') {
     return (
       <Radio.Group

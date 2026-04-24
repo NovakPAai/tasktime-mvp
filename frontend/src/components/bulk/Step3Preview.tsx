@@ -124,10 +124,12 @@ function EligibleRow({
   index,
   style,
   items,
+  ariaAttributes,
 }: RowComponentProps<{ items: BulkEligibleItem[] }>) {
   const item = items[index];
   return (
     <div
+      {...ariaAttributes}
       style={{
         ...style,
         display: 'flex',
@@ -164,10 +166,12 @@ function SkippedRow({
   index,
   style,
   items,
+  ariaAttributes,
 }: RowComponentProps<{ items: BulkSkippedItem[] }>) {
   const item = items[index];
   return (
     <div
+      {...ariaAttributes}
       style={{
         ...style,
         display: 'flex',
@@ -214,10 +218,12 @@ function ConflictRow({
   index,
   style,
   items,
+  ariaAttributes,
 }: RowComponentProps<{ items: BulkConflictItem[] }>) {
   const item = items[index];
   return (
     <div
+      {...ariaAttributes}
       style={{
         ...style,
         display: 'flex',

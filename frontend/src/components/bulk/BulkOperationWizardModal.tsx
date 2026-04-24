@@ -126,8 +126,21 @@ export default function BulkOperationWizardModal({
       onSubmitted?.(res.id);
       onClose();
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      void message.error(err?.response?.data?.error ?? 'Не удалось создать операцию');
+      const err = e as {
+        response?: { status?: number; data?: { error?: string; code?: string } };
+      };
+      const code = err?.response?.data?.code;
+      if (err?.response?.status === 409 || code === 'PREVIEW_EXPIRED') {
+        // Preview expired — возврат на Step 3, сбросить preview → auto-refetch.
+        setPreview(null);
+        setPreviewError(null);
+        setStep(2);
+        void message.warning('Preview устарел — пересчитываем…');
+      } else {
+        void message.error(
+          err?.response?.data?.error ?? 'Не удалось создать операцию',
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -191,7 +204,14 @@ export default function BulkOperationWizardModal({
           onSelect={(t) => {
             setSelectedType(t);
             // Сбрасываем payload при смене типа — старый не валиден для нового.
-            setPayload(null);
+            // Исключение: DELETE backend DTO требует confirmPhrase: 'DELETE'
+            // в payload (anti-accidental server-side дубликат UI-gate'а).
+            // Устанавливаем его сразу чтобы Step 2 → preview работал без формы.
+            if (t === 'DELETE') {
+              setPayload({ type: 'DELETE', confirmPhrase: 'DELETE' });
+            } else {
+              setPayload(null);
+            }
             setPreview(null);
           }}
           allowedOperations={allowedOperations}
@@ -248,7 +268,8 @@ function isCompletePayload(
     case 'EDIT_FIELD': {
       const f = (p as { field?: unknown }).field;
       const v = (p as { value?: unknown }).value;
-      return typeof f === 'string' && v !== undefined;
+      // Reject null (DatePicker cleared) и undefined — backend отклонит их 400.
+      return typeof f === 'string' && v !== undefined && v !== null;
     }
     case 'EDIT_CUSTOM_FIELD': {
       const cf = (p as { customFieldId?: unknown }).customFieldId;
@@ -278,8 +299,13 @@ function computeCanNext(
     case 1:
       return payload !== null && isCompletePayload(payload);
     case 2:
-      // Идти на step 4 только если preview успешен и есть хотя бы 1 eligible.
-      return preview !== null && preview.eligible.length > 0;
+      // Идти на step 4 только если preview успешен, previewToken есть
+      // и есть хотя бы 1 eligible.
+      return (
+        preview !== null &&
+        !!preview.previewToken &&
+        preview.eligible.length > 0
+      );
     case 3: {
       if (!preview || preview.eligible.length === 0) return false;
       if (type === 'DELETE' && confirmPhrase !== 'DELETE') return false;
