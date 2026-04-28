@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Сравнение TaskTime и коробочной JIRA — админка и функциональность</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --p0: #dc2626;
+    --p0-bg: #fee2e2;
+    --p1: #ea580c;
+    --p1-bg: #ffedd5;
+    --p2: #ca8a04;
+    --p2-bg: #fef3c7;
+    --p3: #64748b;
+    --p3-bg: #e2e8f0;
+    --ok: #059669;
+    --ok-bg: #d1fae5;
+    --partial: #d97706;
+    --partial-bg: #fef3c7;
+    --missing: #991b1b;
+    --missing-bg: #fee2e2;
+    --win: #0369a1;
+    --win-bg: #dbeafe;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 32px 24px 80px; }
+  header.page {
+    background: linear-gradient(135deg, #0c4a6e 0%, #075985 100%);
+    color: #fff;
+    padding: 40px 32px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px -10px rgba(12, 74, 110, 0.4);
+  }
+  header.page h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; letter-spacing: -0.3px; }
+  header.page p { margin: 0; color: #cbd5e1; font-size: 15px; }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+  .meta { display: flex; flex-direction: column; }
+  .meta .k { font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.6px; }
+  .meta .v { font-size: 15px; font-weight: 500; color: #f1f5f9; margin-top: 2px; }
+
+  /* Tabs */
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+    margin-bottom: 24px;
+    position: sticky;
+    top: 12px;
+    z-index: 10;
+    box-shadow: 0 4px 12px -6px rgba(0,0,0,0.08);
+  }
+  nav.tabs button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 12px 16px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  nav.tabs button:hover { background: #f1f5f9; color: #0f172a; }
+  nav.tabs button.active { background: #0c4a6e; color: #fff; box-shadow: 0 2px 6px -2px rgba(12,74,110,0.5); }
+  nav.tabs .tab-icon { font-size: 15px; }
+  nav.tabs .tab-sub { font-size: 11px; opacity: 0.7; font-weight: 400; margin-left: 4px; }
+  nav.tabs button.active .tab-sub { opacity: 0.9; }
+
+  .tab-panel { display: none; animation: fadeIn 0.2s ease-out; }
+  .tab-panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi .val { font-size: 26px; font-weight: 600; margin-top: 6px; }
+  .kpi.p0 .val { color: var(--p0); }
+  .kpi.p1 .val { color: var(--p1); }
+  .kpi.p2 .val { color: var(--p2); }
+  .kpi.p3 .val { color: var(--p3); }
+  .kpi.ok .val { color: var(--ok); }
+  .kpi.win .val { color: var(--win); }
+
+  .kpi-group-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: #334155; font-weight: 600; margin: 8px 0 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .kpi-group-title::before {
+    content: ""; display: inline-block; width: 4px; height: 14px;
+    background: #0369a1; border-radius: 2px;
+  }
+  .kpi-group-title.fn::before { background: #059669; }
+
+  section.section {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px 28px; margin-bottom: 24px;
+  }
+  section.section > h2 {
+    margin: 0 0 6px; font-size: 20px; font-weight: 600; color: #0f172a;
+  }
+  section.section > .sub { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+
+  table.cmp {
+    width: 100%; border-collapse: collapse; font-size: 13.5px;
+  }
+  table.cmp th, table.cmp td {
+    text-align: left; vertical-align: top;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  table.cmp th {
+    background: #f1f5f9; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #334155; font-weight: 600;
+  }
+  table.cmp td.note { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+  table.cmp tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+  .badge.ok { background: var(--ok-bg); color: var(--ok); }
+  .badge.partial { background: var(--partial-bg); color: var(--partial); }
+  .badge.missing { background: var(--missing-bg); color: var(--missing); }
+  .badge.p0 { background: var(--p0-bg); color: var(--p0); }
+  .badge.p1 { background: var(--p1-bg); color: var(--p1); }
+  .badge.p2 { background: var(--p2-bg); color: var(--p2); }
+  .badge.p3 { background: var(--p3-bg); color: var(--p3); }
+  .badge.win { background: var(--win-bg); color: var(--win); }
+  .badge.na { background: #e5e7eb; color: #475569; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 18px;
+    font-size: 12.5px; color: var(--muted);
+  }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+
+  .crit-block {
+    border-left: 4px solid;
+    padding: 14px 18px 14px 20px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    background: #fafafa;
+  }
+  .crit-block.p0 { border-color: var(--p0); background: #fff1f1; }
+  .crit-block.p1 { border-color: var(--p1); background: #fff7ed; }
+  .crit-block.p2 { border-color: var(--p2); background: #fffbeb; }
+  .crit-block.p3 { border-color: var(--p3); background: #f1f5f9; }
+  .crit-block.win { border-color: var(--win); background: #eff6ff; }
+  .crit-block h3 { margin: 0 0 4px; font-size: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .crit-block p.scope { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  .crit-block ul { margin: 0; padding-left: 20px; font-size: 13.5px; }
+  .crit-block li { margin-bottom: 4px; }
+
+  .cols-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 1000px) {
+    .cols-2 { grid-template-columns: 1fr; }
+  }
+
+  .col-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: #334155; font-weight: 600; margin: 0 0 10px;
+    padding: 6px 12px; background: #f1f5f9; border-radius: 6px;
+    display: inline-block;
+  }
+
+  .callout {
+    background: #ecfeff; border: 1px solid #67e8f9; border-radius: 8px;
+    padding: 14px 18px; margin-bottom: 18px; font-size: 14px;
+  }
+  .callout.warn { background: #fef3c7; border-color: #fbbf24; }
+  .callout.ok { background: #d1fae5; border-color: #34d399; }
+
+  footer {
+    text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px;
+  }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+
+  .toc-inline {
+    background: #f8fafc; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 20px; font-size: 13px;
+  }
+  .toc-inline strong { color: #0f172a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 12px; }
+  .toc-inline a { color: #0369a1; text-decoration: none; margin-right: 14px; }
+  .toc-inline a:hover { text-decoration: underline; }
+
+  @media print {
+    body { background: #fff; }
+    .wrap { max-width: 100%; padding: 0; }
+    nav.tabs { display: none; }
+    .tab-panel { display: block !important; page-break-before: always; }
+    .tab-panel:first-of-type { page-break-before: auto; }
+    section.section, header.page { box-shadow: none; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>TaskTime MVP vs коробочная Jira — сравнительный анализ</h1>
+  <p>Чего уже хватает для запуска, а чего нет. Два пласта: администрирование и бизнес-функциональность. Jira рассматривается без Marketplace-плагинов.</p>
+  <div class="meta-row">
+    <div class="meta"><span class="k">Дата отчёта</span><span class="v">24 апреля 2026 (v2 — добавлен пласт функциональности)</span></div>
+    <div class="meta"><span class="k">Ветка источника</span><span class="v">feat/release-card-enhancements</span></div>
+    <div class="meta"><span class="k">База Jira для сравнения</span><span class="v">Jira Software DC 9.x (vanilla)</span></div>
+    <div class="meta"><span class="k">Автор анализа</span><span class="v">auto-scan модулей backend + frontend</span></div>
+    <div class="meta"><span class="k">Скоуп</span><span class="v">админка + функциональность end-user</span></div>
+    <div class="meta"><span class="k">План реализации</span><span class="v"><a href="tz/MVP2JIRA/INDEX.md" style="color:#7dd3fc;">docs/tz/MVP2JIRA/</a></span></div>
+  </div>
+</header>
+
+<div class="callout warn">
+  <strong>Версия 4 (2026-04-24):</strong> v2 добавила <b>функциональную часть</b>, v3 — анализ <b>Стэка &amp; Enterprise</b> на 5 000 users, v4 — отдельную вкладку <b>«Yandex Tracker»</b> с референсным сравнением (SaaS + Enterprise on-prem, РФ-альтернатива Jira).
+</div>
+
+<nav class="tabs" role="tablist">
+  <button type="button" data-tab="summary" class="active" role="tab"><span class="tab-icon">📊</span> Саммари <span class="tab-sub">гэпы и оценка</span></button>
+  <button type="button" data-tab="admin" role="tab"><span class="tab-icon">⚙️</span> Админка <span class="tab-sub">детали</span></button>
+  <button type="button" data-tab="functional" role="tab"><span class="tab-icon">🧩</span> Функциональность <span class="tab-sub">детали</span></button>
+  <button type="button" data-tab="enterprise" role="tab"><span class="tab-icon">🏢</span> Стэк &amp; Enterprise <span class="tab-sub">5000 users</span></button>
+  <button type="button" data-tab="ytracker" role="tab"><span class="tab-icon">🟡</span> Yandex Tracker <span class="tab-sub">референс</span></button>
+</nav>
+
+<!-- =========================================================================
+     ВКЛАДКА 1 — САММАРИ
+     ========================================================================= -->
+<div id="summary" class="tab-panel active" role="tabpanel">
+
+<section class="section">
+  <h2>Ключевое саммари — административная и функциональная части</h2>
+  <p class="sub">Сколько закрыто от коробочной Jira, где дыры, где TaskTime уже впереди. Цифры получены обходом <code>backend/src/modules</code>, <code>frontend/src/pages</code>, <code>prisma/schema.prisma</code> и <code>docs/user-manual/features/</code>.</p>
+
+  <div class="legend">
+    <div class="item"><span class="badge ok">Есть</span></div>
+    <div class="item"><span class="badge partial">Частично</span></div>
+    <div class="item"><span class="badge missing">Нет</span></div>
+    <div class="item"><span class="badge win">Лучше, чем в Jira</span></div>
+    <div class="item"><span class="badge p0">P0</span> блокер запуска</div>
+    <div class="item"><span class="badge p1">P1</span> критично</div>
+    <div class="item"><span class="badge p2">P2</span> важно</div>
+    <div class="item"><span class="badge p3">P3</span> nice-to-have</div>
+  </div>
+
+  <div class="kpi-group-title">Администрирование</div>
+  <div class="summary">
+    <div class="kpi ok"><div class="label">Покрыто от Jira</div><div class="val">~55%</div></div>
+    <div class="kpi p0"><div class="label">P0 гэпов</div><div class="val">4</div></div>
+    <div class="kpi p1"><div class="label">P1 гэпов</div><div class="val">6</div></div>
+    <div class="kpi p2"><div class="label">P2 гэпов</div><div class="val">4</div></div>
+    <div class="kpi win"><div class="label">Сильнее Jira</div><div class="val">5</div></div>
+  </div>
+
+  <div class="kpi-group-title fn">Бизнес-функциональность</div>
+  <div class="summary">
+    <div class="kpi ok"><div class="label">Покрыто от Jira</div><div class="val">~60%</div></div>
+    <div class="kpi p0"><div class="label">P0 гэпов</div><div class="val">1</div></div>
+    <div class="kpi p1"><div class="label">P1 гэпов</div><div class="val">7</div></div>
+    <div class="kpi p2"><div class="label">P2 гэпов</div><div class="val">6</div></div>
+    <div class="kpi win"><div class="label">Сильнее Jira</div><div class="val">7</div></div>
+  </div>
+
+  <p style="margin: 8px 0 0; font-size: 14px; color: var(--muted);">
+    <b>Короткий вердикт:</b> TaskTime ближе к Jira по <b>сквозным абстракциям</b> (Workflow / Screens / Field Schemas) и <b>опережает</b> её по <b>релизному контуру</b> (Release Workflows + Checkpoints + Burndown), <b>AI/MCP</b>, <b>гибкому Role Scheme</b>, <b>бесшовной интеграции с GitLab</b> и <b>TTQL-поиску</b>. Но на уровне <b>end-user фич</b> не хватает двух столпов: <b>вложений</b> и <b>уведомлений/коммуникаций</b> (watchers, @mentions, email, in-app bell). Плюс <b>agile-отчётности</b> (Velocity, CFD, Sprint Report).
+  </p>
+</section>
+
+<section class="section">
+  <h2>Где TaskTime уже сильнее коробочной Jira</h2>
+  <p class="sub">Уникальные конкурентные преимущества — их нельзя терять при реализации гэпов.</p>
+  <div class="cols-2">
+    <div>
+      <div class="col-title">Админка</div>
+      <div class="crit-block win">
+        <ul>
+          <li><b>Role Scheme с 33 permission-флагами</b> — плотнее, чем стандартная Permission Scheme Jira.</li>
+          <li><b>Field Schemas с 4-уровневым scope</b> — GLOBAL / PROJECT / ISSUE_TYPE / PROJECT+ISSUE_TYPE из коробки.</li>
+          <li><b>Release Workflows + Statuses + Checkpoint Templates</b> — отдельный lifecycle релиза с конструктором.</li>
+          <li><b>Custom Field type REFERENCE</b> — собственный справочник (в Jira — только Marketplace).</li>
+          <li><b>UAT-тесты в админке</b> — встроенный онбординг-чеклист для ролей, нет у Jira.</li>
+          <li><b>Monitoring Page</b> — системные / endpoint / page метрики, auto-refresh 30s.</li>
+          <li><b>MCP-сервер как first-class</b> — в Jira DC вообще не существует.</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="col-title">Функциональность</div>
+      <div class="crit-block win">
+        <ul>
+          <li><b>Release Checkpoints</b> — детерминированные release-gates с preview, risk scoring (LOW / MEDIUM / HIGH / CRITICAL), матрицей issue × checkpoint, аудитом. В Jira DC такого нет.</li>
+          <li><b>Release Burndown</b> — actual + ideal, daily snapshots, retention. Jira DC — только sprint burndown.</li>
+          <li><b>TTQL с release-/checkpoint-функциями</b> — <code>violatedCheckpoints()</code>, <code>releasePlannedDate()</code>, <code>currentUser()</code>. Семантически богаче, чем JQL.</li>
+          <li><b>AI-декомпозиция Epic → Subtasks</b> + оценка часов через Claude, сессии логируются с токенами и стоимостью.</li>
+          <li><b>GitLab webhooks из коробки</b> — auto-transition по <code>MR open/merge</code>, без Marketplace-плагина.</li>
+          <li><b>Bulk-operations с friendly-пикерами и CSV/XLSX-экспортом</b> — в Jira DC экспорт через отдельный шаг.</li>
+          <li><b>Teams (Business + Flow)</b> + Operations + UAT Tests — орг-абстракции, которых в Jira нет.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Блокеры и критичные гэпы</h2>
+  <p class="sub">Сгруппировано по уровню, раздельно для админки и функциональности. Ссылки на ТЗ (<code>TTxxx-N</code>) ведут в <code>docs/tz/MVP2JIRA/</code>.</p>
+
+  <div class="cols-2">
+
+    <!-- АДМИНКА -->
+    <div>
+      <div class="col-title">Админка — 4 P0 / 6 P1 / 4 P2</div>
+
+      <div class="crit-block p0">
+        <h3><span class="badge p0">P0</span> Блокеры продакшна — 4 ТЗ</h3>
+        <ul>
+          <li><b>Event Bus</b> — <a href="tz/MVP2JIRA/TTBUS-0.md">TTBUS-0</a> (54ч). Kafka (KRaft) + transactional outbox. Prerequisite для Notifications и Webhooks.</li>
+          <li><b>Notifications (Email + in-app bell)</b> — <a href="tz/MVP2JIRA/TTNOTIF-1.md">TTNOTIF-1</a> (110ч). SMTP, Notification Scheme per-project, watchers, mention-parser.</li>
+          <li><b>Resolutions</b> — <a href="tz/MVP2JIRA/TTRES-1.md">TTRES-1</a> (33ч). 5 системных + TTQL.</li>
+          <li><b>Issue Security</b> — <a href="tz/MVP2JIRA/TTSEC-3.md">TTSEC-3</a> (52ч). PUBLIC / TEAM / PRIVATE + extras + permission.</li>
+          <li><s>Backup/Restore в приложении</s> — закрывается DevOps (<code>pg_dump</code>, snapshots, Git).</li>
+        </ul>
+      </div>
+
+      <div class="crit-block p1">
+        <h3><span class="badge p1">P1</span> Критично для прома — 6 ТЗ</h3>
+        <ul>
+          <li><b>SSO / OIDC</b> — <a href="tz/MVP2JIRA/TTSSO-1.md">TTSSO-1</a> (102ч).</li>
+          <li><b>Password Policy + Audit Log UI + Banner</b> — <a href="tz/MVP2JIRA/TTSEC-4.md">TTSEC-4</a> (63ч).</li>
+          <li><b>Priorities CRUD + Status reconciliation</b> — <a href="tz/MVP2JIRA/TTCORE-1.md">TTCORE-1</a> (63ч).</li>
+          <li><b>Components + fix/affectsVersion</b> — <a href="tz/MVP2JIRA/TTPROJ-1.md">TTPROJ-1</a> (48ч).</li>
+          <li><b>Screens (контекст полей)</b> — <a href="tz/MVP2JIRA/TTSCR-1.md">TTSCR-1</a> (24ч).</li>
+          <li><b>Attachments (full feature)</b> — <a href="tz/MVP2JIRA/TTATTACH-1.md">TTATTACH-1</a> (84ч).</li>
+        </ul>
+      </div>
+
+      <div class="crit-block p2">
+        <h3><span class="badge p2">P2</span> Важно, но не блокирует — 4 ТЗ</h3>
+        <ul>
+          <li><b>2FA / TOTP</b> — <a href="tz/MVP2JIRA/TTMFA-1.md">TTMFA-1</a> (68ч).</li>
+          <li><b>Webhooks (system + project)</b> — <a href="tz/MVP2JIRA/TTINTEG-1.md">TTINTEG-1</a> (70ч).</li>
+          <li><b>Time Tracking parser + auto-stop</b> — <a href="tz/MVP2JIRA/TTCFG-1.md">TTCFG-1</a> (23ч).</li>
+          <li><b>Look &amp; Feel (брендинг)</b> — <a href="tz/MVP2JIRA/TTBRAND-1.md">TTBRAND-1</a> (32ч).</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ФУНКЦИОНАЛЬНОСТЬ -->
+    <div>
+      <div class="col-title">Функциональность — 1 P0 / 7 P1 / 6 P2</div>
+
+      <div class="crit-block p0">
+        <h3><span class="badge p0">P0</span> Блокеры прод-использования</h3>
+        <p class="scope">На самом уровне задач, без чего нельзя эксплуатировать трекер.</p>
+        <ul>
+          <li><b>Attachments на задачах и комментариях</b> — в модели нет <code>Attachment</code>, нет <code>multer</code>, нет upload-endpoint'а. Закрывается тем же ТЗ <a href="tz/MVP2JIRA/TTATTACH-1.md">TTATTACH-1</a>. Без вложений в реальном bug tracking невозможны скриншоты, логи, артефакты.</li>
+        </ul>
+      </div>
+
+      <div class="crit-block p1">
+        <h3><span class="badge p1">P1</span> Критично для полноценной работы команды</h3>
+        <ul>
+          <li><b>Watchers + @mentions в комментариях</b> — требует <a href="tz/MVP2JIRA/TTNOTIF-1.md">TTNOTIF-1</a>. Без этого пользователи не узнают об изменениях.</li>
+          <li><b>In-app bell (история уведомлений)</b> — через ту же TTNOTIF-1.</li>
+          <li><b>Velocity chart</b> (средняя скорость команды за N спринтов). Требует Story Points или опоры на <code>estimatedHours</code>. <span class="badge p1">Новое ТЗ</span></li>
+          <li><b>Sprint Report</b> (commitment vs completed, added / removed scope) — базовая agile-отчётность. <span class="badge p1">Новое ТЗ</span></li>
+          <li><b>Cumulative Flow Diagram</b> — wip-поток по статусам во времени. <span class="badge p1">Новое ТЗ</span></li>
+          <li><b>Persistent Activity stream per issue</b> — сейчас <code>audit_logs</code> есть, но нет UI «история задачи на вкладке». <span class="badge p1">Новое ТЗ</span></li>
+          <li><b>CSV/XLSX import задач</b> — критично для миграции из Jira / Excel. <span class="badge p1">Новое ТЗ</span></li>
+        </ul>
+      </div>
+
+      <div class="crit-block p2">
+        <h3><span class="badge p2">P2</span> Важно, но обходится</h3>
+        <ul>
+          <li><b>Kanban swimlanes</b> (по assignee / epic / priority).</li>
+          <li><b>WIP-лимиты на колонках доски</b> с жёстким enforcement.</li>
+          <li><b>Roadmap / Timeline view</b> (аналог Advanced Roadmaps в base Jira DC тоже нет, но ожидается).</li>
+          <li><b>Personal Dashboards с виджетами</b> — сейчас единый read-only дашборд проекта.</li>
+          <li><b>Story Points как first-class</b> — сейчас только <code>estimatedHours</code>.</li>
+          <li><b>Reactions / pinned / edit-history на комментариях</b>.</li>
+        </ul>
+      </div>
+
+      <div class="crit-block p3">
+        <h3><span class="badge p3">P3</span> Nice-to-have / отложено</h3>
+        <ul>
+          <li>Gantt chart / dependency graph.</li>
+          <li>Mobile app / offline mode.</li>
+          <li>Visual query builder (JQL builder) — у нас есть help-страница <code>/search/help</code>.</li>
+          <li>Shared Dashboards admin-управление.</li>
+          <li>Comment reactions.</li>
+          <li>Time in Status / Control Chart / Cycle Time report.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section">
+  <h2>Итоговая оценка реализации гэпов</h2>
+  <p class="sub">Сводная матрица по всем областям. Колонка «Эффект на MVP-ready» показывает, насколько закрытие гэпа приближает к production для корпоративного заказчика.</p>
+
+  <table class="cmp">
+    <thead><tr>
+      <th style="width: 6%">Слой</th>
+      <th style="width: 22%">Область</th>
+      <th style="width: 10%">Покрытие</th>
+      <th style="width: 10%">Крит-ть</th>
+      <th style="width: 14%">Трудозатраты</th>
+      <th>Эффект на MVP-ready</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Админ</td><td>SMTP + Notification Scheme + in-app bell</td><td><span class="badge missing">0%</span></td><td><span class="badge p0">P0</span></td><td>110ч + 54ч infra</td><td class="note">Разблокирует коммуникационный pillar: watchers, mentions, подписки, рассылки. Без него команда работает вслепую.</td></tr>
+      <tr><td>Админ</td><td>Resolutions</td><td><span class="badge missing">0%</span></td><td><span class="badge p0">P0</span></td><td>33ч</td><td class="note">Закрывает сценарий «Won't Do / Duplicate / Can't Reproduce». Нужен для корректных DONE-переходов и отчётности.</td></tr>
+      <tr><td>Админ</td><td>Issue Security</td><td><span class="badge missing">0%</span></td><td><span class="badge p0">P0</span></td><td>52ч</td><td class="note">Compliance + корп-контур. Без Issue Security невозможно скрыть HR/Security-задачи от остальной команды проекта.</td></tr>
+      <tr><td>Функц.</td><td>Attachments (full feature)</td><td><span class="badge missing">0%</span></td><td><span class="badge p0">P0</span></td><td>84ч</td><td class="note">Базовая функция трекера. Пока её нет — любая операционная работа (bug reports со скриншотами, логи) невозможна.</td></tr>
+      <tr><td>Админ</td><td>SSO / OIDC</td><td><span class="badge missing">0%</span></td><td><span class="badge p1">P1</span></td><td>102ч</td><td class="note">Требование корп-контура. Без SSO невозможно автопровижн и массовый онбординг.</td></tr>
+      <tr><td>Админ</td><td>Priorities CRUD + Status reconciliation</td><td><span class="badge partial">~40%</span></td><td><span class="badge p1">P1</span></td><td>63ч</td><td class="note">Убирает хард-энум и двойное моделирование Issue.status / workflowStatusId.</td></tr>
+      <tr><td>Админ</td><td>Password Policy + Audit UI + Banner</td><td><span class="badge partial">~30%</span></td><td><span class="badge p1">P1</span></td><td>63ч</td><td class="note">Audit таблица уже есть, но нет UI; policy захардкожен — нужна админ-страница.</td></tr>
+      <tr><td>Админ</td><td>Components + fix/affectsVersion</td><td><span class="badge missing">0%</span></td><td><span class="badge p1">P1</span></td><td>48ч</td><td class="note">Для крупных проектов без компонент организовать работу практически нельзя.</td></tr>
+      <tr><td>Админ</td><td>Screens (контекст полей)</td><td><span class="badge partial">~40%</span></td><td><span class="badge p1">P1</span></td><td>24ч</td><td class="note">Field Schema есть, но нет showOnCreate/Edit/View — добавляется 3 флагами.</td></tr>
+      <tr><td>Функц.</td><td>Watchers + @mentions</td><td><span class="badge missing">0%</span></td><td><span class="badge p1">P1</span></td><td>входит в TTNOTIF-1</td><td class="note">Разблокируется вместе с Notifications pillar.</td></tr>
+      <tr><td>Функц.</td><td>Velocity / CFD / Sprint Report</td><td><span class="badge missing">0%</span></td><td><span class="badge p1">P1</span></td><td>~80–120ч суммарно</td><td class="note">Трио классической agile-отчётности. Без них Scrum-команда лишена ретроспективных метрик.</td></tr>
+      <tr><td>Функц.</td><td>CSV/XLSX import issues</td><td><span class="badge missing">0%</span></td><td><span class="badge p1">P1</span></td><td>~30–40ч</td><td class="note">Обязательно для миграции с Jira / Excel. Bulk export уже есть — import несимметричен.</td></tr>
+      <tr><td>Функц.</td><td>Activity stream per issue (UI)</td><td><span class="badge partial">~50%</span></td><td><span class="badge p1">P1</span></td><td>~20–30ч</td><td class="note">Данные в <code>audit_logs</code> есть, нужна только агрегированная вкладка на странице задачи.</td></tr>
+      <tr><td>Админ</td><td>2FA / TOTP</td><td><span class="badge missing">0%</span></td><td><span class="badge p2">P2</span></td><td>68ч</td><td class="note">Ожидается в корп-контуре, но паритет с Jira (там тоже нет из коробки).</td></tr>
+      <tr><td>Админ</td><td>Webhooks admin UI</td><td><span class="badge partial">~30%</span></td><td><span class="badge p2">P2</span></td><td>70ч</td><td class="note">Есть notifier для checkpoints; нужен универсальный UI.</td></tr>
+      <tr><td>Функц.</td><td>Kanban swimlanes + WIP</td><td><span class="badge missing">0%</span></td><td><span class="badge p2">P2</span></td><td>~40–60ч</td><td class="note">Увеличивает потолок сложности команд 20+ человек.</td></tr>
+      <tr><td>Функц.</td><td>Story Points (first-class)</td><td><span class="badge partial">(через hours)</span></td><td><span class="badge p2">P2</span></td><td>~20ч</td><td class="note">Есть estimatedHours; Points — отдельная культурная единица, добавляется полем / CF.</td></tr>
+      <tr><td>Функц.</td><td>Personal Dashboards с виджетами</td><td><span class="badge missing">0%</span></td><td><span class="badge p2">P2</span></td><td>~80ч</td><td class="note">Сейчас дашборд один на проект, read-only.</td></tr>
+      <tr><td>Функц.</td><td>Roadmap / Timeline</td><td><span class="badge missing">0%</span></td><td><span class="badge p2">P2</span></td><td>~100ч</td><td class="note">В vanilla Jira DC тоже нет — покрывается по запросу PM-команд.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout ok">
+    <strong>Оценка сверху:</strong> закрытие всех P0 (≈ 333ч — админка + attachments) + всех критических P1 (≈ 430ч) = <b>~760 часов</b> (≈ 4–5 команд-месяцев).
+    Это приведёт трекер к уровню, в котором его можно заменять Jira для любой <b>среднего размера ИТ-организации</b> (50–300 пользователей) без ощутимых потерь и с явным выигрышем по релизному контуру, AI, интеграциям и кастомизации полей.
+  </div>
+</section>
+
+<section id="recommend" class="section">
+  <h2>Рекомендованный план дозакрытия до MVP-ready</h2>
+  <p class="sub">Минимально необходимый набор для закрытия P0 и наиболее болезненных P1. Объём — ориентировочные спринты (2 недели). Полный план: <a href="tz/MVP2JIRA/mvp2jira_plan.md"><code>mvp2jira_plan.md</code></a>.</p>
+
+  <div class="callout">
+    <strong>14 отдельных ТЗ в <a href="tz/MVP2JIRA/INDEX.md"><code>docs/tz/MVP2JIRA/</code></a>.</strong>
+    Scenarios: single-team ~14 спринтов / two-teams ~9 спринтов.
+  </div>
+
+  <table class="cmp">
+    <thead><tr><th style="width: 3%">#</th><th style="width: 28%">Инициатива</th><th style="width: 10%">Крит-ть</th><th style="width: 12%">Объём</th><th>Что входит</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Event Bus + Email + in-app notifications (pillar)</td><td><span class="badge p0">P0</span></td><td>3 спринта</td><td class="note">Kafka outbox (TTBUS-0) + SMTP / Notification Scheme (TTNOTIF-1). Разблокирует watchers, mentions, webhook-notifier.</td></tr>
+      <tr><td>2</td><td>Resolutions</td><td><span class="badge p0">P0</span></td><td>0.5 спринта</td><td class="note">TTRES-1: модель + 5 системных + TTQL-фильтр.</td></tr>
+      <tr><td>3</td><td>Issue Security</td><td><span class="badge p0">P0</span></td><td>1 спринт</td><td class="note">TTSEC-3: PUBLIC / TEAM / PRIVATE + permission ISSUES_CHANGE_VISIBILITY.</td></tr>
+      <tr><td>4</td><td>Attachments (full feature)</td><td><span class="badge p0">P0</span></td><td>1.5 спринта</td><td class="note">TTATTACH-1: модель + pluggable storage + thumbnails + inherit permissions + undo-delete.</td></tr>
+      <tr><td>5</td><td>SSO / OIDC</td><td><span class="badge p1">P1</span></td><td>2 спринта</td><td class="note">TTSSO-1: несколько IdP, JIT provisioning, маппинг групп.</td></tr>
+      <tr><td>6</td><td>Password Policy + Audit Log UI + Banner</td><td><span class="badge p1">P1</span></td><td>1 спринт</td><td class="note">TTSEC-4: админ-UI + deep-diff drawer + баннер.</td></tr>
+      <tr><td>7</td><td>Priorities CRUD + Status reconciliation</td><td><span class="badge p1">P1</span></td><td>1 спринт</td><td class="note">TTCORE-1: enum → таблица + dual-field API на переход.</td></tr>
+      <tr><td>8</td><td>Components + Versions</td><td><span class="badge p1">P1</span></td><td>1 спринт</td><td class="note">TTPROJ-1: M:M Components + fix / affectsVersion.</td></tr>
+      <tr><td>9</td><td>Screens (контекст полей)</td><td><span class="badge p1">P1</span></td><td>0.5 спринта</td><td class="note">TTSCR-1: 3 флага на FieldSchemaItem + 7 virtual system fields.</td></tr>
+      <tr><td>10</td><td>Velocity + Sprint Report + CFD</td><td><span class="badge p1">P1</span></td><td>2 спринта</td><td class="note">Agile-отчётность: три графика на основе sprint-scope snapshots и status-transition log.</td></tr>
+      <tr><td>11</td><td>CSV/XLSX import задач</td><td><span class="badge p1">P1</span></td><td>0.5 спринта</td><td class="note">Симметрия к существующему bulk-export. Mapping: summary, type, status (по имени), assignee (email), custom fields.</td></tr>
+      <tr><td>12</td><td>Activity stream per issue (UI)</td><td><span class="badge p1">P1</span></td><td>0.5 спринта</td><td class="note">Новая вкладка на странице задачи, агрегация из audit_logs. Данные уже индексированы.</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top: 16px; font-size: 13.5px; color: var(--muted);">
+    Итог: <b>≈ 14 спринтов</b> full-time на команду, чтобы закрыть все P0 + критические P1 обоих пластов. Если срезать до <b>только P0</b>, получается ≈ 6 спринтов (3 месяца).
+  </p>
+</section>
+
+</div>
+<!-- /ВКЛАДКА 1 -->
+
+<!-- =========================================================================
+     ВКЛАДКА 2 — АДМИНКА, ДЕТАЛИ
+     ========================================================================= -->
+<div id="admin" class="tab-panel" role="tabpanel">
+
+<div class="toc-inline">
+  <strong>Содержание</strong>
+  <a href="#system">1. Система</a>
+  <a href="#users">2. Пользователи и доступы</a>
+  <a href="#projects">3. Проекты</a>
+  <a href="#issues-taxonomy">4. Таксономия задач</a>
+  <a href="#workflow">5. Workflow и Screens</a>
+  <a href="#fields">6. Поля и схемы</a>
+  <a href="#notifications">7. Уведомления</a>
+  <a href="#integrations">8. Интеграции</a>
+  <a href="#observability">9. Аудит и обслуживание</a>
+</div>
+
+<section id="system" class="section">
+  <h2>1. Система — общие настройки, безопасность, почта</h2>
+  <p class="sub">Соответствует блокам «System», «Security» и «Mail» в Jira Administration.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>General Configuration (base URL, app title)</td><td>частично <code>AdminSystemPage</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Из настроек — только сессия (TTL) и JWT exp (read-only). Нет base URL, заголовка, tz, контактов админа.</td></tr>
+      <tr><td>Outgoing Mail (SMTP)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Нет <code>nodemailer</code>, SMTP-клиента и модуля почты. Любые уведомления невозможны.</td></tr>
+      <tr><td>Incoming Mail Handlers</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Создание задачи из письма — отсутствует.</td></tr>
+      <tr><td>Session &amp; JWT</td><td><code>AdminSystemPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Скользящая сессия 5–10080 мин. JWT_EXPIRES_IN — ENV, только чтение.</td></tr>
+      <tr><td>Password Policy</td><td>валидация в коде (CVE-11)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Правила хард-кодом, без админ-UI. Нет policy: срок, история, сложность, блокировка.</td></tr>
+      <tr><td>Captcha on login</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Есть rate-limit, но CAPTCHA после N fails — нет.</td></tr>
+      <tr><td>2FA / MFA</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">В коробочной Jira тоже нет — паритет, но корпоративно ожидается.</td></tr>
+      <tr><td>SSO / LDAP / SAML / OIDC</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Проверено: в backend нет упоминаний <code>ldap / saml / oauth / oidc / sso</code>.</td></tr>
+      <tr><td>Регистрация пользователей (toggle)</td><td><code>AdminUsersPage</code> → Registration switch</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Переключатель на странице пользователей.</td></tr>
+      <tr><td>Announcement Banner</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Нужен для maintenance-окна и релиз-анонсов.</td></tr>
+      <tr><td>Look and Feel (лого, цвета)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Только Ant Design дефолт.</td></tr>
+      <tr><td>Internationalization</td><td>RU hard-coded</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Исключено из списка ТЗ — UI остаётся RU-only.</td></tr>
+      <tr><td>Attachments (функционал вложений)</td><td>— <b>(нет функционала)</b></td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">В модели нет Attachment. Полноценная фича: TTATTACH-1 (доп. детали на вкладке «Функциональность»).</td></tr>
+      <tr><td>Backup / Restore</td><td>—</td><td><span class="badge na">Out-of-scope</span></td><td><span class="badge p3">P3</span></td><td class="note">Закрывается через DevOps: <code>pg_dump</code> cron на хосте, снэпшоты дисков.</td></tr>
+      <tr><td>Services (scheduled jobs)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Кроны работают, но управлять ими из UI нельзя.</td></tr>
+      <tr><td>License</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Актуально только для коммерческой self-hosted модели.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="users" class="section">
+  <h2>2. Пользователи, группы и доступы</h2>
+  <p class="sub">Соответствует «User Management» в Jira.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Users</td><td><code>AdminUsersPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">CRUD, выдача temp-пароля, deactivate с проверкой зависимостей, <code>mustChangePassword</code>.</td></tr>
+      <tr><td>Groups</td><td><code>AdminGroupsPage</code> + <code>AdminGroupDetailPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Группы + вложенность ролей проекта (<code>ProjectGroupRole</code>) через TTSEC-2.</td></tr>
+      <tr><td>Global Permissions</td><td><code>SystemRoleType</code> (5 ролей)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Роли <i>SUPER_ADMIN / ADMIN / RELEASE_MANAGER / USER / AUDITOR</i>, но нет отдельной матрицы глобальных разрешений.</td></tr>
+      <tr><td>Project Roles (глобально)</td><td><code>AdminRolesPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">CRUD глобальных ролей.</td></tr>
+      <tr><td>Role Schemes (per project)</td><td><code>AdminRoleSchemesPage</code> + <code>PermissionMatrixDrawer</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Матрица 33 permission-флагов на роль — <b>плотнее</b> чем стандартная Permission Scheme Jira.</td></tr>
+      <tr><td>Permission Scheme (независимая)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Jira отделяет Permission Scheme от Role Scheme. TaskTime объединил — осознанное упрощение, но может мешать при требованиях «разные проекты — разные права для одной и той же роли».</td></tr>
+      <tr><td>User directories (LDAP / Crowd)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Пользователи только внутренние.</td></tr>
+      <tr><td>Issue Security Scheme</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Нельзя скрыть отдельные задачи от части участников проекта.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="projects" class="section">
+  <h2>3. Проекты</h2>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Projects (CRUD, lead, key)</td><td><code>AdminProjectsPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Управление проектами и настройками.</td></tr>
+      <tr><td>Project Categories</td><td><code>AdminCategoriesPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Категоризация проектов.</td></tr>
+      <tr><td>Components (подсистемы внутри проекта)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Нет моделей <code>Component</code>. Для крупных проектов — ограничение.</td></tr>
+      <tr><td>Versions / Fix Version</td><td><code>Release</code> + <code>ReleaseItem</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Есть концепция Releases с checkpoints, но нет полей <code>fixVersion / affectsVersion</code> на задаче в чистом виде.</td></tr>
+      <tr><td>Project Templates</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Нельзя клонировать проект с настройками как шаблон.</td></tr>
+      <tr><td>Default Assignee</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">В Jira — project lead / component lead / unassigned.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="issues-taxonomy" class="section">
+  <h2>4. Таксономия задач — типы, приоритеты, статусы, резолюции</h2>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Issue Types (CRUD, иконки)</td><td><code>IssueTypeConfig</code> + <code>AdminIssueTypeConfigsPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Настраиваемый тип с иконкой / цветом.</td></tr>
+      <tr><td>Issue Type Schemes</td><td><code>AdminIssueTypeSchemesPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Привязка набора типов к проекту (<code>IssueTypeSchemeProject</code>).</td></tr>
+      <tr><td>Priorities (CRUD)</td><td>enum <code>IssuePriority</code></td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Жёсткий enum <i>CRITICAL / HIGH / MEDIUM / LOW</i>. Нет админ-UI, нельзя добавить «Blocker / Trivial» или сменить иконки.</td></tr>
+      <tr><td>Statuses (глобальные)</td><td><code>WorkflowStatus</code> + <code>AdminWorkflowStatusesPage</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Есть таблица, но одновременно используется enum <code>IssueStatus</code> в <code>Issue.status</code> — двойное моделирование.</td></tr>
+      <tr><td>Resolutions</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Нет ни модели, ни поля на задаче. Сценарий «закрыто как Won't Do / Duplicate» невозможен.</td></tr>
+      <tr><td>Labels</td><td><code>CustomFieldType.LABEL</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Через кастом-поле типа LABEL.</td></tr>
+      <tr><td>Issue Link Types</td><td><code>AdminLinkTypesPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">CRUD, inbound / outbound имена, флаг system.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="workflow" class="section">
+  <h2>5. Workflow и Screens</h2>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Workflows (steps + transitions)</td><td><code>AdminWorkflowEditorPage</code> + <code>workflow-engine</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Полный конструктор с condition / validator / post-function. Системные workflow защищены.</td></tr>
+      <tr><td>Workflow Schemes</td><td><code>AdminWorkflowSchemesPage</code> + editor</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Привязка workflow → issue type → проект.</td></tr>
+      <tr><td>Transition Screens</td><td><code>AdminTransitionScreensPage</code> + editor</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Экраны, показываемые при выполнении перехода.</td></tr>
+      <tr><td>View / Edit / Create Screens</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Поля на просмотр / редактирование / создание управляются Field Schema. TTSCR-1 закроет.</td></tr>
+      <tr><td>Screen Schemes / Issue Type Screen Schemes</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">В Jira — связка создание / просмотр / правка → экран.</td></tr>
+      <tr><td>Release Workflows (уникальная фича)</td><td><code>AdminReleaseWorkflowsPage</code> + editor, <code>AdminReleaseStatusesPage</code>, checkpoints</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Доп. ценность vs Jira — отдельный workflow для lifecycle релиза с checkpoint-типами и шаблонами.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="fields" class="section">
+  <h2>6. Поля и схемы полей</h2>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Custom Fields (CRUD, типы)</td><td><code>AdminCustomFieldsPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">13 типов: TEXT / TEXTAREA / NUMBER / DECIMAL / DATE / DATETIME / URL / CHECKBOX / SELECT / MULTI_SELECT / USER / LABEL / REFERENCE.</td></tr>
+      <tr><td>Field Configurations</td><td><code>FieldSchema</code> + <code>AdminFieldSchemasPage</code> + detail</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Items = поля, <code>isRequired</code>, <code>showOnKanban</code>. Draft / Active статус.</td></tr>
+      <tr><td>Field Configuration Schemes</td><td><code>FieldSchemaBinding</code> (GLOBAL / PROJECT / ISSUE_TYPE / PROJECT_ISSUE_TYPE)</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Богаче Jira: 4-уровневая область применения.</td></tr>
+      <tr><td>Default / System fields в UI</td><td>встроены в Issue</td><td><span class="badge partial">Частично</span></td><td><span class="badge p3">P3</span></td><td class="note">Системные поля (summary, description, assignee, priority) не редактируются через Field Schema.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="notifications" class="section">
+  <h2>7. Уведомления, события, почта</h2>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Events (системный реестр)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Нет реестра событий «issue created / assigned / commented».</td></tr>
+      <tr><td>Event Listeners</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">—</td></tr>
+      <tr><td>Notification Schemes</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Нельзя определить «на событие X шлём email роли Y / пользователю Z».</td></tr>
+      <tr><td>In-app notifications</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Нет колокольчика и истории уведомлений пользователя.</td></tr>
+      <tr><td>Outgoing Mail (SMTP)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Корневая блокировка всего pillar'а уведомлений.</td></tr>
+      <tr><td>Mail Templates</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="integrations" class="section">
+  <h2>8. Интеграции</h2>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>DVCS (GitLab / GitHub / Bitbucket)</td><td><code>integrations/gitlab</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">GitLab webhooks + pipeline-service из коробки. В Jira DC — через Marketplace.</td></tr>
+      <tr><td>Webhooks (админ-реестр)</td><td>частично (есть <code>webhook-notifier</code> для checkpoints)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Нет универсального UI «добавить свой webhook на событие».</td></tr>
+      <tr><td>Application Links / OAuth between apps</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">—</td></tr>
+      <tr><td>AI / MCP</td><td><code>mcp/http-transport.ts</code> + <code>ai</code> / <code>ai-sessions</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">MCP-сервер — уникальная фича vs Jira.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="observability" class="section">
+  <h2>9. Аудит, мониторинг, обслуживание</h2>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Раздел Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Audit Log (UI)</td><td><code>audit_logs</code> в БД; <code>AdminCheckpointAuditPage</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Таблица и индексы есть. Нет общего админ-UI просмотра / фильтра (TTSEC-4).</td></tr>
+      <tr><td>Monitoring / Performance</td><td><code>AdminMonitoringPage</code> + <code>AdminMonitoringTab</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">System / endpoint / page метрики, auto-refresh 30s, clear.</td></tr>
+      <tr><td>Logging &amp; Profiling</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Только через docker-логи.</td></tr>
+      <tr><td>Reindex (Lucene)</td><td>—</td><td><span class="badge na">—</span></td><td><span class="badge p3">P3</span></td><td class="note">Не требуется — поиск на PostgreSQL + TTQL compiler.</td></tr>
+      <tr><td>Integrity Checker</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">—</td></tr>
+      <tr><td>Backup / Restore</td><td>—</td><td><span class="badge na">Out-of-scope</span></td><td><span class="badge p3">P3</span></td><td class="note">DevOps (pg_dump + snapshots).</td></tr>
+      <tr><td>UAT-тесты</td><td><code>uat-tests.data.ts</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Своя админ-фича, нет у Jira.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div>
+<!-- /ВКЛАДКА 2 -->
+
+<!-- =========================================================================
+     ВКЛАДКА 3 — ФУНКЦИОНАЛЬНОСТЬ, ДЕТАЛИ
+     ========================================================================= -->
+<div id="functional" class="tab-panel" role="tabpanel">
+
+<div class="toc-inline">
+  <strong>Содержание</strong>
+  <a href="#f-issues">F1. Задачи и иерархия</a>
+  <a href="#f-boards">F2. Доски (Kanban)</a>
+  <a href="#f-sprints">F3. Scrum: спринты и бэклог</a>
+  <a href="#f-releases">F4. Релизы и чекпоинты</a>
+  <a href="#f-search">F5. Поиск (TTQL) и фильтры</a>
+  <a href="#f-reports">F6. Отчёты и дашборды</a>
+  <a href="#f-time">F7. Учёт времени</a>
+  <a href="#f-collab">F8. Коллаборация</a>
+  <a href="#f-integrations">F9. Интеграции и уникальные фичи</a>
+</div>
+
+<div class="callout">
+  <strong>Про эту вкладку:</strong> здесь сравнивается то, что видит <b>рядовой пользователь</b> — задачи, доски, спринты, релизы, отчёты, поиск, комментарии. Админская конфигурация — на соседней вкладке.
+  База сравнения — <b>Jira Software DC 9.x без Marketplace-плагинов</b>. Это важно: многие «привычные» по Jira фичи (Advanced Roadmaps, Tempo, Structure, Portfolio) — это плагины, в коробочной Jira их нет.
+</div>
+
+<section id="f-issues" class="section">
+  <h2>F1. Задачи и иерархия</h2>
+  <p class="sub">Модель <code>Issue</code>, иерархия parent / child, типы, приоритеты, статусы, пользовательские поля.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Создание / редактирование задачи</td><td><code>IssueDetailPage</code> + <code>CreateIssueModal</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">CRUD, inline-edit полей, permission checks через Role Scheme.</td></tr>
+      <tr><td>Типы задач (Epic / Story / Task / Bug / Subtask)</td><td><code>IssueTypeConfig</code> + <code>IssueTypeScheme</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Полностью настраиваемо. Эпики — просто тип в конфиге.</td></tr>
+      <tr><td>Parent / Subtasks (иерархия)</td><td><code>Issue.parentId</code> self-relation</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Многоуровневая иерархия (Epic → Story → Subtask). Без лимита глубины.</td></tr>
+      <tr><td>Issue Links (depends, blocks, relates)</td><td><code>IssueLink</code> + <code>AdminLinkTypesPage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">CRUD типов линков, inbound / outbound тексты. Паритет с Jira.</td></tr>
+      <tr><td>Priorities</td><td>enum CRITICAL / HIGH / MEDIUM / LOW</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Enum хардкоднут. Иконок / цветов не настроить (см. TTCORE-1).</td></tr>
+      <tr><td>Statuses на задаче</td><td><code>Issue.status</code> (enum) + <code>workflowStatusId</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Двойное моделирование — надо свести к одному источнику (TTCORE-1).</td></tr>
+      <tr><td>Resolution на задаче</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Нет поля / модели. Сценарий «закрыто как Duplicate» невозможен. TTRES-1.</td></tr>
+      <tr><td>Custom Fields per-issue</td><td>13 типов, включая REFERENCE</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">REFERENCE (справочник) — в Jira DC нет, только через Marketplace.</td></tr>
+      <tr><td>Story Points</td><td>есть <code>estimatedHours</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Оценка в часах, не в story points. Для Scrum-команд, работающих в points, — ограничение.</td></tr>
+      <tr><td>Acceptance Criteria</td><td><code>Issue.acceptanceCriteria</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Отдельное поле — удобнее Jira (там через description).</td></tr>
+      <tr><td>Due date / Start date</td><td><code>Issue.dueDate</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p3">P3</span></td><td class="note">Есть dueDate, нет startDate.</td></tr>
+      <tr><td>Attachments на задаче</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note"><b>Ключевая дыра.</b> Нет модели Attachment, нет upload. Нельзя приложить скриншот / лог. TTATTACH-1.</td></tr>
+      <tr><td>Bulk operations (change status / assignee / sprint)</td><td><code>BulkStatusWizardModal</code>, bulk-ops API</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Friendly-пикеры (см. TTBULK-1), CSV / XLSX экспорт из коробки.</td></tr>
+      <tr><td>Issue history (field changes)</td><td><code>audit_logs</code> в БД</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Данные пишутся, но нет вкладки «История» на странице задачи. Нужен UI.</td></tr>
+      <tr><td>Flagged / impediments</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Можно эмулировать через custom field.</td></tr>
+      <tr><td>Voting</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Мало используется, не критично.</td></tr>
+      <tr><td>Cloning issue</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">В Jira клонирование с переносом полей / субтасков.</td></tr>
+      <tr><td>Move Issue (между проектами)</td><td><code>MoveIssueModal</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Готово, с валидацией совместимости схем.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-boards" class="section">
+  <h2>F2. Доски — Kanban</h2>
+  <p class="sub">Доска проекта для визуализации потока задач. <code>BoardPage</code> + <code>KanbanBoard</code>.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira Agile Board</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Kanban-доска</td><td><code>BoardPage</code> + <code>KanbanBoard</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">DnD между колонками, фильтры по assignee / epic / type, real-time обновления.</td></tr>
+      <tr><td>Колонки = статусы workflow</td><td>WorkflowStatus → columns</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Конфигурируется через workflow editor.</td></tr>
+      <tr><td>Swimlanes (по assignee / epic / priority)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Упрощает навигацию для 20+ участников. Сейчас только фильтры.</td></tr>
+      <tr><td>WIP-лимиты с enforcement</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Можно показывать, можно блокировать дроп. В Jira — soft warning.</td></tr>
+      <tr><td>Card cover images / attachments preview</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Blocked by Attachments (TTATTACH-1).</td></tr>
+      <tr><td>Quick-create с клавиши</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Сейчас через модалку.</td></tr>
+      <tr><td>Card customization (показ Story Points, due date, labels)</td><td>частично (через <code>showOnKanban</code> в FieldSchema)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Есть флаг, но настройка через админку, не самим пользователем.</td></tr>
+      <tr><td>Epic-панель / epic-link фильтр</td><td>фильтр по epic-родителю</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Через обычный фильтр по parent.</td></tr>
+      <tr><td>Scrum-доска (sprint view)</td><td><code>SprintIssuesDrawer</code> + sprint-scoped filter</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Нет отдельной strict sprint-board как в Jira; показываем через drawer и фильтр.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-sprints" class="section">
+  <h2>F3. Scrum — спринты и бэклог</h2>
+  <p class="sub">Модели <code>Sprint</code>, <code>SprintIssue</code>. Страницы <code>SprintsPage</code>, <code>GlobalSprintsPage</code>, <code>SprintPlanningDrawer</code>.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira Scrum</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>CRUD спринта (plan / start / close)</td><td><code>SprintsPage</code> + <code>SprintPlanningDrawer</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Create / start / close, drag задач в sprint.</td></tr>
+      <tr><td>Cross-project Global Sprints</td><td><code>GlobalSprintsPage</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">В Jira DC cross-project boards — отдельная фича «Board by filter». У нас нативно.</td></tr>
+      <tr><td>Backlog view (ранжирование)</td><td>drag-and-drop, <code>orderIndex</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Порядок сохраняется через orderIndex.</td></tr>
+      <tr><td>Sprint Goal</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Отдельное поле для цели спринта.</td></tr>
+      <tr><td>Burndown chart</td><td>частично (release-level есть)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Release-burndown есть, sprint-burndown на базовом уровне.</td></tr>
+      <tr><td>Velocity chart</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Ключевая agile-метрика (avg delivered за N спринтов).</td></tr>
+      <tr><td>Sprint Report (commit vs completed)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">added / removed scope, что не сделано, что перенесено.</td></tr>
+      <tr><td>Sprint capacity / team commitment</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Капасити команды на спринт по часам / поинтам.</td></tr>
+      <tr><td>Retrospective / Sprint Review артефакты</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">В Jira тоже слабо — делается плагинами.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-releases" class="section">
+  <h2>F4. Релизы и чекпоинты — уникальная зона</h2>
+  <p class="sub">Самая сильная часть TaskTime. Модели <code>Release</code>, <code>ReleaseItem</code>, <code>Checkpoint</code>, <code>CheckpointRun</code>. Страницы <code>ReleasesPage</code>, <code>GlobalReleasesPage</code>.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira Release</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Версии (CRUD)</td><td><code>Release</code> + <code>ReleaseItem</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Плюс статусы, даты, ответственные.</td></tr>
+      <tr><td>fixVersion / affectsVersion на задаче</td><td>частично через <code>releaseId</code> (single)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">fixVersion ≡ releaseId (single), affectsVersion — M:M в TTPROJ-1.</td></tr>
+      <tr><td>Release Hub (обзор версии)</td><td><code>GlobalReleasesPage</code> + Release Card</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Сводная карточка с метриками, чекпоинтами, задачами.</td></tr>
+      <tr><td>Release Notes generation</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Автосборка заметок по задачам в версии.</td></tr>
+      <tr><td>Release Workflow (lifecycle релиза)</td><td><code>AdminReleaseWorkflowsPage</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note"><b>Нет в Jira.</b> Конструктор с статусами, переходами.</td></tr>
+      <tr><td>Release Checkpoints (quality gates)</td><td>Checkpoint / <code>CheckpointRun</code> / <code>CheckpointCriterion</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note"><b>Нет в Jira.</b> 5 типов критериев + TTQL + combined; preview; risk scoring LOW / MEDIUM / HIGH / CRITICAL; матрица issue × checkpoint.</td></tr>
+      <tr><td>Release Burndown</td><td><code>ReleaseBurndown</code> + daily snapshots</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note"><b>В Jira DC только sprint burndown.</b> Actual + ideal + retention + manual backfill.</td></tr>
+      <tr><td>Risk scoring релиза</td><td>rules-engine по чекпоинтам + violations</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Детерминированный расчёт risk-level по violated checkpoints.</td></tr>
+      <tr><td>Checkpoint Audit</td><td><code>AdminCheckpointAuditPage</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Лог всех запусков / переполнений, exportable.</td></tr>
+      <tr><td>Webhook-notifier на release-events</td><td><code>release-webhook-notifier.service</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Точечный notifier (не общий webhooks-реестр).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-search" class="section">
+  <h2>F5. Поиск — TTQL и фильтры</h2>
+  <p class="sub">Собственный язык запросов TTQL (аналог JQL), compiler, help-страница, сохранённые фильтры.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Basic filters (assignee / status / …)</td><td><code>SearchPage</code> + filter-panel</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">UI-фильтры + превращение в TTQL под капотом.</td></tr>
+      <tr><td>JQL ⟷ TTQL</td><td>TTQL compiler в backend</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Функции <code>currentUser()</code>, <code>releasePlannedDate()</code>, <code>violatedCheckpoints()</code> — release-aware.</td></tr>
+      <tr><td>Help / syntax reference</td><td><code>SearchHelpPage</code> (<code>/search/help</code>)</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Отдельная справочная страница.</td></tr>
+      <tr><td>Visual query builder</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">В Jira JQL builder — покрывается filter-panel + help.</td></tr>
+      <tr><td>Saved Filters (private / shared)</td><td><code>SavedFilter</code> с visibility PRIVATE / SHARED / PUBLIC</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Per-user permissions, starred, use-count.</td></tr>
+      <tr><td>Filter subscription (email-рассылка)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Требует SMTP (TTNOTIF-1) — как следствие блокируется одним pillar'ом.</td></tr>
+      <tr><td>Full-text search (description / comments)</td><td>частично (Phase 2)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Сейчас — по полям. Full-text (pg_trgm / tsvector) в плане.</td></tr>
+      <tr><td>Export search results</td><td>через Bulk ops (CSV / XLSX)</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Работает для любого набора задач.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-reports" class="section">
+  <h2>F6. Отчёты и дашборды</h2>
+  <p class="sub">Слабое место относительно Jira. Сейчас только 2 отчёта + единый read-only Dashboard.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira Reports</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Задачи по статусам</td><td>Admin → Отчёты → Задачи по статусам</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Фильтр по проекту / спринту / периоду.</td></tr>
+      <tr><td>Задачи по исполнителям</td><td>Admin → Отчёты → Задачи по исполнителям</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Выявление перекоса нагрузки.</td></tr>
+      <tr><td>Velocity Chart</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Ключевой agile-отчёт.</td></tr>
+      <tr><td>Sprint Report (commit vs done)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Scope-changes, что перенесено / отменено.</td></tr>
+      <tr><td>Cumulative Flow Diagram</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Накопительный поток задач по статусам.</td></tr>
+      <tr><td>Burndown / Burnup (sprint)</td><td>частично</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Release-burndown — да; sprint-level — базово.</td></tr>
+      <tr><td>Burndown (release)</td><td><code>ReleaseBurndown</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note"><b>В Jira DC отсутствует.</b></td></tr>
+      <tr><td>Time Tracking report</td><td>частично (My Time / TimePage)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Сводки по пользователю / дню есть, нет кросс-команды / кросс-проекта.</td></tr>
+      <tr><td>Control Chart / Cycle Time / Time in Status</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Метрики lean / kanban-команд.</td></tr>
+      <tr><td>Personal Dashboards с виджетами (drag-n-drop)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Сейчас один общий <code>DashboardPage</code> read-only.</td></tr>
+      <tr><td>Shared Dashboards</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">В Jira — публикация дашборда ролям / группам.</td></tr>
+      <tr><td>Gadgets / widgets marketplace</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Концепция плагинных гаджетов.</td></tr>
+      <tr><td>Release-level risk / violations matrix</td><td><code>AdminCheckpointAuditPage</code> + violations</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note"><b>Новый тип отчётности</b>, в Jira нет.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-time" class="section">
+  <h2>F7. Учёт времени</h2>
+  <p class="sub">Интегрированный таймер и ручной лог часов. Модель <code>TimeLog</code>, страница <code>TimePage</code>.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira Time Tracking</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Original / Remaining estimate</td><td><code>Issue.estimatedHours</code></td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td class="note">Один оценочный слот. В Jira — original + remaining.</td></tr>
+      <tr><td>Work logs (manual entries)</td><td><code>TimeLog</code> CRUD</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Работает через TimePage.</td></tr>
+      <tr><td>Live timer (start / stop)</td><td>таймер, 1 active per user</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">В Jira DC — нет, плагин Tempo.</td></tr>
+      <tr><td>Auto-stop таймера</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">TTCFG-1: auto-stop через N часов.</td></tr>
+      <tr><td>Парсер формата (1w 2d 3h)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">TTCFG-1: Jira-style парсер.</td></tr>
+      <tr><td>My Time / daily aggregation</td><td><code>TimePage</code></td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Персональная сводка дня.</td></tr>
+      <tr><td>Timesheet (team-wide таблица)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Кросс-команда недельная / месячная.</td></tr>
+      <tr><td>Billing rates / costs</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Из коробки в Jira тоже нет.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-collab" class="section">
+  <h2>F8. Коллаборация — комментарии, watchers, mentions, вложения</h2>
+  <p class="sub">Крупная дыра. Без уведомлений и вложений трекер остаётся CRM-style, а не Jira-style.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича Jira</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>Комментарии (CRUD)</td><td><code>Comment</code> CRUD + permissions</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td class="note">Add / edit own / delete, role-based permissions.</td></tr>
+      <tr><td>@mentions в комментариях</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Парсер-лексер + нотификация упомянутому. Закрывается TTNOTIF-1.</td></tr>
+      <tr><td>Watchers на задаче</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Нет модели Watcher. Закрывается TTNOTIF-1.</td></tr>
+      <tr><td>Notifications (in-app bell)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Нет колокольчика и истории. Закрывается TTNOTIF-1.</td></tr>
+      <tr><td>Email notifications</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Нет SMTP. Закрывается TTNOTIF-1.</td></tr>
+      <tr><td>Attachments (upload)</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td class="note">Нет модели, нет storage, нет multer. TTATTACH-1.</td></tr>
+      <tr><td>Thumbnails / preview вложений</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td class="note">Зависит от TTATTACH-1.</td></tr>
+      <tr><td>Comment reactions</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">В Jira есть эмоджи-реакции (Cloud).</td></tr>
+      <tr><td>Edit-history / pinned comments</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Улучшение UX.</td></tr>
+      <tr><td>Rich-text editor (Markdown / WYSIWYG)</td><td>базовый</td><td><span class="badge partial">Частично</span></td><td><span class="badge p3">P3</span></td><td class="note">Базовый редактор без таблиц / code blocks на уровне Jira.</td></tr>
+      <tr><td>Activity stream per issue (UI-вкладка)</td><td>audit_logs (данные) / нет UI</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td class="note">Данные пишутся, нужна отдельная вкладка на странице задачи.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="f-integrations" class="section">
+  <h2>F9. Интеграции, AI, уникальные фичи</h2>
+  <p class="sub">Зона преимущества TaskTime. MCP, AI-декомпозиция, GitLab из коробки, Teams / Operations / UAT.</p>
+  <table class="cmp">
+    <thead><tr><th style="width: 22%">Фича</th><th style="width: 26%">Аналог в TaskTime</th><th style="width: 10%">Статус</th><th style="width: 10%">Критичность</th><th>Примечание</th></tr></thead>
+    <tbody>
+      <tr><td>GitLab (webhook → auto-transition)</td><td><code>integrations/gitlab</code> + <code>webhooks</code> + <code>pipeline-service</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">MR open / merge → статус задачи. В Jira DC — только через Marketplace.</td></tr>
+      <tr><td>GitHub / Bitbucket DVCS</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Можно добавить по запросу.</td></tr>
+      <tr><td>CI Pipeline Dashboard</td><td><code>PipelineDashboardPage</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Визуализация пайплайнов — нет у Jira нативно.</td></tr>
+      <tr><td>AI — декомпозиция Epic → Subtasks</td><td><code>ai/ai.service</code> + Anthropic provider</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note"><b>Нет у Jira DC.</b> Claude-based.</td></tr>
+      <tr><td>AI — оценка часов задачи</td><td><code>ai</code> module</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">С логированием sessions / tokens / стоимости.</td></tr>
+      <tr><td>MCP-сервер (Model Context Protocol)</td><td><code>mcp/http-transport</code> + tools</td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note"><b>Уникально.</b> Позволяет подключить задачи к Claude / агентам.</td></tr>
+      <tr><td>Teams abstraction</td><td><code>BusinessTeamsPage</code>, <code>FlowTeamsPage</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Бизнес-команды и flow-команды отдельно от User Groups. В Jira нет.</td></tr>
+      <tr><td>Operations (meta-проект)</td><td><code>OperationsPage</code> + <code>OperationDetailPage</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Ops-задачи отдельно от продуктовых.</td></tr>
+      <tr><td>UAT Tests (роль-specific чеклисты)</td><td><code>UatTestsPage</code></td><td><span class="badge win">Лучше</span></td><td><span class="badge na">—</span></td><td class="note">Встроенный онбординг-чеклист.</td></tr>
+      <tr><td>Slack / Teams notifications</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td class="note">Требует SMTP → webhook → channel. В Jira — плагины.</td></tr>
+      <tr><td>Email → create issue</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Incoming Mail Handlers.</td></tr>
+      <tr><td>Mobile app</td><td>—</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td class="note">Jira имеет — у нас пока нет PWA.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div>
+<!-- /ВКЛАДКА 3 -->
+
+<!-- =========================================================================
+     ВКЛАДКА 4 — СТЭК & ENTERPRISE-ГОТОВНОСТЬ (5000 users)
+     ========================================================================= -->
+<div id="enterprise" class="tab-panel" role="tabpanel">
+
+<div class="toc-inline">
+  <strong>Содержание</strong>
+  <a href="#e-snapshot">E1. Стэк — как есть</a>
+  <a href="#e-posture">E2. Prod-постура (текущий деплой)</a>
+  <a href="#e-capacity">E3. Оценка нагрузки для 5000 users</a>
+  <a href="#e-matrix">E4. Матрица Enterprise-готовности</a>
+  <a href="#e-target">E5. Целевая архитектура</a>
+  <a href="#e-plan">E6. План дозакрытия</a>
+</div>
+
+<div class="callout warn">
+  <strong>Целевой сценарий:</strong> on-premise Astra Linux SE 1.7+ / Red OS 7.3+, корпоративный контур РФ,
+  <b>5 000 зарегистрированных пользователей</b>, из них ~1 500 DAU (30%) и ~500–800 concurrent в пиках.
+  Для такой нагрузки single-node compose из <code>deploy/docker-compose.production.yml</code> — <b>не годится</b>.
+  Текущие целевые NFR в <code>docs/architecture/overview.md</code> заявляют 2 500+ concurrent sessions; для 5 000
+  users этого мало, нужна горизонтальная стратегия.
+</div>
+
+<section id="e-snapshot" class="section">
+  <h2>E1. Стэк — как есть</h2>
+  <p class="sub">Выжимка из <code>backend/package.json</code>, <code>frontend/package.json</code>, <code>docker-compose.yml</code>, <code>deploy/docker-compose.production.yml</code>, <code>docs/architecture/overview.md</code>.</p>
+  <table class="cmp">
+    <thead><tr>
+      <th style="width: 18%">Слой</th>
+      <th style="width: 30%">Технология</th>
+      <th style="width: 14%">Версия</th>
+      <th style="width: 12%">Enterprise-profile</th>
+      <th>Комментарий</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Runtime</td><td>Node.js</td><td>20 LTS</td><td><span class="badge ok">Подходит</span></td><td class="note">LTS до 2026-04. Поддержка clustering через <code>node:cluster</code> / PM2 / K8s.</td></tr>
+      <tr><td>Язык</td><td>TypeScript</td><td>5.7</td><td><span class="badge ok">Подходит</span></td><td class="note">Строгая типизация — плюс для enterprise аудита.</td></tr>
+      <tr><td>HTTP-фреймворк</td><td>Express</td><td>4.21</td><td><span class="badge partial">Приемлемо</span></td><td class="note">Зрелый, но не самый быстрый. Для 5k users ок, в hot-path при тестировании проверить.</td></tr>
+      <tr><td>ORM</td><td>Prisma</td><td>6.5</td><td><span class="badge partial">Приемлемо</span></td><td class="note">Без connection pool из коробки — нужен <b>PgBouncer</b>. Query planner иногда генерит неэффективный SQL — мониторить.</td></tr>
+      <tr><td>Валидация</td><td>Zod</td><td>3.24</td><td><span class="badge ok">Подходит</span></td><td class="note">Используется как на backend, так и на frontend — паритет схем.</td></tr>
+      <tr><td>БД (основная)</td><td>PostgreSQL</td><td>16 (alpine)</td><td><span class="badge partial">Single-node</span></td><td class="note">Нет streaming replication, нет read-replicas, нет pooler. Для 5k users — критический гэп.</td></tr>
+      <tr><td>Кэш / сессии</td><td>Redis</td><td>7 (alpine)</td><td><span class="badge partial">Single-node</span></td><td class="note">AOF включён, но нет Sentinel/Cluster. Используется для rate-limiting и кэша.</td></tr>
+      <tr><td>Event Bus</td><td>—</td><td>—</td><td><span class="badge missing">Нет</span></td><td class="note">Kafka в плане TTBUS-0 (54ч). Критически важен для notifications/webhooks pillar'а.</td></tr>
+      <tr><td>Auth</td><td>JWT (access + refresh) + bcryptjs</td><td>—</td><td><span class="badge partial">Приемлемо</span></td><td class="note">Refresh-tokens в БД — OK. Нет SSO (TTSSO-1, 102ч), нет MFA (TTMFA-1, 68ч).</td></tr>
+      <tr><td>Метрики</td><td>prom-client + Prometheus + Grafana</td><td>15.1</td><td><span class="badge ok">Готово</span></td><td class="note"><code>deploy/prometheus</code>, <code>deploy/grafana</code> уже в репо. Дашборды готовы.</td></tr>
+      <tr><td>Логирование</td><td>stdout → docker logs</td><td>—</td><td><span class="badge missing">Нет агрегации</span></td><td class="note">Нет централизованного логирования (Loki / ELK / Graylog). Для 5k users обязательно.</td></tr>
+      <tr><td>Трейсинг</td><td>—</td><td>—</td><td><span class="badge missing">Нет</span></td><td class="note">Нет OpenTelemetry / Jaeger / Tempo. Для SLO-debugging обязательно.</td></tr>
+      <tr><td>Cron / scheduler</td><td>node-cron</td><td>4.2</td><td><span class="badge partial">In-process</span></td><td class="note">Работает внутри backend-инстанса. При horizontal scaling — race: нужен leader election или внешний scheduler.</td></tr>
+      <tr><td>Webhooks out</td><td>native fetch</td><td>—</td><td><span class="badge partial">Custom</span></td><td class="note">Checkpoint-notifier есть, общий реестр — TTINTEG-1 (70ч).</td></tr>
+      <tr><td>Reverse proxy / TLS</td><td>Nginx</td><td>—</td><td><span class="badge partial">Single</span></td><td class="note">Rate limiting 5–30 r/s, security headers. Single instance — SPOF.</td></tr>
+      <tr><td>Frontend runtime</td><td>React + Vite</td><td>18.3 / 6.x</td><td><span class="badge ok">Подходит</span></td><td class="note">SPA, Ant Design 5, Zustand 5, Recharts 3.</td></tr>
+      <tr><td>UI-состояние</td><td>Zustand</td><td>5.0</td><td><span class="badge ok">Подходит</span></td><td class="note">Лёгкий, без излишней оркестрации.</td></tr>
+      <tr><td>Drag &amp; drop</td><td>@hello-pangea/dnd</td><td>18.x</td><td><span class="badge ok">Подходит</span></td><td class="note">Fork react-beautiful-dnd, поддержан.</td></tr>
+      <tr><td>CI / CD</td><td>GitHub Actions</td><td>—</td><td><span class="badge partial">Приемлемо</span></td><td class="note">5 workflows (ci, build, deploy-staging, deploy-production, update-docs). Нет canary / blue-green.</td></tr>
+      <tr><td>Контейнеризация</td><td>Docker Compose</td><td>—</td><td><span class="badge partial">Single-host</span></td><td class="note">Нет K8s / Swarm. Horizontal scaling через compose не делается — нужен orchestrator.</td></tr>
+      <tr><td>AI</td><td>Anthropic SDK 0.39</td><td>—</td><td><span class="badge ok">Подходит</span></td><td class="note">Сессии логируются (tokens/стоимость), feature-flag <code>FEATURES_AI</code>.</td></tr>
+      <tr><td>MCP</td><td>@modelcontextprotocol/sdk 1.29</td><td>—</td><td><span class="badge ok">Подходит</span></td><td class="note">Отдельный сервис в compose, HTTP transport на 3002.</td></tr>
+      <tr><td>Pipeline-service</td><td>Отдельный Node/Express + свой Postgres</td><td>—</td><td><span class="badge partial">Standalone</span></td><td class="note">Правильная изоляция CI-данных. Тоже single-node.</td></tr>
+      <tr><td>Secrets</td><td>.env / docker env</td><td>—</td><td><span class="badge missing">Нет vault</span></td><td class="note">Для корпоративного контура нужен Vault / Conjur / Kube Secrets + sealed.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="e-posture" class="section">
+  <h2>E2. Текущая prod-постура (как деплоится сейчас)</h2>
+  <p class="sub">Что реально видно в <code>deploy/docker-compose.production.yml</code> + <code>deploy/nginx/nginx.conf.template</code>.</p>
+
+  <div class="cols-2">
+    <div>
+      <div class="col-title">Что есть</div>
+      <ul style="font-size: 13.5px; padding-left: 20px;">
+        <li>Единый Docker Compose на один хост: <code>web</code> (nginx+static), <code>backend</code>, <code>postgres</code>, <code>redis</code>, <code>mcp</code>, <code>pipeline-service</code>, <code>pipeline-postgres</code>.</li>
+        <li>Healthcheck'и на все сервисы, <code>restart: unless-stopped</code>.</li>
+        <li>Rate-limit в nginx (5 r/s auth, 30 r/s api), client_max_body_size 10m.</li>
+        <li>Скрипты <code>backup-postgres.sh</code>, <code>restore-postgres.sh</code>, <code>rollback.sh</code> в <code>deploy/scripts/</code>.</li>
+        <li>Prometheus + Grafana (есть конфиги в <code>deploy/</code>).</li>
+        <li>Feature-flags через ENV (<code>FEATURES_*</code>).</li>
+      </ul>
+    </div>
+    <div>
+      <div class="col-title">Что отсутствует на уровне инфры</div>
+      <ul style="font-size: 13.5px; padding-left: 20px;">
+        <li><b>Нет репликации Postgres</b> (одна instance → SPOF + только вертикальное масштабирование).</li>
+        <li><b>Нет PgBouncer</b> — Prisma-пул упрётся в <code>max_connections</code> постгри при &gt;5 backend replica.</li>
+        <li><b>Нет Redis HA</b> (ни Sentinel, ни Cluster).</li>
+        <li><b>Нет K8s / orchestrator</b> — масштабировать backend можно только добавив реплик в compose и балансировщик перед ним.</li>
+        <li><b>Нет centralized logging</b> (нет Loki / ELK / Vector).</li>
+        <li><b>Нет tracing</b> (нет OpenTelemetry).</li>
+        <li><b>Нет WAF / IPS</b> перед nginx.</li>
+        <li><b>Нет CDN</b> для фронтенд-статики (для 5k — не критично, но снижает latency региональным пользователям).</li>
+        <li><b>Нет blue-green / canary deploy</b>; deploy-скрипт останавливает контейнеры.</li>
+        <li><b>Нет secrets vault</b>; всё через <code>.env</code>-файлы на хосте.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="e-capacity" class="section">
+  <h2>E3. Оценка нагрузки для 5 000 пользователей</h2>
+  <p class="sub">Грубый расчёт — для sizing'а. Реальные цифры нужно валидировать load-тестом с Playwright + k6 на staging.</p>
+
+  <div class="summary">
+    <div class="kpi"><div class="label">Зарегистрировано</div><div class="val">5 000</div></div>
+    <div class="kpi"><div class="label">DAU (≈30%)</div><div class="val">~1 500</div></div>
+    <div class="kpi"><div class="label">Concurrent (peak)</div><div class="val">500–800</div></div>
+    <div class="kpi"><div class="label">RPS sustained</div><div class="val">50–100</div></div>
+    <div class="kpi"><div class="label">RPS peak</div><div class="val">200–400</div></div>
+    <div class="kpi"><div class="label">Issues в БД (2–3 года)</div><div class="val">500k–1.5M</div></div>
+  </div>
+
+  <table class="cmp" style="margin-top: 16px;">
+    <thead><tr>
+      <th style="width: 22%">Ресурс</th>
+      <th style="width: 28%">Оценка для 5k users</th>
+      <th style="width: 22%">Сейчас</th>
+      <th>Действие</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Backend инстансы</td><td>3–5 реплик × 1–2 vCPU / 1 GB</td><td>1 реплика</td><td class="note">Добавить replicas, поставить nginx upstream или K8s Service. Удостовериться в <b>stateless</b> (сейчас node-cron in-process — требует leader election).</td></tr>
+      <tr><td>Postgres</td><td>4–8 vCPU / 16–32 GB RAM / NVMe; shared_buffers 25%, effective_cache_size 75%; streaming replication + 1 read-replica</td><td>single alpine без тюнинга</td><td class="note">Тюнинг + primary-standby + PgBouncer (transaction pooling) между backend и postgres.</td></tr>
+      <tr><td>Connection pool</td><td>~60–100 соединений PgBouncer; Prisma 10–20 на backend × 5 = 50–100</td><td>Prisma прямо в Postgres</td><td class="note"><b>P0.</b> Без PgBouncer любая replica-атака упрётся в <code>max_connections</code> (default 100).</td></tr>
+      <tr><td>Redis</td><td>Sentinel (1 primary + 2 replicas + 3 sentinels) или Cluster (3 shard × 2 nodes)</td><td>single node</td><td class="note">Для rate-limiting и кэша. Для session-store (если будет) — обязательно HA.</td></tr>
+      <tr><td>Kafka (будущее)</td><td>3 broker × KRaft, 3 × 4 vCPU / 16 GB / SSD</td><td>отсутствует</td><td class="note">TTBUS-0 (54ч). Для notifications + webhooks. 3 ноды — минимум для quorum.</td></tr>
+      <tr><td>Frontend (статика)</td><td>nginx + gzip + brotli + long-cache; опционально CDN</td><td>есть nginx</td><td class="note">Vite-бандл ~1.5–2 MB gzipped. Для РФ-контура CDN не обязателен.</td></tr>
+      <tr><td>Attachments storage</td><td>S3-совместимый (MinIO для on-prem) или NFS; ~100 GB / год при средних 5 MB/задача</td><td>не реализовано</td><td class="note">TTATTACH-1 предусматривает pluggable storage (local / s3).</td></tr>
+      <tr><td>Logs</td><td>~30–100 GB / месяц при 100 RPS; retention 30–90 дней</td><td>docker-logs</td><td class="note">Vector / Loki или ELK + S3 archive.</td></tr>
+      <tr><td>Бэкапы Postgres</td><td>pg_dump / pg_basebackup ежедневно + WAL-archive; S3 / NFS; RPO ≤ 15 мин, RTO ≤ 1ч</td><td>есть cron-скрипт</td><td class="note">Нужна регулярная drill-проверка restore.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="e-matrix" class="section">
+  <h2>E4. Матрица Enterprise-готовности</h2>
+  <p class="sub">Что критично для 5 000 users и корпоративного контура. Сгруппировано по слоям.</p>
+
+  <table class="cmp">
+    <thead><tr>
+      <th style="width: 18%">Категория</th>
+      <th style="width: 26%">Требование</th>
+      <th style="width: 10%">Статус</th>
+      <th style="width: 10%">Крит-ть</th>
+      <th style="width: 14%">Трудозатраты</th>
+      <th>Комментарий</th>
+    </tr></thead>
+    <tbody>
+
+      <!-- Приложение / runtime -->
+      <tr><td>Runtime</td><td>Horizontal scaling backend (stateless, 3–5 replicas)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td>~40–60ч</td><td class="note">Убрать in-process state (node-cron), вывести jobs в отдельный worker с leader-election (Redis Redlock или Postgres advisory lock).</td></tr>
+      <tr><td>Runtime</td><td>Orchestrator (K8s / Swarm / Nomad)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~80–120ч</td><td class="note">Для 5k users compose на одном хосте — SPOF. Минимально — K3s / managed K8s.</td></tr>
+      <tr><td>Runtime</td><td>Graceful shutdown + connection draining</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td>~16ч</td><td class="note">Для zero-downtime deploy обязательно.</td></tr>
+
+      <!-- DB -->
+      <tr><td>БД</td><td>PgBouncer (transaction pooling)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td>~16ч</td><td class="note">Без этого больше 3–4 backend replicas не запустить.</td></tr>
+      <tr><td>БД</td><td>Postgres HA (Patroni / streaming replication + automated failover)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td>~80ч</td><td class="note">Минимум primary + 1 sync standby + automatic failover (Patroni + etcd / consul).</td></tr>
+      <tr><td>БД</td><td>Read-replica для reporting / отчётов</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td>~24ч</td><td class="note">Развязать тяжёлые TTQL-запросы и dashboard-агрегации от транзакционного primary.</td></tr>
+      <tr><td>БД</td><td>DB tuning (shared_buffers, WAL, autovacuum)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~16ч</td><td class="note">Сейчас только <code>postgres:16-alpine</code> без конфига.</td></tr>
+      <tr><td>БД</td><td>Partitioning больших таблиц (audit_logs, time_logs)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td>~40ч</td><td class="note">При 5k users audit_logs быстро превысит 10M записей. Partitioning по дате обязателен.</td></tr>
+
+      <!-- Cache -->
+      <tr><td>Cache</td><td>Redis HA (Sentinel / Cluster)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td>~40ч</td><td class="note">Redis — сейчас в critical path для rate-limit. Его падение = DoS.</td></tr>
+      <tr><td>Cache</td><td>Redis-based distributed locks (для cron и idempotency)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~16ч</td><td class="note">Нужен для работы node-cron в кластере backend.</td></tr>
+
+      <!-- Event bus -->
+      <tr><td>Messaging</td><td>Kafka (KRaft) для событий + outbox pattern</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td>54ч (TTBUS-0)</td><td class="note">Разблокирует Notifications (TTNOTIF-1) и Webhooks (TTINTEG-1). Уже в плане MVP2JIRA.</td></tr>
+
+      <!-- Observability -->
+      <tr><td>Observability</td><td>Prometheus + Grafana</td><td><span class="badge ok">Есть</span></td><td><span class="badge na">—</span></td><td>—</td><td class="note">Конфиги в <code>deploy/prometheus</code> и <code>deploy/grafana</code>. prom-client уже встроен.</td></tr>
+      <tr><td>Observability</td><td>Centralized logging (Loki + Promtail или ELK / Vector)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~40ч</td><td class="note">Для 5k users docker-logs не поисковый. Loki + Grafana — дешевле всего.</td></tr>
+      <tr><td>Observability</td><td>Distributed tracing (OpenTelemetry + Jaeger / Tempo)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~40ч</td><td class="note">Для debugging cross-service latency (backend ↔ pipeline-service ↔ postgres).</td></tr>
+      <tr><td>Observability</td><td>SLO / error-budget / alerting</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td>~24ч</td><td class="note">Дашборды в Grafana — да; алерты (Alertmanager / Slack / email) — не настроены продакшн-grade.</td></tr>
+      <tr><td>Observability</td><td>Audit Log UI + экспорт</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td>~63ч (TTSEC-4)</td><td class="note">Данные есть, UI — нет. Обязательно для ФЗ-152 compliance и корп-безопасности.</td></tr>
+
+      <!-- Security -->
+      <tr><td>Security</td><td>SSO / OIDC</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td>102ч (TTSSO-1)</td><td class="note">Корп-контур без SSO невозможен. Keycloak / Blitz Identity / Azure AD.</td></tr>
+      <tr><td>Security</td><td>MFA / TOTP (минимум для SUPER_ADMIN)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>68ч (TTMFA-1)</td><td class="note">Для админов — обязательно.</td></tr>
+      <tr><td>Security</td><td>Secrets vault (HashiCorp Vault / Conjur / Kube Secrets + sealed)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~40ч</td><td class="note">Сейчас <code>.env</code>-файлы на хосте — не соответствует корп-стандартам.</td></tr>
+      <tr><td>Security</td><td>WAF / IPS перед nginx</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td>~16ч</td><td class="note">ModSecurity / CrowdSec / облачный WAF.</td></tr>
+      <tr><td>Security</td><td>Image scanning (Trivy / Grype в CI)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td>~8ч</td><td class="note">В pipeline сейчас нет vulnerability scan Docker-образов.</td></tr>
+      <tr><td>Security</td><td>TLS 1.2+ / mTLS между сервисами</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td>~16ч</td><td class="note">TLS снаружи — да (nginx); между backend↔postgres / backend↔redis внутри сети — обычно plaintext.</td></tr>
+      <tr><td>Security</td><td>Issue Security (visibility levels)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p0">P0</span></td><td>52ч (TTSEC-3)</td><td class="note">Корп-контур: HR / инфобез задачи не должны быть видны всем.</td></tr>
+      <tr><td>Security</td><td>Password policy + lockout</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td>входит в TTSEC-4</td><td class="note">Правила хардкодом, без admin-UI.</td></tr>
+
+      <!-- DR -->
+      <tr><td>DR</td><td>Automated Postgres backups + off-site</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td>~16ч</td><td class="note">Скрипт есть; нужна cron-регулярность + off-site copy + restore drill.</td></tr>
+      <tr><td>DR</td><td>RPO / RTO документация + drills</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~8ч</td><td class="note">Регламент + квартальные учения восстановления.</td></tr>
+      <tr><td>DR</td><td>Geo-redundancy (multi-DC / multi-region)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p3">P3</span></td><td>по отдельному плану</td><td class="note">Есть <code>docs/architecture/geo-redundancy-plan.md</code> — план для второго DC.</td></tr>
+
+      <!-- CI/CD -->
+      <tr><td>CI/CD</td><td>Blue-green / canary / rolling deploy</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>~40ч</td><td class="note">Сейчас deploy-скрипт гасит контейнеры — downtime пара минут. Для 5k users непозволительно.</td></tr>
+      <tr><td>CI/CD</td><td>DB migration safety (expand/contract, review-gate)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p1">P1</span></td><td>~16ч</td><td class="note">Prisma migrate deploy — OK. Но нет проверок обратной совместимости и auto-lock.</td></tr>
+      <tr><td>CI/CD</td><td>Load-testing в CI (k6 / Artillery)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p2">P2</span></td><td>~40ч</td><td class="note">Нужен baseline-тест перед релизами.</td></tr>
+
+      <!-- App -->
+      <tr><td>App</td><td>Full-text search через <code>pg_trgm</code> / <code>tsvector</code> или Elasticsearch</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td>~60ч</td><td class="note">Сейчас TTQL без FTS по description/comments. При 1M+ задач — обязательно.</td></tr>
+      <tr><td>App</td><td>Pagination всех API-листингов с cursor</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td>~30ч</td><td class="note">Проверить, что все <code>/api/*/list</code> используют keyset-пагинацию.</td></tr>
+      <tr><td>App</td><td>Idempotency-keys для bulk и webhooks</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td>~24ч</td><td class="note">Bulk-ops уже есть частично; webhooks in/out — обязательно.</td></tr>
+      <tr><td>App</td><td>Rate limiting per-user (не только per-IP в nginx)</td><td><span class="badge partial">Частично</span></td><td><span class="badge p2">P2</span></td><td>~16ч</td><td class="note">Redis-based token bucket per userId.</td></tr>
+      <tr><td>App</td><td>File upload pipeline (virus scan, size limits, rate-limit)</td><td><span class="badge missing">Нет</span></td><td><span class="badge p1">P1</span></td><td>входит в TTATTACH-1</td><td class="note">После закрытия attachments.</td></tr>
+
+    </tbody>
+  </table>
+</section>
+
+<section id="e-target" class="section">
+  <h2>E5. Целевая архитектура для 5 000 users (HA)</h2>
+  <p class="sub">Минимальная HA-постура. Все слои без SPOF, каждый компонент — 3 ноды или primary+replica(+арбитр).</p>
+
+<pre style="background:#0f172a;color:#e2e8f0;padding:18px 20px;border-radius:10px;font-size:12.5px;overflow-x:auto;line-height:1.45;">
+                          ┌────────────────────────┐
+                          │  Corporate IdP (OIDC)   │
+                          │  Keycloak / Blitz / AD  │
+                          └───────────┬────────────┘
+                                      │ OIDC
+                                      ▼
+┌─────────────┐    ┌──────────────────────────────────────────────────┐
+│  Пользова-   │    │      LB / ingress (keepalived + nginx × 2)       │
+│  тели (5k)   │───▶│      TLS term + WAF (ModSecurity / CrowdSec)     │
+└─────────────┘    └────┬──────────────────────────┬──────────────────┘
+                        │                          │
+         ┌──────────────┴────┐            ┌────────┴──────────┐
+         ▼                   ▼            ▼                   ▼
+   ┌──────────┐     ┌──────────┐    ┌──────────┐     ┌──────────────┐
+   │ backend  │ ... │ backend  │    │  MCP     │     │ notifications│
+   │ (3–5)    │     │ (3–5)    │    │ (2)      │     │ service (2)  │
+   └────┬─────┘     └────┬─────┘    └────┬─────┘     └──────┬───────┘
+        │                │                │                 │
+        └────────┬───────┴───────┬────────┘                 │
+                 ▼               ▼                          ▼
+          ┌──────────────┐  ┌──────────────┐       ┌────────────────┐
+          │  PgBouncer    │  │  Redis        │       │  Kafka (KRaft)  │
+          │  (2, ha)      │  │  Sentinel     │       │  3 broker       │
+          └──────┬───────┘  │  3 primary    │       │  (TTBUS-0)      │
+                 ▼           │  + 3 replicas │       └────────────────┘
+     ┌──────────────────┐   └──────────────┘
+     │ PostgreSQL HA    │
+     │ Patroni + etcd   │
+     │ primary + 2 repl │◀── WAL archive → S3 / MinIO ─▶ off-site
+     └──────────────────┘                                       │
+                                                                ▼
+                                         Backups / Point-in-time recovery
+                                         RPO ≤ 15 мин, RTO ≤ 1ч
+
+ Observability:   Prometheus × 2  ─┐
+                  Grafana          │  Alertmanager → Slack / email / PagerDuty
+                  Loki + Promtail  │  (всем backend/mcp/pipeline — side-car логи)
+                  Tempo + OTel    ─┘
+
+ Attachments:     MinIO (S3-совместимое) — 3 ноды, erasure coding
+ Secrets:         HashiCorp Vault — 3 ноды с Raft storage
+ CI/CD:           GitHub Actions → registry → ArgoCD / deploy.sh → K8s (K3s)
+</pre>
+
+  <p style="margin-top: 14px; font-size: 13.5px; color: var(--muted);">
+    Диаграмма отражает <b>минимум</b> для 5 000 users. Для 10 000+ — добавляется read-replica Postgres под отчёты, Kafka-кластер увеличивается до 5 broker'ов, backend вырастает до 6–8 реплик.
+  </p>
+</section>
+
+<section id="e-plan" class="section">
+  <h2>E6. План дозакрытия до Enterprise-ready (5 000 users)</h2>
+  <p class="sub">Только инфраструктурный трек. Продуктовые гэпы (TTNOTIF-1, TTSEC-3 и т.д.) — см. вкладки «Саммари» / «Админка». Часть инициатив пересекается.</p>
+
+  <table class="cmp">
+    <thead><tr><th style="width: 3%">#</th><th style="width: 28%">Инициатива</th><th style="width: 10%">Крит-ть</th><th style="width: 12%">Объём</th><th>Что входит</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>PgBouncer + Postgres tuning</td><td><span class="badge p0">P0</span></td><td>0.5 спринта</td><td class="note">Transaction pooling, настройка shared_buffers / WAL / autovacuum, установка max_connections ≈ 200.</td></tr>
+      <tr><td>2</td><td>Postgres HA (Patroni / streaming replication + failover)</td><td><span class="badge p0">P0</span></td><td>2 спринта</td><td class="note">Primary + sync standby + automatic failover через Patroni + etcd. WAL-archive на S3 / MinIO.</td></tr>
+      <tr><td>3</td><td>Redis Sentinel (3+3)</td><td><span class="badge p0">P0</span></td><td>1 спринт</td><td class="note">Для rate-limiting, locks и будущего session-store.</td></tr>
+      <tr><td>4</td><td>Stateless backend + leader-election для jobs</td><td><span class="badge p0">P0</span></td><td>1 спринт</td><td class="note">Вынести node-cron в отдельный worker. Redis Redlock / Postgres advisory lock.</td></tr>
+      <tr><td>5</td><td>Orchestrator (K3s / managed K8s)</td><td><span class="badge p1">P1</span></td><td>2 спринта</td><td class="note">Деплой через Helm charts. nginx ingress + Horizontal Pod Autoscaler.</td></tr>
+      <tr><td>6</td><td>Event Bus (Kafka KRaft)</td><td><span class="badge p0">P0</span></td><td>54ч (TTBUS-0)</td><td class="note">Prereq для notifications (TTNOTIF-1) и webhooks (TTINTEG-1). 3-node кластер.</td></tr>
+      <tr><td>7</td><td>Centralized logging (Loki + Promtail)</td><td><span class="badge p1">P1</span></td><td>1 спринт</td><td class="note">Side-car агенты на каждый сервис, хранение 30–90 дней, архив в S3.</td></tr>
+      <tr><td>8</td><td>Distributed tracing (OpenTelemetry + Tempo)</td><td><span class="badge p1">P1</span></td><td>1 спринт</td><td class="note">Инструментирование Express-middleware + Prisma.</td></tr>
+      <tr><td>9</td><td>SSO / OIDC</td><td><span class="badge p0">P0</span></td><td>102ч (TTSSO-1)</td><td class="note">Интеграция с корп-IdP (Keycloak / Blitz / AD).</td></tr>
+      <tr><td>10</td><td>Secrets vault (HashiCorp Vault)</td><td><span class="badge p1">P1</span></td><td>1 спринт</td><td class="note">Убрать <code>.env</code> с хостов. Vault Agent для инжекта.</td></tr>
+      <tr><td>11</td><td>Blue-green / rolling deploy</td><td><span class="badge p1">P1</span></td><td>0.5 спринта</td><td class="note">Graceful shutdown + connection draining + K8s rolling update.</td></tr>
+      <tr><td>12</td><td>Automated backup + restore drill</td><td><span class="badge p1">P1</span></td><td>0.5 спринта</td><td class="note">Квартальный drill с документированием RPO/RTO.</td></tr>
+      <tr><td>13</td><td>Alertmanager + runbooks</td><td><span class="badge p1">P1</span></td><td>0.5 спринта</td><td class="note">Правила для SLI (p95 latency, 5xx rate, DB pool saturation) + playbook'и на on-call.</td></tr>
+      <tr><td>14</td><td>Load-testing baseline (k6)</td><td><span class="badge p2">P2</span></td><td>1 спринт</td><td class="note">Сценарии: 500 concurrent + 5k ramp-up, регресс-тест на main.</td></tr>
+      <tr><td>15</td><td>Partitioning audit_logs / time_logs</td><td><span class="badge p2">P2</span></td><td>0.5 спринта</td><td class="note">По месяцам, retention 2–3 года hot, остальное — archive.</td></tr>
+      <tr><td>16</td><td>Read-replica Postgres под отчёты</td><td><span class="badge p2">P2</span></td><td>0.5 спринта</td><td class="note">Разгрузить primary от тяжёлых TTQL-агрегаций.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout ok" style="margin-top: 16px;">
+    <strong>Итог по infrastructure-треку:</strong> <b>≈ 10–12 спринтов</b> (5–6 месяцев infra-команды) для полной HA + observability + security-постуры на 5 000 users.
+    Из них <b>P0-минимум (pgbouncer + pg ha + redis ha + stateless + kafka + sso + issue security) ≈ 6 спринтов</b> — без этого трекер на 5k users падает на первом же инциденте.
+    Стэк сам по себе (Node 20 / TS / Postgres 16 / Redis 7 / React 18) — зрелый и enterprise-grade; основная работа — <b>эксплуатационная обвязка</b>, а не замена технологий.
+  </div>
+
+  <div class="callout" style="margin-top: 12px;">
+    <strong>Отличие этого плана от плана «MVP-ready»:</strong> там 760ч закрывают <i>функциональные</i> дыры (attachments, notifications, resolutions, security, velocity и т.д.).
+    Здесь — <i>операционные</i>. Оба трека можно вести параллельно; шесть пунктов (Event Bus TTBUS-0, SSO TTSSO-1, Issue Security TTSEC-3, Audit UI TTSEC-4, MFA TTMFA-1, Attachments TTATTACH-1) пересекаются и зачтутся в обоих.
+  </div>
+</section>
+
+</div>
+<!-- /ВКЛАДКА 4 -->
+
+<!-- =========================================================================
+     ВКЛАДКА 5 — YANDEX TRACKER (РЕФЕРЕНСНОЕ СРАВНЕНИЕ)
+     ========================================================================= -->
+<div id="ytracker" class="tab-panel" role="tabpanel">
+
+<div class="toc-inline">
+  <strong>Содержание</strong>
+  <a href="#y-context">Y1. Контекст и позиционирование</a>
+  <a href="#y-admin">Y2. Админка — сравнение</a>
+  <a href="#y-func">Y3. Функциональность — сравнение</a>
+  <a href="#y-enterprise">Y4. Enterprise-постура</a>
+  <a href="#y-verdict">Y5. Итоговый вердикт</a>
+</div>
+
+<div class="callout">
+  <strong>Почему это сравнение важно:</strong> Yandex Tracker — <b>прямой конкурент</b> TaskTime в российском корп-сегменте.
+  С 2022 года доступен в двух вариантах: <b>Yandex 360 SaaS</b> (yandex.cloud) и <b>Yandex Tracker Enterprise</b> (on-premise),
+  имеет сертификацию ФСТЭК и аттестации для КИИ. Для fintech-заказчика, выбирающего замену Jira, это реалистичная альтернатива TaskTime.
+  Данные о Yandex Tracker — по публичной документации <code>yandex.cloud/docs/tracker</code> на 2026-04.
+</div>
+
+<section id="y-context" class="section">
+  <h2>Y1. Контекст и позиционирование</h2>
+  <p class="sub">Что такое Yandex Tracker в 2026 году, в каких конфигурациях поставляется, где пересекается с TaskTime и Jira.</p>
+
+  <div class="cols-2">
+    <div>
+      <div class="col-title">Yandex Tracker — ключевые факты</div>
+      <ul style="font-size: 13.5px; padding-left: 20px;">
+        <li><b>Модель:</b> Yandex 360 SaaS (облако) + Enterprise on-prem (K8s-based).</li>
+        <li><b>Парадигма:</b> «очереди» (queues) вместо проектов — немного иная ментальная модель, но похоже на Jira Project.</li>
+        <li><b>Типы задач, workflow, статусы, резолюции, приоритеты</b> — всё есть, настраивается.</li>
+        <li><b>Language-first:</b> UI и документация изначально на русском. RU-техподдержка.</li>
+        <li><b>Макросы + автодействия</b> (триггеры) — аналог Jira Automation Rules.</li>
+        <li><b>Мобильные приложения</b> iOS/Android.</li>
+        <li><b>Интеграции:</b> GitLab, Bitbucket, Telegram-бот, Yandex 360 (Почта, Диск, Мессенджер), Yandex Forms (Service Desk).</li>
+        <li><b>Сертификация:</b> ФСТЭК на Enterprise-поставку, поддержка КИИ-контура, ФЗ-152.</li>
+        <li><b>AI:</b> интеграция с YandexGPT (генерация резюме, подсказки).</li>
+      </ul>
+    </div>
+    <div>
+      <div class="col-title">TaskTime — как позиционируется против</div>
+      <ul style="font-size: 13.5px; padding-left: 20px;">
+        <li><b>Тот же рынок:</b> РФ-fintech, on-prem Astra / Red OS, ФЗ-152.</li>
+        <li><b>Сильнее:</b> Release Checkpoints + Release Burndown + Release Workflows (у Yandex Tracker нет структурированных релиз-gate).</li>
+        <li><b>Сильнее:</b> AI-декомпозиция через Claude + MCP-сервер (Yandex Tracker имеет YandexGPT-подсказки, но не MCP / не decomposition-loop).</li>
+        <li><b>Сильнее:</b> TTQL с release-/checkpoint-функциями, REFERENCE custom field, 33-permission Role Scheme.</li>
+        <li><b>Слабее:</b> нет attachments, notifications pillar, мобильного приложения, Service Desk / SLA, автодействий-UI, дашбордов с виджетами.</li>
+        <li><b>Паритет:</b> workflow, issue types, custom fields, issue links, bulk ops, TTQL vs Yandex Query Language.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="y-admin" class="section">
+  <h2>Y2. Админка — сравнение</h2>
+  <p class="sub">Сопоставление административных возможностей Yandex Tracker, TaskTime и Jira DC 9.x.</p>
+  <table class="cmp">
+    <thead><tr>
+      <th style="width: 22%">Функция</th>
+      <th style="width: 14%">Yandex Tracker</th>
+      <th style="width: 14%">TaskTime</th>
+      <th style="width: 14%">Jira DC 9.x</th>
+      <th>Комментарий</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Users / Groups</td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td class="note">Паритет по базовому user management.</td></tr>
+      <tr><td>Queues / Projects</td><td><span class="badge ok">Queues</span></td><td><span class="badge ok">Projects</span></td><td><span class="badge ok">Projects</span></td><td class="note">Разная терминология, одинаковая семантика.</td></tr>
+      <tr><td>Permissions per queue / project</td><td><span class="badge ok">Есть</span></td><td><span class="badge win">33 флага</span></td><td><span class="badge ok">Permission Scheme</span></td><td class="note">TaskTime имеет более гранулярную матрицу; у Yandex Tracker — наборы ролей + доступы по типу.</td></tr>
+      <tr><td>SSO / SAML / OIDC</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет (TTSSO-1)</span></td><td><span class="badge missing">Нет</span></td><td class="note">Yandex Tracker поддерживает SAML и Yandex ID; в TaskTime запланировано (102ч).</td></tr>
+      <tr><td>LDAP / AD sync</td><td><span class="badge ok">Есть (Enterprise)</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge missing">Нет</span></td><td class="note">В Yandex Tracker Enterprise — штатно.</td></tr>
+      <tr><td>Issue Types (CRUD)</td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td class="note">Все три.</td></tr>
+      <tr><td>Statuses / Workflows</td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td class="note">Конструктор статусов и переходов — у всех.</td></tr>
+      <tr><td>Автодействия / triggers</td><td><span class="badge ok">Есть (макросы + автодействия)</span></td><td><span class="badge partial">Частично (post-functions)</span></td><td><span class="badge partial">Workflow post-functions</span></td><td class="note">Yandex Tracker ближе всего к Jira Cloud Automation — UI-конструктор триггеров. В TaskTime только backend post-functions.</td></tr>
+      <tr><td>Priorities (CRUD)</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Enum</span></td><td><span class="badge ok">Есть</span></td><td class="note">TaskTime — хардкод enum, см. TTCORE-1.</td></tr>
+      <tr><td>Resolutions</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет (TTRES-1)</span></td><td><span class="badge ok">Есть</span></td><td class="note">Критический гэп TaskTime.</td></tr>
+      <tr><td>Components / Версии</td><td><span class="badge ok">Есть</span></td><td><span class="badge partial">Release-вместо-version</span></td><td><span class="badge ok">Есть</span></td><td class="note">TTPROJ-1 закроет.</td></tr>
+      <tr><td>Custom Fields</td><td><span class="badge ok">Есть (~12 типов)</span></td><td><span class="badge win">13 типов + REFERENCE</span></td><td><span class="badge ok">Есть</span></td><td class="note">REFERENCE — собственный справочник — есть только у TaskTime.</td></tr>
+      <tr><td>Field Schemas / Configurations</td><td><span class="badge partial">Есть (per queue)</span></td><td><span class="badge win">4-level scope</span></td><td><span class="badge ok">Есть</span></td><td class="note">TaskTime — GLOBAL / PROJECT / ISSUE_TYPE / PROJECT_ISSUE_TYPE, богаче.</td></tr>
+      <tr><td>Issue Security / visibility</td><td><span class="badge ok">Есть (access per queue / per issue)</span></td><td><span class="badge missing">Нет (TTSEC-3)</span></td><td><span class="badge ok">Есть</span></td><td class="note">Yandex Tracker умеет скрывать отдельные задачи — TaskTime пока нет.</td></tr>
+      <tr><td>Notification Schemes</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет (TTNOTIF-1)</span></td><td><span class="badge ok">Есть</span></td><td class="note">Крупнейший админ-гэп TaskTime.</td></tr>
+      <tr><td>SMTP</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge ok">Есть</span></td><td class="note">В SaaS — готово, в Enterprise — в админке.</td></tr>
+      <tr><td>Audit Log UI</td><td><span class="badge ok">Есть</span></td><td><span class="badge partial">Есть данные, нет UI</span></td><td><span class="badge ok">Есть</span></td><td class="note">TTSEC-4 закроет.</td></tr>
+      <tr><td>Announcement Banner</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge missing">Нет</span></td><td class="note">У Yandex Tracker — «системные сообщения».</td></tr>
+      <tr><td>Look &amp; Feel (брендинг)</td><td><span class="badge ok">Есть (Enterprise)</span></td><td><span class="badge missing">Нет (TTBRAND-1)</span></td><td><span class="badge missing">Нет</span></td><td class="note">Yandex Tracker Enterprise — логотип, цвета, email-подпись.</td></tr>
+      <tr><td>Release Workflows (lifecycle релиза)</td><td><span class="badge missing">Нет</span></td><td><span class="badge win">Есть</span></td><td><span class="badge missing">Нет</span></td><td class="note"><b>Только у TaskTime.</b></td></tr>
+      <tr><td>Release Checkpoints (quality gates)</td><td><span class="badge missing">Нет</span></td><td><span class="badge win">Есть</span></td><td><span class="badge missing">Нет</span></td><td class="note"><b>Только у TaskTime.</b></td></tr>
+      <tr><td>UAT-тесты в админке</td><td><span class="badge missing">Нет</span></td><td><span class="badge win">Есть</span></td><td><span class="badge missing">Нет</span></td><td class="note"><b>Только у TaskTime.</b></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="y-func" class="section">
+  <h2>Y3. Функциональность — сравнение</h2>
+  <p class="sub">Сопоставление бизнес-возможностей, которые видит рядовой пользователь.</p>
+  <table class="cmp">
+    <thead><tr>
+      <th style="width: 22%">Функция</th>
+      <th style="width: 14%">Yandex Tracker</th>
+      <th style="width: 14%">TaskTime</th>
+      <th style="width: 14%">Jira DC 9.x</th>
+      <th>Комментарий</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Создание / редактирование задачи</td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td class="note">Паритет.</td></tr>
+      <tr><td>Иерархия задач (Epic / Story / Subtask)</td><td><span class="badge ok">Есть (эпики, подзадачи)</span></td><td><span class="badge ok">parentId self-relation</span></td><td><span class="badge ok">Есть</span></td><td class="note">Паритет.</td></tr>
+      <tr><td>Attachments на задачах / комментариях</td><td><span class="badge ok">Есть (лимит 50 МБ/файл)</span></td><td><span class="badge missing">Нет (TTATTACH-1)</span></td><td><span class="badge ok">Есть</span></td><td class="note"><b>P0-гэп TaskTime.</b> Интеграция с Yandex Disk у YT.</td></tr>
+      <tr><td>Комментарии + @mentions</td><td><span class="badge ok">Есть + notifications</span></td><td><span class="badge partial">Есть CRUD, нет mentions</span></td><td><span class="badge ok">Есть</span></td><td class="note">Закрывается TTNOTIF-1.</td></tr>
+      <tr><td>Watchers / подписки</td><td><span class="badge ok">Есть (follow/unfollow)</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge ok">Есть</span></td><td class="note">Закрывается TTNOTIF-1.</td></tr>
+      <tr><td>In-app bell / email notifications</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge ok">Есть</span></td><td class="note">Закрывается TTNOTIF-1 (110ч).</td></tr>
+      <tr><td>Issue Links (blocks, relates, duplicates)</td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td class="note">Паритет.</td></tr>
+      <tr><td>Bulk operations</td><td><span class="badge ok">Есть</span></td><td><span class="badge win">CSV/XLSX export</span></td><td><span class="badge partial">Limited</span></td><td class="note">TaskTime bulk-ops с friendly-пикерами (TTBULK-1) лучше, но нет import.</td></tr>
+      <tr><td>CSV / XLSX import</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет (план P1)</span></td><td><span class="badge partial">CSV only</span></td><td class="note">Yandex Tracker поддерживает миграцию из Jira и Excel.</td></tr>
+      <tr><td>Kanban-доска</td><td><span class="badge ok">Есть + swimlanes + WIP</span></td><td><span class="badge partial">Есть, без swimlanes / WIP</span></td><td><span class="badge ok">Есть</span></td><td class="note">YT полнее.</td></tr>
+      <tr><td>Scrum-sprints</td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">Есть</span></td><td class="note">Паритет по базе.</td></tr>
+      <tr><td>Velocity / Sprint Report / CFD</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет (план P1)</span></td><td><span class="badge ok">Есть</span></td><td class="note">Крупный гэп agile-отчётности.</td></tr>
+      <tr><td>Roadmap / Timeline / Gantt</td><td><span class="badge ok">Есть (гантограммы)</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge missing">Нет в vanilla</span></td><td class="note">Yandex Tracker имеет штатный timeline. Для PM-команд — важно.</td></tr>
+      <tr><td>Personal Dashboards с виджетами</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Read-only</span></td><td><span class="badge ok">Есть</span></td><td class="note">YT — drag-drop конструктор.</td></tr>
+      <tr><td>Поиск / язык запросов</td><td><span class="badge ok">YQL (Yandex Query Language)</span></td><td><span class="badge ok">TTQL</span></td><td><span class="badge ok">JQL</span></td><td class="note">Функционально близко; TTQL имеет <b>release-/checkpoint-функции</b>, которых нет в YQL.</td></tr>
+      <tr><td>Saved Filters</td><td><span class="badge ok">Есть (private/public)</span></td><td><span class="badge ok">PRIVATE/SHARED/PUBLIC</span></td><td><span class="badge ok">Есть</span></td><td class="note">Паритет.</td></tr>
+      <tr><td>Full-text search (description, comments)</td><td><span class="badge ok">Есть (ClickHouse под капотом)</span></td><td><span class="badge partial">Phase 2</span></td><td><span class="badge ok">Lucene</span></td><td class="note">Пока TaskTime слабее.</td></tr>
+      <tr><td>Time Tracking (manual + live timer)</td><td><span class="badge ok">Есть</span></td><td><span class="badge win">Timer встроенный</span></td><td><span class="badge partial">Manual only</span></td><td class="note">TaskTime с live-таймером — сильнее vanilla Jira; YT тоже имеет timer.</td></tr>
+      <tr><td>Macros / автодействия (UI)</td><td><span class="badge win">Есть (мощно)</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge missing">Нет в DC (есть в Cloud)</span></td><td class="note">YT-макросы — их сильная сторона.</td></tr>
+      <tr><td>Service Desk / SLA mode</td><td><span class="badge ok">Есть (через Yandex Forms)</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge missing">Jira SM — отдельный продукт</span></td><td class="note">Для customer-facing очередей важно.</td></tr>
+      <tr><td>Mobile app</td><td><span class="badge ok">iOS + Android</span></td><td><span class="badge missing">Нет (даже PWA)</span></td><td><span class="badge ok">Есть</span></td><td class="note">Для мобильных ролей (менеджмент, ops) — существенный фактор.</td></tr>
+      <tr><td>GitLab / Bitbucket / GitHub</td><td><span class="badge ok">Есть</span></td><td><span class="badge ok">GitLab webhooks</span></td><td><span class="badge partial">Plugin</span></td><td class="note">Паритет по GitLab.</td></tr>
+      <tr><td>AI / GPT</td><td><span class="badge ok">YandexGPT-подсказки</span></td><td><span class="badge win">Claude + MCP + decomposition</span></td><td><span class="badge missing">Нет</span></td><td class="note"><b>TaskTime глубже</b>: декомпозиция Epic → Subtasks, оценка часов, MCP для агентов.</td></tr>
+      <tr><td>Release Management (планы, burndown)</td><td><span class="badge partial">Есть базовый</span></td><td><span class="badge win">Releases + Checkpoints + Burndown</span></td><td><span class="badge partial">Release Hub</span></td><td class="note"><b>TaskTime — сильнее всех.</b></td></tr>
+      <tr><td>Release Workflows</td><td><span class="badge missing">Нет</span></td><td><span class="badge win">Есть</span></td><td><span class="badge missing">Нет</span></td><td class="note"><b>Уникальная фича TaskTime.</b></td></tr>
+      <tr><td>Release Checkpoints с TTQL</td><td><span class="badge missing">Нет</span></td><td><span class="badge win">Есть</span></td><td><span class="badge missing">Нет</span></td><td class="note"><b>Уникальная фича TaskTime.</b></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="y-enterprise" class="section">
+  <h2>Y4. Enterprise-постура (on-prem, 5000 users, РФ)</h2>
+  <p class="sub">Сравнение зрелости инфраструктуры и эксплуатации для on-prem enterprise-сценария.</p>
+  <table class="cmp">
+    <thead><tr>
+      <th style="width: 22%">Аспект</th>
+      <th style="width: 18%">Yandex Tracker Enterprise</th>
+      <th style="width: 18%">TaskTime (сейчас)</th>
+      <th style="width: 18%">TaskTime (после infra-плана)</th>
+      <th>Комментарий</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Поставка on-prem</td><td><span class="badge ok">K8s + Helm charts</span></td><td><span class="badge partial">Docker Compose single-host</span></td><td><span class="badge ok">K3s + Helm</span></td><td class="note">Yandex Tracker из коробки в K8s; TaskTime нужен orchestrator — см. E6 п.5.</td></tr>
+      <tr><td>Horizontal scaling</td><td><span class="badge ok">Auto-scaling pods</span></td><td><span class="badge missing">Single replica</span></td><td><span class="badge ok">3–5 replicas + HPA</span></td><td class="note">Целевая архитектура E5.</td></tr>
+      <tr><td>Postgres HA</td><td><span class="badge ok">Managed по умолчанию</span></td><td><span class="badge missing">Single node</span></td><td><span class="badge ok">Patroni + standby</span></td><td class="note">E4: 80ч на внедрение.</td></tr>
+      <tr><td>Redis HA</td><td><span class="badge ok">Sentinel / Cluster</span></td><td><span class="badge missing">Single node</span></td><td><span class="badge ok">Sentinel 3+3</span></td><td class="note">E4: 40ч.</td></tr>
+      <tr><td>Event bus</td><td><span class="badge ok">Kafka / внутренние очереди</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge ok">Kafka KRaft 3-node (TTBUS-0)</span></td><td class="note">54ч.</td></tr>
+      <tr><td>Logging / tracing</td><td><span class="badge ok">Централизованное из коробки</span></td><td><span class="badge missing">docker-logs</span></td><td><span class="badge ok">Loki + Tempo + OTel</span></td><td class="note">E4: 80ч суммарно.</td></tr>
+      <tr><td>Metrics / алерты</td><td><span class="badge ok">Встроенные дашборды</span></td><td><span class="badge ok">Prometheus + Grafana</span></td><td><span class="badge ok">Есть + Alertmanager</span></td><td class="note">Паритет по метрикам.</td></tr>
+      <tr><td>SSO / SAML / OIDC</td><td><span class="badge ok">Есть + LDAP sync</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge ok">TTSSO-1 (OIDC)</span></td><td class="note">102ч.</td></tr>
+      <tr><td>Secrets management</td><td><span class="badge ok">Sealed secrets / Vault</span></td><td><span class="badge missing">.env files</span></td><td><span class="badge ok">HashiCorp Vault</span></td><td class="note">E4: 40ч.</td></tr>
+      <tr><td>Backup / PITR</td><td><span class="badge ok">Managed</span></td><td><span class="badge partial">Скрипты pg_dump</span></td><td><span class="badge ok">WAL-archive + drills</span></td><td class="note">E4: 16ч.</td></tr>
+      <tr><td>Blue-green / zero-downtime deploy</td><td><span class="badge ok">Rolling update</span></td><td><span class="badge missing">Downtime deploy</span></td><td><span class="badge ok">K8s rolling</span></td><td class="note">E4: 40ч.</td></tr>
+      <tr><td>Сертификация ФСТЭК / КИИ</td><td><span class="badge ok">Есть</span></td><td><span class="badge missing">Нет</span></td><td><span class="badge partial">Требует процесса</span></td><td class="note"><b>Ключевое преимущество YT</b> для гос-fin сектора. TaskTime-сертификация — отдельный проект за рамками ТЗ.</td></tr>
+      <tr><td>ФЗ-152 compliance</td><td><span class="badge ok">Есть</span></td><td><span class="badge partial">Audit + RBAC есть</span></td><td><span class="badge ok">+ Issue Security + Audit UI</span></td><td class="note">Нужно закрыть TTSEC-3 + TTSEC-4.</td></tr>
+      <tr><td>SLA поддержки от вендора</td><td><span class="badge ok">24/7 Yandex Support</span></td><td><span class="badge partial">Зависит от команды</span></td><td><span class="badge partial">Зависит от команды</span></td><td class="note">Поставка в виде on-prem обычно сопровождается SLA-контрактом; для TaskTime — нужно формировать.</td></tr>
+      <tr><td>Гибкость доработки</td><td><span class="badge partial">Только через API / макросы</span></td><td><span class="badge win">Полный open-source контроль</span></td><td><span class="badge win">Полный контроль</span></td><td class="note"><b>Ключевое преимущество TaskTime</b>: исходники, TS-типизация, возможность глубоких кастомизаций.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="y-verdict" class="section">
+  <h2>Y5. Итоговый вердикт</h2>
+  <p class="sub">Где TaskTime впереди, где догоняет, и что это значит для позиционирования.</p>
+
+  <div class="cols-2">
+    <div>
+      <div class="col-title">Где TaskTime впереди Yandex Tracker</div>
+      <div class="crit-block win">
+        <ul>
+          <li><b>Release Workflows + Checkpoints + Burndown</b> — детерминированные релиз-gate с risk scoring. У Yandex Tracker релиз-контур минимальный.</li>
+          <li><b>AI-integration уровня decomposition</b> — Claude-based декомпозиция Epic → Subtasks, оценка часов, логирование токенов. YT имеет YandexGPT-подсказки, но не decomposition-loop.</li>
+          <li><b>MCP-сервер</b> — первоклассный протокол для подключения AI-агентов. У YT нет аналога.</li>
+          <li><b>Role Scheme с 33 permission-флагами</b> — гранулярнее, чем YT role-based модель.</li>
+          <li><b>Custom Field type REFERENCE</b> — собственный справочник на уровне админки.</li>
+          <li><b>Field Schema 4-level scope</b> (GLOBAL / PROJECT / ISSUE_TYPE / PROJECT_ISSUE_TYPE).</li>
+          <li><b>Open-source контроль</b> — исходники под контролем заказчика, возможность любых доработок без зависимости от вендора.</li>
+          <li><b>GitLab + Pipeline-service из коробки</b> — визуализация CI-пайплайнов, которой у YT нет.</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="col-title">Где TaskTime догоняет</div>
+      <div class="crit-block p1">
+        <ul>
+          <li><b>Attachments</b> — критически; у YT штатно + интеграция с Yandex Disk (TTATTACH-1, 84ч).</li>
+          <li><b>Notifications pillar</b> — email, in-app bell, watchers, @mentions (TTNOTIF-1 + TTBUS-0, 164ч).</li>
+          <li><b>Mobile app</b> — iOS/Android у YT; в TaskTime даже PWA нет.</li>
+          <li><b>Agile-отчётность</b> — Velocity, CFD, Sprint Report (план P1).</li>
+          <li><b>Roadmap / Gantt</b> — timeline-диаграмма у YT штатно.</li>
+          <li><b>Personal Dashboards с виджетами</b> — drag-drop конструктор у YT.</li>
+          <li><b>SSO / SAML / LDAP sync</b> (TTSSO-1, 102ч).</li>
+          <li><b>Automation / автодействия UI</b> — макросы у YT, у нас только backend post-functions.</li>
+          <li><b>Service Desk / SLA-режим</b> — не приоритет MVP, но отсутствует.</li>
+          <li><b>ФСТЭК / КИИ сертификация</b> — у YT есть, у TaskTime — требует отдельной процедуры.</li>
+          <li><b>On-prem K8s-поставка</b> — у YT штатно, у нас — в плане E6.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout ok" style="margin-top: 18px;">
+    <strong>Стратегический вывод:</strong> Yandex Tracker — <b>более зрелый на момент 2026-04</b> в части коммодити-фич (notifications, attachments, mobile, Gantt, macros, SSO, SLA-поддержка, сертификация).
+    TaskTime — <b>стратегически уникален</b> в 4 зонах: релизный контур с checkpoints, AI/MCP, гибкая кастомизация полей/ролей, open-source контроль.
+    <br><br>
+    <b>Реалистичное позиционирование:</b> TaskTime выигрывает у Yandex Tracker там, где заказчику важен <b>релизный контроль с gate'ами</b>, <b>глубокая AI-интеграция</b> и <b>полный контроль кода</b> (например, для внутренних команд банка, где готовы содержать devops-ресурс).
+    Yandex Tracker выигрывает там, где нужен <b>«взял и работает»</b> — готовые мобильные приложения, notifications, dashboards и <b>формальная сертификация</b> для закупки в гос- и крупном корп-секторе.
+  </div>
+
+  <div class="callout" style="margin-top: 12px;">
+    <strong>Что закрытие плана MVP2JIRA даст в терминах YT-паритета:</strong>
+    после выполнения 14 ТЗ из <code>docs/tz/MVP2JIRA/</code> (~760ч) TaskTime закрывает ~70% гэпов относительно Yandex Tracker (notifications, attachments, SSO, security, resolutions, priorities, components, audit UI, screens, bulk-import).
+    Остаются: <b>mobile app</b>, <b>Gantt/Timeline</b>, <b>Personal Dashboards с виджетами</b>, <b>automation UI</b>, <b>Service Desk</b>, <b>ФСТЭК-сертификация</b> — это следующая фаза после MVP-ready.
+  </div>
+</section>
+
+</div>
+<!-- /ВКЛАДКА 5 -->
+
+<footer>
+  Сгенерировано 2026-04-24 · <code>docs/admin-vs-jira-comparison.html</code> · v2 (добавлен пласт функциональности)<br>
+  Источники: <code>backend/src/modules</code>, <code>frontend/src/pages</code>, <code>backend/src/prisma/schema.prisma</code>, <code>docs/user-manual/features/</code>, <code>docs/tz/MVP2JIRA/</code>
+</footer>
+
+</div>
+
+<script>
+(function() {
+  const tabs = document.querySelectorAll('nav.tabs button[data-tab]');
+  const panels = document.querySelectorAll('.tab-panel');
+
+  function activate(name, updateHash) {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    panels.forEach(p => p.classList.toggle('active', p.id === name));
+    if (updateHash) {
+      history.replaceState(null, '', '#tab=' + name);
+    }
+  }
+
+  tabs.forEach(t => {
+    t.addEventListener('click', () => activate(t.dataset.tab, true));
+  });
+
+  // Support #tab=admin, #tab=functional, #tab=summary, and anchor-links
+  function applyHash() {
+    const hash = window.location.hash || '';
+    const m = hash.match(/tab=(summary|admin|functional|enterprise|ytracker)/);
+    if (m) {
+      activate(m[1], false);
+      return;
+    }
+    // If hash points to a section, open its tab
+    if (hash.length > 1) {
+      const target = document.querySelector(hash);
+      if (target) {
+        const panel = target.closest('.tab-panel');
+        if (panel) {
+          activate(panel.id, false);
+          setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+        }
+      }
+    }
+  }
+
+  window.addEventListener('hashchange', applyHash);
+  applyHash();
+
+  // TOC links: if user clicks an inline TOC anchor that belongs to other tab, switch tab first
+  document.querySelectorAll('.toc-inline a[href^="#"]').forEach(a => {
+    a.addEventListener('click', () => {
+      const id = a.getAttribute('href').slice(1);
+      const target = document.getElementById(id);
+      if (target) {
+        const panel = target.closest('.tab-panel');
+        if (panel && !panel.classList.contains('active')) {
+          activate(panel.id, true);
+        }
+      }
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

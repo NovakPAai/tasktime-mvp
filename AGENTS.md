@@ -112,3 +112,43 @@ Before writing any code that uses a library API:
 
 Key versions to double-check: Prisma client API, Express 4 vs 5 routing, Zod v3 schema methods.
 <!-- END:framework-versions -->
+
+<!-- BEGIN:codex-adapted-from-claude -->
+# Codex workflow notes
+
+These notes adapt the local `CLAUDE.md` guidance for Codex.
+
+## Tooling
+
+- Prefer `rg` / `rg --files` for search and file discovery.
+- Prefer `sed`, `nl`, and other focused shell reads for file inspection.
+- Use `multi_tool_use.parallel` when independent reads or searches can run at the same time.
+- Use `apply_patch` for manual file edits.
+- Do not rely on Claude-only `lean-ctx` tools unless they are explicitly available in the current session.
+
+## UI — Modal/Drawer close must refresh parent page
+
+Whenever you add or modify a modal/drawer (Ant Design `Modal`, `Drawer`, or any custom
+overlay), both `onCancel` and `onClose` handlers MUST trigger a refresh of the data on
+the page from which the modal/drawer was opened. Closing via the × button, Esc key,
+backdrop click, or a "Cancel" footer button must all call the parent's data-loading
+function (`load()`, `fetchX()`, `loadX(page)`, etc.).
+
+Rationale: the modal may have side effects (nested actions, auto-save, cascading
+updates) that change server state even when the user "cancels". Forcing a refresh
+keeps the page consistent with the server without requiring manual F5.
+
+Pattern:
+
+```tsx
+// BAD
+<Modal onCancel={() => setOpen(false)} ... />
+
+// GOOD
+<Modal onCancel={() => { setOpen(false); void load(); }} ... />
+```
+
+Applies equally to custom footer "Отмена" buttons inside a Modal/Drawer form.
+If the load function is defined inside a `useEffect` closure, extract it as a
+top-level `useCallback` so it can be invoked from close handlers.
+<!-- END:codex-adapted-from-claude -->
