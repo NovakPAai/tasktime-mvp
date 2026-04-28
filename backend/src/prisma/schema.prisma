@@ -1467,3 +1467,31 @@ model UserGroupSystemRole {
   @@index([groupId])
   @@map("user_group_system_roles")
 }
+
+// ===== EVENT BUS / TRANSACTIONAL OUTBOX =====
+
+model EventOutbox {
+  id        String    @id @default(uuid())
+  topic     String
+  messageId String    @unique @default(uuid()) @map("message_id")
+  type      String
+  envelope  Json
+  createdAt DateTime  @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
+  attempts  Int       @default(0)
+  lastError String?   @map("last_error")
+
+  @@index([sentAt, createdAt])
+  @@index([messageId])
+  @@map("event_outbox")
+}
+
+model ProcessedMessage {
+  consumerGroup String   @map("consumer_group")
+  messageId     String   @map("message_id")
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  @@id([consumerGroup, messageId])
+  @@index([processedAt])
+  @@map("processed_messages")
+}
