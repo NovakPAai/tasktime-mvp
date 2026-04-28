@@ -60,6 +60,8 @@ beforeAll(async () => {
   });
 
   // Clean test database (respect foreign keys)
+  await prisma.processedMessage.deleteMany();
+  await prisma.eventOutbox.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.timeLog.deleteMany();
   await prisma.comment.deleteMany();
