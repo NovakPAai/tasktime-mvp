@@ -330,7 +330,7 @@ Run `make docs` to check for staleness warnings.
 > ⚡ Авто-сгенерировано из `backend/src/prisma/schema.prisma`
 > Обновляется автоматически при каждом изменении схемы.
 
-## Модели (59)
+## Модели (61)
 
 ### User
 
@@ -1278,6 +1278,28 @@ Run `make docs` to check for staleness warnings.
 | `createdAt` | `DateTime` | нет | default: now( |
 | `createdBy` | `String` | да |  |
 | `group` | `UserGroup` | нет |  |
+
+### EventOutbox
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `id` | `String` | нет | PK, default: uuid( |
+| `topic` | `String` | нет |  |
+| `messageId` | `String` | нет | UNIQUE, default: uuid( |
+| `type` | `String` | нет |  |
+| `envelope` | `Json` | нет |  |
+| `createdAt` | `DateTime` | нет | default: now( |
+| `sentAt` | `DateTime` | да |  |
+| `attempts` | `Int` | нет | default: 0 |
+| `lastError` | `String` | да |  |
+
+### ProcessedMessage
+
+| Поле | Тип | Nullable | Примечание |
+|------|-----|----------|------------|
+| `consumerGroup` | `String` | нет |  |
+| `messageId` | `String` | нет |  |
+| `processedAt` | `DateTime` | нет | default: now( |
 
 ## Перечисления (26)
 
