@@ -31,6 +31,61 @@ services:
       retries: 5
       start_period: 20s
 
+  kafka:
+    image: bitnami/kafka:3.7
+    profiles: ["events"]
+    restart: unless-stopped
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafka-data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka-topics-init:
+    image: bitnami/kafka:3.7
+    profiles: ["events"]
+    command:
+      - /bin/bash
+      - -lc
+      - |
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic tt.issues --partitions 1 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic tt.comments --partitions 1 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic tt.releases --partitions 1 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic tt.workflow --partitions 1 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic tt.notifications.dlq --partitions 1 --replication-factor 1 --config retention.ms=2592000000
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  backend-relay:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}:${IMAGE_TAG:-staging}
+    command: ["npm", "run", "events:relay"]
+    profiles: ["events"]
+    restart: unless-stopped
+    env_file:
+      - ./env/backend.staging.env
+    environment:
+      NOTIFICATIONS_ENABLED: "true"
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: tasktime-backend-relay
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-topics-init:
+        condition: service_completed_successfully
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -120,3 +175,4 @@ volumes:
   postgres-data:
   redis-data:
   pipeline-postgres-data:
+  kafka-data:

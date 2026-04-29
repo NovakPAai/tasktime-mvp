@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend infra stop clean seed test lint setup docs sync pr ship merge branches worktree-clean branch-clean
+.PHONY: dev backend frontend infra events stop clean seed test lint setup docs sync pr ship merge branches worktree-clean branch-clean
 
 # --- First time setup ---
 setup:
@@ -10,6 +10,12 @@ infra:
 	@echo "Waiting for PostgreSQL..."
 	@until docker compose exec -T postgres pg_isready -U tasktime >/dev/null 2>&1; do sleep 1; done
 	@echo "PostgreSQL ready on :5432, Redis ready on :6379"
+
+events:
+	docker compose --profile events up -d postgres redis kafka backend-relay
+	@echo "Waiting for Kafka..."
+	@until docker compose --profile events exec -T kafka kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1; do sleep 1; done
+	@echo "Kafka ready on :9092, backend-relay started"
 
 # --- Dev servers ---
 backend: infra
