@@ -47,12 +47,19 @@ test.describe('TTBULK-1: bulk operations', () => {
   });
 
   test('POST /bulk-operations без BULK_OPERATOR роли → 401/403', async ({ request }) => {
-    // Создаём plain USER без системных ролей.
+    // Создаём plain USER без системных ролей через /auth/register.
     const email = `plain-${Date.now()}@e2e.test`;
-    const plain = await api.registerUser(request, email, 'Test Pass 123!');
+    const password = 'Test Pass 123!';
+    const regRes = await request.post(`${API_BASE}/auth/register`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { email, password, name: `plain-${Date.now()}` },
+    });
+    // Register может вернуть 201 (created) или 409 (уже существует — повтор в serial). Обе ok — идём login.
+    expect([201, 409]).toContain(regRes.status());
+
     const loginRes = await request.post(`${API_BASE}/auth/login`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email: plain.email, password: 'Test Pass 123!' },
+      data: { email, password },
     });
     const token = loginRes.ok() ? (await loginRes.json()).accessToken : '';
 
