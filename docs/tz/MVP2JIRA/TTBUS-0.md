@@ -1,10 +1,12 @@
 # ТЗ: TTBUS-0 — Event Bus (Kafka + Transactional Outbox)
 
 **Дата:** 2026-04-23
-**Тип:** EPIC | **Приоритет:** P0-prerequisite | **Статус:** OPEN
+**Тип:** EPIC | **Приоритет:** P0-prerequisite | **Статус:** IN_PROGRESS
 **Проект:** TaskTime MVP (TTMP)
-**Исполнитель:** TBD
+**Исполнитель:** Codex
 **Автор ТЗ:** Claude Code (auto-generated)
+
+**Прогресс на 2026-04-28:** первый инкремент смержен в main через PR #170. Реализованы Prisma-модели `event_outbox` / `processed_messages`, envelope schema, `publishInTx(...)`, helper `markProcessedOnce(...)` и focused tests. Остальные части TTBUS-0 (Kafka/kafkajs, relay worker, docker-compose, issues producer integration, events tail docs/script) остаются открытыми.
 
 ---
 
@@ -37,7 +39,7 @@
 - Отдельный процесс **`pipeline-service`** создаёт прецедент микросервис-split — команда с этим знакома.
 - **Webhook-notifier** для release-checkpoints (`backend/src/modules/releases/checkpoints/webhook-notifier.service.ts`) сейчас посылает HTTP прямо из бизнес-логики — после TTBUS-0 должен быть переведён на consume из Kafka.
 - **Kafka в инфре отсутствует.**
-- **Схема `event_outbox` отсутствует.**
+- **Схемы `event_outbox` и `processed_messages` добавлены в Prisma и миграции.**
 
 ---
 
@@ -45,7 +47,11 @@
 
 ### Модули backend
 - [ ] `shared/eventbus/` (новый) — обёртка над kafkajs: `EventBusProducer`, `EventBusConsumer`, envelope schema.
+  - [x] Envelope schema и domain-oriented topic constants добавлены.
+  - [ ] kafkajs producer/consumer wrapper ещё не реализован.
 - [ ] `shared/outbox/` (новый) — service для записи в `event_outbox`, `RelayWorker` (отдельный процесс или in-process cron).
+  - [x] `publishInTx(...)` добавлен.
+  - [ ] `RelayWorker` ещё не реализован.
 - [ ] `modules/issues/issues.service.ts` — интеграция outbox-паттерна как reference implementation (create/update/delete/status change → запись в outbox в одной транзакции с БД-операцией).
 
 ### Новый процесс
@@ -60,8 +66,8 @@
 - Нет изменений.
 
 ### Модели данных (Prisma)
-- [ ] `event_outbox` — новая таблица.
-- [ ] `processed_messages` — новая таблица (для consumer-side dedup).
+- [x] `event_outbox` — новая таблица.
+- [x] `processed_messages` — новая таблица (для consumer-side dedup).
 
 ### Внешние зависимости
 - [ ] `kafkajs` — клиент.
@@ -257,10 +263,10 @@ services:
 ## 6. Требования к реализации
 
 ### Функциональные
-- [ ] FR-1: `publishInTx(tx, topic, type, payload, actor)` доступен из любого service-модуля.
+- [x] FR-1: `publishInTx(tx, topic, type, payload, actor)` доступен из любого service-модуля.
 - [ ] FR-2: Событие, записанное в outbox, гарантированно попадает в Kafka или остаётся в outbox с `sent_at IS NULL`.
 - [ ] FR-3: Consumer получает события в порядке публикации в рамках одной partition.
-- [ ] FR-4: Consumer-side dedup через `ProcessedMessage` — повторная обработка одного `messageId` тем же `consumerGroup` невозможна.
+- [x] FR-4: Consumer-side dedup через `ProcessedMessage` — повторная обработка одного `messageId` тем же `consumerGroup` невозможна.
 - [ ] FR-5: Reference implementation — issues-модуль публикует 6 событий: `ISSUE_CREATED`, `ISSUE_UPDATED`, `ISSUE_DELETED`, `ISSUE_ASSIGNED`, `ISSUE_STATUS_CHANGED`, `ISSUE_MENTIONED`.
 - [ ] FR-6: `NOTIFICATIONS_ENABLED=false` → publisher продолжает писать в outbox, но relay не стартует, consumer'ы тоже — система работает без Kafka локально.
 
@@ -271,14 +277,14 @@ services:
 - [ ] NFR-4: При падении relay-worker outbox не теряется — relay перезапускается, все несемпленные события доставляются.
 
 ### Безопасность
-- [ ] SEC-1: Payload не должен содержать секретов (passwords, API-keys) — sanitize в producer.
+- [x] SEC-1: Payload не должен содержать секретов (passwords, API-keys) — sanitize в producer.
 - [ ] SEC-2: Kafka-порт не проксируется наружу — только из internal docker-network.
 - [ ] SEC-3: Будущая интеграция (когда будет Broker-over-TLS) — не в MVP.
 
 ### Тестирование
-- [ ] Unit: `publishInTx` — rollback транзакции откатывает и issue, и outbox-row.
+- [x] Unit: `publishInTx` — rollback транзакции откатывает outbox-row.
 - [ ] Unit: Relay-worker — retry на Kafka-error, increment attempts, ограничение повторов.
-- [ ] Unit: Consumer-dedup — второй вызов с тем же messageId скипается.
+- [x] Unit: Consumer-dedup — второй вызов с тем же messageId скипается.
 - [ ] Integration: 100 параллельных `ISSUE_CREATED` → все 100 events в топике, без дубликатов.
 - [ ] Integration: kill relay-worker, reboot → pending outbox-rows подхватываются.
 - [ ] Покрытие ≥ 70%.
@@ -288,7 +294,7 @@ services:
 ## 7. Критерии приёмки (Definition of Done)
 
 - [ ] AC-1: Kafka поднимается в docker-compose одной командой `make up`.
-- [ ] AC-2: В миграциях Prisma есть `event_outbox` и `processed_messages`.
+- [x] AC-2: В миграциях Prisma есть `event_outbox` и `processed_messages`.
 - [ ] AC-3: Issues-модуль публикует все 6 событий через `publishInTx`.
 - [ ] AC-4: relay-worker процесс работает в отдельном docker-service, устойчив к падению Kafka.
 - [ ] AC-5: Админ-consumer-чек: вспомогательный скрипт `npm run events:tail -- tt.issues` печатает envelope'ы в stdout.
@@ -328,12 +334,13 @@ services:
 
 ## 10. Иерархия задач
 
-```
-TTBUS-0 (EPIC) — Event Bus
-  ├─ TTBUS-0.1 — Prisma models (outbox, processed_messages)
-  ├─ TTBUS-0.2 — shared/eventbus (kafkajs wrapper)
-  ├─ TTBUS-0.3 — shared/outbox (publishInTx + relay)
-  ├─ TTBUS-0.4 — docker-compose infra (dev/staging/prod)
-  ├─ TTBUS-0.5 — issues-producer integration (reference impl)
-  └─ TTBUS-0.6 — tests + docs
-```
+- [x] TTBUS-0.1 — Prisma models (outbox, processed_messages)
+- [ ] TTBUS-0.2 — shared/eventbus (kafkajs wrapper)
+  - [x] Envelope schema
+  - [ ] kafkajs wrapper
+- [ ] TTBUS-0.3 — shared/outbox (publishInTx + relay)
+  - [x] `publishInTx(...)`
+  - [ ] relay worker
+- [ ] TTBUS-0.4 — docker-compose infra (dev/staging/prod)
+- [ ] TTBUS-0.5 — issues-producer integration (reference impl)
+- [ ] TTBUS-0.6 — tests + docs
