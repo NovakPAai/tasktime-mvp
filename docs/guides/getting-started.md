@@ -239,6 +239,7 @@ make clean && make setup
 | Команда | Описание |
 |---------|----------|
 | `make infra` |  |
+| `make events` |  |
 
 **Dev servers**
 
@@ -288,6 +289,13 @@ make clean && make setup
 |---------|----------|
 | `make stop` |  |
 | `make clean` |  |
+
+**TBD: Cleanup stale worktrees and merged branches**
+
+| Команда | Описание |
+|---------|----------|
+| `make worktree-clean` | Removing stale git worktrees... |
+| `make branch-clean` | Removing local branches merged into main... |
 <!-- AUTO-GENERATED:END:makefile -->
 
 <!-- AUTO-GENERATED:START:docker -->
@@ -298,5 +306,9 @@ make clean && make setup
 |--------|-------|-------|---------|
 | `postgres` | `postgres:16-alpine` | 5432:5432 | default |
 | `redis` | `redis:7-alpine` | 6379:6379 | default |
-| `mcp-tasktime` | `evilfreelancer/openapi-to-mcp:latest` | 3002:3000 | backend |
+| `kafka` | `bitnami/kafka:3.7` | 9092:9092 | default |
+| `kafka-topics-init` | `bitnami/kafka:3.7` | — | default |
+| `backend-relay` | `—` | — | default |
+| `pipeline-postgres` | `postgres:16-alpine` | 5433:5432 | default |
+| `mcp-flow-universe` | `—` | 3002:3002 | default |
 <!-- AUTO-GENERATED:END:docker -->
