@@ -26,3 +26,14 @@ export async function markProcessedOnce(
     throw err;
   }
 }
+
+export async function hasProcessedMessage(
+  consumerGroup: string,
+  messageId: string,
+  client: PrismaLike = prisma,
+): Promise<boolean> {
+  const count = await client.processedMessage.count({
+    where: { consumerGroup, messageId },
+  });
+  return count > 0;
+}

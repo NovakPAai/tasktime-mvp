@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+const booleanFlag = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
+
 const envSchema = z.object({
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string().min(10),
@@ -30,6 +32,16 @@ const envSchema = z.object({
   BURNDOWN_RETENTION_CRON: z.string().default('0 3 * * 0'),
   BURNDOWN_RETENTION_DAYS_AFTER_DONE: z.coerce.number().min(7).max(3650).default(90),
   BURNDOWN_WEEKLY_AGG_AFTER_DAYS: z.coerce.number().min(30).max(3650).default(365),
+
+  // TTBUS-0: Kafka event bus + transactional outbox relay.
+  NOTIFICATIONS_ENABLED: booleanFlag,
+  KAFKA_BROKERS: z.string().default('localhost:9092'),
+  KAFKA_CLIENT_ID: z.string().min(1).default('tasktime-backend'),
+  OUTBOX_RELAY_INTERVAL_MS: z.coerce.number().min(100).max(60000).default(500),
+  OUTBOX_RELAY_BATCH_SIZE: z.coerce.number().min(1).max(500).default(100),
+  OUTBOX_RELAY_MAX_ATTEMPTS: z.coerce.number().min(1).max(100).default(10),
+  OUTBOX_RELAY_TRANSACTION_TIMEOUT_MS: z.coerce.number().min(1000).max(300000).default(60000),
+  OUTBOX_CLEANUP_RETENTION_DAYS: z.coerce.number().min(1).max(365).default(7),
 });
 
 export const config = envSchema.parse(process.env);
