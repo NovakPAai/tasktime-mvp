@@ -291,7 +291,7 @@ function Field({
   type: string;
   value: string;
   onChange: (v: string) => void;
-  placeholder: string;
+  placeholder?: string;
   autoComplete?: string;
   minLength?: number;
   testId?: string;
@@ -483,7 +483,7 @@ export default function LoginPage() {
             )}
             <Field
               label="Email" type="email" value={email} onChange={setEmail}
-              placeholder="p.novak@tasktime.ru" autoComplete="email" testId="login-email" C={CWithFocus}
+              autoComplete="email" testId="login-email" C={CWithFocus}
             />
             <div style={{ marginBottom: 24 }}>
               <Field
